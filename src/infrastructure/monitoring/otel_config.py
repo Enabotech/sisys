@@ -176,7 +176,7 @@ def init(config: OtelConfig | None = None) -> bool:
     Returns:
         是否成功初始化（True=成功, False=禁用或失败）
     """
-    global _initialized, _tracer_provider, _failed  # noqa: PLW0603
+    global _initialized, _tracer_provider, _failed
 
     with _init_lock:
         if _initialized or _failed:
@@ -283,7 +283,7 @@ def shutdown(timeout: int = 5) -> None:
     Args:
         timeout: force_flush 的超时时间（秒）
     """
-    global _initialized, _tracer_provider, _failed  # noqa: PLW0603
+    global _initialized, _tracer_provider, _failed
 
     if _tracer_provider is not None:
         try:
@@ -318,7 +318,7 @@ def reset_for_testing() -> None:
     ⚠️ 仅用于测试环境，生产环境禁止调用
     H-04 修复: 同时重置 OpenTelemetry SDK 内部的全局状态
     """
-    global _initialized, _tracer_provider, _failed  # noqa: PLW0603
+    global _initialized, _tracer_provider, _failed
 
     if _tracer_provider is not None:
         try:
@@ -334,6 +334,6 @@ def reset_for_testing() -> None:
     try:
         from opentelemetry import trace
 
-        trace._TRACER_PROVIDER = None  # noqa: SLF001 (内部 API，测试隔离必需)
+        trace._TRACER_PROVIDER = None  # 测试隔离必需（opentelemetry 内部状态复位）
     except (ImportError, AttributeError):
         pass

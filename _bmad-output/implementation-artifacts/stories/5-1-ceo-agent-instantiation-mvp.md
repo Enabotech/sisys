@@ -1142,9 +1142,9 @@ tests/
 - [x] D5【P3·已核销】`publish` 返回 None 静默视为成功 → ✅ 核销于 Round 2（裁定：EventPublisher Protocol 返回类型由 mypy src 门禁编译期覆盖，全部 5 个实现均返回 PublishResult；运行时 warn 防御边际价值不足）
 - [ ] D6【P3·R2 收窄】AgentConfig 直构造残余缺口（**R2-F2 已清偿 responsibilities/domain_knowledge tuple 守卫**；残余=标量字段非 str 直构造（name=123 裸 AttributeError）/ isolation 无枚举校验 / 空白串未归一 / `_required_str` 不 strip）→ 核销：5.3/5.4 消费方 Story 回填
 - [ ] D7【P3】SINGLETON 用例捕获 SCOPED 仓储（captive dependency；clear_scoped 未接线暂无实害；R2 科学性复审判明无状态仓储翻 SINGLETON 可廉价消解但属架构级 lifetime 语义决策）→ 已有 lifetime 注记，5.4 决策回迁时评估
-- [ ] D8【P3】存量技术债汇总（src 12 处 raise ValueError/49 处 HTTPException/noqa 若干/RedisSnapshotStore 非原子/存量 FakeRedis 未关闭（test_redis_cache/test_session_storage，**R2 勘误：5-1 自有用法自 ea0c0564 起即 try/finally aclose，原 D9(d) 归类失准**），均非 5-1 引入）→ deferred-work.md 登记——核销：专项技术债 Story（附存量无 TTL 孤儿键一次性 SCAN+TTL==-1 清理建议）
+- [ ] D8【P3·范围收窄至 HTTPException 专项】存量技术债——**2026-10-15 D8 清偿轮已清偿大部分**（ocr_cli 6 处 ValueError→201、circuit_breaker 3 处→101、noqa 死注释×3 文件清除（src 层现零命中）、RedisSnapshotStore pipeline 原子化、FakeRedis 13 用例 fixture 化 aclose；**甄别剔除**：strategic_archive 2 处属 Pydantic validator 契约合法形态）；剩余 ~41 处裸 HTTPException（9 路由文件）归专项——核销：专项技术债 Story（附存量无 TTL 孤儿键 SCAN 清理建议）
 - [x] D9【P3·全部核销】测试 P3 群：(a)(b) Round 2 核销；(c) 架构验证器 D AST 化 → ✅ 核销于 2026-10-14 留项清偿轮（ast.Call func 名/属性名扫描替代子串匹配，堵 FakeXxx(Cls 前缀误报）
-- [ ] D11【P3·范围收窄至①③】outbox 毒消息终态机制——②InMemory 毒隔离对齐、④process_one 伪 mark_pending（poller 层幂等，严格状态机保留）、⑤_mark_failed_entity 截断、⑥AuditOutbox 截断 **已于 2026-10-14 留项清偿轮核销**；剩余 ①超限行 archived 终态迁移+requeue+巡检面、③DLQ dequeue 毒隔离 → dead-letter 专项，设计方案见 `proposals/proposal-d11-outbox-dead-letter.md`（微 Story D11-a/D11-b 切分）——核销：专项 Story（D1 治理方案见 `proposals/proposal-d1-importlinter-governance.md`）
+- [ ] D11【P3·范围收窄至①】outbox 毒消息终态机制——②④⑤⑥ 已于 2026-10-14 核销；**③DLQ dequeue 毒隔离 + count_by_status 巡检面已于 2026-10-15 D11-a 微 Story 核销**（毒条目标 error 终态+action_taken 记毒因；按状态分组巡检）；剩余 ①超限行 archived 终态迁移+requeue → D11-b 专项（方案见 proposals/proposal-d11-outbox-dead-letter.md，PG 环境前置）
 - [ ] D12【P2·R4 新增】wheel 形态 configs/ 分发缺口：pyproject `packages=[{include="src"}]` 不含 configs/（configs 非 Python 包），wheel/pip 安装形态 CLI 必现 440「配置文件不存在」；源码树/Docker（dockerfile COPY configs/）/k8s（挂载 /app/configs）三形态自洽，全仓无 wheel 消费方（CI 零 poetry build 环节）——裁定不冒改打包配置（非包数据分发细节+构建验证成本，改错比不改糟）→ 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态）
 - [ ] D13【P2·R4 新增】CLI 全量 bootstrap 启动开销：单次调用墙钟 10.4s（import 0.2s + bootstrap 7.7s≈157 端口注册 + litellm import 触发远端价目表拉取出网 + BGE tokenizer 加载），实际用例 ~2.5ms（2026-10-14 本机实测，环境限定）；非 5-1 引入（组合根预存成本，agent_cli 是首个全量付费的 Redis CLI）——短期缓解：部署环境设 `LITELLM_LOCAL_MODEL_COST_MAP=1` 防出网阻塞；根治（组合根瘦身/lazy 化）属架构级决策 → 核销触发：5.3 批量实例化消费前
 - [ ] D10【P3·已核销】Story「12 维度」vs 契约测试「11 维度」计数矛盾 → 本轮已统一为「11 维度/12 用例（9a/9b）」（✅ 核销于 Round 1）
@@ -1161,7 +1161,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.13.0
+**故事版本/Story Version:** v1.14.0
 **创建日期/Created:** 2026-10-14
 **最后更新/Last Updated:** 2026-10-14
 **更新说明/Description:**
@@ -1179,3 +1179,4 @@ tests/
 - v1.11.0: **代码审查 Round 5 收敛终审**（2026-10-14：独立收敛终审 Agent 不轻信台账全量重取证——周期闭合（5 提交无游离）/关键修复抽验（R1-F4 往返 UUID·R1-F3 pipeline·R2/R3 outbox 过滤与隔离·R2-F2 VO 守卫，代码形态+行为实测双确认）/全量实跑（10030+53 passed·CLI 退出码 0/1 实证·收集数 13）/台账 D1-D13 完整带核销触发器/文档终态一致——**裁定收敛达成**；终审新发现 P3×3（R1 文件计数勘正+File List 补列已处置；§3.12 引用经复核为误报如实记录）；收敛声明入账；**Status: review → done**）
 - v1.12.0: **留项清偿轮**（2026-10-14：D2/D9(c) 核销 + D11 四子项清偿（②④⑤⑥）范围收窄至①③ + D13 短期缓解落地（.env.example）；TDD 红 7 用例→绿；unit+contracts 10038 + EPO 消费方验收 35 全绿；D1/D11 治理方案件两份入 proposals/（供架构评审与立项））
 - v1.13.0: **D1 方案 A 落地**（2026-10-15：3-body 拍板——同日决策链 B 落地→用户撤销→A 终态实施。入口上移 src/entrypoints/ 组装层（agent_cli/ocr_cli/api_app git mv，interfaces 组合根引用清零）+ 契约还原严格传导禁止（5 kept，注入直接违规仍捕获）+ CI 直接 blocking + pre-commit 钩子 + 12 测试引用面更新 + CLAUDE.md 目录树同步；受影响面 798 passed）
+- v1.14.0: **D8 清偿轮 + D11-a 微 Story + R1-F4 集成层补漏**（2026-10-15：①R1-F4 integration 层两处 str 锚漏网类型化（archive_validity/data_staleness——回归面静态全扫教训入记忆）；②D8 清偿：ocr_cli 6 处 ValueError→ValidationError(201)、circuit_breaker 3 处→ConfigurationError(101)、noqa 死注释×3 文件清除、RedisSnapshotStore pipeline 原子化、FakeRedis 13 用例 fixture 化（strategic_archive 2 处经甄别属 Pydantic validator 契约合法形态剔除）；③D11-a：DLQ dequeue 毒隔离（error 终态）+ outbox count_by_status 巡检面——每项 TDD 红绿；验证：受影响面全绿 + snapshot 真实链路验收 19 passed）

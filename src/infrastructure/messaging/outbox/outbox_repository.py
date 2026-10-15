@@ -21,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import String, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
@@ -185,6 +185,15 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             model.retry_count += 1
             model.error_message = error[:_ERROR_MESSAGE_MAX_LENGTH]
             await self._session.flush()
+
+    async def count_by_status(self) -> dict[str, int]:
+        """按状态分组统计事件数（运维巡检面——D11-a 清偿）。
+
+        pending 滞留（发布链路健康度）、failed 存量、archived 终态与
+        published 待清理量一查可见——SQL 巡检的正式替代，供 CLI/metrics 消费。
+        """
+        result = await self._session.execute(select(OutboxModel.status, func.count()).group_by(OutboxModel.status))
+        return {status: count for status, count in result.all()}
 
     async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
         """清理超过保留期的已发布记录

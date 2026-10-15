@@ -37,6 +37,7 @@ import sys
 from typing import Any
 
 from src.composition_root import bootstrap
+from src.domain.exceptions import ValidationError
 from src.domain.ports.resolver import resolve
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ def parse_page_spec(spec: str) -> list[int]:
         排序后的页码列表（1-indexed）
 
     Raises:
-        ValueError: 格式错误或页码无效
+        ValidationError: 格式错误或页码无效（EXCEPTION_201）
     """
     pages: set[int] = set()
     parts = spec.split(",")
@@ -79,12 +80,12 @@ def parse_page_spec(spec: str) -> list[int]:
                 start = int(start_str.strip())
                 end = int(end_str.strip())
             except (ValueError, AttributeError) as e:
-                raise ValueError(f"页码范围格式无效: '{part}'，应为 'start-end' 格式") from e
+                raise ValidationError(message=f"页码范围格式无效: '{part}'，应为 'start-end' 格式") from e
 
             if start < 1:
-                raise ValueError(f"页码必须为正整数，起始值: {start}")
+                raise ValidationError(message=f"页码必须为正整数，起始值: {start}")
             if end < start:
-                raise ValueError(f"页码范围结束值({end})必须大于等于起始值({start})")
+                raise ValidationError(message=f"页码范围结束值({end})必须大于等于起始值({start})")
 
             pages.update(range(start, end + 1))
         else:
@@ -92,15 +93,15 @@ def parse_page_spec(spec: str) -> list[int]:
             try:
                 page = int(part)
             except ValueError as e:
-                raise ValueError(f"页码格式无效: '{part}'，应为正整数") from e
+                raise ValidationError(message=f"页码格式无效: '{part}'，应为正整数") from e
 
             if page < 1:
-                raise ValueError(f"页码必须为正整数，实际值: {page}")
+                raise ValidationError(message=f"页码必须为正整数，实际值: {page}")
 
             pages.add(page)
 
     if not pages:
-        raise ValueError("页码范围为空，请指定有效页码")
+        raise ValidationError(message="页码范围为空，请指定有效页码")
 
     return sorted(pages)
 
@@ -331,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             page_numbers = parse_page_spec(args.pages)
             logger.info("指定页码范围: %s → %d 页", args.pages, len(page_numbers))
-        except ValueError as e:
+        except ValidationError as e:
             logger.error("页码范围解析失败: %s", e)
             return 1
 

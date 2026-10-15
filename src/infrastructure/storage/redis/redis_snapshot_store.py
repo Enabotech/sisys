@@ -113,8 +113,13 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
 
         try:
             hash_data = self._snapshot_to_hash(snapshot)
-            await self._adapter.raw_client.hset(key, "latest", json_dumps(hash_data))
-            await self._adapter.raw_client.expire(key, ttl)
+            # hset+expire 经 MULTI/EXEC pipeline 原子提交（D8 清偿，修法对齐
+            # RedisAgentRepository.save）——两命令分离的崩溃窗口会留下无 TTL
+            # 孤儿键（snapshot 会话快照永不回收）
+            async with self._adapter.raw_client.pipeline(transaction=True) as pipe:
+                pipe.hset(key, "latest", json_dumps(hash_data))
+                pipe.expire(key, ttl)
+                await pipe.execute()
 
             logger.debug(
                 "Saved snapshot: session_id=%s version=%d ttl=%d",

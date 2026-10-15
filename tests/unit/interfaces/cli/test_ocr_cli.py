@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.domain.exceptions import ValidationError
 from src.entrypoints.ocr_cli import _format_as_markdown, build_parser, parse_page_spec
 
 
@@ -41,36 +42,36 @@ class TestParsePageSpec:
         assert result == [1, 3, 5]
 
     def test_page_0_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码必须为正整数"):
+        with pytest.raises(ValidationError, match="页码必须为正整数"):
             parse_page_spec("0")
 
     def test_negative_page_raises_value_error(self) -> None:
         # "-1" 被解析为范围格式（- 作为分隔符），抛出范围格式错误
-        with pytest.raises(ValueError, match="页码范围格式无效|页码必须为正整数"):
+        with pytest.raises(ValidationError, match="页码范围格式无效|页码必须为正整数"):
             parse_page_spec("-1")
 
     def test_range_start_lt_1_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码必须为正整数"):
+        with pytest.raises(ValidationError, match="页码必须为正整数"):
             parse_page_spec("0-5")
 
     def test_range_end_lt_start_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="必须大于等于"):
+        with pytest.raises(ValidationError, match="必须大于等于"):
             parse_page_spec("5-3")
 
     def test_invalid_range_format_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码范围格式无效"):
+        with pytest.raises(ValidationError, match="页码范围格式无效"):
             parse_page_spec("a-b")
 
     def test_invalid_single_page_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码格式无效"):
+        with pytest.raises(ValidationError, match="页码格式无效"):
             parse_page_spec("abc")
 
     def test_empty_spec_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码范围为空"):
+        with pytest.raises(ValidationError, match="页码范围为空"):
             parse_page_spec("")
 
     def test_only_commas_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="页码范围为空"):
+        with pytest.raises(ValidationError, match="页码范围为空"):
             parse_page_spec(", ,")
 
 

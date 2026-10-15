@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import fakeredis
 import fakeredis.aioredis
+import pytest
 
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
@@ -79,6 +80,14 @@ def _make_blackboard_entry() -> dict:
 # ============================================================================
 # AC-1: 序列化/反序列化性能 <10ms
 # ============================================================================
+
+
+@pytest.fixture
+async def fake_redis():
+    """场景级 FakeRedis 客户端（同用例生命周期，teardown 关闭——D8 清偿）。"""
+    client = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    yield client
+    await client.aclose()
 
 
 class TestSerializationPerformance:
@@ -151,8 +160,7 @@ class TestSerializationPerformance:
 class TestReadLatencyPerformance:
     """验证读取延迟 P95 <5ms"""
 
-    async def test_session_read_latency_p95_under_5ms(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_session_read_latency_p95_under_5ms(self, fake_redis) -> None:
         storage = RedisSessionStorage(redis_client=fake_redis)
 
         session_id = str(uuid.uuid4())
@@ -168,8 +176,7 @@ class TestReadLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["read_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["read_p95_ms"]
 
-    async def test_blackboard_read_latency_p95_under_5ms(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_blackboard_read_latency_p95_under_5ms(self, fake_redis) -> None:
         blackboard = RedisPublicBlackboard(redis_client=fake_redis)
 
         conversation_id = str(uuid.uuid4())
@@ -200,8 +207,7 @@ class TestReadLatencyPerformance:
 class TestWriteLatencyPerformance:
     """验证写入延迟 P95 <10ms"""
 
-    async def test_session_write_latency_p95_under_10ms(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_session_write_latency_p95_under_10ms(self, fake_redis) -> None:
         storage = RedisSessionStorage(redis_client=fake_redis)
 
         latencies: list[float] = []
@@ -215,8 +221,7 @@ class TestWriteLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
-    async def test_blackboard_write_latency_p95_under_10ms(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_blackboard_write_latency_p95_under_10ms(self, fake_redis) -> None:
         blackboard = RedisPublicBlackboard(redis_client=fake_redis)
 
         latencies: list[float] = []
@@ -236,9 +241,7 @@ class TestWriteLatencyPerformance:
         assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
-    async def test_cache_set_latency_p95_under_10ms(self) -> None:
-
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_cache_set_latency_p95_under_10ms(self, fake_redis) -> None:
         original_execute = fake_redis.execute_command
 
         async def _mock_execute(*args, **kwargs):
@@ -268,17 +271,14 @@ class TestWriteLatencyPerformance:
 class TestTTLBehavior:
     """验证 TTL 过期策略"""
 
-    async def test_session_ttl_is_applied(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_session_ttl_is_applied(self, fake_redis) -> None:
         storage = RedisSessionStorage(redis_client=fake_redis)
 
         await storage.save("test-ttl-session", "agent-1", {"key": "value"}, ttl=60)
         ttl = await fake_redis.ttl(build_key(storage._NAMESPACE, "test-ttl-session"))
         assert 0 < ttl <= 60
 
-    async def test_cache_ttl_is_applied(self) -> None:
-
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    async def test_cache_ttl_is_applied(self, fake_redis) -> None:
         original_execute = fake_redis.execute_command
 
         async def _mock_execute(*args, **kwargs):

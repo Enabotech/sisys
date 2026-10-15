@@ -43,7 +43,7 @@ class DeadLetterQueueModel(Base):
         retry_count: 重试次数
         context: 额外上下文信息（JSONB）
         created_at: 创建时间
-        status: 条目状态（pending/processed）
+        status: 条目状态（pending/processed/error——error 为毒 payload 终态，D11-a）
         processed_at: 处理时间
         action_taken: 人工处理动作描述
     """
@@ -168,28 +168,45 @@ class PostgresDeadLetterQueue(DeadLetterQueue):
         )
 
     async def dequeue(self) -> tuple[DomainEvent, str, int] | None:
-        """出队最旧的 pending 事件
+        """出队最旧的 pending 事件（逐条毒隔离）
+
+        队头畸形 payload（from_dict 失败）标记 error 终态（action_taken 记录
+        毒因）并继续取下一条——单条毒消息不阻塞队列（D11-a 清偿，语义对齐
+        发布侧 get_unpublished 的毒隔离；原形态 from_dict 裸调且先行改标，
+        毒条目每轮重炸队头）。
 
         Returns:
-            (event, error, retry_count) 元组，队列为空时返回 None
+            (event, error, retry_count) 元组，队列无合法条目时返回 None
         """
-        result = await self._session.execute(
-            select(DeadLetterQueueModel)
-            .where(DeadLetterQueueModel.status == "pending")
-            .order_by(DeadLetterQueueModel.created_at.asc())
-            .limit(1)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
+        while True:
+            result = await self._session.execute(
+                select(DeadLetterQueueModel)
+                .where(DeadLetterQueueModel.status == "pending")
+                .order_by(DeadLetterQueueModel.created_at.asc())
+                .limit(1)
+            )
+            model = result.scalar_one_or_none()
+            if model is None:
+                return None
 
-        # 标记为已处理
-        model.status = "processed"
-        model.processed_at = datetime.now(UTC)
+            # 先重建再改标——畸形 payload 不落 processed（标记 error 终态）
+            try:
+                event = DomainEvent.from_dict(model.payload)
+            except Exception as exc:
+                model.status = "error"
+                model.action_taken = f"deserialization failed: {exc}"[:200]
+                await self._session.flush()
+                logger.error(
+                    "DLQ 条目反序列化失败（毒消息隔离，标记 error 终态）: id=%s error=%s",
+                    model.id,
+                    exc,
+                )
+                continue
 
-        # 重建事件并返回
-        event = DomainEvent.from_dict(model.payload)
-        return (event, model.error_message or "", model.retry_count)
+            # 标记为已处理
+            model.status = "processed"
+            model.processed_at = datetime.now(UTC)
+            return (event, model.error_message or "", model.retry_count)
 
     async def get_all(self, limit: int = 100) -> list[DeadLetterQueueEntry]:
         """获取所有 DLQ 条目（最近优先）

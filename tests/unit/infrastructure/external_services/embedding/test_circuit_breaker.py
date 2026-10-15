@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from src.domain.exceptions import ConfigurationError
 from src.infrastructure.external_services.embedding.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
@@ -54,17 +55,17 @@ class TestCircuitBreakerInit:
 
     def test_invalid_threshold_raises(self) -> None:
         """failure_threshold < 1 抛出 ValueError"""
-        with pytest.raises(ValueError, match="failure_threshold"):
+        with pytest.raises(ConfigurationError, match="failure_threshold"):
             CircuitBreaker(failure_threshold=0)
 
     def test_invalid_recovery_timeout_raises(self) -> None:
         """recovery_timeout <= 0 抛出 ValueError"""
-        with pytest.raises(ValueError, match="recovery_timeout"):
+        with pytest.raises(ConfigurationError, match="recovery_timeout"):
             CircuitBreaker(recovery_timeout=0)
 
     def test_invalid_half_open_max_calls_raises(self) -> None:
         """half_open_max_calls < 1 抛出 ValueError"""
-        with pytest.raises(ValueError, match="half_open_max_calls"):
+        with pytest.raises(ConfigurationError, match="half_open_max_calls"):
             CircuitBreaker(half_open_max_calls=0)
 
 

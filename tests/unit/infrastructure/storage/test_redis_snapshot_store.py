@@ -18,19 +18,26 @@ class TestRedisSnapshotStore:
 
     @pytest.fixture
     def mock_adapter(self) -> MagicMock:
-        """创建 mock RedisAdapter 及 raw_client"""
+        """创建 mock RedisAdapter 及 raw_client（含 pipeline 替身——hset/expire 同步入队、execute 原子应用）"""
         adapter = MagicMock(spec=RedisAdapter)
         adapter.delete = AsyncMock()
         adapter.exists = AsyncMock()
         raw = MagicMock()
-        raw.hset = AsyncMock()
         raw.hget = AsyncMock()
-        raw.expire = AsyncMock()
+
+        pipe = MagicMock()
+        pipe.hset = MagicMock()
+        pipe.expire = MagicMock()
+        pipe.execute = AsyncMock(return_value=[1, True])
+        pipe.__aenter__ = AsyncMock(return_value=pipe)
+        pipe.__aexit__ = AsyncMock(return_value=None)
+
+        raw.pipeline = MagicMock(return_value=pipe)
         adapter.raw_client = raw
         return adapter
 
     async def test_save_snapshot_to_redis(self, mock_adapter: MagicMock) -> None:
-        """save 应存储快照到 Redis Hash"""
+        """save 应经 pipeline 原子存储快照到 Redis Hash（D8 清偿：hset+expire 单事务，防崩溃窗口孤儿键）"""
         store = RedisSnapshotStore(adapter=mock_adapter)
         snapshot = CheckpointSnapshot(
             session_id="test-session",
@@ -41,8 +48,11 @@ class TestRedisSnapshotStore:
 
         await store.save(snapshot)
 
-        mock_adapter.raw_client.hset.assert_called_once()
-        mock_adapter.raw_client.expire.assert_called_once()
+        mock_adapter.raw_client.pipeline.assert_called_once_with(transaction=True)
+        pipe = mock_adapter.raw_client.pipeline.return_value
+        pipe.hset.assert_called_once()
+        pipe.expire.assert_called_once()
+        pipe.execute.assert_awaited_once()
 
     async def test_load_snapshot_from_redis(self, mock_adapter: MagicMock) -> None:
         """load 应从 Redis Hash 读取快照"""
@@ -120,9 +130,9 @@ class TestRedisSnapshotStore:
         assert store._ttl_seconds == 3600
 
     async def test_save_handles_exception(self, mock_adapter: MagicMock) -> None:
-        """save 应在 Redis 异常时抛出 RuntimeError"""
+        """save 应在 Redis 异常时抛出 StorageError（pipeline execute 注入）"""
         store = RedisSnapshotStore(adapter=mock_adapter)
-        mock_adapter.raw_client.hset = AsyncMock(side_effect=Exception("redis error"))
+        mock_adapter.raw_client.pipeline.return_value.execute = AsyncMock(side_effect=Exception("redis error"))
         snapshot = CheckpointSnapshot(
             session_id="test-session",
             stage_id="test",

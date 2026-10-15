@@ -28,7 +28,7 @@ class InMemoryEventListener:
         for handler in self._handlers.get(event.event_type, []):
             try:
                 handler(event)
-            except Exception as e:  # noqa: BLE001 - log and continue
+            except Exception as e:  # 逐 handler 容错（日志收集后继续），非抑制
                 errors.append(e)
         if errors:
             raise ExceptionGroup(

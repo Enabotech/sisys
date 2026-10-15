@@ -32,6 +32,8 @@ import time
 from enum import Enum
 from typing import TypeVar
 
+from src.domain.exceptions import ConfigurationError
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -78,11 +80,11 @@ class CircuitBreaker:
         name: str = "default",
     ) -> None:
         if failure_threshold < 1:
-            raise ValueError("failure_threshold 必须 ≥ 1")
+            raise ConfigurationError(message="failure_threshold 必须 ≥ 1")
         if recovery_timeout <= 0:
-            raise ValueError("recovery_timeout 必须为正数")
+            raise ConfigurationError(message="recovery_timeout 必须为正数")
         if half_open_max_calls < 1:
-            raise ValueError("half_open_max_calls 必须 ≥ 1")
+            raise ConfigurationError(message="half_open_max_calls 必须 ≥ 1")
 
         self._failure_threshold = failure_threshold
         self._recovery_timeout = recovery_timeout

@@ -210,6 +210,41 @@ class TestPostgresDeadLetterQueue:
         finally:
             reset_session(token)
 
+    async def test_dequeue_poison_entry_isolated(self, mock_session):
+        """D11-a 清偿：队头畸形 payload 标 error 终态跳过，不阻塞后续合法条目出队。
+
+        原形态 from_dict 裸调（在 status 先行改标之后）——毒条目每轮重炸队头，
+        与发布侧 get_unpublished R2-F1 修复前同构。
+        """
+        token = set_session(mock_session)
+        try:
+            dlq = PostgresDeadLetterQueue()
+            good_event = _make_event()
+            good_model = MockDLQModel(good_event, "transient error", 2)
+            poison_model = MockDLQModel(_make_event(), "poison", 3)
+            poison_model.payload = dict(poison_model.payload, event_id="not-a-uuid")  # 畸形 payload（from_dict 242）
+
+            poison_result = mock.Mock()
+            poison_result.scalar_one_or_none.return_value = poison_model
+            good_result = mock.Mock()
+            good_result.scalar_one_or_none.return_value = good_model
+            empty_result = mock.Mock()
+            empty_result.scalar_one_or_none.return_value = None
+            mock_session.execute.side_effect = [poison_result, good_result, empty_result]
+
+            result = await dlq.dequeue()
+
+            assert result is not None, "毒队头不得阻塞合法条目出队"
+            event, error, retries = result
+            assert event.event_id == good_event.event_id
+            assert error == "transient error"
+            assert retries == 2
+            assert poison_model.status == "error", "毒条目必须标记 error 终态"
+            assert "deserialization failed" in (poison_model.action_taken or ""), "action_taken 须记录毒因"
+            assert good_model.status == "processed"
+        finally:
+            reset_session(token)
+
     async def test_get_all_returns_entries_ordered_by_created_at_desc(self, mock_session):
         """get_all should return all DLQ entries ordered by created_at desc."""
         token = set_session(mock_session)

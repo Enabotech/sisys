@@ -3,6 +3,6 @@
 从领域层导入 SagaStatus，保持向后兼容
 """
 
-from src.domain.ports.saga_status import SagaStatus  # noqa: F401
+from src.domain.ports.saga_status import SagaStatus
 
 __all__ = ["SagaStatus"]

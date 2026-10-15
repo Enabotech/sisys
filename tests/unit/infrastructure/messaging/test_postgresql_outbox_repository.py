@@ -272,3 +272,13 @@ class TestPostgreSQLOutboxRepository:
         await repository._mark_failed_entity(model, "x" * 2500)
 
         assert len(model.error_message) == 1000, "内部方法同样必须按列宽截断（防 VARCHAR 溢出）"
+
+    async def test_count_by_status_groups_counts(self, repository, mock_session):
+        """D11-a 清偿：count_by_status 巡检面——按状态分组计数（pending 滞留/archived 终态可观测）。"""
+        mock_result = mock.Mock()
+        mock_result.all.return_value = [("pending", 3), ("failed", 2), ("archived", 1)]
+        mock_session.execute.return_value = mock_result
+
+        counts = await repository.count_by_status()
+
+        assert counts == {"pending": 3, "failed": 2, "archived": 1}
