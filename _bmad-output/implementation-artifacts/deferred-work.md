@@ -145,7 +145,7 @@
 - ~~【行动项#2·P0】cninfo 巨潮资讯接入立项（Epic 6 Story 6.2 前置）~~ — **RESOLVED**（2026-10-13 D-10 落地：Story 4-1f Task 10 增量交付——CninfoAdapter 免 key A 组无条件注册 + 两段式公告检索 + 真实端点集成实测 2 passed；competitor-analysis 8 源（市场份额 4 源）；适配器池 13 终态；PDF 内容下载拆期归 B2 摄取桥）
 - 【行动项#3】comtrade 零 Skill 引用（4-1f「受益 Skill 声明重分配」遗漏面） — ansoff-matrix/space-matrix 等行业量化 Skill 补声明 + 四方联动断言；触发= 下一数据源域 Story 或独立微 Story
 - 【行动项#4】fetch_many 执行前预检门 — 「声明源 ∩ 已注册适配器」交集空时输出数据缺口报告（标注休眠源+激活条件）而非 503 硬失败；同步修正 vrio SKILL.md:205「Key 敏感降级」话术与机制落差（话术声称休眠保留、机制实际全败硬失败）
-- 【行动项#5】sec-edgar UA 头真实调用验证 — A 组唯一未真实验证源（10-12 核查 403 记录在案，适配器声称携带 UA 未实证）
+- ~~【行动项#5】sec-edgar UA 头真实调用验证~~ — **RESOLVED 2026-10-15**（四层实证：curl 直访 200 / httpx 裸测 200 / 适配器 fetch 全链 200+10.5KB / 集成测试 2 passed（search 模式 filings 非空 + XBRL 模式 Revenues 时序非空）——UA_HEADER「sisys-tools/1.0 (contact@sisys.local)」Fair Access 格式正确且真实生效；当日曾现 TimeoutError 波动（Fair Access 临时限流），复跑即恢复——外部端点波动属性非代码缺陷，重跑即绿）
 - 【行动项#6】tavily 单点集中依赖 — 10/16 Skill 依赖（全部降级路径经它），配额耗尽/可达性劣化将波及全部外部数据 Skills；触发条件= tavily 月度配额 >80% 或连续探活失败 2 次
 - 【裁定记录】newsapi 实质非必配 — 8 个引用 Skill 全有 A 组源或 tavily 伴随；Key 申请优先级降至最低（大陆普遍不可达 + 覆盖面被 tavily 含盖）
 - 【裁定记录】专利域维持三源计划（3-body 2026-10-13 拍板） — B/C 组条件注册设计天然支撑休眠语义（Key 未到位零代码成本）；大陆部署专利域可得上限= EPO OPS（含 CN 数据）+ 代理侧 uspto/google-patents；中国专利无免费公开 API 为显式能力边界
