@@ -145,7 +145,8 @@ class TestDataStalenessPostgreSQL:
         assert saved.metadata["stale_reason"] == "expired"
         assert saved.metadata["stale_since"]
         events = event_loop.run_until_complete(outbox.get_unpublished(1000))
-        matching = [event for event in events if getattr(event, "archive_id", None) == str(archive.archive_id)]
+        # from_dict 按字段声明还原 UUID 对象（Story 5-1 R1-F4 契约）——事件字段以 UUID 直接比较
+        matching = [event for event in events if getattr(event, "archive_id", None) == archive.archive_id]
         assert len(matching) == 1
         assert matching[0].event_type == "FactBecameStale"
 

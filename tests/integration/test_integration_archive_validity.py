@@ -403,7 +403,7 @@ class TestSetValidityPeriodIntegration:
         assert any(e.event_type == "ValidityPeriodSet" for e in unpublished)
         stale_events = [e for e in unpublished if e.event_type == "ValidityPeriodSet"]
         assert len(stale_events) == 1
-        assert stale_events[0].archive_id == str(archive.archive_id)
+        assert stale_events[0].archive_id == archive.archive_id  # from_dict 按字段声明还原 UUID 对象（Story 5-1 R1-F4 契约）
 
     def test_set_validity_period_overwrite(self, repo_session, event_loop) -> None:
         """有效期可被覆盖更新"""
