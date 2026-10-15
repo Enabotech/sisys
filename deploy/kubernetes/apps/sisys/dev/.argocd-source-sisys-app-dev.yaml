@@ -1,3 +1,3 @@
 kustomize:
   images:
-  - harbor.sisys.local/sisys/app:dev-main-v0.0.6-be17899
+  - harbor.sisys.local/sisys/app:dev-main-v0.0.6-5eefa78
