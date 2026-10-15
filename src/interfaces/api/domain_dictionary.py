@@ -9,12 +9,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
-from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
+from src.domain.ports.auth_service import AuthServicePort
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.auth import get_current_user_dependency
 
 logger = logging.getLogger(__name__)
 
@@ -133,42 +134,6 @@ class NotificationResponse(BaseModel):
 # ===================================================================
 
 
-def get_current_user_dependency(auth_service: AuthServicePort) -> Callable:
-    """创建 get_current_user 依赖工厂
-
-    Args:
-        auth_service: 认证服务端口
-
-    Returns:
-        get_current_user 依赖函数
-    """
-
-    async def get_current_user(
-        token: str | None = Depends(oauth2_scheme),
-    ) -> TokenPayload:
-        """验证 Bearer token 返回当前用户
-
-        Args:
-            token: Bearer token
-
-        Returns:
-            当前用户 TokenPayload
-
-        Raises:
-            HTTPException: 未认证或 token 无效
-        """
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        result: TokenPayload = await auth_service.verify_token(token)
-        return result
-
-    return get_current_user
-
-
 # ===================================================================
 # 路由工厂
 # ===================================================================
@@ -207,24 +172,11 @@ def create_document_dictionary_router(
         async def get_current_user(
             token: str | None = Depends(oauth2_scheme),
         ) -> TokenPayload:
-            if not token:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
             from src.domain.ports.resolver import get_resolver
 
             svc: AuthServicePort = get_resolver().resolve("auth_service")
-            try:
-                result: TokenPayload = await svc.verify_token(token)
-                return result
-            except AuthenticationError:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            result: TokenPayload = await get_current_user_dependency(svc)(token)
+            return result
 
     @router.get(
         "/entries",

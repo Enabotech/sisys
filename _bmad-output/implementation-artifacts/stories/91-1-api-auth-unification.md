@@ -1,6 +1,6 @@
 # Story 91.1: API 认证守卫统一化（HTTPException 收敛至统一异常体系）
 
-**Status:** `backlog`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环。
@@ -162,12 +162,17 @@
 | 配置项 | 值 |
 |--------|-----|
 | **Model** | Claude Code (glm-5.3) |
-| **Execution Date** | 2026-10-15（立项） |
+| **Execution Date** | 2026-10-15（立项）；2026-10-15（实施完成） |
 
 ### 完成清单 Completion Notes List
 
 - [x] 立项调研（26 处分布实测/语义单一确认/先例完备性核实）
-- [x] Story 创建（create-story 立项版，待 dev-story 实施）
+- [x] Story 创建（create-story 立项版）
+- [x] **Task 0（2026-10-15）**：D-1 裁定=**②契约显式迁移**（统一 error body；实测既有断言只断 status_code/宽松字符串——影响面近零）；**设计变更（用户指令）**：共享工厂不新建 auth_dependency.py，**升级 auth.py 既有 `get_current_user_dependency`**（零新增 src 模块——增量开发原则）；双契约守卫定稿（AuthenticationError 透传 + 非领域异常包装 + None 拒绝）
+- [x] **Task 1**：auth.py 工厂升级（TDD：tests/unit/interfaces/api/test_auth_dependency.py 6 用例——无 token/领域异常透传（对象同一性断言）/兜底包装/None 拒绝/合法返回/工厂兼容；变异实证：删透传分支→同一性断言红→还原绿）
+- [x] **Task 2**：9 文件切换（tools/domain_dictionary/strategic_archive/summary/document_upload/equilibrium_security/relevance_evaluation/traceability/auth 本体）——本地工厂与内联闭包全删，统一 import auth.py 工厂；DI 降级闭包保留（委托共享工厂）；equilibrium 修复 token 先检次序（无 token 不得因 service 未配置误报 500）
+- [x] **Task 3**：D-1②测试同步 2 处（equilibrium 裸 app + traceability 契约裸 app 补 `register_exception_handlers`——先例 test_archive_routes:60）；**AC-4 红线达成：interfaces 层 26 处 raise HTTPException → 0**（剩 2 处 infrastructure embedding demo 立项时已甄别排除）；验证门：api 层 306 passed + 全量 unit+contracts **10046 passed** + 401 相关验收 62 passed + ruff/mypy 665 files 全绿
+- [x] Story Status → done；sprint-status 91-1 → done
 
 ### 文件清单 File List
 
@@ -186,5 +191,5 @@
 | **来源** | 5-1 审查周期 D8 残余（deferred-work.md 登记） |
 | **预估** | 1 天（含 D-1 裁定与 9 文件回归） |
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-10-15

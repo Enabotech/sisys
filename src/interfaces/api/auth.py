@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
@@ -162,7 +162,14 @@ def get_current_user_dependency(
     async def get_current_user(
         token: str | None = Depends(oauth2_scheme),
     ) -> TokenPayload:
-        """获取当前认证用户.
+        """获取当前认证用户（共享认证依赖——Story 91-1 单点收敛）.
+
+        认证失败统一 raise AuthenticationError（EXCEPTION_205，统一异常体系），
+        由 ExceptionHandlers 映射 401 + WWW-Authenticate: Bearer header。
+
+        verify_token 契约兼容（双形态守卫）：
+        - 真实契约：token 无效/过期/撤销 raise AuthenticationError → 透传
+        - 替身/漂移形态：返回 None 或抛非领域异常 → 包装（不静默放行）
 
         Args:
             token: OAuth2 Bearer token
@@ -171,23 +178,19 @@ def get_current_user_dependency(
             TokenPayload 领域值对象
 
         Raises:
-            HTTPException: 用户未认证
+            AuthenticationError: 用户未认证 / token 无效或过期
         """
         if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
+            raise AuthenticationError(message="Not authenticated")
         try:
-            return await auth_service.verify_token(token)
+            payload = await auth_service.verify_token(token)
         except AuthenticationError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise
+        except Exception as exc:
+            raise AuthenticationError(message="Invalid or expired token", cause=exc) from exc
+        if payload is None:
+            raise AuthenticationError(message="Invalid or expired token")
+        return payload
 
     return get_current_user
 

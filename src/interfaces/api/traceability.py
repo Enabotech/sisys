@@ -16,13 +16,14 @@ import logging
 import uuid
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
-from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
+from src.domain.ports.auth_service import AuthServicePort
 from src.domain.ports.resolver import get_resolver
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.auth import get_current_user_dependency
 
 logger = logging.getLogger(__name__)
 
@@ -115,24 +116,12 @@ def create_trace_router(
     async def _get_current_user(
         token: str | None = Depends(oauth2_scheme),
     ) -> TokenPayload:
-        """验证 Bearer token，未认证请求直接拒绝"""
+        """验证 Bearer token（经共享认证依赖，统一异常体系 401）"""
         nonlocal _auth_service
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
         if _auth_service is None:
             _auth_service = get_resolver().resolve("auth_service")
-        try:
-            return await _auth_service.verify_token(token)
-        except AuthenticationError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        payload: TokenPayload = await get_current_user_dependency(_auth_service)(token)
+        return payload
 
     # 允许测试覆盖认证依赖
     current_user_dep = get_current_user_override or _get_current_user

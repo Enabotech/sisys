@@ -128,7 +128,8 @@ class TestTraceAuthentication:
     """认证中间件测试"""
 
     def _make_app(self) -> FastAPI:
-        """创建 FastAPI 应用"""
+        """创建 FastAPI 应用（含统一异常处理器——认证 401 由其映射，D-1② 同步）"""
+        from src.interfaces.api.exception_handlers import register_exception_handlers
         from src.interfaces.api.traceability import create_trace_router
 
         app = FastAPI()
@@ -136,6 +137,7 @@ class TestTraceAuthentication:
             trace_service=MockTraceService(),
         )
         app.include_router(router)
+        register_exception_handlers(app)
         return app
 
     def test_post_trace_without_auth_returns_401(self) -> None:

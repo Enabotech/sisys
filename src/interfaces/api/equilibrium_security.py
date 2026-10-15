@@ -10,17 +10,18 @@ import uuid
 from datetime import datetime
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
-from src.domain.exceptions import ConfigurationError
+from src.domain.exceptions import AuthenticationError, ConfigurationError
 from src.domain.ports.auth_service import AuthServicePort
 from src.domain.ports.backup_recovery_service import BackupRecoveryServicePort
 from src.domain.ports.data_integrity_service import DataIntegrityServicePort
 from src.domain.ports.intrusion_detection_service import IntrusionDetectionServicePort
 from src.domain.value_objects.backup_result import BackupType
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.auth import get_current_user_dependency
 from src.interfaces.api.shared_models import ErrorResponse
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
@@ -180,26 +181,14 @@ def create_security_router(
     async def get_current_user(
         token: str = Depends(oauth2_scheme),
     ) -> TokenPayload:
-        """获取当前认证用户（使用真实 JWT 验证）
-
-        Args:
-            token: OAuth2 Bearer token
-
-        Returns:
-            TokenPayload 领域值对象
-
-        Raises:
-            HTTPException: 用户未认证（OAuth2 需要 WWW-Authenticate header）
-        """
+        """获取当前认证用户（经共享认证依赖，统一异常体系 401 + WWW-Authenticate）"""
         if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            # token 先检（与共享工厂同序）——无 token 不得因 service 未配置误报 500
+            raise AuthenticationError(message="Not authenticated")
         if auth_service is None:
             raise ConfigurationError("Auth service not configured")
-        return await auth_service.verify_token(token)
+        payload: TokenPayload = await get_current_user_dependency(auth_service)(token)
+        return payload
 
     current_user = get_current_user_override or get_current_user
 

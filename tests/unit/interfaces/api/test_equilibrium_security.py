@@ -450,6 +450,11 @@ class TestAuthenticationRequired:
         )
         app = FastAPI()
         app.include_router(router)
+        # 认证失败现为领域异常（AuthenticationError），401 由统一 ExceptionHandlers
+        # 映射（D-1②：生产 app 同款注册——裸 app 需补挂，先例 test_archive_routes:60）
+        from src.interfaces.api.exception_handlers import register_exception_handlers
+
+        register_exception_handlers(app)
 
         client = TestClient(app)
 

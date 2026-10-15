@@ -12,14 +12,15 @@ import tempfile
 import uuid
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, Form, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Header, UploadFile, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
 from src.domain.exceptions import NotFoundError, UploadSessionExpiredError
-from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
+from src.domain.ports.auth_service import AuthServicePort
 from src.domain.value_objects.document_format import get_mime_type
 from src.domain.value_objects.token_payload import TokenPayload
+from src.interfaces.api.auth import get_current_user_dependency
 
 logger = logging.getLogger(__name__)
 
@@ -104,39 +105,6 @@ class BatchUploadResponse(BaseModel):
     details: list[dict[str, Any]]
 
 
-def get_current_user_dependency(
-    auth_service: AuthServicePort,
-) -> Callable:
-    """创建 get_current_user 依赖工厂
-
-    Args:
-        auth_service: 认证服务实例
-
-    Returns:
-        依赖函数
-    """
-
-    async def get_current_user(
-        token: str | None = Depends(oauth2_scheme),
-    ) -> TokenPayload:
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        try:
-            return await auth_service.verify_token(token)
-        except AuthenticationError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-    return get_current_user
-
-
 def create_document_upload_router(
     upload_service: Any = None,
     chunked_manager: Any = None,
@@ -188,24 +156,11 @@ def create_document_upload_router(
         async def get_current_user(
             token: str | None = Depends(oauth2_scheme),
         ) -> TokenPayload:
-            if not token:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
             from src.domain.ports.resolver import get_resolver
 
             svc: AuthServicePort = get_resolver().resolve("auth_service")
-            try:
-                result: TokenPayload = await svc.verify_token(token)
-                return result
-            except AuthenticationError:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            result: TokenPayload = await get_current_user_dependency(svc)(token)
+            return result
 
     @router.post(
         "",

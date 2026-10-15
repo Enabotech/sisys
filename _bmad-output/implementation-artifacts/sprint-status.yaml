@@ -396,7 +396,7 @@ development_status:
   # Epic 91: 技术债清偿专项 (2026-10-15 立项，来源 5-1 审查周期留项 D8/D11 残余)
   # ===========================================================================
   epic-91: backlog
-  91-1-api-auth-unification: backlog  # API 认证守卫统一化（26 处 HTTPException 收敛 + 共享依赖抽取）
+  91-1-api-auth-unification: done  # API 认证守卫统一化（26 处 HTTPException → auth.py 单点 AuthenticationError；2026-10-15 实施完成）
   91-2-outbox-dead-letter-termination: backlog  # Outbox archived 终态 + requeue + 巡检消费（proposal-d11 D11-b）
 
 # =============================================================================
