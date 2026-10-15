@@ -125,3 +125,44 @@ class TestRetryPolicyIntegration:
         assert policy.should_retry(0) is True
         assert policy.should_retry(2) is True
         assert policy.should_retry(3) is False
+
+    async def test_cleanup_includes_archived_when_enabled(self) -> None:
+        """91-2 AC-3：include_archived=True 时超期 archived 行一并清理。"""
+        from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository
+
+        repo = InMemoryOutboxRepository()
+        old_archived = OutboxEntity(
+            event_id=uuid4(),
+            event_type="test",
+            payload={},
+            status="archived",
+            created_at=datetime.now(UTC) - timedelta(days=91),
+        )
+        old_entity = OutboxEntity(
+            event_id=uuid4(),
+            event_type="test",
+            payload={},
+            status="published",
+            published_at=datetime.now(UTC) - timedelta(days=31),
+        )
+        repo._entities.extend([old_archived, old_entity])
+
+        removed = await repo.cleanup_old_published_records(older_than_days=30, include_archived=True)
+        assert removed == 2, "超期 published + 超期 archived 均应清理"
+
+    async def test_cleanup_archived_disabled_by_default(self) -> None:
+        """91-2 AC-3：默认不清理 archived（显式 opt-in）。"""
+        from src.infrastructure.messaging.outbox.inmemory_outbox import InMemoryOutboxRepository
+
+        repo = InMemoryOutboxRepository()
+        old_archived = OutboxEntity(
+            event_id=uuid4(),
+            event_type="test",
+            payload={},
+            status="archived",
+            created_at=datetime.now(UTC) - timedelta(days=400),
+        )
+        repo._entities.append(old_archived)
+
+        removed = await repo.cleanup_old_published_records(older_than_days=30)
+        assert removed == 0, "默认不含 archived"

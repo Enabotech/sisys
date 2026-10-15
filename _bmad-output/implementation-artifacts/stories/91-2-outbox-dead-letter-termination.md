@@ -1,6 +1,6 @@
 # Story 91.2: Outbox 毒消息终态机制（archived 终态迁移 + requeue 入口）
 
-**Status:** `backlog`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 来源：5-1 代码审查周期留项 D11 残余①（proposal-d11 §6 切分的 D11-b）。
@@ -152,12 +152,18 @@
 | 配置项 | 值 |
 |--------|-----|
 | **Model** | Claude Code (glm-5.3) |
-| **Execution Date** | 2026-10-15（立项） |
+| **Execution Date** | 2026-10-15（立项）；2026-10-15（实施完成） |
 
 ### 完成清单 Completion Notes List
 
 - [x] 立项（依据 proposal-d11 方案 A + D11-a 前序交付实测）
-- [ ] dev-story 实施（从前置 PG 环境修复开始）
+- [x] **Task 0**：状态机评审落地（archived → pending 经 requeue 唯一入口，守卫防误重放）；D-1 裁定=巡检消费暂留 `count_by_status()`（D11-a 已交付）+ CLI/宿主消费面随 poller 宿主 Story（deferred-work 部署面注记）；**PG 前置解除**（评估确认既有 PG 集成测试连 dev 5432 可用——无需 postgres-test）
+- [x] **Task 1（循环 A）**：`OutboxEntity.requeue()`——archived→pending + retry 清零 + error 清空 + 非 archived 拒绝（红→绿 2 用例）
+- [x] **Task 2（循环 B）**：仓储 `requeue(event_id)` / `archive(event_id)` / `_archive_entity`；get_unpublished 重构为应用层分流（SELECT 放宽 + Python 侧超限即归档 + 未超限毒行 mark_failed）+ 白盒断言语义同步（7 新用例红→绿）
+- [x] **Task 3（循环 C）**：poller `process_one` 终局接线——mark_failed 后 archive（getattr 容错旧测试桩）+ 归档失败不阻断批处理（1 用例红→绿）
+- [x] **Task 4（循环 D）**：cleanup `include_archived` 参数扩展（PG + InMemory 双实现）+ 默认不清理（2 用例红→绿）
+- [x] **Task 5（循环 E）**：PG 集成验证三链路（真实 5432）——超限归档/requeue 重放进入选择集/巡检计数（3 用例；调试中发现并修复测试数据构造缺陷：model.event_id 与 payload["event_id"] 必须同源）
+- [x] **Task 6**：全量 unit+contracts 10058 passed + mypy 665 + ruff 全绿；outbox 全树零回归；Story/sprint-status → done
 
 ### 文件清单 File List
 
@@ -177,5 +183,5 @@
 | **前置** | 本地 PG 环境修复；Task 0 状态机评审 |
 | **预估** | 2 天（proposal §6 口径，含 PG 集成验证） |
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-10-15

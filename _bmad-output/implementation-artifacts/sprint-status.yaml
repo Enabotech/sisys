@@ -397,7 +397,7 @@ development_status:
   # ===========================================================================
   epic-91: backlog
   91-1-api-auth-unification: done  # API 认证守卫统一化（26 处 HTTPException → auth.py 单点 AuthenticationError；2026-10-15 实施完成）
-  91-2-outbox-dead-letter-termination: backlog  # Outbox archived 终态 + requeue + 巡检消费（proposal-d11 D11-b）
+  91-2-outbox-dead-letter-termination: done  # Outbox archived 终态 + requeue + cleanup 扩展（2026-10-15 实施完成，基于既有 PG 集成测试连 dev 5432）
 
 # =============================================================================
 # Summary: (verified 2026-08-27 by code + tests + story files + retrospectives)

@@ -126,6 +126,21 @@ class AsyncOutboxPoller:
                 if last_error is not None:
                     try:
                         await self._repo.mark_failed(event.event_id, str(last_error))
+                        # 91-2 终局接线：重试预算耗尽（本批最终失败）→ 归档终态
+                        # （ERROR 可观测；可经 requeue 显式重放）。归档失败仅记日志
+                        # 不阻断批内其余事件处理。
+                        archive = getattr(self._repo, "archive", None)
+                        if callable(archive):
+                            try:
+                                result = archive(event.event_id)
+                                if inspect.isawaitable(result):
+                                    await result
+                            except Exception as archive_exc:
+                                logger.error(
+                                    "Failed to archive exhausted event %s: %s",
+                                    event.event_id,
+                                    archive_exc,
+                                )
                     except Exception:
                         logger.error(
                             "Failed to mark event %s as failed: %s",

@@ -54,6 +54,9 @@ class TestPostgreSQLOutboxRepository:
 
         model1 = mock.Mock()
         model1.event_type = "TestEvent"
+        model1.status = "pending"
+        model1.retry_count = 0
+        model1.max_retries = 3
         model1.payload = {
             "event_id": str(uuid4()),
             "event_type": "TestEvent",
@@ -63,6 +66,9 @@ class TestPostgreSQLOutboxRepository:
         }
         model2 = mock.Mock()
         model2.event_type = "TestEvent"
+        model2.status = "pending"
+        model2.retry_count = 0
+        model2.max_retries = 3
         model2.payload = {
             "event_id": str(uuid4()),
             "event_type": "TestEvent",
@@ -99,6 +105,9 @@ class TestPostgreSQLOutboxRepository:
         poison_model.max_retries = 3
 
         good_model = mock.Mock()
+        good_model.status = "pending"
+        good_model.retry_count = 0
+        good_model.max_retries = 3
         good_model.event_type = "TestEvent"
         good_model.payload = {
             "event_id": str(uuid4()),
@@ -142,6 +151,9 @@ class TestPostgreSQLOutboxRepository:
         poison_model.max_retries = 3
 
         good_model = mock.Mock()
+        good_model.status = "pending"
+        good_model.retry_count = 0
+        good_model.max_retries = 3
         good_model.event_type = "TestEvent"
         good_model.payload = {
             "event_id": str(uuid4()),
@@ -162,7 +174,7 @@ class TestPostgreSQLOutboxRepository:
 
         assert len(result) == 1, "合法事件必须正常返回"
         assert poison_model.retry_count == 3, "超限毒行不得再递增 retry_count（有界化）"
-        assert poison_model.status == "failed"
+        assert poison_model.status == "archived", "91-2 语义更新：超限毒行迁移 archived 终态（可经 requeue 重放）"
 
     async def test_get_unpublished_excludes_retry_exhausted_rows(self, repository, mock_session):
         """SELECT 语句含 retry_count < max_retries 过滤（白盒断言——mock 模式测不到 WHERE 语义）。
@@ -180,7 +192,10 @@ class TestPostgreSQLOutboxRepository:
 
         stmt = mock_session.execute.call_args_list[0][0][0]  # 首次调用（mark_failed 可能追加调用）
         compiled = str(stmt.compile())
-        assert "retry_count < event_outbox.max_retries" in compiled, "SELECT 必须以列比较过滤重试耗尽行"
+        # 91-2 语义更新：SELECT 放宽为 pending/failed 全量（归档执行窗口），
+        # 「超限行不进正常发布批」由应用层分流保证（test_get_unpublished_archives_exhausted_rows 钉死）
+        assert "status IN" in compiled, "状态过滤保留"
+        assert "retry_count < event_outbox.max_retries" not in compiled, "SQL 过滤已放宽（应用层分流替代）"
 
     async def test_mark_published(self, repository, mock_session):
         """测试异步标记已发布"""
@@ -282,3 +297,104 @@ class TestPostgreSQLOutboxRepository:
         counts = await repository.count_by_status()
 
         assert counts == {"pending": 3, "failed": 2, "archived": 1}
+
+    async def test_requeue_archived_row_resets(self, repository, mock_session):
+        """requeue：archived 行重置为 pending（计数清零/错误清空）——91-2 AC-2。"""
+        model = mock.Mock()
+        model.status = "archived"
+        model.retry_count = 3
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = model
+        mock_session.execute.return_value = mock_result
+
+        await repository.requeue(model.event_id)
+
+        assert model.status == "pending"
+        assert model.retry_count == 0
+        assert model.error_message is None
+
+    @pytest.mark.parametrize("status", ["pending", "failed", "published"])
+    async def test_requeue_rejects_non_archived(self, repository, mock_session, status):
+        """requeue 唯一入口守卫：非 archived 状态抛 InvalidStateTransitionError。"""
+        from src.domain.exceptions import InvalidStateTransitionError
+
+        model = mock.Mock()
+        model.status = status
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = model
+        mock_session.execute.return_value = mock_result
+
+        with pytest.raises(InvalidStateTransitionError):
+            await repository.requeue(model.event_id)
+
+    async def test_archive_failed_row_terminal(self, repository, mock_session):
+        """archive：failed → archived 终态迁移（poller 重试耗尽接线点）——91-2 AC-1。"""
+        model = mock.Mock()
+        model.status = "failed"
+        model.retry_count = 3
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = model
+        mock_session.execute.return_value = mock_result
+
+        await repository.archive(model.event_id)
+
+        assert model.status == "archived"
+
+    async def test_get_unpublished_archives_exhausted_rows(self, repository, mock_session):
+        """超限行归档分流（91-2 AC-1 迁移窗口）：SELECT 放宽全量，Python 侧分流——
+        超限毒行迁移 archived（终态+可观测），合法行正常返回。"""
+        DomainEvent.register("TestEvent", DomainEvent)
+
+        exhausted = mock.Mock()
+        exhausted.event_type = "TestEvent"
+        exhausted.payload = {
+            "event_id": str(uuid4()),
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+        exhausted.status = "failed"
+        exhausted.retry_count = 3
+        exhausted.max_retries = 3
+
+        good = mock.Mock()
+        good.event_type = "TestEvent"
+        good.status = "pending"
+        good.retry_count = 0
+        good.max_retries = 3
+        good.payload = {
+            "event_id": str(uuid4()),
+            "event_type": "TestEvent",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "payload": {},
+        }
+
+        mock_scalars = mock.Mock()
+        mock_scalars.all.return_value = [exhausted, good]
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value = mock_scalars
+        mock_session.execute.return_value = mock_result
+
+        result = await repository.get_unpublished(limit=10)
+
+        assert len(result) == 1, "合法行正常返回（超限行不进正常发布批——语义不变）"
+        assert str(result[0].event_id) == good.payload["event_id"]
+        assert exhausted.status == "archived", "超限行必须迁移 archived 终态"
+
+    async def test_get_unpublished_select_no_retry_filter(self, repository, mock_session):
+        """白盒断言语义更新（91-2 DC 风险4）：SELECT 放宽为 pending/failed 全量
+        （归档执行窗口需要），超限行经应用层分流——「不进正常发布批」由测试钉死。"""
+        mock_scalars = mock.Mock()
+        mock_scalars.all.return_value = []
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value = mock_scalars
+        mock_session.execute.return_value = mock_result
+
+        await repository.get_unpublished(limit=10)
+
+        stmt = mock_session.execute.call_args_list[0][0][0]
+        compiled = str(stmt.compile())
+        assert "retry_count < event_outbox.max_retries" not in compiled, "SQL 过滤已放宽（应用层分流替代）"
+        assert "status IN" in compiled, "状态过滤保留"

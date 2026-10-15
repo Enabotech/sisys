@@ -97,46 +97,65 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         logger.info("Outbox 事件经独立会话落库（后台路径 fallback）: event_id=%s", event_id)
 
     async def get_unpublished(self, limit: int) -> list[DomainEvent]:
-        """获取未发布的事件列表（FIFO 排序，逐条毒消息隔离）。
+        """获取未发布的事件列表（FIFO 排序，逐条毒隔离 + 超限归档分流）。
 
-        单条畸形 payload（反序列化失败）标记 failed 后跳过——防止毒事件卡在
-        FIFO 队头阻塞其后全部合法事件（对齐消费侧 redis_subscriber 逐消息
-        隔离语义）。SELECT 以 retry_count < max_retries 过滤重试耗尽行——
-        超限行不退出选择集会在累积至 batch_size 后恒返回空批，合法事件
-        静默停发（队头阻塞隐蔽复发形态）。
+        SELECT 取 pending/failed 全量（不再以 retry_count 过滤——归档执行
+        窗口需要），Python 侧逐行分流（91-2 DC-2 迁移窗口设计）：
+        - 合法行 → 正常返回（超限行不进正常发布批——语义与 R3-F1 等价保持）
+        - 未超限毒行（反序列化失败）→ mark_failed 计数（毒隔离，R2-F1 语义）
+        - 超限行（毒 payload 达上限 / 发布失败耗尽）→ **迁移 archived 终态**
+          （ERROR 级日志含 event_id/retries/error——消除 R3-F1 后的零日志
+          监控盲区；archived 可经 requeue 显式重放）
         """
         result = await self._session.execute(
             select(OutboxModel)
-            .where(
-                OutboxModel.status.in_(("pending", "failed")),
-                OutboxModel.retry_count < OutboxModel.max_retries,
-            )
+            .where(OutboxModel.status.in_(("pending", "failed")))
             .order_by(OutboxModel.created_at.asc())
             .limit(limit)
         )
         models = list(result.scalars().all())
         events: list[DomainEvent] = []
         for model in models:
+            if model.retry_count >= model.max_retries:
+                await self._archive_entity(
+                    model,
+                    f"retries exhausted ({model.retry_count}/{model.max_retries})"
+                    + (f"; last error: {model.error_message}" if model.error_message else ""),
+                )
+                continue
             try:
                 events.append(SQLAlchemyEventOutboxAdapter.to_domain_event(model))
             except Exception as exc:
-                if model.retry_count < model.max_retries:
-                    logger.error(
-                        "Outbox 事件反序列化失败（毒消息隔离，标记失败）: event_id=%s error=%s",
-                        model.event_id,
-                        exc,
-                    )
-                    await self.mark_failed(model.event_id, f"deserialization failed: {exc}")
-                else:
-                    # 防御性保留（真实流程经 SELECT 过滤后不可达；防御行属性与
-                    # SELECT 物化值不一致的极端形态）：超限毒行降级单行 warning
-                    # 不写库（毒 payload 静态垃圾永不恢复，重试标记纯写放大）
-                    logger.warning(
-                        "Outbox 毒消息已超重试上限（跳过标记）: event_id=%s retry_count=%d",
-                        model.event_id,
-                        model.retry_count,
-                    )
+                logger.error(
+                    "Outbox 事件反序列化失败（毒消息隔离，标记失败）: event_id=%s error=%s",
+                    model.event_id,
+                    exc,
+                )
+                await self.mark_failed(model.event_id, f"deserialization failed: {exc}")
         return events
+
+    async def _archive_entity(self, model: OutboxModel, reason: str) -> None:
+        """行级归档（failed → archived 终态迁移 + ERROR 可观测日志）。
+
+        Args:
+            model: 目标行（须处于 failed/pending 且重试耗尽）
+            reason: 归档原因（日志与 error_message 载体）
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不在 pending/failed 时
+        """
+        if model.status not in ("pending", "failed"):
+            raise InvalidStateTransitionError(model.status, "archived")
+        previous_status = model.status
+        model.status = "archived"
+        model.error_message = f"archived: {reason}"[:_ERROR_MESSAGE_MAX_LENGTH]
+        await self._session.flush()
+        logger.error(
+            "Outbox 事件重试耗尽归档（终态迁移，可经 requeue 显式重放）: event_id=%s status=%s->archived reason=%s",
+            model.event_id,
+            previous_status,
+            reason,
+        )
 
     async def mark_published(self, event_id: UUID) -> None:
         """标记事件已发布
@@ -195,22 +214,58 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         result = await self._session.execute(select(OutboxModel.status, func.count()).group_by(OutboxModel.status))
         return {status: count for status, count in result.all()}
 
-    async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+    async def archive(self, event_id: UUID) -> None:
+        """归档事件（failed → archived 终态迁移，poller 重试耗尽接线点——91-2 AC-1）
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 failed/pending 时
+        """
+        result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
+        model = result.scalar_one_or_none()
+        if model:
+            await self._archive_entity(model, f"explicit archive via poller (event_id={event_id})")
+
+    async def requeue(self, event_id: UUID) -> None:
+        """重放归档事件（archived → pending，retry_count 清零——91-2 AC-2）
+
+        唯一重放入口（防误重放守卫：非 archived 状态拒绝）。
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 archived 时
+        """
+        result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
+        model = result.scalar_one_or_none()
+        if model:
+            if model.status != "archived":
+                raise InvalidStateTransitionError(model.status, "pending")
+            model.status = "pending"
+            model.retry_count = 0
+            model.error_message = None
+            await self._session.flush()
+            logger.info("Outbox 归档事件重放: event_id=%s archived->pending（重试预算重置）", event_id)
+
+    async def cleanup_old_published_records(self, older_than_days: int = 30, include_archived: bool = False) -> int:
         """清理超过保留期的已发布记录
 
         Args:
             older_than_days: 保留天数（默认 30 天）
+            include_archived: 是否同时清理超期 archived 终态行（默认 False——
+                91-2 AC-3 扩展；archived 默认保留 90 天语义由调用方控制窗口）
 
         Returns:
             清理的记录数量
         """
         cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
-        result = await self._session.execute(
-            select(OutboxModel).where(
-                OutboxModel.status == "published",
-                OutboxModel.published_at < cutoff,
+        conditions = [OutboxModel.status == "published", OutboxModel.published_at < cutoff]
+        if include_archived:
+            # 91-2 AC-3：archived 终态行超期清理（OR 分支——archived 无 published_at，
+            # 以 created_at 计窗口）
+            archived_condition = (OutboxModel.status == "archived") & (OutboxModel.created_at < cutoff)
+            result = await self._session.execute(
+                select(OutboxModel).where((conditions[0] & conditions[1]) | archived_condition)
             )
-        )
+        else:
+            result = await self._session.execute(select(OutboxModel).where(*conditions))
         models = list(result.scalars().all())
         for model in models:
             await self._session.delete(model)

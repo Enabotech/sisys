@@ -88,7 +88,7 @@ class OutboxEntity:
         self.error_message = None
 
     def mark_archived(self) -> None:
-        """归档（终态，不可逆）
+        """归档（终态——除显式 requeue 外不可逆，91-2 状态机评审）
 
         Raises:
             InvalidStateTransitionError: 当当前状态不是 failed 时
@@ -96,3 +96,18 @@ class OutboxEntity:
         if self.status != "failed":
             raise InvalidStateTransitionError(self.status, "archived")
         self.status = "archived"
+
+    def requeue(self) -> None:
+        """重放：archived → pending（显式唯一入口，retry_count 清零，91-2 AC-2）
+
+        守卫：仅 archived 状态可重放（防误重放 pending/failed/published）；
+        重放后重新获得完整重试预算。
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 archived 时
+        """
+        if self.status != "archived":
+            raise InvalidStateTransitionError(self.status, "pending")
+        self.status = "pending"
+        self.retry_count = 0
+        self.error_message = None

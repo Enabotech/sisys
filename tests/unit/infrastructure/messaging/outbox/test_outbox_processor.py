@@ -160,6 +160,36 @@ class TestAsyncOutboxPoller:
         mock_repo.mark_published.assert_awaited_once_with(event.event_id)
         mock_repo.mark_failed.assert_not_called()
 
+    async def test_poll_once_archives_exhausted_event(
+        self,
+        mock_repo: MagicMock,
+        mock_publisher: MagicMock,
+        mock_router: MagicMock,
+    ) -> None:
+        """91-2 终局接线：重试耗尽 → mark_failed 后归档 archived（可观测+可重放）。"""
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
+        mock_repo.mark_pending = AsyncMock()  # 幂等恢复
+        mock_repo.archive = AsyncMock()
+        mock_repo.mark_failed = AsyncMock()
+        # 发布始终失败（重试耗尽）
+        mock_publisher.async_publish = AsyncMock(side_effect=RuntimeError("broker down"))
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+            poll_interval=0.01,
+            batch_size=5,
+            retry_policy=RetryPolicy(base_delay=0.001, max_delay=0.01, max_retries=1),
+        )
+
+        await poller.poll_once()
+
+        mock_repo.mark_failed.assert_awaited()
+        mock_repo.archive.assert_awaited_once_with(event.event_id), "重试耗尽必须归档终态"
+
     async def test_poll_once_marks_failed_on_error(
         self,
         poller: AsyncOutboxPoller,

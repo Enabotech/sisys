@@ -84,7 +84,7 @@ class TestOutboxEntityStateTransitions:
             entity.mark_archived()
 
     def test_archived_cannot_transition(self) -> None:
-        """archived 是终态，不能再转换"""
+        """archived 除显式 requeue 外是终态（91-2：requeue 唯一放开口）"""
         entity = OutboxEntity()
         entity.mark_failed("error")
         entity.mark_archived()
@@ -97,6 +97,35 @@ class TestOutboxEntityStateTransitions:
 
         with pytest.raises(InvalidStateTransitionError):
             entity.mark_pending()
+
+    def test_requeue_from_archived_resets(self) -> None:
+        """requeue：archived → pending，retry_count 清零、error_message 清空（91-2 AC-2）。"""
+        entity = OutboxEntity()
+        entity.mark_failed("exhausted")
+        entity.mark_archived()
+        entity.retry_count = 3
+
+        entity.requeue()
+
+        assert entity.status == "pending"
+        assert entity.retry_count == 0, "重放须清零计数（重新获得完整重试预算）"
+        assert entity.error_message is None
+
+    def test_requeue_rejects_non_archived(self) -> None:
+        """requeue 唯一入口守卫：非 archived 状态调用抛 InvalidStateTransitionError（防误重放）。"""
+        pending = OutboxEntity()
+        with pytest.raises(InvalidStateTransitionError):
+            pending.requeue()
+
+        failed = OutboxEntity()
+        failed.mark_failed("err")
+        with pytest.raises(InvalidStateTransitionError):
+            failed.requeue()
+
+        published = OutboxEntity()
+        published.mark_published()
+        with pytest.raises(InvalidStateTransitionError):
+            published.requeue()
 
     def test_max_retries_exceeded_prevents_pending(self) -> None:
         """超过最大重试次数后，不能再 mark_pending"""

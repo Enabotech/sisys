@@ -87,11 +87,12 @@ class InMemoryOutboxRepository(OutboxRepository):
                     e.mark_failed(error)
                     break
 
-    async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
-        """清理超过保留期的已发布记录
+    async def cleanup_old_published_records(self, older_than_days: int = 30, include_archived: bool = False) -> int:
+        """清理超过保留期的已发布记录（可选归档终态行——91-2 AC-3 扩展）
 
         Args:
             older_than_days: 保留天数（默认 30 天）
+            include_archived: 是否同时清理超期 archived 行（以 created_at 计窗口）
 
         Returns:
             清理的记录数量
@@ -99,7 +100,10 @@ class InMemoryOutboxRepository(OutboxRepository):
         async with self._lock:
             cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
             to_remove = [
-                e for e in self._entities if e.status == "published" and e.published_at is not None and e.published_at < cutoff
+                e
+                for e in self._entities
+                if (e.status == "published" and e.published_at is not None and e.published_at < cutoff)
+                or (include_archived and e.status == "archived" and e.created_at < cutoff)
             ]
             for e in to_remove:
                 self._entities.remove(e)
