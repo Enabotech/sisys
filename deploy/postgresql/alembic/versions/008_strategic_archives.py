@@ -13,13 +13,13 @@ migration——同一表的建表/索引/加列合并为完整版一次交付。
 
 Migration chain:
 001_initial (base)
-└── 002_audit_tables
-    └── 003_rbac_extensions
-        └── 004_saga_tables
-            └── 005_documents
-                └── 006_document_version_snapshots
-                    └── 007_dictionary_tables
-                        └── 008_strategic_archives (this file)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives (this file)
 """
 
 from __future__ import annotations

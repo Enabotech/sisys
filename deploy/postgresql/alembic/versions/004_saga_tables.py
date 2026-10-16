@@ -9,9 +9,9 @@ for persisting Saga execution state.
 
 Migration chain:
 001_initial (base)
-└── 002_audit_tables
-    └── 003_rbac_extensions
-        └── 004_saga_tables (this file)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables (this file)
 """
 
 from __future__ import annotations

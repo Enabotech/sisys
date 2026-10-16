@@ -6,15 +6,15 @@ Create Date: 2026-08-01
 
 This migration creates the document_version_snapshots table with
 document_id foreign key to documents table and unique constraint
-on (document_id, version).
+on (document_id, version) for optimistic concurrency.
 
 Migration chain:
 001_initial (base)
-└── 002_audit_tables
-    └── 003_rbac_extensions
-        └── 004_saga_tables
-            └── 005_documents
-                └── 006_document_version_snapshots (this file)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots (this file)
 """
 
 from __future__ import annotations

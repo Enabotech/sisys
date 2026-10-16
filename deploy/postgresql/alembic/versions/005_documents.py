@@ -9,10 +9,10 @@ via tenant_id column and supporting indexes.
 
 Migration chain:
 001_initial (base)
-└── 002_audit_tables
-    └── 003_rbac_extensions
-        └── 004_saga_tables
-            └── 005_documents (this file)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents (this file)
 """
 
 from __future__ import annotations

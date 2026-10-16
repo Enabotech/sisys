@@ -4,14 +4,24 @@ Revision ID: 013
 Revises: 012
 Create Date: 2026-10-07
 
-- (tool_id, version) 复合唯一；平台级资源无 tenant_id（TOOL_CATALOG 语义一致）
-- 2 个 partial unique index 硬守护单 STABLE / 单活跃 CANARY（并发不变量——
-  逐语句即时校验，多行状态变更须"先降级/清场、后提升"）
-- 2 查询索引（状态过滤 + 回滚候选 last_stable_at DESC）
-- CHECK 值域与 ToolVersionStatus 小写枚举一一对应
-- tool_id 无外键（011 先例：tools 表落地后补强，文件头注释说明）
+This migration creates:
+- tool_versions table: 版本灰度（traffic_weight/required_rollout_mode）+ last_stable_at 回滚锚点
+- CHECK（traffic_weight 0-100）+ (tenant_id, tool_id, version) UNIQUE
 
-CLAUDE.md §5 硬约束：禁止修改已合入的 alembic migration，本期只允许新增。
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives
+                                └── 009_tool_executions
+                                    └── 010_tool_chains
+                                        └── 011_schema_validation_records
+                                            └── 012_sandbox_sessions
+                                                └── 013_tool_versions (this file)
 """
 
 from __future__ import annotations

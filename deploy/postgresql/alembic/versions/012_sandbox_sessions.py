@@ -4,22 +4,24 @@ Revision ID: 012
 Revises: 011
 Create Date: 2026-09-16
 
-记录沙箱会话（便于审计 + 配额统计）。
-- VARCHAR(64) 主键 session_id（业务标识符,匹配 ^[A-Za-z0-9_-]{1,64}$）
-- tenant_id UUID 多租户隔离
-- container_id Docker container ID（启动后填充）
-- image_digest 实际启动的镜像 digest
-- started_at / last_activity_at / terminated_at 时间戳
-- resource_limits JSONB 容器资源限制字典
-- state VARCHAR(16) 状态（RUNNING / TERMINATED / FAILED）
-- state_version INT 乐观锁版本号
+记录沙箱会话（便于审计 + 配额统计）：
+- VARCHAR(64) 主键 session_id（业务标识符）、tenant_id UUID 多租户隔离
+- container_id / image_digest / started_at / last_activity_at / terminated_at
+- resource_limits JSONB、state VARCHAR(16)（RUNNING/TERMINATED/FAILED）
 
-索引（3 个）:
-- (tenant_id, state) 复合索引：按租户 + 状态过滤
-- (state, last_activity_at) 复合索引：空闲 TTL 扫描
-- container_id UNIQUE 索引：防止容器 ID 冲突
-
-CLAUDE.md §5 硬约束：禁止修改已合入的 alembic migration。
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives
+                                └── 009_tool_executions
+                                    └── 010_tool_chains
+                                        └── 011_schema_validation_records
+                                            └── 012_sandbox_sessions (this file)
 """
 
 from __future__ import annotations

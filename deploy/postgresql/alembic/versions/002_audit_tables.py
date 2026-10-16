@@ -2,8 +2,16 @@
 
 Revision ID: 002
 Revises: 001
-Create audit_log and audit_outbox tables with Row-Level Security for immutability.
-Reference: Story 1.10 - AC-2 Immutable Storage
+Create Date: 2026-04-20
+
+This migration creates:
+- audit_log table: immutable audit trail with checksum
+- audit_outbox table: audit event outbox with retry semantics
+- Row-Level Security policies for immutability (INSERT/SELECT only on audit_log)
+
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables (this file)
 """
 
 from __future__ import annotations

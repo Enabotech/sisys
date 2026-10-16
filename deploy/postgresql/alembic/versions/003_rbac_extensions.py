@@ -5,17 +5,14 @@ Revises: 002
 Create Date: 2026-05-05
 
 This migration consolidates all RBAC-related schema changes:
-- Add is_active to roles (from 96b449496c15)
-- Add is_locked to users (from add_is_locked_to_users)
-- Add is_system_reserved to roles (from add_is_system_reserved_to_roles)
-- Add login_attempts table (new)
-- Add updated_at to roles (from 96b449496c15)
-- Allow nullable fields for OAuth users
+- Add is_active/is_system_reserved/updated_at to roles
+- Add is_locked to users; relax password/email nullability
+- Add parent_id hierarchy + is_active to permissions
 
 Migration chain:
 001_initial (base)
-└── 002_audit_tables
-    └── 003_rbac_extensions (this file)
+    └── 002_audit_tables
+        └── 003_rbac_extensions (this file)
 """
 
 from __future__ import annotations

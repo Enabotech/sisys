@@ -6,18 +6,21 @@ Create Date: 2026-09-07
 
 Story 4.1a: 战略工具实现（ToolExecution 聚合根持久化）
 
-CLAUDE.md §5 硬约束：已合入 migration 禁止修改，本期只允许新增。
+This migration creates:
+- tool_executions table: execution state + evidence package (L2 structured / L4 refs)
+- 4 indexes (tenant+execution unique, tenant+tool+started_at, tenant+state, input_hash)
+- 3 CHECK constraints (state values, confidence range, state_version >= 0)
 
-设计决策：
-- tool_id 使用 ID-only 弱引用（无 FOREIGN KEY 约束），等 Tool PostgreSQL
-  持久化（Story 后续）后再补强 FK
-- L2/L4 双轨存储边界：结构化字段 → L2_rdb / 大文本 → L4_object
-  （evidence_storage_key 引用 L4 MinIO 对象键）
-
-字段分类：
-- 结构化字段（L2_rdb）：input_hash, rule_version, confidence
-- 大文本字段（L4_object）：plan, code, result, observation, validation
-- L4 引用（L2_rdb VARCHAR）：evidence_storage_key
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives
+                                └── 009_tool_executions (this file)
 """
 
 import sqlalchemy as sa

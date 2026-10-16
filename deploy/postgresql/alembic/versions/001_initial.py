@@ -1,6 +1,16 @@
 """Initial migration - Create core tables.
 
-创建 event_outbox, users, roles, permissions 及关联表。
+Revision ID: 001
+Revises: None
+Create Date: 2026-04-15
+
+This migration creates:
+- event_outbox table: transactional outbox for reliable event publishing
+- users, roles, permissions tables + role_permissions/user_roles associations: RBAC core
+- login_attempts table: authentication audit trail
+
+Migration chain:
+001_initial (base)
 """
 
 from __future__ import annotations

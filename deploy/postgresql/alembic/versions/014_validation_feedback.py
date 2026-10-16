@@ -1,22 +1,33 @@
 """Story 4.7: Validation Feedback 双表（错误案例库 + 演进日志）
 
-合并注记（2026-10-16 重构）：吸收原 018（ABORTED 中止态 CHECK）——建表直接含
-ABORTED 终态集（enhanced_retry_count 0-3 仅限 ABORTED，其余终态 1-3）。
-
 Revision ID: 014
 Revises: 013
 Create Date: 2026-10-09
 
+This migration creates:
 - error_cases：自然键 (tenant_id, tool_id, error_signature) UNIQUE——精确查表；
-  分类计数拆分（recovered/infeasible）+ occurrence 守恒 CHECK；
-  error_signature VARCHAR(64) 与签名提取器/实体不变量三处口径同一
+  分类计数拆分（recovered/infeasible）+ occurrence 守恒 CHECK
 - tool_evolution_logs：(tenant_id, execution_id) UNIQUE——execution_id 幂等 upsert；
-  fix_attempts JSONB（含 attempt_execution_id 回链）；trigger_code/final_status
-  CHECK 值域与枚举一一对应
-- 不建 (tenant_id, tool_id, error_signature) 普通索引——与 UNIQUE 约束完全同列
-  属冗余写放大（ix_error_cases_tool 支撑按工具查最近案例排序）
+  fix_attempts JSONB、final_status 含 ABORTED 终态集
 
-CLAUDE.md §5 硬约束：禁止修改已合入的 alembic migration，本期只允许新增。
+合并注记（2026-10-16 重构）：吸收原 018（ABORTED 中止态 CHECK）——建表直接含
+ABORTED 终态集（enhanced_retry_count 0-3 仅限 ABORTED，其余终态 1-3）。
+
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives
+                                └── 009_tool_executions
+                                    └── 010_tool_chains
+                                        └── 011_schema_validation_records
+                                            └── 012_sandbox_sessions
+                                                └── 013_tool_versions
+                                                    └── 014_validation_feedback (this file)
 """
 
 from __future__ import annotations

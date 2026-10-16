@@ -6,13 +6,21 @@ Create Date: 2026-09-10
 
 Story 4.2: 工具链编排（DAG 工具链持久化）
 
-CLAUDE.md §5 硬约束：已合入 migration 禁止修改，本期只允许新增。
+This migration creates:
+- tool_chains table: DAG node/edge JSONB + execution state + gate results
+- 3 indexes (tenant+chain_id unique, tenant+state, tenant+triggered_at)
 
-设计决策：
-- nodes 字段使用 JSONB 存储 DAG 节点数组（含 node_id / tool_slug / depends_on / arguments_template 等）
-- 4 索引：tenant_id / (tenant_id, name) / (tenant_id, failure_strategy) / GIN(nodes JSONB)
-- L2/L4 双轨存储边界：结构化字段 → L2_rdb / 大文本 → L4_object
-  （本期无 L4 依赖，DAG 元数据全在 L2_rdb）
+Migration chain:
+001_initial (base)
+    └── 002_audit_tables
+        └── 003_rbac_extensions
+            └── 004_saga_tables
+                └── 005_documents
+                    └── 006_document_version_snapshots
+                        └── 007_dictionary_tables
+                            └── 008_strategic_archives
+                                └── 009_tool_executions
+                                    └── 010_tool_chains (this file)
 """
 
 from __future__ import annotations
