@@ -107,7 +107,7 @@
 **And** TOOLS.md L1 视图 token 计量 ≤1200 tokens——**计量对象定稿（两口径分述，DC-3）**：① **L1 缓存口径** = `src/application/skills/TOOLS.md` 全文 `len(chars)//4`（现状 1104 tokens，interface-design.md L52/L633「启动全量预加载 ≤1.2K」预算的对象）；② **用例计量口径** = `"\n".join(f"{m.tool_name}: {m.description}" for m in tools_l1)` 拼接文本（现状约 218 tokens，是 TOOLS.md 内容子集——本 Story `startup_context_tokens` 的 L1 部分与 AC-3.1 断言均用此口径）
 
 **验证标准/Validation Criteria:**
-- [ ] `tools_l1` 条目数 == 23，全部 `status == "active"`
+- [ ] `tools_l1` 条目数 == 23，全部 `status == "active"`。**⚠️ 23 为当前 Skills 资产状态 tripwire**（23 个 SKILL.md 全 ACTIVE 实测）——任一 SKILL.md status 演进（deprecated 等）时本 Story 全部 `==23` 计数断言（AC-1.1/3.1/3.2/Task 3 红/Task 6 集成都含）随资产同步更新，届时红 = 资产演进确认而非测试缺陷；事件 `active_skill_count` 断言写 `== len(result.tools_l1)` 与 DTO 同源派生，勿新增字面量
 - [ ] L1 token 计量用 `_estimate_tokens` 同款启发式（chars//4），**断言对象为用例拼接视图**（`"\n".join(f"{m.tool_name}: {m.description}")`，分隔符定稿换行），断言 ≤1200（拼接视图为 TOOLS.md 子集，实测 ~218，远低于上限——1104 为 TOOLS.md 文件口径参照值，非本断言对象）
 - [ ] SkillSelector 为纯过滤（组合 `skill_manifest.get_all_slugs()` + `skill_loader.load_metadata(slug)`，过滤 status），零排序副作用断言（返回顺序与 slug 清单一致或稳定序）
 - [ ] **不实现**关键词 40% + 语义 60% 融合（GAP-CRITICAL-08b 明文废弃；语义基础设施零消费属预期）
@@ -329,10 +329,10 @@ class SkillSelectorPort(Protocol):
 |------|------|------|
 | AC-1.1 加载 CEO 七档案成功 | AC-1 | 服务级真实组装（**用例级场景**——需先 instantiate 的四场景之一（AC-1.1/4.1/5.1/5.2））：先 5-1 用例真实 instantiate（手动组装：`resolve("agent_config_loader")` + 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()`，⚠️ 禁 resolve `agent_repository`/用例端口——SCOPED 钉住全局 Resolver 跨循环死连接，5-1 文档审查修复 #23 教训）→ 本 Story 用例手动组装（`resolve("agent_profile_loader")` + `resolve("skill_selector")`（无连接构造，本地文件只读）+ 手动仓储 + InMemoryEventBus）→ 断言六档案非空含 CEO 语义锚点 + 23 ACTIVE 工具 + result 三段 |
 | AC-1.2 档案文件缺失抛异常 | AC-1 | **loader 端口直连场景**（对齐 5-1 AC-2.2/2.3 破坏场景先例——When 文案用「通过档案加载端口加载」）：tmp_path 构造六档案后删 IDENTITY.md → `MarkdownAgentProfileLoader(profile_root=tmp_path).load(role, agent_id)` 直连 → `AgentProfileError` EXCEPTION_442 且 context 含文件名。**不经用例**（守卫链存在性 443 先行——用例级直连会先抛 443 非 442；442 经用例的传播路径由 Task 4 单测覆盖）；无需 Redis、无需 instantiate（无 Redis 门控行） |
-| AC-1.3 档案内容空白抛异常 | AC-1 | **loader 端口直连**（同 AC-1.2 形态）：tmp_path 六文件全为空白（空串/纯换行）→ 442；无需 Redis |
+| AC-1.3 档案内容空白抛异常 | AC-1 | **loader 端口直连**（同 AC-1.2 形态）：六档案建于 `tmp_path/"ceo"/` 角色子目录（对齐寻址契约 `profile_root / role.value / 固定名`——写 tmp_path 根级会报「目录缺失」442 假绿）后六文件全为空白（空串/纯换行）→ 442 **且 `error.context["profile_path"]` 含空白文件名 + reason 含空白语义**（同码多因区分断言——442 覆盖七类成因，仅断言错误码无区分力）；无需 Redis |
 | AC-2.1 档案内容验证通过 | AC-2 | **loader 端口直连**（默认 profile_root）：内置 `configs/agents/profiles/ceo/` 加载六档案验证全过 + IDENTITY 含「CEO」语义断言 + 单文件 ≤64KB；无需 Redis（纯静态文件场景，脱离门控） |
-| AC-2.2 agent_id 不存在抛异常 | AC-2 | **用例级场景**（验证 443 守卫，需 Redis）：真实仓储（场景级客户端手动组装）+ `uuid.uuid4()` 随机 id → `AgentNotFoundError` EXCEPTION_443 + context 携带 agent_id；无需 instantiate（随机 id 本应查无） |
-| AC-2.3 档案大小超限抛异常 | AC-2 | **loader 端口直连**（同 AC-1.2 形态）：tmp_path 构造 >64KB 档案文件 → 442；无需 Redis |
+| AC-2.2 agent_id 不存在抛异常 | AC-2 | **用例级场景**（验证 443 守卫，需 Redis）：真实仓储（场景级客户端手动组装）+ `uuid.uuid4()` 随机 id → `AgentNotFoundError` EXCEPTION_443 + context 携带 agent_id（**断言形态定稿 `error.context["agent_id"] == str(随机id)`**——raise 侧 `str(agent_id)`，对齐 5-1 `role=role.value` 先例）；无需 instantiate（随机 id 本应查无） |
+| AC-2.3 档案大小超限抛异常 | AC-2 | **loader 端口直连**（同 AC-1.2 形态，建于 `tmp_path/"ceo"/` 子目录）：构造 >65536 **字节**档案文件（ASCII 写 65537 字节即稳）→ 442 且 `error.context["profile_path"]` 含超限文件名；无需 Redis |
 | AC-3.1 Skills L1 元数据与 token 预算 | AC-3 | 23 条 ACTIVE 元数据 + L1 计量 ≤1200 tokens（**断言对象 = 用例拼接视图** `"\n".join(f"{m.tool_name}: {m.description}")`，AC-3 两口径分述的口径②；`resolve("skill_loader")` 本地文件只读无连接，无 Redis 门控；**红绿形态注记**：若步骤内联现算拼接公式则 Task 0 即绿——tripwire 性质（保护既有 Skills 资产，23 条/218 tokens 恒满足），属预期无变异实证覆盖；若 import 新用例模块取拼接函数则红） |
 | AC-3.2 SkillSelector 返回 ACTIVE 列表 | AC-3 | `resolve("skill_selector")` → `list_active_skills()` 条目数 23 + 全 active + 与 slug 清单同序（零排序副作用断言） |
 | AC-4.1 启动上下文 token 预算与事件发布 | AC-4 | 真实链路计量断言（IDENTITY+SOUL ≤500 **由测试从 `result.profile.identity/soul` 按 `len//4` 现算** / 总量 `result.startup_context_tokens` ≤1700）+ InMemoryEventBus 捕获 AgentProfileLoaded 四字段 |
@@ -572,8 +572,8 @@ class SkillSelectorPort(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/agent_orch/test_markdown_agent_profile_loader.py`（tmp_path 真实文件 IO 零 mock：正常六档案构造 → AgentProfile 全字段一致/**目录缺失**（profile_root 指向不存在路径）→ 442/**单文件缺失**（删 IDENTITY.md）→ 442 且 context 含文件名/**内容空白**（空串/纯空白/纯换行三形态）→ 442/**大小超限**（>65536 字节文件）→ 442/**编码非法**（GBK 字节写文件）→ 442/**未知文件忽略**（目录多放 README.md → 六档案加载成功且字段不受污染——前向兼容策略）/**agent_id/role 透传**（VO 归属锚点断言）；另内置资产冒烟：默认 profile_root 加载 `profiles/ceo/` 六档案成功且 IDENTITY 含「CEO」） |
-| 🟢 绿 | 实现 `src/application/ports/agent_profile_loader.py`（Protocol，签名见 Task 0）+ `src/infrastructure/agent_orch/markdown_agent_profile_loader.py`（`profile_root` 构造注入默认仓库根四级上溯锚定 `configs/agents/profiles`——对齐 YamlAgentConfigLoader L31；`asyncio.to_thread(Path.read_text, path, encoding="utf-8")` 逐档案读取——**必须显式 encoding**，对齐 yaml_agent_config_loader `_read_yaml` 与 InMemorySkillLoader 先例（裸 read_text 依赖 locale，非 UTF-8 locale 下中文资产会误判 442）；大小上限 `PROFILE_FILE_MAX_BYTES = 65536` 模块常量（读前 stat 或读后 len 判定皆可——资产随代码分发无恶意大文件面）；`Path.read_text` 的 OSError/UnicodeDecodeError 逐类包装 442（reason 分列「档案不可读/编码非法」）；VO 构造在加载器内（六字段齐后一次构造，VO 校验兜底））+ 新建六档案资产 `configs/agents/profiles/ceo/{IDENTITY,CODE,SOUL,USER,MEMORY,HEARTBEAT}.md`（内容红线见 Task 0 数据模型节；IDENTITY+SOUL 合计 ≤500 tokens——编写后以 `len(chars)//4` 实测断言） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/agent_orch/test_markdown_agent_profile_loader.py`（tmp_path 真实文件 IO 零 mock，档案一律建于 `tmp_path/"ceo"/` 角色子目录：正常六档案构造 → AgentProfile 全字段一致/**目录缺失**（profile_root 指向不存在路径）→ 442/**单文件缺失**（删 IDENTITY.md）→ 442 且 context 含文件名/**内容空白**（空串/纯空白/纯换行三形态）→ 442 **且 context.profile_path 含对应文件名**（钉住判空主检在加载器——DC-5 观测锚点，防实现滑入 VO 兜底路径致 context 失文件名）/**大小超限**（>65536 字节文件）→ 442/**编码非法**（GBK 字节写文件）→ 442/**未知文件忽略**（目录多放 README.md → 六档案加载成功且字段不受污染——前向兼容策略）/**agent_id/role 透传**（VO 归属锚点断言）；另内置资产冒烟：默认 profile_root 加载 `profiles/ceo/` 六档案成功且 IDENTITY 含「CEO」） |
+| 🟢 绿 | 实现 `src/application/ports/agent_profile_loader.py`（Protocol，签名见 Task 0）+ `src/infrastructure/agent_orch/markdown_agent_profile_loader.py`（`profile_root` 构造注入默认仓库根四级上溯锚定 `configs/agents/profiles`——对齐 YamlAgentConfigLoader L31；`asyncio.to_thread(Path.read_text, path, encoding="utf-8")` 逐档案读取——**必须显式 encoding**，对齐 yaml_agent_config_loader `_read_yaml` 与 InMemorySkillLoader 先例（裸 read_text 依赖 locale，非 UTF-8 locale 下中文资产会误判 442）；大小上限 `PROFILE_FILE_MAX_BYTES = 65536` 模块常量（**字节口径**：读前 `stat().st_size` 或读后 `len(content.encode("utf-8"))` 判定——`len(content)` 字符口径中文下差至 3 倍不用，与常量名 MAX_BYTES 对齐；资产随代码分发无恶意大文件面）；`Path.read_text` 的 OSError/UnicodeDecodeError 逐类包装 442（reason 分列「档案不可读/编码非法」）；VO 构造在加载器内（六字段齐后一次构造，VO 校验兜底））+ 新建六档案资产 `configs/agents/profiles/ceo/{IDENTITY,CODE,SOUL,USER,MEMORY,HEARTBEAT}.md`（内容红线见 Task 0 数据模型节；IDENTITY+SOUL 合计 ≤500 tokens——编写后以 `len(chars)//4` 实测断言） |
 | 🟡 变异 | 突变固定名映射（"IDENTITY.md"→"IDENTITY_X.md"）→ 加载测试红 → 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_profile_loader`（SINGLETON，lambda + `__import__` 延迟加载，仿 5-1 段形态）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_loader.py`（11 维度；DummyResolver 零依赖直构）；ruff+mypy |
 
@@ -627,7 +627,7 @@ class SkillSelectorPort(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/use_cases/test_agent_profile_loading.py`（Mock 端口：`AsyncMock(spec=AgentProfileLoader)`、`AsyncMock(spec=AgentRepository)`、`AsyncMock(spec=SkillSelectorPort)`、InMemoryEventBus 真实类；成功编排顺序断言（**get_by_id → 守卫 → loader.load → list_active_skills → publish 调用序**，Mock calls 序断言——对齐 5-1 Task 4 红行模式）；get_by_id 返回 None → AgentNotFoundError 443 且 loader 未被调用；非 CEO 实体（Mock get_by_id 返回 role=CFO 实体）→ AgentRoleNotSupportedError 441 且 loader 未被调用；loader 失败（442）传播；list_active_skills 恰被调用一次且其返回值进入 DTO tools_l1（ACTIVE 过滤逻辑单点在 SkillSelector——用例透传不断言过滤，Task 3 已覆盖）；token 计量 = (identity+soul+L1 视图 chars)//4 口径断言；publish 失败两分支（PublishResult.is_success==False / raise）→ 结果仍返回且记日志不回滚；返回 DTO 四字段） |
+| 🔴 红 | 编写 `tests/unit/application/use_cases/test_agent_profile_loading.py`（Mock 端口：`AsyncMock(spec=AgentProfileLoader)`、`AsyncMock(spec=AgentRepository)`、`AsyncMock(spec=SkillSelectorPort)`；**发布方分两类**——成功编排与事件字段断言用 InMemoryEventBus 真实类（捕获 `published_events`），**publish 失败两分支换 `AsyncMock(spec=EventPublisher)` 注入**（raise 分支 `side_effect=RuntimeError`；is_success==False 分支返回空 results 的 `PublishResult`——5-1 test_agent_instantiation.py L264-277 先例。⚠️ 真实总线的失败面从用例不可达：新 event_id 不触发去重、成功路径 is_success 恒 True，勿在真实总线上构造失败分支）；成功编排顺序断言（**get_by_id → 守卫 → loader.load → list_active_skills → publish 调用序**——Mock calls 序断言 + `_TracingEventBus(InMemoryEventBus)` 子类记录 publish 段（5-1 L50-67 先例，真实总线非 Mock 其调用不入 Mock calls））；get_by_id 返回 None → AgentNotFoundError 443 且 loader 未被调用（context 断言 `error.context["agent_id"] == str(agent_id)`——raise 侧 `str(agent_id)`，对齐 5-1 `role=role.value` 先例）；非 CEO 实体（Mock get_by_id 返回 role=CFO 实体）→ AgentRoleNotSupportedError 441 且 loader 未被调用；loader 失败（442）传播；list_active_skills 恰被调用一次且其返回值进入 DTO tools_l1（ACTIVE 过滤逻辑单点在 SkillSelector——用例透传不断言过滤，Task 3 已覆盖）；token 计量 = (identity+soul+L1 视图 chars)//4 口径断言；publish 失败两分支 → 结果仍返回且记日志不回滚；返回 DTO 四字段；事件 `active_skill_count` 断言写 `== len(result.tools_l1)` 同源派生，勿写字面量） |
 | 🟢 绿 | 实现 `src/application/use_cases/agent_profile_loading.py` `LoadAgentProfileUseCase`（构造注入 profile_loader/repository/skill_selector/event_publisher 四端口；`async execute(agent_id: uuid.UUID) -> AgentProfileLoadResult`；守卫链如上；L1 组装：`tools = await self._skill_selector.list_active_skills()` 一次调用（**注入 SkillSelector 而非直组 skill_loader**——ACTIVE 过滤逻辑单点在 SkillSelector，依赖数与直组相同而消重，DC-8）；计量：`startup_context_tokens = _estimate(profile.identity + profile.soul + L1 视图文本)`（L1 视图文本 = `"\n".join(f"{m.tool_name}: {m.description}" for m in tools)` 换行拼接——**分隔符定稿 `\n`，AC-3 口径②**，`_estimate_tokens` 同款 chars//4，模块内私有函数）；事件构造四字段 + 发布两分支记日志不回滚（照抄 5-1 L128-145 形态——`is_success==False` 分支普通 `logger.error`、raise 分支带 `exc_info=True`，两分支形态照旧不要统一）） |
 | 🟡 变异 | 突变发布调用行（注释掉 publish）→ 「事件已发布」断言红 → 还原绿（Epic 4 零发布教训防线）；突变守卫顺序（**将角色守卫移至 `loader.load` 之后**——「441 检查移到 get_by_id 前」不可编码：role 取自 get_by_id 返回的实体）→ 「非 CEO 实体 → 441 且 loader 未被调用」断言红（结果型断言：错误码 + Mock 未调用，非字面调用序）→ 还原绿 |
 | 🔄 重构 | `AgentProfileLoadResult` DTO（模块内定义，Schema 见 Task 0）；组合根注册 `agent_profile_use_case`（SINGLETON，工厂 resolve 四依赖）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_use_case.py`（DummyResolver 提供四依赖名）；ruff+mypy |
@@ -656,7 +656,7 @@ class SkillSelectorPort(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 追加 `tests/unit/interfaces/cli/test_agent_cli.py`（build_parser 参数契约：`load-profile` 子命令 + `--agent-id` 必填；**UUID 守卫红线**：合法 UUID 字符串成功、非法串（"not-a-uuid"/空串）→ `ValidationError` EXCEPTION_201 且 context 携带原始输入（**禁止裸 uuid.UUID ValueError 逃逸**）；裸调用 `main([])` → SystemExit 2（既有断言不回归）；成功路径输出多行摘要含「IDENTITY.md: OK」「活跃技能」「启动上下文」字样（monkeypatch `agent_cli` 模块级 `bootstrap`/`resolve` 属性——5-1 Task 5 定稿的唯一可行注入）；业务异常路径退出码 1 且 stderr 含 `EXCEPTION_44`；`instantiate` 子命令既有测试零回归） |
+| 🔴 红 | 追加 `tests/unit/interfaces/cli/test_agent_cli.py`（**新增 load-profile 用例的红形态 = SystemExit 2**——argparse 未注册子命令即拒，UUID 守卫同（守卫代码尚未触达）；属单元层合法红（Task 0.4 三类合法红为验收域清单，不含此形态故此处显式注明）。build_parser 参数契约：`load-profile` 子命令 + `--agent-id` 必填；**UUID 守卫红线**：合法 UUID 字符串成功、非法串（"not-a-uuid"/空串）→ `ValidationError` EXCEPTION_201 且 context 携带原始输入（**禁止裸 uuid.UUID ValueError 逃逸**）；裸调用 `main([])` → SystemExit 2（既有断言不回归）；成功路径输出多行摘要含「IDENTITY.md: OK」「活跃技能」「启动上下文」字样（monkeypatch `agent_cli` 模块级 `bootstrap`/`resolve` 属性——5-1 Task 5 定稿的唯一可行注入）；业务异常路径退出码 1 且 stderr 含 `EXCEPTION_44`；`instantiate` 子命令既有测试零回归） |
 | 🟢 绿 | 在 `src/entrypoints/agent_cli.py` 追加 `load-profile` 子命令处理（`--agent-id` str 参数；函数体内 `try: agent_id = uuid.UUID(value.strip()) except ValueError: raise ValidationError(...201)`——**argparse type= 不用 uuid.UUID**（会把 ValueError 转 usage error exit 2 绕过统一异常体系）；`asyncio.run()` 执行用例；输出：六档案逐行 `IDENTITY.md: OK (N chars)` + `活跃技能: N` + `启动上下文: N tokens`；Redis 池 finally 关闭沿用 `_close_redis_pool`（本子命令同样读 Redis）；模块 docstring 补 load-profile 幂等只读语义声明） |
 | 🟡 变异 | 突变 UUID 守卫（删 except 分支）→ 非法串测试红（ValueError 逃逸被断言捕获）→ 还原绿 |
 | 🔄 重构 | 输出格式收敛、docstring 规范；pyproject script 无需改动（`sisys-agent` 已注册）核对；ruff+mypy |
@@ -707,7 +707,16 @@ class SkillSelectorPort(Protocol):
 
 **关联 AC:** AC-6
 
-> **性质说明：** SDD 规范验证测试（非 TDD 单元测试）——验证前序 Task 产出是否符合六边形架构规则。
+> **性质说明：** SDD 规范验证测试（非 TDD 单元测试）——验证前序 Task 产出是否符合六边形架构规则。**断言对象已由 Task 1-5 交付，编写后直接转绿为合法预期**（同 Task 6 形态——不构造合法红）；断言活性由变异阶段背书（四验证器均为恒真风险池——Epic 4 教训「8/13 Story 恒真断言」的直接暴露面）。
+
+#### TDD 循环（验证型形态）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | （无——验证型测试，见性质说明） |
+| 🟢 绿 | 编写四验证器并直接转绿（若红则暴露 Task 1-5 产出的真实架构违规，修复至绿） |
+| 🟡 变异 | 突变 `selector.py` 加一处 `sorted(` 调用 → 验证器 D 红 → 还原绿；突变 `agent_profile.py` 加一行第三方 import（如 `import yaml`）→ 验证器 A 红 → 还原绿（证明 AST 扫描断言活着） |
+| 🔄 重构 | 验证器断言表达收敛（扫描豁免清单注释化） |
 
 #### 架构验证测试实现
 
@@ -776,7 +785,7 @@ class SkillSelectorPort(Protocol):
 | DC-2 | TOOLS.md 双角色冲突（七档案之一 vs Skills L1 既有文件） | **不复制物理文件**——档案链路的 TOOLS.md 视图 = `skill_loader` 端口 L1 元数据（23 条 ToolMetadata），加载用例组合注入 | a) 在 profiles/ceo/ 落一份精简派生 TOOLS.md（弃用：双真源——23 个 SKILL.md 演进时派生文件必漂移）；b) 瘦身既有 `src/application/skills/TOOLS.md`（8 列 1104 tokens = 全文 `len(chars)//4` 实测）至 4 列 <200 tokens（弃用：是 4-1a 交付资产且两用例消费中；瘦身属破坏性变更无 Story 认领） | R2 应用层端口组合注入原则；epics L3431「Epic 5 对 Epic 4 依赖为可选 TOOLS.md 元数据」；单一真源 |
 | DC-3 | token 预算口径（旧 <200/<500 vs 新 ≤1.2K 冲突） | **按 interface-design.md 修订版**，两口径分述（AC-3 定稿）：① L1 缓存口径——TOOLS.md 全文 ≤1200 tokens（现状 1104，interface-design 启动预加载预算的对象）；② 用例计量口径——`"\n".join(f"{m.tool_name}: {m.description}")` 拼接视图（现状约 218，TOOLS.md 内容子集，`startup_context_tokens` 的 L1 部分）；IDENTITY+SOUL ≤500 tokens（保留 PRD 精神的身份档案精简约束）；总计量 ≤1700 tokens 可观测 | 严格执行 PRD NFR-IF-02「启动上下文 <500 tokens」（弃用：L1 现实 1104 tokens 已超其 2 倍+，23 工具描述无法压进 200 tokens——旧口径基于「L1 <200」假设已被 interface-design §2.1「23 工具 ≈1150 tokens」推翻；登记偏离 D-2） | interface-design.md L52/L633/L723；architecture.md §17.3 L2686；GAP-CRITICAL-08b 同源决策链 |
 | DC-4 | SkillSelector 形态（epics vs interface-design 冲突） | **`list_active_skills()` 纯查询**（get_all_slugs 枚举 → load_metadata → status 过滤；零排序零打分零 Top-K）；触发由 LLM 基于 L1 description 自主判断（5.3 实现） | epics L1546「关键词匹配 40% + 语义相似度 60% 融合排序推荐 Top-K」（弃用：interface-design.md §5.5 L920-990 明文废弃——违反 P5「Less scaffilling」+ 双重不必要复杂度；architecture.md GAP-CRITICAL-08b 指定本 Story「删除硬编码，模型自决」；登记偏离 D-1） | interface-design.md §5.5；architecture.md L3315；Anthropic Skills 设计哲学 |
-| DC-5 | 档案验证规则（无文档定义，本 Story 设计） | **六档案非空（strip 后）+ 单文件 ≤64KB**（`PROFILE_FILE_MAX_BYTES = 65536`）；无 frontmatter 强制（纯 Markdown）；VO `__post_init__` 二次校验兜底 | a) 强制 YAML frontmatter（弃用：frontmatter 解析在 application 层（skills/frontmatter.py），infrastructure 加载器跨层引用；且档案是人写文档非机器路由配置，无消费方需要结构化元数据）；b) 每档案最少行数/必需章节（弃用：无 LLM 消费契约支撑，YAGNI——5.3 注入 LLM 时按需收紧） | Simplicity First；5-1 未知键忽略前向兼容同族 |
+| DC-5 | 档案验证规则（无文档定义，本 Story 设计） | **六档案非空（strip 后）+ 单文件 ≤64KB（字节口径：`stat().st_size` 或 `len(content.encode("utf-8"))`——与 `PROFILE_FILE_MAX_BYTES` 常量语义对齐；`len(content)` 字符口径在中文下差至 3 倍，不用）**；无 frontmatter 强制（纯 Markdown）；**判空主检在加载器**（逐文件、`context.profile_path` 携带文件名——AC-2「加载器内实施」的观测锚点，AC-1.3 场景断言依赖）；VO `__post_init__` 二次校验为直接构造场景的纵深兜底（兜底路径 profile_path 可空——5-1 yaml loader 的「剩余校验 VO 兜底」模式在 5-2 不适用主检位，因 442 的 context 契约需要文件名） | a) 强制 YAML frontmatter（弃用：frontmatter 解析在 application 层（skills/frontmatter.py），infrastructure 加载器跨层引用；且档案是人写文档非机器路由配置，无消费方需要结构化元数据）；b) 每档案最少行数/必需章节（弃用：无 LLM 消费契约支撑，YAGNI——5.3 注入 LLM 时按需收紧） | Simplicity First；5-1 未知键忽略前向兼容同族 |
 | DC-6 | MEMORY.md 档案语义（系统级动态 vs 静态种子） | **MVP 静态种子文件**（profiles/ceo/MEMORY.md，内容明示「暂无系统级记忆，此为加载占位」）；系统级 `~/.sisys/memory/MEMORY.md` 动态索引合并不在本 Story（记忆链路休眠：MemoryConfig 零生产 from_env + l0_storage impl 路径失效，deferred-work 在案） | 经 L0StoragePort/IndexManager 读系统级真源（弃用：L0StoragePort 寻址 `{type}/{uuid}.md` 不适配固定名根级文件；且记忆链路整体休眠，激活属独立 Story） | architecture.md §11.2.2 L1021「Agent 的 MEMORY.md 来自系统级，无独立索引」——MVP 先落「加载」语义，「系统级合并」deferred（D-3） |
 | DC-7 | AgentProfile VO 分层（ToolMetadata 不可入 domain） | **domain VO 仅六档案 str** + **应用层 DTO `AgentProfileLoadResult` 组装**（profile + tools_l1 + 计量）——ToolMetadata 属 application 层（`src/application/ports/skill_loader.py`），domain 引用即违反方向矩阵（domain ✗→ application） | a) ToolMetadata 下沉 domain（弃用：4-1a 交付资产大迁移，破坏 33 个测试文件消费面）；b) AgentProfile 含 `tuple[str, ...]` slug 列表（弃用：丢失 description/when_to_use 元数据，5.3 LLM 上下文装配无材料） | 依赖方向矩阵（CLAUDE.md Hard Constraints）；R1/R2 分层设计规则 |
 | DC-8 | 用例是否注入 SkillSelector | **注入 SkillSelector**（四依赖：profile_loader/repository/skill_selector/event_publisher；ACTIVE 过滤逻辑单点在 SkillSelector，用例一次调用消费） | 用例直组 skill_loader（get_all_slugs + load_metadata + 过滤逻辑在用例内重复实现——弃用：依赖数与注入 Selector 相同（4 个）而过滤逻辑双份，DRY 违反；且 SkillSelector 作为「查询接口」需要首个真实消费方验证其形态，用例即天然消费方） | R2 应用层端口组合注入；接口单一职责 + DRY；GAP-CRITICAL-08b 交付物的消费验证 |
@@ -1091,6 +1100,10 @@ tests/
 | 16 | 【Round 2】R1 修复台账两子项零落地：「无状态」→「无连接状态」（L240/L790 残留）；资产红线 chars≤2000 绑定约束未入正文 | P3 | 两子项补落地（台账声称与实际不符的 R2 勘误） |
 | 17 | 【Round 2】TOOL_ID_TO_SLUG L14-38 行号错配（R1 勘正自引入——SLUG_TO_TOOL_ID 本体在 L41）；L330「唯一需要先 instantiate」与 AC-4.1/5.1/5.2 矛盾；v1.1.0 版本说明「6 P2」算术错误（实为 7 P2） | P3 | 三处勘正 |
 | 18 | 【Round 2】调试日志引用表缺正文重度引用的三份文档（or.md/deferred-work.md/sisys-uni-exception-design.md）；AC-5「复用 SINGLETON 连接」混入生产语义（验证路径为场景级手动组装，无独立断言载体）；SOUL 锚点 core-domain §17.3.1 内容空洞（view 仅 "executive" 标签）；epics Gherkin TOOLS.md 物理文件语义偏离未入 D 表；§11.2.4 顺序差异（加载先于实例化 vs 本 Story DC-10 反序）未注记；中文 token 低估倍数误引（docstring 是 1.5 token/字符 vs 估算 0.25，达数倍非 1.5~2 倍）；docker_sandbox 缩写引用歧义（acceptance 版非 benchmark 版）；AC-3.1 红绿形态未定（内联现算即绿的 tripwire 无注记）；AC-1 块 And 子句仍挂用例语境；R6 骨架「服务组装」整体配方表述；Task 3 绿行缺 registry/__init__.py | P3 | 十一项逐一修订入正文（D-9 偏离声明新增） |
+| 19 | 【Round 3】Task 4「发布失败两分支」测试在处方的真实 InMemoryEventBus 上不可达——`is_success==False` 唯一路径是 event_id 去重命中（用例每次新建事件无法预知 id）、raise 仅 `publish(None)`/listener 异常（文档未载）——dev 按字面实施 TDD 中段撞墙 | P1 | Task 4 红行定稿：失败两分支**换 `AsyncMock(spec=EventPublisher)`**（raise 用 side_effect / is_success=False 用空 results 的 PublishResult——5-1 test_agent_instantiation.py L264-277 先例）；真实总线仅用于成功路径与事件字段断言（失败面从用例不可达的机理注明）；编排调用序补 `_TracingEventBus` 子类先例（5-1 L50-67） |
+| 20 | 【Round 3】空白校验主检位置两读缝隙——「加载器内实施」（AC-2）vs「VO 兜底」（DC-5/Task 2 绿）双读下 442 的 context 形状不同（VO 路径 profile_path 失文件名），AC-1 checklist「context 携带缺失文件名」在读法 B 下不可满足；两种实现全测绿但期望不唯一 | P2 | DC-5 定稿「判空**主检在加载器**（context.profile_path 携带文件名——AC-2 观测锚点），VO 为直接构造兜底（profile_path 可空）」；Task 2 红行空白用例补 context 断言钉住加载器实施 |
+| 21 | 【Round 3】AC-1.3/2.3 同码多因断言不足——442 覆盖七类成因，仅断言错误码无区分力；场景未写明 `tmp_path/"ceo"/` 角色子目录（fixture 写根级报目录缺失 442 亦假绿）；`==23` 计数七处无 tripwire 注记（4-1f 验收资产计数联动同款教训未吸收） | P2 | AC-1.3/2.3 补 context 区分断言 + 子目录层级写明；AC-3 checklist 补 23-tripwire 全局注记（资产演进同步更新 + active_skill_count 写 `== len(result.tools_l1)` 同源派生） |
+| 22 | 【Round 3】Task 7 无 TDD 循环表/无转绿声明/无变异背书（四验证器为恒真风险池——违反 Story 自身「每 Task 完整循环」全局约束）；64KB「读后 len 判定」字符/字节歧义（中文差 3 倍，与 MAX_BYTES 常量名冲突）；Task 5 新增用例红形态（SystemExit 2）未注明；AC-2.2 断言 str/UUID 形态未定稿 | P2/P3 | Task 7 补四行验证型循环表（转绿声明 + sorted/import 双变异）；DC-5/Task 2 定稿字节口径（stat 或 encode 后 len）；Task 5 红行注明 SystemExit 2 合法红；AC-2.2 定稿 `== str(agent_id)` 断言形态 |
 
 ---
 
@@ -1121,10 +1134,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-10-15
 **最后更新/Last Updated:** 2026-10-16
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/规划文档/Skills 基础设施/记忆心跳基础设施/测试模板调研 + 关键签名人工核验；含链路接线断言清单 L1-L8、10 项关键架构决策 DC-1~DC-10、8 项偏离声明 D-1~D-8（SkillSelector 新旧口径/token 预算口径两处规划冲突裁决）、组合根 impl 路径失效观察项登记要求、deferred-work 分流处置）
 - v1.1.0: Round 1 文档审查修订（5 调研 Agent + 2 审查 Agent 并行 + 主会话实测定谳；2 P0 + 4 P1 + 7 P2 + 1 P3 批量 = 修复表 #1~#14）——档案破坏场景定稿 loader 端口直连（443/442 守卫陷阱）、SkillSelectorPort 端口定名（同名矛盾消除）、AC-6.3 时点对齐 5-1（Task 0 落盘 14 场景）、token 两口径分述（文件 1104 vs 拼接 ~218）、read_text 显式 UTF-8、守卫变异可编码改述、行号/计数/溯源逐项勘正（19→18 字段、event_channels L182-185、#23 教训、prd.md L1838 等）
 - v1.2.0: Round 2 回归核查修订（传播核查 + 增量面双 Agent；1 P2 + 13 P3）——BDD 约束/隔离表两处「先 instantiate」全局表述分档化（P0 修复的同语义漏网，适用范围定为四场景 AC-1.1/4.1/5.1/5.2）；R1 台账两子项补落地（「无状态」→「无连接状态」两处、资产红线 chars≤2000 绑定约束入正文）；TOOL_ID_TO_SLUG 行号勘正、AC-3.1 tripwire 红绿形态注记、AC-5 生产语义注记、§11.2.4 顺序差异注记、D-9 偏离声明（epics TOOLS.md 物理文件语义）、调试日志表补三行（or.md/异常设计/deferred-work）、中文 token 低估倍数勘正、docker_sandbox 全路径、AC-1 块 And 子句端口级限定、「唯一 instantiate」措辞、R6 骨架组装分档、registry/__init__.py 入 Task 3 绿行
+- v1.3.0: Round 3 深度推演修订（单深度 Agent：14 场景三轴推演 + TDD 时序 + 生产失败语义对照；1 P1 + 4 P2 + 4 P3 + 15 项证伪留痕）——Task 4 发布失败两分支定稿换 AsyncMock(spec=EventPublisher)（真实总线失败面不可达机理 + 5-1 L264-277 先例）；判空主检定稿在加载器（DC-5 观测锚点 + Task 2 红行 context 断言）；AC-1.3/2.3 补同码多因区分断言与 tmp_path/ceo/ 子目录层级；23 计数 tripwire 全局注记 + active_skill_count 同源派生；Task 7 补验证型四行循环表（转绿声明 + sorted/import 双变异）；64KB 字节口径定稿；Task 5 SystemExit 2 合法红注明；AC-2.2 断言 str 形态定稿
