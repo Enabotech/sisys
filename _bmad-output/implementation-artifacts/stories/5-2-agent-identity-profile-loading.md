@@ -21,7 +21,7 @@
 - **覆盖 FR:** FR-AC-02（P0）——「系统可以加载 Agent 身份档案（IDENTITY.md/CODE.md/SOUL.md/TOOLS.md/USER.md/MEMORY.md/HEARTBEAT.md）」（prd.md L1838）；FR-IF-02 的 Agent 侧消费（Skills 三级渐进式加载主归属 Story 4.1a 已交付，本 Story 接通 Agent 启动链路并交付 SkillSelector）
 - **Epic 定位:** Epic 5「单 Agent 战略规划能力」价值组第二环——依赖链 `5.1→5.2→5.3→{5.7,5.11}`（epics L1452 顺序依赖「实例化→加载→执行→隔离」）：5.1 交付「Agent 存在」（实体+配置+持久化+事件），本 Story 交付「Agent 是谁」（身份/规则/技能清单），5.3 工作流消费两者执行任务。没有档案加载，5.3 的 LLM 上下文装配无从谈起。
 - **价值链:** 身份档案是 Agent 区别于裸 LLM 调用的核心资产——or.md 四.1.[1]（L277）：AGENT 实例化启动时加载身份档案（IDENTITY.md）、行为规范（CODE.md）、人格定义（SOUL.md）、工具集（TOOLS.md）、用户信息（USER.md）、长期记忆（MEMORY.md）、心跳任务配置（HEARTBEAT.md）。
-- **Skills 框架激活价值:** Epic 4 交付的 L1/L2/L3 三级加载（InMemorySkillLoader + 23 SKILL.md）当前仅被 strategic_analysis / run_tool_chain 两用例消费；本 Story 把 Skills L1 元数据接入 Agent 启动上下文（Skills 框架的 Agent 侧首个消费方），并按 architecture.md GAP-CRITICAL-08b（L3315）交付 SkillSelector（`list_active_skills()` 形态，消除「硬编码选择器违反 P5 Less scaffolding」GAP）。
+- **Skills 框架激活价值:** Epic 4 交付的 L1/L2/L3 三级加载（InMemorySkillLoader + `src/application/skills/` 下 23 个 SKILL.md）当前仅被 strategic_analysis / run_tool_chain 两用例类型级消费（生产接线仅 run_tool_chain——strategic_analysis 未注册组合根，仅测试构造）；本 Story 把 Skills L1 元数据接入 Agent 启动上下文（Skills 框架的 Agent 侧首个消费方），并按 architecture.md GAP-CRITICAL-08b（L3315）交付 SkillSelector（`list_active_skills()` 形态，消除「硬编码选择器违反 P5 Less scaffolding」GAP）。
 
 ### 前置依赖（全部 ✅ 已完成，无阻塞）
 
@@ -45,10 +45,10 @@
 | `AgentConfigLoader` 加载链结构（目录锚定/`asyncio.to_thread`/三阶段异常包装/未知键忽略/相对路径 path_display） | `src/infrastructure/agent_orch/yaml_agent_config_loader.py`（DEFAULT_CONFIG_DIR 四级上溯 L31、`_read_yaml` L156-195） | **参考照抄**——MarkdownAgentProfileLoader 的结构模板（换 .md 文件读取与校验逻辑） |
 | agent 异常子域 440/441（442-449 空闲，`_code_ranges.py` L117 注释显式预留「5.2 档案加载」） | `src/domain/exceptions/agent_exceptions.py`、`_code_ranges.py` | **追加**——本 Story 在同文件新增 442/443，`_CLASS_TO_SUBDOMAIN` 同步 |
 | `AgentInstantiated` 事件模板（kw_only 必填 + `event_type` init=False + `__post_init__` 设 aggregate） | `src/domain/events/agent_events.py` L39-67 | **参考照抄**——AgentProfileLoaded 事件模板 |
-| 事件双登记模式（`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`） | configs/event_channels.yaml L177-180、`src/infrastructure/messaging/channel_router.py` L231 | **追加登记**（AgentProfileLoaded） |
-| `SkillLoaderPort.load_metadata(tool_name)` + `ToolMetadata`（19 字段，含 `status: str = "active"`） | `src/application/ports/skill_loader.py` L28-72/L112 | **直接复用**——L1 元数据单工具查询；slug 直传合法（`_resolve_slug` L403-429 支持） |
-| `skill_manifest.get_all_slugs()`（23 slug 全量静态映射） | `src/application/skills/skill_manifest.py` L44-109 | **直接复用**——SkillSelector 的全量枚举真源 |
-| `InMemorySkillLoader`（`skill_loader` 端口已注册 SCOPED，两用例消费先例） | `src/application/skills/loader.py` L78（注册 composition_root.py L2529-2539） | **直接复用**——L1 缓存 `__init__` 同步构建，被本 Story 用例组合注入 |
+| 事件双登记模式（`configs/event_channels.yaml` + `ChannelRouter.DEFAULT_MAPPINGS`） | configs/event_channels.yaml L182-185、`src/infrastructure/messaging/channel_router.py` L237-242 | **追加登记**（AgentProfileLoaded） |
+| `SkillLoaderPort.load_metadata(tool_name)` + `ToolMetadata`（18 字段，含 `status: str = "active"`） | `src/application/ports/skill_loader.py` L28-72/L119 | **直接复用**——L1 元数据单工具查询；slug 直传合法（`_resolve_slug` L403-429 支持） |
+| `skill_manifest.get_all_slugs()`（23 slug 全量静态映射，`SLUG_TO_TOOL_ID` L14-38） | `src/application/skills/skill_manifest.py` L74-76 | **直接复用**——SkillSelector 的全量枚举真源 |
+| `InMemorySkillLoader`（`skill_loader` 端口已注册 SCOPED，两用例消费先例） | `src/application/skills/loader.py` L78（注册 composition_root.py L2528-2540） | **直接复用**——L1 缓存 `__init__` 同步构建（构造期同步读 TOOLS.md 一次——本地静态文件只读，非零 IO 但无网络连接），被本 Story 用例组合注入 |
 | `_estimate_tokens` 启发式（`len(content) // 4`） | `src/application/skills/loader.py` L248-260 | **参考**——启动上下文 token 计量同款口径 |
 | CLI 骨架（`add_subparsers(required=True)` 已就位 + 退出码 0/1/2 + finally 关池 + 守卫先于 bootstrap） | `src/entrypoints/agent_cli.py`（D1 方案 A 后入口在此，**注意 5-1 故事文中 `src/interfaces/cli/` 路径已过时**） | **扩展**——`subparsers.add_parser("load-profile")` 追加子命令，pyproject script 无需新增 |
 | 组合根 Story 5.1 注册段形态（`register_port` + `__import__` 延迟导入 + lambda 工厂 resolve 依赖） | `src/composition_root.py` L2674-2736 | **参考照抄**——5-2 三端口在其后追加 |
@@ -104,11 +104,11 @@
 **When** 档案加载用例组装 TOOLS.md 视图 / 调用 SkillSelector
 **Then** L1 元数据清单包含 23 个工具（slug + tool_name + description + when_to_use + tags 元数据），仅含 status=="active" 条目
 **And** `SkillSelector.list_active_skills()` 返回 ACTIVE 全量列表——**无关键词权重排序、无语义相似度打分**（interface-design.md §5.5 权威口径：Skill 触发由 LLM 基于 L1 description 自主判断，SkillSelector 仅作查询接口；epics L1546 旧文案已废弃，见偏离声明 D-1）
-**And** TOOLS.md L1 视图 token 计量 ≤1200 tokens（interface-design.md L52/L633 口径；现状 1104 tokens）
+**And** TOOLS.md L1 视图 token 计量 ≤1200 tokens——**计量对象定稿（两口径分述，DC-3）**：① **L1 缓存口径** = `src/application/skills/TOOLS.md` 全文 `len(chars)//4`（现状 1104 tokens，interface-design.md L52/L633「启动全量预加载 ≤1.2K」预算的对象）；② **用例计量口径** = `"\n".join(f"{m.tool_name}: {m.description}" for m in tools_l1)` 拼接文本（现状约 218 tokens，是 TOOLS.md 内容子集——本 Story `startup_context_tokens` 的 L1 部分与 AC-3.1 断言均用此口径）
 
 **验证标准/Validation Criteria:**
 - [ ] `tools_l1` 条目数 == 23，全部 `status == "active"`
-- [ ] L1 token 计量用 `_estimate_tokens` 同款启发式（chars//4），断言 ≤1200
+- [ ] L1 token 计量用 `_estimate_tokens` 同款启发式（chars//4），**断言对象为用例拼接视图**（`"\n".join(f"{m.tool_name}: {m.description}")`，分隔符定稿换行），断言 ≤1200（拼接视图为 TOOLS.md 子集，实测 ~218，远低于上限——1104 为 TOOLS.md 文件口径参照值，非本断言对象）
 - [ ] SkillSelector 为纯过滤（组合 `skill_manifest.get_all_slugs()` + `skill_loader.load_metadata(slug)`，过滤 status），零排序副作用断言（返回顺序与 slug 清单一致或稳定序）
 - [ ] **不实现**关键词 40% + 语义 60% 融合（GAP-CRITICAL-08b 明文废弃；语义基础设施零消费属预期）
 
@@ -116,7 +116,7 @@
 
 **Given** 七档案加载与 L1 组装完成
 **When** 用例完成计量与发布
-**Then** 启动上下文分项计量：IDENTITY.md + SOUL.md 合计 ≤500 tokens；TOOLS.md L1 ≤1200 tokens；总计量（IDENTITY+SOUL+TOOLS_L1）≤1700 tokens——预算口径按 interface-design.md 修订版（PRD NFR-IF-02 旧口径 <500 tokens 偏离声明 D-2）
+**Then** 启动上下文分项计量：IDENTITY.md + SOUL.md 合计 ≤500 tokens；TOOLS.md L1（拼接口径，见 AC-3）≤1200 tokens；总计量（IDENTITY+SOUL+TOOLS_L1 拼接后一次计量）≤1700 tokens——预算口径按 interface-design.md 修订版（PRD NFR-IF-02 旧口径 <500 tokens 偏离声明 D-2）。注：总量为拼接后一次 `//4` 计量，与分项计量之和存在 ≤1 取整差；**分项断言由测试从 `result.profile.identity/soul` 与 `result.tools_l1` 按同款口径现算**（DTO 仅暴露总量 `startup_context_tokens`，无分项字段）
 **And** 发布 `AgentProfileLoaded` 领域事件（frozen dataclass：`agent_id`/`role`/`startup_context_tokens`/`active_skill_count`，`aggregate_type="Agent"`；RELIABLE 模式经 RabbitMQ via Outbox——同 5-1 语义）
 **And** 事件在 `configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` 双登记（routing key `sisys.events.reliable.agent_profile_loaded`）
 **And** 发布失败记日志不回滚（`PublishResult.is_success == False` 与 raise 两分支，对齐 5-1 AC-4 语义）；先加载后发布
@@ -234,7 +234,7 @@ class AgentProfileLoadResult:
 | # | 端口名称（注册名） | 版本 | interface | 实现模块 | lifetime | owner | tags | 状态 |
 |---|------------------|------|-----------|---------|----------|-------|------|------|
 | 1 | `agent_profile_loader` | v1.0.0 | `AgentProfileLoader`（application/ports/agent_profile_loader.py） | `src.infrastructure.agent_orch.markdown_agent_profile_loader.MarkdownAgentProfileLoader` | SINGLETON | platform | ("agent","profile") | 新建 |
-| 2 | `skill_selector` | v1.0.0 | `SkillSelector`（application/ports/skill_selector.py） | `src.application.skills.registry.selector.SkillSelector` | SINGLETON | platform | ("skills","selector") | 新建 |
+| 2 | `skill_selector` | v1.0.0 | `SkillSelectorPort`（application/ports/skill_selector.py——端口名带 Port 后缀对齐 `SkillLoaderPort` 先例，与实现类 `SkillSelector` 异名防 import 二义） | `src.application.skills.registry.selector.SkillSelector` | SINGLETON | platform | ("skills","selector") | 新建 |
 | 3 | `agent_profile_use_case` | v1.0.0 | `LoadAgentProfileUseCase`（application/use_cases/agent_profile_loading.py，interface 绑定自身类型，对齐 5-1 用例端口先例） | 工厂 lambda：resolve agent_profile_loader + agent_repository + skill_selector + event_publisher | SINGLETON | platform | ("agent",) | 新建 |
 
 > lifetime 说明：三端口均 SINGLETON——`MarkdownAgentProfileLoader` 无状态（每次调用即时读文件，MVP 无缓存层）；`SkillSelector` 无状态纯查询；用例对齐 5-1 `agent_instantiation_use_case` SINGLETON 先例。`skill_loader`（4-1a，SCOPED）被 SINGLETON 用例捕获属 captive dependency——与 5-1 D7 同款（`InMemorySkillLoader` 无状态且其 L1 缓存被钉住反而保证跨调用复用，性能有利），登记注记不处置（D7 留项归 5.4 决策回迁）。
@@ -251,12 +251,12 @@ class AgentProfileLoader(Protocol):
 
 # src/application/ports/skill_selector.py —— Skill 选择器端口（interface-design.md §5.5 权威口径）
 @runtime_checkable
-class SkillSelector(Protocol):
+class SkillSelectorPort(Protocol):
     async def list_active_skills(self) -> tuple[ToolMetadata, ...]: ...
     # 返回 status=="active" 的全量 L1 元数据（按 slug 清单稳定序）；无排序打分、无 Top-K
 ```
 
-- [ ] `MarkdownAgentProfileLoader` 构造注入 `profile_root: Path | None = None`（默认 `Path(__file__).parent.parent.parent.parent / "configs" / "agents" / "profiles"` **仓库根锚定不依赖 cwd**——对齐 YamlAgentConfigLoader L31 四级上溯模式；测试传 tmp_path 覆盖）；文件读取 `asyncio.to_thread(Path.read_text, ...)`（不引入 aiofiles）；目录寻址 `profile_root / role.value / "IDENTITY.md"` 等六固定名
+- [ ] `MarkdownAgentProfileLoader` 构造注入 `profile_root: Path | None = None`（默认 `Path(__file__).parent.parent.parent.parent / "configs" / "agents" / "profiles"` **仓库根锚定不依赖 cwd**——对齐 YamlAgentConfigLoader L31 四级上溯模式；测试传 tmp_path 覆盖）；文件读取 `asyncio.to_thread(Path.read_text, path, encoding="utf-8")`（不引入 aiofiles；**必须显式 encoding**——裸 read_text 依赖 locale，「非 UTF-8 → 442」契约会环境漂移）；目录寻址 `profile_root / role.value / "IDENTITY.md"` 等六固定名
 - [ ] `SkillSelector`（`src/application/skills/registry/selector.py`——architecture.md §13.11 L2299 规划路径，registry/ 目录已存在为空）组合注入 `SkillLoaderPort`，实现为 `get_all_slugs()` 枚举 → 逐 slug `await skill_loader.load_metadata(slug)` → 过滤 `status == "active"` → 按 slug 清单序返回 tuple；**禁止**关键词打分/语义检索/Top-K（GAP-CRITICAL-08b）
 - [ ] 组合根注册位置：`src/composition_root.py` Story 5.1 段（L2674-2736）之后新增「=== Story 5.2 ===」段
 
@@ -293,9 +293,9 @@ class SkillSelector(Protocol):
 #### API 契约 (API Contract)
 
 - [ ] **OpenAPI 不适用**——本 Story 无 REST 端点（架构文档 §13.17.1 的 agent 执行端点属 5.3+；API 路由强制认证中间件成本由 Epic 7 承接）
-- [ ] CLI 契约：扩展 `src/entrypoints/agent_cli.py` 追加 `load-profile` 子命令（`sisys-agent load-profile --agent-id <uuid>`，`-a/--agent-id` 必填 str）；输出格式定稿：多行人类可读摘要（六档案逐项 `IDENTITY.md: OK (N tokens)` + `活跃技能: 23` + `启动上下文: N tokens`），成功退出码 0；业务异常退出码 1（stderr `[EXCEPTION_44x] 消息`）；argparse 用法错 2（`add_subparsers(required=True)` 已就位）
+- [ ] CLI 契约：扩展 `src/entrypoints/agent_cli.py` 追加 `load-profile` 子命令（`sisys-agent load-profile --agent-id <uuid>`，`-a/--agent-id` 必填 str）；输出格式定稿：多行人类可读摘要（六档案逐项 `IDENTITY.md: OK (N chars)`——N 为 `len(profile.<field>)` 字符数直读 + `活跃技能: N`（运行期动态值，不写字面量）+ `启动上下文: N tokens`），成功退出码 0；业务异常退出码 1（stderr `[EXCEPTION_44x] 消息`）；argparse 用法错 2（`add_subparsers(required=True)` 已就位）
 - [ ] **UUID 解析守卫（红线）**：`--agent-id` 字符串转 UUID 时**禁止裸 `uuid.UUID(value)`** 逃逸 ValueError——函数体内 try/except 映射 `ValidationError`（EXCEPTION_201，应用层输入校验语义，对齐 ocr_cli D8 清偿后模式：ocr_cli 6 处 ValueError→201 先例）；argparse 的 `type=` 参数**不得**用 `uuid.UUID`（argparse 会把 ValueError 转 usage error exit 2，绕过统一异常体系）
-- [ ] **幂等性：`load-profile` 幂等只读**——不创建/修改任何状态（纯读 + 发布事件），agent_cli.py 模块 docstring 明示此语义（与 `instantiate` 非幂等对照）
+- [ ] **幂等性：`load-profile` 幂等只读**——不创建/修改任何状态（纯读 + 发布事件），agent_cli.py 模块 docstring 明示此语义（与 `instantiate` 非幂等对照）；注：发布事件是副作用——重复调用会重复发布 AgentProfileLoaded（事件带 `event_id`，消费方可按其幂等去重），「幂等只读」指不改变被读状态
 
 #### 六边形架构约束（必须遵守）
 
@@ -327,20 +327,20 @@ class SkillSelector(Protocol):
 
 | 场景 | 覆盖 | 要点 |
 |------|------|------|
-| AC-1.1 加载 CEO 七档案成功 | AC-1 | 服务级真实组装：先 5-1 用例真实 instantiate（手动组装：`resolve("agent_config_loader")` + 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()`，⚠️ 禁 resolve `agent_repository`/用例端口——SCOPED 钉住全局 Resolver 跨循环死连接，5-1 R3-F5 教训）→ 本 Story 用例手动组装（`resolve("agent_profile_loader")` + `resolve("skill_selector")` 零 IO 安全 + 手动仓储 + InMemoryEventBus）→ 断言六档案非空含 CEO 语义锚点 + 23 ACTIVE 工具 + result 三段 |
-| AC-1.2 档案文件缺失抛异常 | AC-1 | tmp_path 构造六档案后删 IDENTITY.md → `AgentProfileError` EXCEPTION_442（构造注入 `profile_root=tmp_path` 的手动组装 loader） |
-| AC-1.3 档案内容空白抛异常 | AC-1 | tmp_path 六文件全为空白（空串/纯换行）→ 442 |
-| AC-2.1 档案内容验证通过 | AC-2 | 内置 `configs/agents/profiles/ceo/` 加载：六档案验证全过 + IDENTITY 含「CEO」语义断言 + 单文件 <64KB |
-| AC-2.2 agent_id 不存在抛异常 | AC-2 | `uuid.uuid4()` 随机 id → `AgentNotFoundError` EXCEPTION_443 + context 携带 agent_id |
-| AC-2.3 档案大小超限抛异常 | AC-2 | tmp_path 构造 >64KB 档案文件 → 442 |
-| AC-3.1 Skills L1 元数据与 token 预算 | AC-3 | 23 条 ACTIVE 元数据 + L1 计量 ≤1200 tokens（`resolve("skill_loader")` 纯内存查询，无 Redis 门控） |
+| AC-1.1 加载 CEO 七档案成功 | AC-1 | 服务级真实组装（**用例级场景**——唯一需要先 instantiate 的成功链路）：先 5-1 用例真实 instantiate（手动组装：`resolve("agent_config_loader")` + 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()`，⚠️ 禁 resolve `agent_repository`/用例端口——SCOPED 钉住全局 Resolver 跨循环死连接，5-1 文档审查修复 #23 教训）→ 本 Story 用例手动组装（`resolve("agent_profile_loader")` + `resolve("skill_selector")`（无连接构造，本地文件只读）+ 手动仓储 + InMemoryEventBus）→ 断言六档案非空含 CEO 语义锚点 + 23 ACTIVE 工具 + result 三段 |
+| AC-1.2 档案文件缺失抛异常 | AC-1 | **loader 端口直连场景**（对齐 5-1 AC-2.2/2.3 破坏场景先例——When 文案用「通过档案加载端口加载」）：tmp_path 构造六档案后删 IDENTITY.md → `MarkdownAgentProfileLoader(profile_root=tmp_path).load(role, agent_id)` 直连 → `AgentProfileError` EXCEPTION_442 且 context 含文件名。**不经用例**（守卫链存在性 443 先行——用例级直连会先抛 443 非 442；442 经用例的传播路径由 Task 4 单测覆盖）；无需 Redis、无需 instantiate（无 Redis 门控行） |
+| AC-1.3 档案内容空白抛异常 | AC-1 | **loader 端口直连**（同 AC-1.2 形态）：tmp_path 六文件全为空白（空串/纯换行）→ 442；无需 Redis |
+| AC-2.1 档案内容验证通过 | AC-2 | **loader 端口直连**（默认 profile_root）：内置 `configs/agents/profiles/ceo/` 加载六档案验证全过 + IDENTITY 含「CEO」语义断言 + 单文件 ≤64KB；无需 Redis（纯静态文件场景，脱离门控） |
+| AC-2.2 agent_id 不存在抛异常 | AC-2 | **用例级场景**（验证 443 守卫，需 Redis）：真实仓储（场景级客户端手动组装）+ `uuid.uuid4()` 随机 id → `AgentNotFoundError` EXCEPTION_443 + context 携带 agent_id；无需 instantiate（随机 id 本应查无） |
+| AC-2.3 档案大小超限抛异常 | AC-2 | **loader 端口直连**（同 AC-1.2 形态）：tmp_path 构造 >64KB 档案文件 → 442；无需 Redis |
+| AC-3.1 Skills L1 元数据与 token 预算 | AC-3 | 23 条 ACTIVE 元数据 + L1 计量 ≤1200 tokens（**断言对象 = 用例拼接视图** `"\n".join(f"{m.tool_name}: {m.description}")`，AC-3 两口径分述的口径②；`resolve("skill_loader")` 本地文件只读无连接，无 Redis 门控） |
 | AC-3.2 SkillSelector 返回 ACTIVE 列表 | AC-3 | `resolve("skill_selector")` → `list_active_skills()` 条目数 23 + 全 active + 与 slug 清单同序（零排序副作用断言） |
-| AC-4.1 启动上下文 token 预算与事件发布 | AC-4 | 真实链路计量断言（IDENTITY+SOUL ≤500 / 总 ≤1700）+ InMemoryEventBus 捕获 AgentProfileLoaded 四字段 |
+| AC-4.1 启动上下文 token 预算与事件发布 | AC-4 | 真实链路计量断言（IDENTITY+SOUL ≤500 **由测试从 `result.profile.identity/soul` 按 `len//4` 现算** / 总量 `result.startup_context_tokens` ≤1700）+ InMemoryEventBus 捕获 AgentProfileLoaded 四字段 |
 | AC-5.1 档案加载延迟 P95<500ms | AC-5 | 真实 Redis + 真实文件，warmup 1 + 20 采样 `quantiles(n=20)[18]` |
 | AC-5.2 档案加载成功率 100% | AC-5 | 20 次重复加载全成功（同 agent_id 复用，幂等只读） |
 | AC-6.1 三端口接线可达 | AC-6 | resolve 三端口 isinstance + PortSpec 元数据（禁对产物发命令） |
-| AC-6.2 事件双登记与 CLI 注册 | AC-6 | yaml + DEFAULT_MAPPINGS 两处 grep 可达 + pyproject script 注册断言（静态场景） |
-| AC-6.3 完成清单逐项确认 | AC-6（收尾） | Task 8 收尾场景（src/tests 完成清单 + L1-L8 接线终态断言） |
+| AC-6.2 事件双登记与 CLI 注册 | AC-6 | yaml + DEFAULT_MAPPINGS 两处 grep 可达 + pyproject script 注册断言（静态场景；script 已注册——断言为防误删 tripwire，当前恒真属预期，无变异实证覆盖） |
+| AC-6.3 完成清单逐项确认 | AC-6（收尾） | **Task 0 落盘、Task 8 转绿核对**（src/tests 完成清单 + L1-L8 接线终态断言——对齐 5-1 先例：全部场景含收尾在 Task 0 落盘，Task 8 只核对不新增，收集数恒 == 14） |
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试（`_run_async` helper）
@@ -409,9 +409,9 @@ class SkillSelector(Protocol):
 | **TDD 单元测试** | LoadAgentProfileUseCase | 编排顺序（get_by_id→守卫→加载→L1→计量→发布）/443/441/442 传播/发布失败两分支不回滚/token 计量口径 | `tests/unit/application/use_cases/test_agent_profile_loading.py` | Task 4 |
 | **TDD 单元测试** | agent_cli load-profile | parser 契约（子命令+--agent-id 必填）/UUID 守卫（非法串→201）/裸调用 exit 2/成功输出摘要/退出码 0-1-2（monkeypatch 注入先例：5-1 Task 5 定稿模式） | `tests/unit/interfaces/cli/test_agent_cli.py`（**追加**——5-1 CLI 测试在此路径，源已迁 entrypoints 但测试目录未迁，跟随现状不移动） | Task 5 |
 | **TDD 契约测试** | agent_profile_loader / skill_selector / agent_profile_use_case | 11 维度断言 | `tests/contracts/test_port_contract_agent_profile_loader.py`、`test_port_contract_skill_selector.py`、`test_port_contract_agent_profile_use_case.py` | Task 2/3/4 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（AC-1~AC-6 全场景表 14 场景） | `tests/acceptance/test_acceptance_agent_profile_loading.feature` | Task 0 |
-| **TDD 验收测试** | BDD 步骤实现 | 步骤函数（5-1 模板模式） | `tests/acceptance/test_acceptance_agent_profile_loading.py` | Task 0 |
-| **TDD 验收测试** | 收尾验收场景 | 完成清单最终确认 | 同上两文件追加收尾场景 | Task 8 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（AC-1~AC-6 全场景表 14 场景，**含 AC-6.3 收尾场景**——对齐 5-1 先例全部场景 Task 0 一次落盘） | `tests/acceptance/test_acceptance_agent_profile_loading.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数（5-1 模板模式，含收尾场景步骤） | `tests/acceptance/test_acceptance_agent_profile_loading.py` | Task 0 |
+| **TDD 验收测试** | 收尾验收场景 | 完成清单最终确认（AC-6.3 场景转绿核对——Task 0 已落盘，Task 8 不新增场景防收集数漂移） | 同上两文件（Task 0 落盘的收尾场景） | Task 0/8 |
 | **集成测试** | 真实 Redis + 真实文件全链路 | instantiate→load-profile→读回→清理（TestTenant/uuid 隔离）+ 性能（P95/成功率） | `tests/integration/test_integration_agent_profile_loading.py` | Task 6 |
 | **SDD 架构验证** | 六边形约束 | domain 零依赖+零 application import/依赖方向/组合根唯一装配/CLI 边界 | `tests/unit/architecture/test_arch_agent_profile_loading.py` | Task 7 |
 
@@ -455,7 +455,7 @@ class SkillSelector(Protocol):
 | asyncio 约束 | BDD 步骤禁 `@pytest.mark.asyncio`；CLI 入口（独立进程）用 `asyncio.run()` 合法；`asyncio.Lock` 若使用必须类变量 |
 | Mock 边界 | **单元测试** Mock 端口（`AsyncMock(spec=Protocol)` + `_make_*` 工厂）；**集成测试**真实 Redis + 真实文件优先；**验收测试禁止 mock**（InMemoryEventBus 是真实实现类非 mock；档案用 tmp_path 真实文件；skill_loader 经组合根 resolve 真实实例） |
 | bootstrap 禁令 | **验收测试禁止调用 `bootstrap()`**——组合根已由 tests/conftest.py session 级 `_bootstrap_once` 完成引导；同进程二次 bootstrap 抛 ConflictError。端口获取直接 `from src.domain.ports.resolver import resolve` |
-| resolve 纪律 | 功能场景一律手动组装（`MarkdownAgentProfileLoader(profile_root=...)` 直构 / 手动仓储 + 场景级客户端）；`resolve` 仅限零 IO 端口（`agent_profile_loader`/`skill_loader`/`skill_selector` 无连接构造）且 AC-6.1 接线断言禁发命令——**禁 resolve `agent_repository`（SCOPED）与用例端口**（SINGLETON redis_client 跨循环死连接，5-1 R3 教训） |
+| resolve 纪律 | 功能场景一律手动组装（`MarkdownAgentProfileLoader(profile_root=...)` 直构 / 手动仓储 + 场景级客户端）；`resolve` 仅限**无连接构造**端口（`agent_profile_loader`/`skill_loader`/`skill_selector`——本地静态文件只读、无网络连接，跨循环安全；注意 `skill_loader` 构造期同步读 TOOLS.md 一次，非零 IO 但确定性本地读）且 AC-6.1 接线断言禁发命令——**禁 resolve `agent_repository`（SCOPED）与用例端口**（SINGLETON redis_client 跨循环死连接，5-1 文档审查修复 #23 教训） |
 | 清理粒度 | 每个测试只清理自己创建的资源；fixture 显式声明依赖 |
 | 性能测试 | `pytestmark` 标记 `benchmark`；xdist 下用 `xdist_group("agent-profile-loading")` 串行化计时场景（仅保同组串行不保独占 CPU；`-n auto` 下抖动超标时以 `-n 0` 结果为准）；硬断言 500ms 对典型 <20ms 链路约 25 倍余量 |
 
@@ -503,7 +503,7 @@ class SkillSelector(Protocol):
 - [ ] Subtask 0.1: 按「领域事件 Schema」「数据模型」「端口契约清单」「领域异常契约」四节定稿全部契约（逐项核对签名/字段/编码无歧义后确认；特别核对 `ToolMetadata.status` 字段与 `get_all_slugs()` 返回形态——SkillSelector 实现的直接输入）
 - [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_agent_profile_loading.feature`（14 场景清单，严格按 R6：5-1 主体基准 + postgresql 模板三项继承先例 + AC 编号命名）
 - [ ] Subtask 0.3: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_agent_profile_loading.py`（@scenario 显式绑定 + context dict + `_run_async` + 场景级 ping 门控下沉 + **新模块延迟 import** + 显式 pytestmark 列表）
-- [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError/AssertionError 为合法红；**前提：Redis 在线**——含 Redis 依赖场景 ping 失败则 skip 无失败可确认；**校验收集场景数 == 14**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
+- [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError/AssertionError/未注册端口的解析期错误（registry miss，如 `resolve("skill_selector")` 未注册）三类均为合法红；**红阶段失败形态不能证明断言正确性——断言活性由各 Task 变异阶段与收集数校验背书**；**前提：Redis 在线**——含 Redis 依赖场景 ping 失败则 skip 无失败可确认；**校验收集场景数 == 14**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
 - [ ] Subtask 0.5: 链路接线断言清单 L1-L8 逐项确认处置（本 Story 接线 6 项 / deferred 保持 2 项）+ **补登记 deferred-work.md 观察项：组合根 `l0_storage`（L268-276）与 `memory_file_storage`（L1108-1116）impl 字符串指向不存在的模块路径（实际在 `src/infrastructure/storage/fs/` 下）——休眠资产路径失效，激活时必炸**（对齐 5-1 Task 0 补登记 session_storage 先例）
 
 **完成标准/Definition of Done:**
@@ -548,7 +548,7 @@ class SkillSelector(Protocol):
 
 - [ ] Subtask 1.1: 🔴 红 — 异常测试（循环 A）
 - [ ] Subtask 1.2: 🟢 绿 — 442/443 实现
-- [ ] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记四处（_CLASS_TO_SUBDOMAIN/__init__/HTTP_MAP/设计文档）
+- [ ] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记五处（`_CLASS_TO_SUBDOMAIN`/`exceptions __init__`/`exception_handlers.py EXCEPTION_HTTP_MAP`/**`tests/unit/interfaces/api/test_exception_handlers.py` Map 完备性期望集补 442/443 行**（既有测试期望集枚举断言，漏改不红——显式列入防漏）/设计文档 §3.3.2）
 - [ ] Subtask 1.4: 🔴 红 — 事件测试（循环 B）
 - [ ] Subtask 1.5: 🟢 绿 — AgentProfileLoaded 实现
 - [ ] Subtask 1.6: 🟡 变异 + 🔄 重构 — 事件双登记 + §10.1
@@ -573,17 +573,17 @@ class SkillSelector(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/agent_orch/test_markdown_agent_profile_loader.py`（tmp_path 真实文件 IO 零 mock：正常六档案构造 → AgentProfile 全字段一致/**目录缺失**（profile_root 指向不存在路径）→ 442/**单文件缺失**（删 IDENTITY.md）→ 442 且 context 含文件名/**内容空白**（空串/纯空白/纯换行三形态）→ 442/**大小超限**（>65536 字节文件）→ 442/**编码非法**（GBK 字节写文件）→ 442/**未知文件忽略**（目录多放 README.md → 六档案加载成功且字段不受污染——前向兼容策略）/**agent_id/role 透传**（VO 归属锚点断言）；另内置资产冒烟：默认 profile_root 加载 `profiles/ceo/` 六档案成功且 IDENTITY 含「CEO」） |
-| 🟢 绿 | 实现 `src/application/ports/agent_profile_loader.py`（Protocol，签名见 Task 0）+ `src/infrastructure/agent_orch/markdown_agent_profile_loader.py`（`profile_root` 构造注入默认仓库根四级上溯锚定 `configs/agents/profiles`——对齐 YamlAgentConfigLoader L31；`asyncio.to_thread(Path.read_text, ...)` 逐档案读取；大小上限 `PROFILE_FILE_MAX_BYTES = 65536` 模块常量；`Path.read_text` 的 OSError/UnicodeDecodeError 逐类包装 442（reason 分列「档案不可读/编码非法」）；VO 构造在加载器内（六字段齐后一次构造，VO 校验兜底））+ 新建六档案资产 `configs/agents/profiles/ceo/{IDENTITY,CODE,SOUL,USER,MEMORY,HEARTBEAT}.md`（内容红线见 Task 0 数据模型节；IDENTITY+SOUL 合计 ≤500 tokens——编写后以 `len(chars)//4` 实测断言） |
+| 🟢 绿 | 实现 `src/application/ports/agent_profile_loader.py`（Protocol，签名见 Task 0）+ `src/infrastructure/agent_orch/markdown_agent_profile_loader.py`（`profile_root` 构造注入默认仓库根四级上溯锚定 `configs/agents/profiles`——对齐 YamlAgentConfigLoader L31；`asyncio.to_thread(Path.read_text, path, encoding="utf-8")` 逐档案读取——**必须显式 encoding**，对齐 yaml_agent_config_loader `_read_yaml` 与 InMemorySkillLoader 先例（裸 read_text 依赖 locale，非 UTF-8 locale 下中文资产会误判 442）；大小上限 `PROFILE_FILE_MAX_BYTES = 65536` 模块常量（读前 stat 或读后 len 判定皆可——资产随代码分发无恶意大文件面）；`Path.read_text` 的 OSError/UnicodeDecodeError 逐类包装 442（reason 分列「档案不可读/编码非法」）；VO 构造在加载器内（六字段齐后一次构造，VO 校验兜底））+ 新建六档案资产 `configs/agents/profiles/ceo/{IDENTITY,CODE,SOUL,USER,MEMORY,HEARTBEAT}.md`（内容红线见 Task 0 数据模型节；IDENTITY+SOUL 合计 ≤500 tokens——编写后以 `len(chars)//4` 实测断言） |
 | 🟡 变异 | 突变固定名映射（"IDENTITY.md"→"IDENTITY_X.md"）→ 加载测试红 → 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_profile_loader`（SINGLETON，lambda + `__import__` 延迟加载，仿 5-1 段形态）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_loader.py`（11 维度；DummyResolver 零依赖直构）；ruff+mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — 加载器测试（含内置资产冒烟与八类边界）
+- [ ] Subtask 2.1: 🔴 红 — 加载器测试（正常加载 + 七类边界：目录缺失/单文件缺失/内容空白/大小超限/编码非法/未知文件忽略/agent_id-role 透传；另含内置资产冒烟——红阶段失败形态与其余用例同为 ModuleNotFoundError（模块先于资产缺失暴露），属合法红）
 - [ ] Subtask 2.2: 🟢 绿 — 端口 + MarkdownAgentProfileLoader + 六档案资产
 - [ ] Subtask 2.3: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试
 - [ ] Subtask 2.4: 内置资产 token 实测（IDENTITY+SOUL ≤500 tokens 计量脚本或测试断言——AC-4 资产红线验证）
 
 **完成标准/Definition of Done:**
-- [ ] 八类失败/边界路径 + 成功路径全覆盖（真实文件 IO）
+- [ ] 七类失败/边界路径 + 成功路径 + 未知文件忽略全覆盖（真实文件 IO，见 Subtask 2.1 清单）
 - [ ] 契约测试通过，`resolve("agent_profile_loader")` 可达（链路 L1 绿灯）
 - [ ] domain 层零依赖（agent_profile.py 仅标准库 + AgentRole）
 
@@ -600,10 +600,10 @@ class SkillSelector(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/skills/test_skill_selector.py`（真实 `InMemorySkillLoader` 直构组合（真实服务优先——`InMemorySkillLoader()` 无参构造零 IO）: `list_active_skills()` 返回 23 条/全部 `status == "active"`/与 `get_all_slugs()` 清单同序（零排序副作用断言——`[m.slug for m in result] == get_all_slugs()`）/返回类型 tuple；Mock 分支：`AsyncMock(spec=SkillLoaderPort)` side_effect 阶段化——某 slug 元数据 status="deprecated" → 结果不含该条（过滤行为断言）/skill_loader 抛 SkillNotFoundError → 传播不静默） |
+| 🔴 红 | 编写 `tests/unit/application/skills/test_skill_selector.py`（真实 `InMemorySkillLoader` 直构组合（真实服务优先——`InMemorySkillLoader()` 无参可用，构造期同步读 TOOLS.md 一次（本地静态文件只读、无连接），单测可接受）: `list_active_skills()` 返回 23 条/全部 `status == "active"`/与 `get_all_slugs()` 清单同序（零排序副作用断言——`[m.slug for m in result] == get_all_slugs()`）/返回类型 tuple；Mock 分支：`AsyncMock(spec=SkillLoaderPort)` side_effect 阶段化——某 slug 元数据 status="deprecated" → 结果不含该条（过滤行为断言）/skill_loader 抛 SkillNotFoundError → 传播不静默） |
 | 🟢 绿 | 实现 `src/application/ports/skill_selector.py`（Protocol，签名见 Task 0）+ `src/application/skills/registry/selector.py`（`SkillSelector` 组合注入 `skill_loader: SkillLoaderPort`；实现 = `get_all_slugs()` 枚举 → 逐 slug `await skill_loader.load_metadata(slug)` → `status == "active"` 过滤 → 按 slug 清单序 tuple 返回；模块 docstring 引用 interface-design.md §5.5 与 GAP-CRITICAL-08b） |
 | 🟡 变异 | 突变过滤条件（`== "active"` → `!= "active"`）→ 23 条断言红（结果为 0 条）→ 还原绿 |
-| 🔄 重构 | 组合根注册 `skill_selector`（SINGLETON，lambda resolve `skill_loader`）+ 契约测试 `tests/contracts/test_port_contract_skill_selector.py`（11 维度；DummyResolver 提供 `skill_loader` 依赖名——直构 `InMemorySkillLoader()` 零 IO）；ruff+mypy |
+| 🔄 重构 | 组合根注册 `skill_selector`（SINGLETON，lambda resolve `skill_loader`）+ 契约测试 `tests/contracts/test_port_contract_skill_selector.py`（11 维度；DummyResolver 提供 `skill_loader` 依赖名——直构 `InMemorySkillLoader()` 本地文件只读、契约测试可接受）；ruff+mypy |
 
 - [ ] Subtask 3.1: 🔴 红 — Selector 测试（真实 + Mock 双分支）
 - [ ] Subtask 3.2: 🟢 绿 — 端口 + SkillSelector 实现
@@ -627,16 +627,16 @@ class SkillSelector(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/use_cases/test_agent_profile_loading.py`（Mock 端口：`AsyncMock(spec=AgentProfileLoader)`、`AsyncMock(spec=AgentRepository)`、`AsyncMock(spec=SkillSelector)`、InMemoryEventBus 真实类；成功编排顺序断言（**get_by_id → 守卫 → loader.load → list_active_skills → publish 调用序**，Mock calls 序断言——对齐 5-1 Task 4 红行模式）；get_by_id 返回 None → AgentNotFoundError 443 且 loader 未被调用；非 CEO 实体（Mock get_by_id 返回 role=CFO 实体）→ AgentRoleNotSupportedError 441 且 loader 未被调用；loader 失败（442）传播；list_active_skills 恰被调用一次且其返回值进入 DTO tools_l1（ACTIVE 过滤逻辑单点在 SkillSelector——用例透传不断言过滤，Task 3 已覆盖）；token 计量 = (identity+soul+L1 视图 chars)//4 口径断言；publish 失败两分支（PublishResult.is_success==False / raise）→ 结果仍返回且记日志不回滚；返回 DTO 四字段） |
-| 🟢 绿 | 实现 `src/application/use_cases/agent_profile_loading.py` `LoadAgentProfileUseCase`（构造注入 profile_loader/repository/skill_selector/event_publisher 四端口；`async execute(agent_id: uuid.UUID) -> AgentProfileLoadResult`；守卫链如上；L1 组装：`tools = await self._skill_selector.list_active_skills()` 一次调用（**注入 SkillSelector 而非直组 skill_loader**——ACTIVE 过滤逻辑单点在 SkillSelector，依赖数与直组相同而消重，DC-8）；计量：`startup_context_tokens = _estimate(profile.identity + profile.soul + L1 视图文本)`（L1 视图文本 = 逐条 `f"{m.tool_name}: {m.description}"` 拼接，`_estimate_tokens` 同款 chars//4，模块内私有函数）；事件构造四字段 + 发布两分支记日志不回滚（照抄 5-1 L128-145 形态）） |
-| 🟡 变异 | 突变发布调用行（注释掉 publish）→ 「事件已发布」断言红 → 还原绿（Epic 4 零发布教训防线）；突变守卫顺序（441 检查移到 get_by_id 前）→ 「443 先于 441」调用序断言红 → 还原绿 |
+| 🔴 红 | 编写 `tests/unit/application/use_cases/test_agent_profile_loading.py`（Mock 端口：`AsyncMock(spec=AgentProfileLoader)`、`AsyncMock(spec=AgentRepository)`、`AsyncMock(spec=SkillSelectorPort)`、InMemoryEventBus 真实类；成功编排顺序断言（**get_by_id → 守卫 → loader.load → list_active_skills → publish 调用序**，Mock calls 序断言——对齐 5-1 Task 4 红行模式）；get_by_id 返回 None → AgentNotFoundError 443 且 loader 未被调用；非 CEO 实体（Mock get_by_id 返回 role=CFO 实体）→ AgentRoleNotSupportedError 441 且 loader 未被调用；loader 失败（442）传播；list_active_skills 恰被调用一次且其返回值进入 DTO tools_l1（ACTIVE 过滤逻辑单点在 SkillSelector——用例透传不断言过滤，Task 3 已覆盖）；token 计量 = (identity+soul+L1 视图 chars)//4 口径断言；publish 失败两分支（PublishResult.is_success==False / raise）→ 结果仍返回且记日志不回滚；返回 DTO 四字段） |
+| 🟢 绿 | 实现 `src/application/use_cases/agent_profile_loading.py` `LoadAgentProfileUseCase`（构造注入 profile_loader/repository/skill_selector/event_publisher 四端口；`async execute(agent_id: uuid.UUID) -> AgentProfileLoadResult`；守卫链如上；L1 组装：`tools = await self._skill_selector.list_active_skills()` 一次调用（**注入 SkillSelector 而非直组 skill_loader**——ACTIVE 过滤逻辑单点在 SkillSelector，依赖数与直组相同而消重，DC-8）；计量：`startup_context_tokens = _estimate(profile.identity + profile.soul + L1 视图文本)`（L1 视图文本 = `"\n".join(f"{m.tool_name}: {m.description}" for m in tools)` 换行拼接——**分隔符定稿 `\n`，AC-3 口径②**，`_estimate_tokens` 同款 chars//4，模块内私有函数）；事件构造四字段 + 发布两分支记日志不回滚（照抄 5-1 L128-145 形态——`is_success==False` 分支普通 `logger.error`、raise 分支带 `exc_info=True`，两分支形态照旧不要统一）） |
+| 🟡 变异 | 突变发布调用行（注释掉 publish）→ 「事件已发布」断言红 → 还原绿（Epic 4 零发布教训防线）；突变守卫顺序（**将角色守卫移至 `loader.load` 之后**——「441 检查移到 get_by_id 前」不可编码：role 取自 get_by_id 返回的实体）→ 「非 CEO 实体 → 441 且 loader 未被调用」断言红（结果型断言：错误码 + Mock 未调用，非字面调用序）→ 还原绿 |
 | 🔄 重构 | `AgentProfileLoadResult` DTO（模块内定义，Schema 见 Task 0）；组合根注册 `agent_profile_use_case`（SINGLETON，工厂 resolve 四依赖）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_use_case.py`（DummyResolver 提供四依赖名）；ruff+mypy |
 
 - [ ] Subtask 4.1: 🔴 红 — 用例单元测试（含编排顺序与异常传播）
 - [ ] Subtask 4.2: 🟢 绿 — LoadAgentProfileUseCase 实现
 - [ ] Subtask 4.3: 🟡 变异 — 发布点 + 守卫顺序双突变实证
 - [ ] Subtask 4.4: 🔄 重构 — DTO + 组合根注册 + 契约测试
-- [ ] Subtask 4.5: 验收场景 AC-1.1/2.2/3.1/4.1 转绿核对（服务级真实组装：5-1 用例先 instantiate → 本 Story 用例手动组装——`resolve("agent_profile_loader")` + `resolve("skill_selector")`（均零 IO 安全）+ 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()` + 手动实例化 `LoadAgentProfileUseCase`；组装先例 5-1 Subtask 4.5 / skill_data_collection L318）
+- [ ] Subtask 4.5: 验收场景 AC-1.1/2.2/3.1/4.1 转绿核对（**按场景分档组装，勿一刀切套「先 instantiate」**：① AC-1.1/4.1 = 用例级——先 5-1 用例真实 instantiate 产生 agent，再本 Story 用例手动组装（`resolve("agent_profile_loader")` + `resolve("skill_selector")`（均无连接构造）+ 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()` + 手动实例化 `LoadAgentProfileUseCase`；组装先例 5-1 Subtask 4.5 / skill_data_collection L318）；② AC-2.2 = 用例级但**无需 instantiate**（真实仓储 + 随机 uuid，本应查无）；③ AC-3.1 = **不走用例**（`resolve("skill_loader")` 直查 + 拼接视图计量，无 Redis 门控））
 
 **完成标准/Definition of Done:**
 - [ ] 用例六步编排顺序有断言守护（calls 序断言非仅结果断言）
@@ -665,7 +665,7 @@ class SkillSelector(Protocol):
 - [ ] Subtask 5.2: 🟢 绿 — load-profile 子命令实现
 - [ ] Subtask 5.3: 🟡 变异 — UUID 守卫突变实证
 - [ ] Subtask 5.4: 🔄 重构 — 输出/docstring 收敛
-- [ ] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 取 agent_id → `REDIS_PORT=6380 poetry run sisys-agent load-profile --agent-id <uuid>` 真实执行输出档案摘要（链路 L5 绿灯）。**前置沿用 5-1 Subtask 5.5 三条**：CLI 子进程只读 `REDIS_PORT`（须显式 6380）；无 PG 环境 RELIABLE 发布走 Outbox 失败仅记日志 exit 0 属预期；TTL 过期的 agent_id → 443 退出码 1 属预期行为实证
+- [ ] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 取 agent_id → `REDIS_PORT=6380 poetry run sisys-agent load-profile --agent-id <uuid>` 真实执行输出档案摘要（链路 L5 绿灯）。**前置三条**（沿用 5-1 Subtask 5.5 两条 + 本 Story 新增一条）：① CLI 子进程只读 `REDIS_PORT`（须显式 6380）；② 无 PG 环境 RELIABLE 发布走 Outbox 失败仅记日志 exit 0 属预期（组合根 event_publisher 真实 impl 为 DualChannelEventBus，RELIABLE 经 Outbox 需 PG）；③ TTL 过期的 agent_id → 443 退出码 1 属预期行为实证（5-1 的「poproject 改后 poetry install」条不适用——本 Story 无 pyproject 改动）
 
 **完成标准/Definition of Done:**
 - [ ] `sisys-agent load-profile` 端到端可执行（摘要 stdout、退出码 0/1/2 三路径实测）
@@ -685,7 +685,7 @@ class SkillSelector(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_agent_profile_loading.py`（fixture 链：`get_test_env()` → `real_redis`（integration conftest L193-220，ping 失败 pytest.skip）→ 手动组装 `RedisAgentRepository(adapter=RedisAdapter(real_redis))` + `resolve("agent_profile_loader")` + `resolve("skill_selector")`（均零 IO 安全）+ `InMemoryEventBus` + 5-1 用例（先 instantiate 产生 agent）+ 本 Story 用例手动实例化；场景：① instantiate→load-profile 全链路→六档案内容非空+23 工具+计量断言→teardown 按 context 记录的 agent_id 逐键精确 delete ② P95 计时（perf_counter，warmup 剔除 1 次 + ≥20 采样 + `statistics.quantiles(n=20)[18]` < 500ms，`benchmark` marker + `xdist_group("agent-profile-loading")` 串行化）③ 20 次重复加载成功率 100%（同 agent_id 复用——幂等只读设计行为）） |
+| 🔴 红 | 编写 `tests/integration/test_integration_agent_profile_loading.py`（fixture 链：`get_test_env()` → `real_redis`（integration conftest L193-220，ping 失败 pytest.skip）→ 手动组装 `RedisAgentRepository(adapter=RedisAdapter(real_redis))` + `resolve("agent_profile_loader")` + `resolve("skill_selector")`（均无连接构造、跨循环安全）+ `InMemoryEventBus` + 5-1 用例（先 instantiate 产生 agent）+ 本 Story 用例手动实例化；场景：① instantiate→load-profile 全链路→六档案内容非空+23 工具+计量断言→teardown 按 context 记录的 agent_id 逐键精确 delete ② P95 计时（perf_counter，warmup 剔除 1 次 + ≥20 采样 + `statistics.quantiles(n=20)[18]` < 500ms，`benchmark` marker + `xdist_group("agent-profile-loading")` 串行化）③ 20 次重复加载成功率 100%（同 agent_id 复用——幂等只读设计行为）） |
 | 🟢 绿 | 全链路已由 Task 2-4 交付，测试应直接转绿（若红则暴露真实集成缺陷，修复至绿） |
 | 🟡 变异 | 突变 P95 断言阈值（500→0.5）→ 性能测试红（证明计时断言活着）→ 还原绿 |
 | 🔄 重构 | 场景命名收敛、超时防护；ruff+mypy |
@@ -734,8 +734,8 @@ class SkillSelector(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 acceptance 收尾场景（AC-6.3 完成清单逐项确认） |
-| 🟢 绿 | BDD 步骤实现（文件存在性/关键符号/接线 grep 断言） |
+| 🔴 红 | （AC-6.3 收尾场景与步骤已在 Task 0 落盘并验证红——本 Task 无新增场景，防收集数漂移） |
+| 🟢 绿 | AC-6.3 收尾场景全量转绿核对（文件存在性/关键符号/接线 grep 断言此时全应通过） |
 | 🟡 变异 | 突变一处预期文件名（改为不存在路径）→ 收尾场景红 → 还原绿 |
 | 🔄 重构 | 场景命名与断言表达收敛 |
 
@@ -743,8 +743,8 @@ class SkillSelector(Protocol):
 - [ ] Subtask 8.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单（测试分类表全文件逐项确认）
 - [ ] Subtask 8.3: 链路接线断言清单 L1-L8 终态核对（L1-L6 绿灯实证、L7/L8 deferred-work.md 登记仍在且未误删——含 Task 0 补登记的组合根 impl 路径失效观察项）
 - [ ] Subtask 8.4: 运行 `poetry run pytest tests/`、`poetry run ruff check src/ tests/`、`poetry run mypy src/` 收尾校验
-- [ ] Subtask 8.5: 更新 sprint-status.yaml（5-2 → review）；同步设计文档（D-1/D-2 不修改历史规划文档——登记在 Story 偏离声明即可；interface-design.md §5.5 的「⚠️ 设计示意，未实现 Epic 5」注记更新为已实现（SkillSelector 交付后）；§10.1 事件行已在 Task 1 同步，此处终态核对）
-- [ ] Subtask 8.6: 验收场景全量转绿核对（14 场景逐一绿 + **收集场景数 == 14 校验**（`pytest --collect-only -q`，防漏绑定静默不收集）——补齐各 Task 未显式核对的 AC-2.1/2.3/6.1/6.2）
+- [ ] Subtask 8.5: 更新 sprint-status.yaml（5-2 → review）；同步设计文档（D-1/D-2 不修改历史规划文档——登记在 Story 偏离声明即可；interface-design.md §5.5 的「⚠️ 设计示意，未实现 Epic 5」注记更新为已实现，**并附实现形态标注**——实际注入 `skill_loader` 端口、返回 `tuple[ToolMetadata, ...]`、纯 status 过滤，示意骨架中的 `SkillRepositoryPort`/`Skill` 实体形态未采纳（防「示意=实现」误读）；**interface-design.md §17.1 路线图两行勘正**（L2047-2052：「设计 TOOLS.md 元数据清单｜agents/ceo/TOOLS.md｜Story 5.2」→ DC-2 裁定不落物理文件、「实现 SkillSelector｜Story 5.3」→ 本 Story 5.2 交付）；**architecture.md §11.2.2 MVP 路径注记（D-4 的 Task 8 动作，防漏）**；§10.1 事件行已在 Task 1 同步，此处终态核对）
+- [ ] Subtask 8.6: 验收场景全量转绿核对（14 场景逐一绿 + **收集场景数 == 14 校验**（`pytest --collect-only -q`，防漏绑定静默不收集）——补齐各 Task 未显式转绿核对的 AC-1.2/1.3/2.1/2.3/3.2/6.1/6.2）
 
 **完成标准/Definition of Done:**
 - [ ] src 与 tests 完成清单逐项验证确认
@@ -773,8 +773,8 @@ class SkillSelector(Protocol):
 | # | 决策点 | 选定方案 | 备选方案（弃用理由） | 依据 |
 |---|--------|---------|---------------------|------|
 | DC-1 | 七档案存放路径 | **`configs/agents/profiles/{role}/`** 固定名六文件（CEO: `configs/agents/profiles/ceo/`） | a) 「Agent 工作目录」规划位（弃用：运行时概念，MVP 无 Agent 工作目录基础设施，且档案需随代码分发；登记偏离 D-4）；b) `src/application/skills/` 同级（弃用：混淆 Skills 静态资源与 Agent 档案两个资产域）；c) `~/.sisys/`（弃用：用户目录属运行时记忆域，1.15b 已占用语义） | YamlAgentConfigLoader 的 `configs/agents/` 锚定一致（四级上溯）；D12 wheel 缺口同域已知登记不新增风险类型 |
-| DC-2 | TOOLS.md 双角色冲突（七档案之一 vs Skills L1 既有文件） | **不复制物理文件**——档案链路的 TOOLS.md 视图 = `skill_loader` 端口 L1 元数据（23 条 ToolMetadata），加载用例组合注入 | a) 在 profiles/ceo/ 落一份精简派生 TOOLS.md（弃用：双真源——23 个 SKILL.md 演进时派生文件必漂移）；b) 瘦身既有 `src/application/skills/TOOLS.md` 至 4 列 <200 tokens（弃用：8 列 1104 tokens 是 4-1a 交付资产且两用例消费中；瘦身属破坏性变更无 Story 认领） | R2 应用层端口组合注入原则；epics L3431「Epic 5 对 Epic 4 依赖为可选 TOOLS.md 元数据」；单一真源 |
-| DC-3 | token 预算口径（旧 <200/<500 vs 新 ≤1.2K 冲突） | **按 interface-design.md 修订版**：TOOLS.md L1 ≤1200 tokens（现状 1104）；IDENTITY+SOUL ≤500 tokens（保留 PRD 精神的身份档案精简约束）；总计量 ≤1700 tokens 可观测 | 严格执行 PRD NFR-IF-02「启动上下文 <500 tokens」（弃用：L1 现实 1104 tokens 已超其 2 倍+，23 工具描述无法压进 200 tokens——旧口径基于「L1 <200」假设已被 interface-design §2.1「23 工具 ≈1150 tokens」推翻；登记偏离 D-2） | interface-design.md L52/L633/L723；architecture.md §17.3 L2686；GAP-CRITICAL-08b 同源决策链 |
+| DC-2 | TOOLS.md 双角色冲突（七档案之一 vs Skills L1 既有文件） | **不复制物理文件**——档案链路的 TOOLS.md 视图 = `skill_loader` 端口 L1 元数据（23 条 ToolMetadata），加载用例组合注入 | a) 在 profiles/ceo/ 落一份精简派生 TOOLS.md（弃用：双真源——23 个 SKILL.md 演进时派生文件必漂移）；b) 瘦身既有 `src/application/skills/TOOLS.md`（8 列 1104 tokens = 全文 `len(chars)//4` 实测）至 4 列 <200 tokens（弃用：是 4-1a 交付资产且两用例消费中；瘦身属破坏性变更无 Story 认领） | R2 应用层端口组合注入原则；epics L3431「Epic 5 对 Epic 4 依赖为可选 TOOLS.md 元数据」；单一真源 |
+| DC-3 | token 预算口径（旧 <200/<500 vs 新 ≤1.2K 冲突） | **按 interface-design.md 修订版**，两口径分述（AC-3 定稿）：① L1 缓存口径——TOOLS.md 全文 ≤1200 tokens（现状 1104，interface-design 启动预加载预算的对象）；② 用例计量口径——`"\n".join(f"{m.tool_name}: {m.description}")` 拼接视图（现状约 218，TOOLS.md 内容子集，`startup_context_tokens` 的 L1 部分）；IDENTITY+SOUL ≤500 tokens（保留 PRD 精神的身份档案精简约束）；总计量 ≤1700 tokens 可观测 | 严格执行 PRD NFR-IF-02「启动上下文 <500 tokens」（弃用：L1 现实 1104 tokens 已超其 2 倍+，23 工具描述无法压进 200 tokens——旧口径基于「L1 <200」假设已被 interface-design §2.1「23 工具 ≈1150 tokens」推翻；登记偏离 D-2） | interface-design.md L52/L633/L723；architecture.md §17.3 L2686；GAP-CRITICAL-08b 同源决策链 |
 | DC-4 | SkillSelector 形态（epics vs interface-design 冲突） | **`list_active_skills()` 纯查询**（get_all_slugs 枚举 → load_metadata → status 过滤；零排序零打分零 Top-K）；触发由 LLM 基于 L1 description 自主判断（5.3 实现） | epics L1546「关键词匹配 40% + 语义相似度 60% 融合排序推荐 Top-K」（弃用：interface-design.md §5.5 L920-990 明文废弃——违反 P5「Less scaffilling」+ 双重不必要复杂度；architecture.md GAP-CRITICAL-08b 指定本 Story「删除硬编码，模型自决」；登记偏离 D-1） | interface-design.md §5.5；architecture.md L3315；Anthropic Skills 设计哲学 |
 | DC-5 | 档案验证规则（无文档定义，本 Story 设计） | **六档案非空（strip 后）+ 单文件 ≤64KB**（`PROFILE_FILE_MAX_BYTES = 65536`）；无 frontmatter 强制（纯 Markdown）；VO `__post_init__` 二次校验兜底 | a) 强制 YAML frontmatter（弃用：frontmatter 解析在 application 层（skills/frontmatter.py），infrastructure 加载器跨层引用；且档案是人写文档非机器路由配置，无消费方需要结构化元数据）；b) 每档案最少行数/必需章节（弃用：无 LLM 消费契约支撑，YAGNI——5.3 注入 LLM 时按需收紧） | Simplicity First；5-1 未知键忽略前向兼容同族 |
 | DC-6 | MEMORY.md 档案语义（系统级动态 vs 静态种子） | **MVP 静态种子文件**（profiles/ceo/MEMORY.md，内容明示「暂无系统级记忆，此为加载占位」）；系统级 `~/.sisys/memory/MEMORY.md` 动态索引合并不在本 Story（记忆链路休眠：MemoryConfig 零生产 from_env + l0_storage impl 路径失效，deferred-work 在案） | 经 L0StoragePort/IndexManager 读系统级真源（弃用：L0StoragePort 寻址 `{type}/{uuid}.md` 不适配固定名根级文件；且记忆链路整体休眠，激活属独立 Story） | architecture.md §11.2.2 L1021「Agent 的 MEMORY.md 来自系统级，无独立索引」——MVP 先落「加载」语义，「系统级合并」deferred（D-3） |
@@ -785,7 +785,7 @@ class SkillSelector(Protocol):
 
 ### 已知下游风险（本 Story 不处置，消费方 Story 决策）
 
-1. **启动上下文的 LLM 注入契约未定**：本 Story 交付 `AgentProfileLoadResult`（六档案 str + L1 元数据 + 计量），但「如何拼装为 LLM 系统提示」（IDENTITY/SOUL/USER 的模板化、L1 description 的注入格式、核心约束文本从哪来）属 5.3 工作流——5.3 立项时定上下文装配契约，届时可能需要本 Story 结果对象的字段演进（DTO 字段追加零成本，非端口签名变更）。
+1. **启动上下文的 LLM 注入契约未定**：本 Story 交付 `AgentProfileLoadResult`（六档案 str + L1 元数据 + 计量），但「如何拼装为 LLM 系统提示」（IDENTITY/SOUL/USER 的模板化、L1 description 的注入格式、核心约束文本从哪来）属 5.3 工作流——5.3 立项时定上下文装配契约，届时可能需要本 Story 结果对象的字段演进（DTO 字段追加零成本，非端口签名变更）。**口径警示**：`startup_context_tokens` 只计 IDENTITY+SOUL+L1 拼接视图（不含 CODE/USER/MEMORY/HEARTBEAT 四档案，L1 为拼接口径 ~218 非 TOOLS.md 全文 1104）——5.3 六档案全量装配时实际上下文将显著大于该计量，装配契约订立时须重定义口径；且 `chars//4` 对中文低估约 1.5~2 倍（`_estimate_tokens` docstring 自述），真实 tokenizer 语义下预算偏松，5.3 注入 LLM 前需按真实 tokenizer 复算。
 2. **LangGraph 引擎 agent_id 双轨道**（5-1 遗留风险的 5-2 延续）：本 Story 用例以实体 agent_id 为锚（get_by_id），而 `LangGraphEngine`（langgraph_engine.py L71-72）执行时自铸 agent_id——5.3 引擎消费档案时必须收敛（复用实例化 agent_id 或桥接映射），否则 AgentProfileLoaded（实体 id）与 AgentDecided（引擎铸 id）无法按 aggregate_id 关联。
 3. **`skill_loader` SCOPED 被 SINGLETON 用例捕获**（captive dependency，5-1 D7 同款）：`InMemorySkillLoader` 无状态、L1 缓存在 `__init__` 构建——被钉住反而保证缓存跨调用复用（性能有利），但请求级 scope 启用时需改为用例内按调用解析。归 5-1 D7 留项（5.4 lifetime 语义决策回迁时一并评估）。
 4. **MEMORY.md 系统级合并缺失**：MVP 静态种子不含任何真实记忆——5.3+ 若期望 Agent 带记忆启动，需先激活记忆链路（l0_storage impl 路径修复 + MemoryConfig from_env）并在档案加载用例中插入合并步骤（本 Story 的 loader 端口签名 `load(role, agent_id)` 不变，合并发生在用例编排层）。
@@ -801,7 +801,7 @@ class SkillSelector(Protocol):
 | D-2 | prd.md NFR-IF-02（L2554）「Agent 启动上下文 <500 tokens（L1 TOOLS.md <200 tokens）」+ epics L1542/L1545 同口径 | 预算按 interface-design.md 修订版执行：L1 ≤1200 tokens（现实 1104，23 工具无法压入 200）+ IDENTITY+SOUL ≤500 tokens（保留精简精神）+ 总计量 ≤1700 可观测 | 不修改 prd/epics（历史规划文档）；AC-4 与 Task 2/4 以新口径为验收真源；5.7+ 若有 token 预算审计需求以 result.startup_context_tokens 计量值为准 |
 | D-3 | architecture.md §11.2.4 流程首步「加载系统级 MEMORY.md → 索引 → user/project/feedback/reference」 | MVP 的 Agent MEMORY.md 为静态种子（DC-6）——系统级动态索引合并 deferred（记忆链路休眠：MemoryConfig 零生产 from_env、l0_storage/memory_file_storage 组合根 impl 字符串路径失效——Task 0 补登记 deferred-work 观察项） | 不修改 architecture.md（§11.2.4 描述的是终态架构）；deferred-work.md 登记合并缺失 + 组合根路径失效观察项，触发=记忆链路激活 Story |
 | D-4 | architecture.md §11.2.2 档案位于「Agent 工作目录」（规划位） | MVP 落地 `configs/agents/profiles/{role}/`（静态资产随代码分发，DC-1）；Agent 工作目录属运行时概念（5.3+ 若引入会话级档案覆写再评估迁移） | Task 8 在 architecture.md §11.2.2 目录树旁补注「MVP 静态资产位于 configs/agents/profiles/，工作目录形态延后」 |
-| D-5 | or.md L1838 引用「[or.md 四.4.(1)]」编号偏差 | 七档案完整枚举实际在 or.md 四.1.[1]（L277）；四.4.(1) 是「初始化」步骤未列档案名——PRD 宽松引用，非内容冲突 | 无需动作（注记性声明，防 dev agent 按 四.4.(1) 找不到档案定义） |
+| D-5 | prd.md L1838（FR-AC-02 行尾）对「[or.md 四.4.(1)]」的引用编号偏差 | 七档案完整枚举实际在 or.md 四.1.[1]（L277）；四.4.(1)（L293）是「初始化」步骤未列档案名——PRD 宽松引用，非内容冲突 | 无需动作（注记性声明，防 dev agent 按 四.4.(1) 找不到档案定义） |
 | D-6 | interface-design.md L93-99 Skills 层列表（含 AGENT.md、无 CODE.md/USER.md）vs or.md 七档案 | 以 or.md 七档案（FR-AC-02 P0 权威）为准；AGENT.md（<150 行）属 interface-design §5.6 规划的扩展档案，无 FR 认领不在本 Story（5.3 上下文装配立项时评估） | 不修改 interface-design.md；5.3 Story 引用本声明评估 AGENT.md 必要性 |
 | D-7 | epics_v1.0.md L1527-1528 建议测试路径 `tests/unit/architecture/test_agent_profile_loading.py`、`tests/integration/test_agent_profile_loading_integration.py` | 以项目实际目录结构为准（本 Story 测试分类表全套路径）——同 5-1 D-5 处置（unit 下按层分目录、integration 无 `_integration` 后缀惯例、架构测试命名 `test_arch_*`） | 不修改 epics；dev 以本 Story 测试分类表为准 |
 | D-8 | NFR-IF-02 编号冲突（prd.md L2554 = Skills 加载上下文；epics L337 = 三重评分延迟，Epic 21 PRD v1.1.0 复用） | 本 Story 覆盖的 NFR-IF-02 以 prd.md 口径为准 | 无需动作（注记性声明，防混淆） |
@@ -831,7 +831,7 @@ register_port(
 
 **AgentProfileLoaded 事件模板（`src/domain/events/agent_events.py` L39-67 AgentInstantiated）——照抄结构：** frozen dataclass；`agent_id: uuid.UUID = field(kw_only=True)` 等四必填 kw_only；`event_type` init=False 默认；`__post_init__` 设 `aggregate_id`（UUID 对象 + None 守卫）/`aggregate_type="Agent"`。
 
-**事件通道登记（configs/event_channels.yaml L177-180 AgentInstantiated 条目）——照抄结构：**
+**事件通道登记（configs/event_channels.yaml L182-185 AgentInstantiated 条目）——照抄结构：**
 
 ```yaml
   AgentProfileLoaded:
@@ -844,11 +844,13 @@ register_port(
 
 **加载器结构模板（`yaml_agent_config_loader.py`）——MarkdownAgentProfileLoader 照抄骨架：** 构造器 `profile_root: Path | None = None` 默认 `Path(__file__).parent.parent.parent.parent / "configs" / "agents" / "profiles"`；`asyncio.to_thread` 包装同步 IO；失败统一 `_fail` 闭包（role/profile_path 相对形态/reason 三键 context）；OSError/UnicodeDecodeError 逐类包装；未知文件忽略。
 
-**用例编排模板（`agent_instantiation.py` L89-147）——LoadAgentProfileUseCase 照抄：** 守卫链（5-1 的「守卫→加载」扩展为「存在性→角色→加载」）；事件发布两分支（`publish_result.is_success` + `except Exception` 双路径均 `logger.error(...)` 不回滚——注意 5-1 修正后形态是 `logger.error(exc_info=True)`）；DTO 模块内定义。
+**用例编排模板（`agent_instantiation.py` L89-147）——LoadAgentProfileUseCase 照抄：** 守卫链（5-1 的「守卫→加载」扩展为「存在性→角色→加载」）；事件发布两分支（`publish_result.is_success` + `except Exception` 双路径均 `logger.error(...)` 不回滚——**5-1 实际形态**：`is_success==False` 分支为普通 `logger.error(...)`，仅 raise/except 分支带 `exc_info=True`，照抄勿统一）；DTO 模块内定义。
 
 **SkillSelector 实现骨架（Task 3）：**
 
 ```python
+from src.application.ports.skill_selector import SkillSelectorPort  # 端口 Protocol（本 Story 新建）
+
 class SkillSelector(SkillSelectorPort):
     def __init__(self, skill_loader: SkillLoaderPort) -> None:
         self._skill_loader = skill_loader
@@ -866,7 +868,7 @@ class SkillSelector(SkillSelectorPort):
 
 **CLI 子命令扩展模式（`src/entrypoints/agent_cli.py`）：** `subparsers.add_parser("load-profile", help=...)` + `add_argument("-a", "--agent-id", required=True, metavar="AGENT_ID")`；UUID 守卫 try/except ValueError → ValidationError(201)；`_close_redis_pool` finally 沿用；输出多行摘要；退出码 0/1/2。
 
-**验收测试骨架（5-1 `test_acceptance_agent_instantiation.py` 605 行）——R6 主体基准：** FEATURE 常量 + 14 个 `@scenario` 显式绑定（收集数 == 14 校验）；context fixture（场景级 `aioredis.Redis(decode_responses=True)` + `_agent_ids` 记录列表）；`_run_async` helper；场景级 ping 门控（`pytest.skip(f"Redis not available: {exc}")`）；服务组装 = 5-1 用例（真实 instantiate）→ 本 Story 用例手动组装；异常断言 `isinstance` + `error.code`；teardown 逐 agent_id 精确 delete + 同循环 close；AST 静态扫描场景写法参照 postgresql 模板 L792-819。
+**验收测试骨架（5-1 `test_acceptance_agent_instantiation.py` 605 行）——R6 主体基准：** FEATURE 常量 + `@scenario` 显式绑定（**5-1 为 13 场景形态；本 Story 为 14 场景——收集数校验按 14**）；context fixture（场景级 `redis.asyncio.Redis(decode_responses=True)`（5-1 代码字面别名 `aioredis` 即 `redis.asyncio`）+ `_agent_ids` 记录列表）；`_run_async` helper；场景级 ping 门控（`pytest.skip(f"Redis not available: {exc}")`）；服务组装 = 5-1 用例（真实 instantiate）→ 本 Story 用例手动组装；异常断言 `isinstance` + `error.code`；teardown 逐 agent_id 精确 delete + 同循环 close；AST 静态扫描场景写法参照 postgresql 模板 L792-819。
 
 **单元测试 Mock 工厂模式（5-1 `test_agent_instantiation.py`）：** `AsyncMock(spec=Protocol)` + `_make_*` 工厂 + `pytest.raises(X) as exc_info` + `exc_info.value.code`/`context.get(...)` 断言 + Mock calls 编排顺序断言。
 
@@ -879,12 +881,12 @@ class SkillSelector(SkillSelectorPort):
 - **7.1-2 变异实证（P0）**：8/13 Story 存在恒真断言——每个 TDD 循环的 🟡 变异阶段不可跳过（本 Story 重点：过滤条件、发布点、守卫顺序、P95 阈值、档案判空五处）
 - **kw_only 必填字段**：DomainEvent 基类字段全带默认值，非 kw_only 必填字段类定义即抛 TypeError（5-1 Docs Review #14）
 - **守卫先于加载**：顺序倒置会使下游异常不可达（5-1 Docs Review #15）——本 Story 级联为存在性→角色→加载
-- **resolve 跨循环死连接**：SCOPED/SINGLETON 有状态端口 resolve 后发命令会钉住全局 Resolver（5-1 R3-F5/#23）——验收手动组装纪律
+- **resolve 跨循环死连接**：SCOPED/SINGLETON 有状态端口 resolve 后发命令会钉住全局 Resolver（5-1 文档审查修复 #23）——验收手动组装纪律
 - **验收门控下沉**：背景块整 feature 门控会让静态场景被整批 skip（5-1 R3-F5/D4 核销）——无背景块 + 场景级 given
 - **@scenario 收集期陷阱**：场景名不匹配整文件炸/漏绑定静默不收集——收集数校验进 Task 0.4/8.6
 - **truthy 标量越过判空**（5-1 R2-F2）：`responsibilities="战略方向"` 静默通过——VO 先 isinstance 类型守卫再判空
 - **失败路径统一异常**（5-1 R1-F2）：OSError/UnicodeDecodeError 家族逐类包装，禁裸内置异常逃逸
-- **CLI 守卫**：枚举/UUID 字符串转换必须 except 映射领域/应用异常，禁裸 ValueError 逃逸（5-1 Task 5 + D8 清偿先例）
+- **CLI 守卫**：枚举/UUID 字符串转换必须 except 映射领域/应用异常，禁裸 ValueError 逃逸（5-1 Task 5 枚举→441 先例 + D8 清偿后 ocr_cli int 页码转换→201 先例——UUID 转换无既有先例，本 Story 新建同款模式）
 - **团队协议**：「Done = 接线生效 + 资产在库」；「已实现未接线」零容忍
 - **D12/D13 治理项**：configs/ wheel 分发缺口（profiles/ 六档案同域适用，不新增处置）；CLI bootstrap 10.4s 开销（核销触发 5.3 批量消费前——本 Story 单次调用同 5-1 语义）
 
@@ -923,7 +925,8 @@ src/
 │   └── （ports/ 无新增——档案加载端口在 application 层，对齐 5-1 AgentConfigLoader 先例）
 ├── application/
 │   ├── ports/agent_profile_loader.py                    # [新建] AgentProfileLoader Protocol
-│   ├── ports/skill_selector.py                          # [新建] SkillSelector Protocol
+│   ├── ports/skill_selector.py                          # [新建] SkillSelectorPort Protocol
+│   ├── skills/registry/__init__.py                      # [新建] 包初始化（registry/ 目录已存在为空，selector.py 需包入口）
 │   ├── skills/registry/selector.py                      # [新建] SkillSelector 实现（GAP-CRITICAL-08b）
 │   └── use_cases/agent_profile_loading.py               # [新建] LoadAgentProfileUseCase + AgentProfileLoadResult
 ├── infrastructure/
@@ -1003,7 +1006,8 @@ tests/
 - `src/domain/events/agent_events.py`（追加 AgentProfileLoaded）
 - `src/domain/exceptions/agent_exceptions.py`（追加 442/443）
 - `src/application/ports/agent_profile_loader.py` - 档案加载端口
-- `src/application/ports/skill_selector.py` - Skill 选择器端口
+- `src/application/ports/skill_selector.py` - Skill 选择器端口（SkillSelectorPort Protocol）
+- `src/application/skills/registry/__init__.py` - registry 包初始化（目录已存在为空）
 - `src/application/skills/registry/selector.py` - SkillSelector 实现
 - `src/application/use_cases/agent_profile_loading.py` - 加载用例 + 结果 DTO
 - `src/infrastructure/agent_orch/markdown_agent_profile_loader.py` - Markdown 加载器
@@ -1065,7 +1069,20 @@ tests/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | （待审查后填写） | — | — |
+| 1 | 【Round 1】档案破坏场景（AC-1.2/1.3/2.1/2.3）「场景层级」未定——走用例级且无 agent 前置会落入 443 先于 442 的守卫陷阱（守卫链 存在性→角色→加载），场景期望必炸；AC-1 When 用例级文案与场景表「手动组装 loader」端口级表述方向相反 | P0 | 四场景定稿为 **loader 端口直连**（对齐 5-1 AC-2.2/2.3 破坏场景先例），When 文案「通过档案加载端口加载」，不经用例（442 经用例传播由 Task 4 单测覆盖），无需 Redis/instantiate；AC-2.2 单独定稿为用例级（需 Redis 无需 instantiate）；AC-1.1/4.1 为用例级（先 instantiate） |
+| 2 | 【Round 1】SkillSelector 端口 Protocol 与实现类同名（import/mypy/契约测试维度 4 二义），且 Dev Notes 骨架 `class SkillSelector(SkillSelectorPort)` 引用全仓不存在的基类——端口契约表与骨架自相矛盾 | P0 | 端口 Protocol 定名 `SkillSelectorPort`（对齐 `SkillLoaderPort` 先例），实现类名 `SkillSelector`（对齐 architecture.md §13.11 L2299 注释）；契约表/Task 0 签名块/结构图/Task 4 红行 AsyncMock spec 四处同步，骨架补 import 行自然成立 |
+| 3 | 【Round 1】AC-6.3 收尾场景编写时点自相矛盾——Task 0「14 场景落盘 + 收集数 == 14」与测试分类表/Task 8「追加/编写收尾场景」互斥（按其一执行则另一门禁必炸） | P1 | 对齐 5-1 先例定稿：Task 0 一次落盘全部 14 场景（含 AC-6.3），Task 8 只转绿核对不新增——分类表行、Task 8 红绿行、场景表 AC-6.3 行三处同步 |
+| 4 | 【Round 1】token 计量口径混用——AC-3「现状 1104」是 TOOLS.md **文件**口径（len(chars)//4），Task 4 计量是 `tool_name: description` **拼接视图**口径（实测 ~218，内容子集）——断言对象不明 + 总预算叙事（1104+500→1700）与实际计量脱节 + 分项断言无数据来源 | P1 | AC-3 定稿两口径分述（①L1 缓存口径 = TOOLS.md 全文 1104；②用例计量口径 = `"\n".join(f"{m.tool_name}: {m.description}")` 拼接 ~218——startup_context_tokens 与 AC-3.1 断言均用②）；分隔符定稿 `\n`；AC-4 补「分项由测试从 result.profile 现算」+ 取整差 ≤1 注记；DC-3 同步；下游风险#1 补口径范围警示（不含 CODE/USER/MEMORY/HEARTBEAT，5.3 装配须重定义） |
+| 5 | 【Round 1】档案读取 `asyncio.to_thread(Path.read_text, ...)` 未指定 encoding——裸 read_text 依赖 locale，「非 UTF-8 → 442」契约会环境漂移（非 UTF-8 locale 下合法中文资产误判 442） | P1 | Task 0/Task 2 两处规范改为 `asyncio.to_thread(Path.read_text, path, encoding="utf-8")`（对齐 yaml_agent_config_loader/InMemorySkillLoader 显式 UTF-8 先例） |
+| 6 | 【Round 1】Task 4 守卫顺序变异「441 检查移到 get_by_id 前」不可编码（role 取自 get_by_id 返回的实体，调用前无 role 可检） | P1 | 改述为「将角色守卫移至 `loader.load` 之后」→「441 且 loader 未被调用」断言红（结果型断言：错误码 + Mock 未调用） |
+| 7 | 【Round 1】「零 IO/无状态」表述失实——`InMemorySkillLoader()` 构造期同步读 TOOLS.md（本地文件 IO），持有 L1/L2 缓存 | P2 | 五处措辞统一改「本地静态文件只读（构造期读 TOOLS.md 一次），无网络连接、跨循环安全」；「无状态」改「无连接状态」 |
+| 8 | 【Round 1】ToolMetadata「19 字段」实为 18 字段；load_metadata L112→L119、get_all_slugs L44-109→L74-76、event_channels.yaml L177-180→L182-185（原引用是 AgentDecided 条目）、channel_router L231→L237-242、skill_loader 注册 L2529-2539→L2528-2540 | P2 | 现有代码继承表与 Dev Notes 各处行号/计数逐一勘正（主会话实测定谳） |
+| 9 | 【Round 1】CLI 输出格式两处矛盾：Task 0「(N tokens)」vs Task 5「(N chars)」；「活跃技能: 23」写字面量 | P2 | 统一为 `(N chars)`（profile 字段 len 直读有据；用例无分档 token 数据来源）+ 动态值 N |
+| 10 | 【Round 1】Subtask 4.5 统一「先 instantiate」配方错套 AC-2.2（无需 instantiate）与 AC-3.1（不走用例无 Redis） | P2 | 分列三档：AC-1.1/4.1 先 instantiate；AC-2.2 真实仓储+随机 uuid；AC-3.1 仅 resolve("skill_loader") 直查 |
+| 11 | 【Round 1】Task 8.5 遗漏 D-4 的 architecture.md §11.2.2 注记动作；interface-design §17.1 路线图两行过期（「TOOLS.md 元数据清单 Story 5.2」「实现 SkillSelector Story 5.3」）无登记；§5.5 注记翻转无适配声明（示意 SkillRepositoryPort/Skill 形态 ≠ 实现） | P2 | 8.5 显式补三项：§11.2.2 注记（D-4）、§17.1 两行勘正、§5.5 附实现形态标注 |
+| 12 | 【Round 1】溯源失实三处：「5-1 R3-F5 教训」用于死连接语义（实为 #23，R3-F5 是 Background 下沉）；D-5「or.md L1838」（实为 prd.md L1838，or.md 全文 626 行）；「5-1 修正后形态是 logger.error(exc_info=True)」（实际仅 except 分支带） | P2 | 三处逐一勘正（#23/prd.md L1838/两分支形态分述） |
+| 13 | 【Round 1】Task 0.4 合法红形态缺「未注册端口解析期错误」类；红阶段区分度边界未声明 | P2 | 补第三类合法红 + 「红阶段失败形态不能证明断言正确性——活性由变异阶段背书」声明 |
+| 14 | 【Round 1】P3 批量清偿：R6「14 个 @scenario」（5-1 实为 13）；资产红线「10~40 行」与 token 红线优先级未分（绑定约束是 chars≤2000）；AC-6.2 pyproject 断言标注 tripwire；幂等补「重复发布事件消费方按 event_id 幂等」；64KB 检测时机注记；registry/__init__.py 补文件清单与结构图；8.6 枚举补 AC-1.2/1.3/3.2；Task 5.5「沿用三条」实为两条+新增；AC-2.1「<64KB」→「≤64KB」；Subtask 1.3 四处→五处（EXCEPTION_HTTP_MAP 期望集测试联动）；ocr_cli 先例是 int 页码转换注记；Task 2.1 八类边界→七类计数澄清；aioredis 实为 redis.asyncio 别名注记 | P3 | 逐项修订入正文（见对应行） |
 
 ---
 
@@ -1096,8 +1113,9 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-10-15
-**最后更新/Last Updated:** 2026-10-15
+**最后更新/Last Updated:** 2026-10-16
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/规划文档/Skills 基础设施/记忆心跳基础设施/测试模板调研 + 关键签名人工核验；含链路接线断言清单 L1-L8、10 项关键架构决策 DC-1~DC-10、8 项偏离声明 D-1~D-8（SkillSelector 新旧口径/token 预算口径两处规划冲突裁决）、组合根 impl 路径失效观察项登记要求、deferred-work 分流处置）
+- v1.1.0: Round 1 文档审查修订（5 调研 Agent + 2 审查 Agent 并行 + 主会话实测定谳；2 P0 + 4 P1 + 6 P2 + 1 P3 批量 = 修复表 #1~#14）——档案破坏场景定稿 loader 端口直连（443/442 守卫陷阱）、SkillSelectorPort 端口定名（同名矛盾消除）、AC-6.3 时点对齐 5-1（Task 0 落盘 14 场景）、token 两口径分述（文件 1104 vs 拼接 ~218）、read_text 显式 UTF-8、守卫变异可编码改述、行号/计数/溯源逐项勘正（19→18 字段、event_channels L182-185、#23 教训、prd.md L1838 等）
