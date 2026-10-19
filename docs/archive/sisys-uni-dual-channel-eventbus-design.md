@@ -1195,7 +1195,7 @@ class AutoRouteService:
 ### 8.1 YAML 配置格式
 
 ```yaml
-# config/event_channels.yaml
+# configs/event_channels.yaml
 event_channels:
   # REALTIME 通道
   AutoTriggered:
@@ -1298,7 +1298,7 @@ class EventBusConfigLoader:
     @classmethod
     def from_default_path(cls) -> ChannelRouter:
         """从默认路径加载配置。"""
-        default_path = Path("config/event_channels.yaml")
+        default_path = Path("configs/event_channels.yaml")
         if default_path.exists():
             return cls(default_path).load()
         logger.warning("Default config not found, using empty router")
@@ -1338,7 +1338,7 @@ class EventBusConfigLoader:
 | 任务 | 文件 | 操作 | 依赖 |
 |------|------|------|------|
 | T3.1 | `src/infrastructure/messaging/event_bus_config_loader.py` | 配置加载器 | YAML |
-| T3.2 | `config/event_channels.yaml` | 配置文件 | - |
+| T3.2 | `configs/event_channels.yaml` | 配置文件 | - |
 | T3.3 | `src/application/main.py` | 启动示例 | EventBusFactory |
 
 ---

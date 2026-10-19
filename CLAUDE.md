@@ -46,9 +46,9 @@ src/
 - Story 开发遵循 SDD+TDD 融合流程：Task 0 定义规范 → 每个任务内含完整 TDD 红/绿/重构循环 → 最后任务做验收测试
 - 代码注释：Google 风格全中文详见`~/.claude/projects/-home-agimtech-sisys/memory/sisys_code_comment_style.md`
 - 行宽 128 字符，ruff 规则 E/F/I/N/W
-- 领域事件双通道投递：realtime（Redis pub/sub）+ reliable（RabbitMQ + Outbox），通道配置在 `config/event_channels.yaml`
+- 领域事件双通道投递：realtime（Redis pub/sub）+ reliable（RabbitMQ + Outbox），通道配置在 `configs/event_channels.yaml`
 - 端口注册带元数据（`PortSpec`）：name / version / interface / impl / lifetime / tags，支持 SINGLETON / SCOPED / TRANSIENT 三种生命周期
-- 新事件必须同时更新 `config/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
+- 新事件必须同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`
 - 测试租户隔离：`TestTenant` 生成 UUID 前缀，覆盖 Redis key / PG schema / Qdrant collection / MinIO bucket / RabbitMQ queue
 - 覆盖率门禁：整体 ≥80%，domain ≥90%，application ≥85%
 - 端口查询参数决策规则（DDD Query Object 模式）：

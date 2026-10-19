@@ -190,7 +190,7 @@ src/infrastructure/messaging/
     └── sqlalchemy_event_outbox_adapter.py  # DomainEvent↔OutboxModel
 
 src/composition_root.py              # DI注册（EventBus相关）
-config/event_channels.yaml           # 6个事件通道映射配置
+configs/event_channels.yaml           # 6个事件通道映射配置
 ```
 
 ### 2.2 设计模式应用

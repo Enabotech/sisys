@@ -169,7 +169,7 @@ create-story 工作流:
 | 路由/模型相关 | 1.2 系统公理一、1.4 关键架构指标、4 UDMR 框架 |
 | 存储/检索相关 | 11 存储架构设计、1.4 检索延迟指标 |
 | Agent/编排相关 | 1.2 系统公理、8 Checkpoint 机制、17 核心领域架构 |
-| 事件/消息相关 | 10 事件驱动架构设计、config/event_channels.yaml |
+| 事件/消息相关 | 10 事件驱动架构设计、configs/event_channels.yaml |
 | 安全相关 | 15 风险缓解、附录 K Agent 沙箱安全策略 |
 | API/接口相关 | 1.5 CLI+Skills 原则、1.6 四层映射架构、13 完整目录结构 |
 

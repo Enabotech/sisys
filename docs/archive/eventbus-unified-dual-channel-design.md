@@ -931,7 +931,7 @@ class DeadLetterQueue:
 ### 4.1 YAML 配置格式
 
 ```yaml
-# config/event_channels.yaml
+# configs/event_channels.yaml
 event_channels:
   # 系统触发链事件（仅 Redis 实时通知）
   AutoTriggered:
@@ -1057,9 +1057,9 @@ class EventBusConfigLoader:
     def from_default_path(cls) -> EventChannelRegistry:
         """从默认路径加载配置。
 
-        默认路径: config/event_channels.yaml
+        默认路径: configs/event_channels.yaml
         """
-        default_path = Path("config/event_channels.yaml")
+        default_path = Path("configs/event_channels.yaml")
         if default_path.exists():
             return cls(default_path).load()
         logger.warning("Default config not found, using empty registry")
@@ -1585,7 +1585,7 @@ class TestDualChannelEventBus:
 ### Phase 2: 配置化（第 3 天）
 
 - [ ] 实现 YAML 配置加载器
-- [ ] 创建默认配置文件 `config/event_channels.yaml`
+- [ ] 创建默认配置文件 `configs/event_channels.yaml`
 - [ ] 支持运行时模式覆盖
 
 ### Phase 3: 死信队列（第 3-4 天）

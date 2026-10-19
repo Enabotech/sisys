@@ -330,12 +330,12 @@
 - [x] **缺失事件清单**（按领域分组，`delivery_mode` 分配规则：控制信号/瞬时/可丢失 → REALTIME；业务状态变更/合规审计 → RELIABLE）：
   - REALTIME（3个）：AutoExecuted（控制流完成）、HeartbeatTriggered（心跳信号）、RoutingDecided（路由决策）
   - RELIABLE（13个）：ToolExecuted、AgentDecided、CheckpointRecovered、IsolationLevelSwitched、CorrectionApproved、StrategicDeviationWarning、MFAChallengeIssuedEvent、IntrusionDetectedEvent、DataIntegrityViolationEvent、SensitiveDataDetected、CrossBorderTransferRequested、DataSovereigntyViolation、PIPLDataAccessRequested
-- [x] **同步修改** `config/event_channels.yaml`
+- [x] **同步修改** `configs/event_channels.yaml`
 - [x] **验证**：所有22个DomainEvent子类均有通道映射
 
 **关键文件**：
 - `src/infrastructure/messaging/channel_router.py` (DEFAULT_MAPPINGS)
-- `config/event_channels.yaml`
+- `configs/event_channels.yaml`
 
 #### 任务 5.2: YAML配置集成
 - [x] **修改** `src/composition_root.py`：在EventBus相关注册中调用 `EventBusConfigLoader.load()`，YAML配置覆盖DEFAULT_MAPPINGS

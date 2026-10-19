@@ -1340,7 +1340,7 @@ class ExceptionMetricsImpl(ExceptionMetricsPort):
 | B3 | 🔴 | **Google 风格 docstring** | 包含 `Attributes:` 段（code/message/自定义属性），中文注释 |
 | B4 | 🔴 | **EXCEPTION_HTTP_MAP 映射** | 在 `src/interfaces/api/exception_handlers.py` 的 `EXCEPTION_HTTP_MAP` 中添加条目，即使 MRO 回退可正确映射也应显式声明（优化精确匹配性能 + 文档清晰） |
 | B5 | 🟡 | **ErrorMapper 映射** | 如异常包装外部 SDK 错误（MinIO/RabbitMQ/Redis），在 `src/infrastructure/messaging/error_mapper.py` 的相应 `*_ERROR_MAP` 字典中添加条目 |
-| B6 | 🟡 | **事件通道配置** | 如异常触发死信队列（DLQ）重试/入队，在 `config/event_channels.yaml` 中配置对应通道 |
+| B6 | 🟡 | **事件通道配置** | 如异常触发死信队列（DLQ）重试/入队，在 `configs/event_channels.yaml` 中配置对应通道 |
 | B7 | 🔴 | **禁止抑制注释** | 不得在异常定义中添加 `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释．如 Ruff/MyPy 报错，必须通过代码修改解决根因 |
 
 #### 阶段 C：验证阶段（质量门禁）

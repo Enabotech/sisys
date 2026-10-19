@@ -429,7 +429,7 @@ class EventBusConfigLoader:
 
 - YAML 配置作为 merge overlay 覆盖 DEFAULT_MAPPINGS
 - 文件不存在时静默返回
-- 配置文件: `config/event_channels.yaml`
+- 配置文件: `configs/event_channels.yaml`
 
 ---
 
@@ -888,7 +888,7 @@ class RabbitMQConfig:
 
 ### 14.3 YAML 配置
 
-**文件:** `config/event_channels.yaml`
+**文件:** `configs/event_channels.yaml`
 
 ```yaml
 event_channels:
@@ -1037,4 +1037,4 @@ event_channels:
 | `src/infrastructure/monitoring/event_metrics.py` | EventMetricsCollector + OpenTelemetryTracer |
 | `src/infrastructure/config/redis.py` | RedisConfig |
 | `src/infrastructure/config/rabbitmq.py` | RabbitMQConfig |
-| `config/event_channels.yaml` | YAML 通道映射 |
+| `configs/event_channels.yaml` | YAML 通道映射 |

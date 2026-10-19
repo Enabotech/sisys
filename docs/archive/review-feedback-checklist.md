@@ -88,7 +88,7 @@ Story 1.18a（Prefect 集成）审查中暴露：`PublishResult.is_full_failure`
 - [ ] 事件发布后是否检查 `PublishResult.is_full_failure`？（记录警告日志，不静默忽略）
 - [ ] 事件发布失败是否独立于业务状态？（不因发布失败回写业务状态为 FAILED）
 - [ ] 事件类型注册表是否显式导入所有事件类？（`__subclasses__()` 不可靠，需模块顶层显式 import）
-- [ ] 新事件是否同时更新 `config/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`？
+- [ ] 新事件是否同时更新 `configs/event_channels.yaml` 和 `ChannelRouter.DEFAULT_MAPPINGS`？
 - [ ] 事件发布顺序是否正确？（业务状态变更后发布事件，而非之前）
 
 ---
