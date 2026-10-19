@@ -1,6 +1,6 @@
 # Story 5.2: Agent 身份档案加载
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -500,16 +500,16 @@ class SkillSelectorPort(Protocol):
 
 > **目的：** 在进入代码实现前，落地本 Story SDD 规范节定义的全部 Schema、端口契约、异常契约与 Gherkin，并完成红阶段验证。
 
-- [ ] Subtask 0.1: 按「领域事件 Schema」「数据模型」「端口契约清单」「领域异常契约」四节定稿全部契约（逐项核对签名/字段/编码无歧义后确认；特别核对 `ToolMetadata.status` 字段与 `get_all_slugs()` 返回形态——SkillSelector 实现的直接输入）
-- [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_agent_profile_loading.feature`（14 场景清单，严格按 R6：5-1 主体基准 + postgresql 模板三项继承先例 + AC 编号命名）
-- [ ] Subtask 0.3: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_agent_profile_loading.py`（@scenario 显式绑定 + context dict + `_run_async` + 场景级 ping 门控下沉 + **新模块延迟 import** + 显式 pytestmark 列表）
-- [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError/AssertionError/未注册端口的解析期错误（registry miss，如 `resolve("skill_selector")` 未注册）三类均为合法红；**红阶段失败形态不能证明断言正确性——断言活性由各 Task 变异阶段与收集数校验背书**；**前提：Redis 在线**——含 Redis 依赖场景 ping 失败则 skip 无失败可确认；**校验收集场景数 == 14**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
-- [ ] Subtask 0.5: 链路接线断言清单 L1-L8 逐项确认处置（本 Story 接线 6 项 / deferred 保持 2 项）+ **补登记 deferred-work.md 观察项：组合根 `l0_storage`（L268-276）与 `memory_file_storage`（L1108-1116）impl 字符串指向不存在的模块路径（实际在 `src/infrastructure/storage/fs/` 下）——休眠资产路径失效，激活时必炸**（对齐 5-1 Task 0 补登记 session_storage 先例）
+- [x] Subtask 0.1: 按「领域事件 Schema」「数据模型」「端口契约清单」「领域异常契约」四节定稿全部契约（逐项核对签名/字段/编码无歧义后确认；特别核对 `ToolMetadata.status` 字段与 `get_all_slugs()` 返回形态——SkillSelector 实现的直接输入）
+- [x] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_agent_profile_loading.feature`（14 场景清单，严格按 R6：5-1 主体基准 + postgresql 模板三项继承先例 + AC 编号命名）
+- [x] Subtask 0.3: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_agent_profile_loading.py`（@scenario 显式绑定 + context dict + `_run_async` + 场景级 ping 门控下沉 + **新模块延迟 import** + 显式 pytestmark 列表）
+- [x] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证；ModuleNotFoundError/AssertionError/未注册端口的解析期错误（registry miss，如 `resolve("skill_selector")` 未注册）三类均为合法红；**红阶段失败形态不能证明断言正确性——断言活性由各 Task 变异阶段与收集数校验背书**；**前提：Redis 在线**——含 Redis 依赖场景 ping 失败则 skip 无失败可确认；**校验收集场景数 == 14**——`pytest --collect-only -q`，防 @scenario 绑定名与 .feature 不匹配的收集期 ScenarioNotFound 或漏绑定静默不收集）
+- [x] Subtask 0.5: 链路接线断言清单 L1-L8 逐项确认处置（本 Story 接线 6 项 / deferred 保持 2 项）+ **补登记 deferred-work.md 观察项：组合根 `l0_storage`（L268-276）与 `memory_file_storage`（L1108-1116）impl 字符串指向不存在的模块路径（实际在 `src/infrastructure/storage/fs/` 下）——休眠资产路径失效，激活时必炸**（对齐 5-1 Task 0 补登记 session_storage 先例）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
-- [ ] deferred-work.md 补登记组合根 impl 路径失效观察项（L7/L8 既有登记核对通过）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认——14 场景全 FAILED，均为 ModuleNotFoundError/registry miss 合法红；收集数 == 14 校验通过）
+- [x] deferred-work.md 补登记组合根 impl 路径失效观察项（L7/L8 既有登记核对通过——heartbeat_scheduler/L0/memory 字符串在位）
 
 ---
 
@@ -546,19 +546,19 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变六字段之一的 strip 判空（删 `not xxx.strip()` 分支）→ 空白档案测试红 → 还原绿 |
 | 🔄 重构 | Google 风格全中文注释（docstring 含 or.md 四.1.[1] 与 architecture.md §11.2.2 出处）；ruff+mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 异常测试（循环 A）
-- [ ] Subtask 1.2: 🟢 绿 — 442/443 实现
-- [ ] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记五处（`_CLASS_TO_SUBDOMAIN`/`exceptions __init__`/`exception_handlers.py EXCEPTION_HTTP_MAP`/**`tests/unit/interfaces/api/test_exception_handlers.py` Map 完备性期望集补 442/443 行**（既有测试期望集枚举断言，漏改不红——显式列入防漏）/设计文档 §3.3.2）
-- [ ] Subtask 1.4: 🔴 红 — 事件测试（循环 B）
-- [ ] Subtask 1.5: 🟢 绿 — AgentProfileLoaded 实现
-- [ ] Subtask 1.6: 🟡 变异 + 🔄 重构 — 事件双登记 + §10.1
-- [ ] Subtask 1.7: 🔴🟢🟡🔄 — AgentProfile 值对象完整循环（循环 C）
-- [ ] Subtask 1.8: 运行 `poetry run pytest tests/unit/domain/ -v` 全绿（含既有 8 项异常套件与 5-1 全部测试不回归）
+- [x] Subtask 1.1: 🔴 红 — 异常测试（循环 A）
+- [x] Subtask 1.2: 🟢 绿 — 442/443 实现
+- [x] Subtask 1.3: 🟡 变异 + 🔄 重构 — 登记五处（`_CLASS_TO_SUBDOMAIN`/`exceptions __init__`/`exception_handlers.py EXCEPTION_HTTP_MAP`/**`tests/unit/interfaces/api/test_exception_handlers.py` Map 完备性期望集补 442/443 行**（既有测试期望集枚举断言，漏改不红——显式列入防漏）/设计文档 §3.3.2）——变异实证：443 HTTP 映射 404→400 突变使 2 测试红、还原绿
+- [x] Subtask 1.4: 🔴 红 — 事件测试（循环 B）
+- [x] Subtask 1.5: 🟢 绿 — AgentProfileLoaded 实现
+- [x] Subtask 1.6: 🟡 变异 + 🔄 重构 — 事件双登记 + §10.1——变异实证：AgentProfileLoaded aggregate_type "Agent"→"AgentX" 突变使 2 测试红、还原绿（注：sed 首次误突变 AgentDecided 位——其断言在 test_core_events.py，修正为精确突变 AgentProfileLoaded 位）
+- [x] Subtask 1.7: 🔴🟢🟡🔄 — AgentProfile 值对象完整循环（循环 C）——变异实证：strip 判空分支突变使 18 测试红、还原绿；修正两处误写 `# type: ignore`（项目红线零容忍）
+- [x] Subtask 1.8: 运行 `poetry run pytest tests/unit/domain/ -v` 全绿（含既有 8 项异常套件与 5-1 全部测试不回归——2975 passed 零回归；ruff/mypy 全过）
 
 **完成标准/Definition of Done:**
-- [ ] 异常/事件/值对象契约实现且既有套件零回归
-- [ ] `grep -r "EXCEPTION_44[23]" src/domain/exceptions/` 无碰撞
-- [ ] 双登记两处 grep 可达
+- [x] 异常/事件/值对象契约实现且既有套件零回归
+- [x] `grep -r "EXCEPTION_44[23]" src/domain/exceptions/` 无碰撞
+- [x] 双登记两处 grep 可达
 
 ---
 
@@ -577,15 +577,15 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变固定名映射（"IDENTITY.md"→"IDENTITY_X.md"）→ 加载测试红 → 还原绿 |
 | 🔄 重构 | 组合根注册 `agent_profile_loader`（SINGLETON，lambda + `__import__` 延迟加载，仿 5-1 段形态）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_loader.py`（11 维度；DummyResolver 零依赖直构）；ruff+mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — 加载器测试（正常加载 + 七类边界：目录缺失/单文件缺失/内容空白/大小超限/编码非法/未知文件忽略/agent_id-role 透传；另含内置资产冒烟——红阶段失败形态与其余用例同为 ModuleNotFoundError（模块先于资产缺失暴露），属合法红）
-- [ ] Subtask 2.2: 🟢 绿 — 端口 + MarkdownAgentProfileLoader + 六档案资产
-- [ ] Subtask 2.3: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试
-- [ ] Subtask 2.4: 内置资产 token 实测（IDENTITY+SOUL ≤500 tokens 计量脚本或测试断言——AC-4 资产红线验证）
+- [x] Subtask 2.1: 🔴 红 — 加载器测试（正常加载 + 七类边界：目录缺失/单文件缺失/内容空白/大小超限/编码非法/未知文件忽略/agent_id-role 透传；另含内置资产冒烟——红阶段失败形态与其余用例同为 ModuleNotFoundError（模块先于资产缺失暴露），属合法红——14 failed 确认）
+- [x] Subtask 2.2: 🟢 绿 — 端口 + MarkdownAgentProfileLoader + 六档案资产（14 passed；大小上限读前 stat 字节口径；GBK/不可解码双形态编码测试；恰好 65536 字节边界通过用例）
+- [x] Subtask 2.3: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试——变异实证：固定名映射 "IDENTITY.md"→"IDENTITY_X.md" 突变使 11 测试红、还原绿；契约测试 12 项全过；resolve("agent_profile_loader") 可达 isinstance 合规（链路 L1 绿灯）
+- [x] Subtask 2.4: 内置资产 token 实测（IDENTITY 322 chars + SOUL 192 chars = 514 chars / 128 tokens——远低于 chars≤2000 / tokens≤500 红线，PASS）
 
 **完成标准/Definition of Done:**
-- [ ] 七类失败/边界路径 + 成功路径 + 未知文件忽略全覆盖（真实文件 IO，见 Subtask 2.1 清单）
-- [ ] 契约测试通过，`resolve("agent_profile_loader")` 可达（链路 L1 绿灯）
-- [ ] domain 层零依赖（agent_profile.py 仅标准库 + AgentRole）
+- [x] 七类失败/边界路径 + 成功路径 + 未知文件忽略全覆盖（真实文件 IO，见 Subtask 2.1 清单）
+- [x] 契约测试通过，`resolve("agent_profile_loader")` 可达（链路 L1 绿灯）
+- [x] domain 层零依赖（agent_profile.py 仅标准库 + AgentRole——ruff/mypy 全过）
 
 ---
 
@@ -605,14 +605,14 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变过滤条件（`== "active"` → `!= "active"`）→ 23 条断言红（结果为 0 条）→ 还原绿 |
 | 🔄 重构 | 组合根注册 `skill_selector`（SINGLETON，lambda resolve `skill_loader`）+ 契约测试 `tests/contracts/test_port_contract_skill_selector.py`（11 维度；DummyResolver 提供 `skill_loader` 依赖名——直构 `InMemorySkillLoader()` 本地文件只读、契约测试可接受）；ruff+mypy |
 
-- [ ] Subtask 3.1: 🔴 红 — Selector 测试（真实 + Mock 双分支）
-- [ ] Subtask 3.2: 🟢 绿 — 端口 + SkillSelector 实现
-- [ ] Subtask 3.3: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试
+- [x] Subtask 3.1: 🔴 红 — Selector 测试（真实 + Mock 双分支——8 failed 确认）
+- [x] Subtask 3.2: 🟢 绿 — 端口 + SkillSelector 实现（含 registry/__init__.py 包入口；8 passed）
+- [x] Subtask 3.3: 🟡 变异 + 🔄 重构 — 组合根注册 + 契约测试——变异实证：过滤条件 `== "active"` → `!= "active"` 突变使 4 测试红（23 条断言结果为 0 条）、还原绿；契约测试 12 项全过；resolve("skill_selector") 可达 + list_active_skills() 实测返回 23 条（链路 L2 绿灯 + L6 skill_loader 新消费方接线验证）
 
 **完成标准/Definition of Done:**
-- [ ] ACTIVE 过滤行为有断言守护（变异实证记录在案）
-- [ ] `resolve("skill_selector")` 可达（链路 L2 绿灯）
-- [ ] 零排序/零打分代码（GAP-CRITICAL-08b 合规）
+- [x] ACTIVE 过滤行为有断言守护（变异实证记录在案）
+- [x] `resolve("skill_selector")` 可达（链路 L2 绿灯）
+- [x] 零排序/零打分代码（GAP-CRITICAL-08b 合规——selector.py 仅枚举+过滤+tuple，无 sorted/score/weight）
 
 ---
 
@@ -632,16 +632,16 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变发布调用行（注释掉 publish）→ 「事件已发布」断言红 → 还原绿（Epic 4 零发布教训防线）；突变守卫顺序（**将角色守卫移至 `loader.load` 之后**——「441 检查移到 get_by_id 前」不可编码：role 取自 get_by_id 返回的实体）→ 「非 CEO 实体 → 441 且 loader 未被调用」断言红（结果型断言：错误码 + Mock 未调用，非字面调用序）→ 还原绿 |
 | 🔄 重构 | `AgentProfileLoadResult` DTO（模块内定义，Schema 见 Task 0）；组合根注册 `agent_profile_use_case`（SINGLETON，工厂 resolve 四依赖）+ 契约测试 `tests/contracts/test_port_contract_agent_profile_use_case.py`（DummyResolver 提供四依赖名）；ruff+mypy |
 
-- [ ] Subtask 4.1: 🔴 红 — 用例单元测试（含编排顺序与异常传播）
-- [ ] Subtask 4.2: 🟢 绿 — LoadAgentProfileUseCase 实现
-- [ ] Subtask 4.3: 🟡 变异 — 发布点 + 守卫顺序双突变实证
-- [ ] Subtask 4.4: 🔄 重构 — DTO + 组合根注册 + 契约测试
-- [ ] Subtask 4.5: 验收场景 AC-1.1/2.2/3.1/4.1 转绿核对（**按场景分档组装，勿一刀切套「先 instantiate」**：① AC-1.1/4.1 = 用例级——先 5-1 用例真实 instantiate 产生 agent，再本 Story 用例手动组装（`resolve("agent_profile_loader")` + `resolve("skill_selector")`（均无连接构造）+ 手动 `RedisAgentRepository(adapter=RedisAdapter(redis_client=ctx["_redis_client"]))` + `InMemoryEventBus()` + 手动实例化 `LoadAgentProfileUseCase`；组装先例 5-1 Subtask 4.5 / skill_data_collection L318）；② AC-2.2 = 用例级但**无需 instantiate**（真实仓储 + 随机 uuid，本应查无）；③ AC-3.1 = **不走用例**（`resolve("skill_loader")` 直查 + 拼接视图计量，无 Redis 门控））
+- [x] Subtask 4.1: 🔴 红 — 用例单元测试（含编排顺序与异常传播——12 failed 确认）
+- [x] Subtask 4.2: 🟢 绿 — LoadAgentProfileUseCase 实现（12 passed；发布两分支形态照抄 5-1——is_success False 普通 logger.error / raise 带 exc_info=True）
+- [x] Subtask 4.3: 🟡 变异 — 发布点 + 守卫顺序双突变实证（① 注释 publish 调用 → 事件断言 + 编排顺序断言双红、还原绿；② 角色守卫移至 loader.load 之后 → 「441 且 loader 未被调用」断言红、还原绿）
+- [x] Subtask 4.4: 🔄 重构 — DTO + 组合根注册 + 契约测试（12 项全过；resolve("agent_profile_use_case") 可达 isinstance 合规——链路 L3 绿灯；修复 E402/F841 两处 ruff 根因）
+- [x] Subtask 4.5: 验收场景 AC-1.1/2.2/3.1/4.1 转绿核对（**按场景分档组装**——12/14 转绿：AC-1.1/1.2/1.3/2.1/2.2/2.3/3.1/3.2/4.1/5.1/5.2/6.1 全绿；余 AC-6.2/6.3 为 Task 5-7 预期未交付；**实施注记**：AC-3.1 步骤文本「L1 元数据清单…」与 AC-1.1「L1 工具元数据清单…」异文，补独立 then 绑定后转绿）
 
 **完成标准/Definition of Done:**
-- [ ] 用例六步编排顺序有断言守护（calls 序断言非仅结果断言）
-- [ ] `resolve("agent_profile_use_case")` 可达（链路 L3 绿灯）+ skill_loader 新消费方接线（链路 L6 绿灯）
-- [ ] 发布点变异实证记录在案
+- [x] 用例六步编排顺序有断言守护（calls 序断言非仅结果断言——`calls == ["get_by_id", "load", "list_active_skills", "publish"]`）
+- [x] `resolve("agent_profile_use_case")` 可达（链路 L3 绿灯）+ skill_loader 新消费方接线（链路 L6 绿灯）
+- [x] 发布点变异实证记录在案
 
 ---
 
@@ -661,16 +661,16 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变 UUID 守卫（删 except 分支）→ 非法串测试红（ValueError 逃逸被断言捕获）→ 还原绿 |
 | 🔄 重构 | 输出格式收敛、docstring 规范；pyproject script 无需改动（`sisys-agent` 已注册）核对；ruff+mypy |
 
-- [ ] Subtask 5.1: 🔴 红 — CLI 追加测试（含 UUID 守卫红线用例）
-- [ ] Subtask 5.2: 🟢 绿 — load-profile 子命令实现
-- [ ] Subtask 5.3: 🟡 变异 — UUID 守卫突变实证
-- [ ] Subtask 5.4: 🔄 重构 — 输出/docstring 收敛
-- [ ] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 取 agent_id → `REDIS_PORT=6380 poetry run sisys-agent load-profile --agent-id <uuid>` 真实执行输出档案摘要（链路 L5 绿灯）。**前置三条**（沿用 5-1 Subtask 5.5 两条 + 本 Story 新增一条）：① CLI 子进程只读 `REDIS_PORT`（须显式 6380）；② 无 PG 环境 RELIABLE 发布走 Outbox 失败仅记日志 exit 0 属预期（组合根 event_publisher 真实 impl 为 DualChannelEventBus，RELIABLE 经 Outbox 需 PG）；③ TTL 过期的 agent_id → 443 退出码 1 属预期行为实证（5-1 的「poproject 改后 poetry install」条不适用——本 Story 无 pyproject 改动）
+- [x] Subtask 5.1: 🔴 红 — CLI 追加测试（含 UUID 守卫红线用例——11 failed 确认：SystemExit 2/AttributeError 合法红）
+- [x] Subtask 5.2: 🟢 绿 — load-profile 子命令实现（32 passed——含 instantiate 21 项零回归；`_parse_agent_uuid` 守卫映射 ValidationError(201) context 携带原始输入；`_print_profile_summary` 六档案逐项 `(N chars)` + 动态活跃技能数 + token 计量）
+- [x] Subtask 5.3: 🟡 变异 — UUID 守卫突变实证（删 except 分支 → 3 测试红（ValueError 逃逸被 pytest.raises(ValidationError) 捕获）、还原绿）
+- [x] Subtask 5.4: 🔄 重构 — main 分发重构为 `_run_load_profile_cli`/`_run_instantiate_cli` 两私有函数（根因修复 mypy Optional 类型错误——守卫与执行同分支作用域，类型自然收窄）；模块 docstring 补 load-profile 幂等只读语义；ruff/mypy 全过
+- [x] Subtask 5.5: 端到端冒烟——`REDIS_PORT=6380 poetry run sisys-agent instantiate --role ceo` 产出 agent_id → `load-profile --agent-id <uuid>` 真实执行输出六档案摘要（IDENTITY 322 chars…HEARTBEAT 223 chars + 活跃技能: 23 + 启动上下文: 346 tokens）exit 0（链路 L5 绿灯）；失败路径实测：非法 UUID → `[EXCEPTION_201]` exit 1（无 ValueError 逃逸）、不存在 agent_id → `[EXCEPTION_443]`、缺参数 → argparse usage error exit 2；冒烟键精确清理 deleted=1
 
 **完成标准/Definition of Done:**
-- [ ] `sisys-agent load-profile` 端到端可执行（摘要 stdout、退出码 0/1/2 三路径实测）
-- [ ] 非法 UUID 统一 ValidationError(201)（无 ValueError 逃逸）
-- [ ] `instantiate` 子命令零回归
+- [x] `sisys-agent load-profile` 端到端可执行（摘要 stdout、退出码 0/1/2 三路径实测）
+- [x] 非法 UUID 统一 ValidationError(201)（无 ValueError 逃逸）
+- [x] `instantiate` 子命令零回归
 
 ---
 
@@ -690,16 +690,16 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变 P95 断言阈值（500→0.5）→ 性能测试红（证明计时断言活着）→ 还原绿 |
 | 🔄 重构 | 场景命名收敛、超时防护；ruff+mypy |
 
-- [ ] Subtask 6.1: 🔴 红 — 集成与性能测试编写
-- [ ] Subtask 6.2: 🟢 绿 — 真实 Redis + 真实文件全链路通过
-- [ ] Subtask 6.3: 🟡 变异 — 阈值突变实证
-- [ ] Subtask 6.4: 🔄 重构 — 隔离与稳定性（连续运行 5 次无随机失败）
-- [ ] Subtask 6.5: 验收场景 AC-5.1/5.2 转绿核对
+- [x] Subtask 6.1: 🔴 红 — 集成与性能测试编写（验证型——直接转绿为合法预期，3 passed）
+- [x] Subtask 6.2: 🟢 绿 — 真实 Redis + 真实文件全链路通过（全链路含收尾 scan_iter 复核零残留 + P95 + 20 次成功率 + 事件计数 20）
+- [x] Subtask 6.3: 🟡 变异 — 阈值突变实证（500→0.5 → P95 测试红、还原绿）
+- [x] Subtask 6.4: 🔄 重构 — 隔离与稳定性（连续运行 5 次全绿无随机失败；ruff 全过）
+- [x] Subtask 6.5: 验收场景 AC-5.1/5.2 转绿核对（2 passed）
 
 **完成标准/Definition of Done:**
-- [ ] 真实 Redis 环境全绿（不可用时动态 skip 而非失败）
-- [ ] P95<500ms 与成功率 100% 断言有变异实证背书
-- [ ] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除——收尾 scan_iter 复核残留 0）
+- [x] 真实 Redis 环境全绿（不可用时动态 skip 而非失败——real_redis fixture ping 失败 pytest.skip）
+- [x] P95<500ms 与成功率 100% 断言有变异实证背书
+- [x] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除——收尾 scan_iter 复核残留 0）
 
 ---
 
@@ -720,18 +720,19 @@ class SkillSelectorPort(Protocol):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_profile_loading.py`
-- [ ] Subtask 7.2: 验证器 A——domain 零依赖 + 零 application import（`agent_profile.py`/`agent_events.py`/`agent_exceptions.py` 无第三方 import 且无 `src.application` import——**本 Story 特有断言**：AgentProfile 不含 ToolMetadata 的架构防线，AST/import 扫描，参照 test_hexagonal_architecture_constraints.py + postgresql 模板 L792-819 AST 写法）
-- [ ] Subtask 7.3: 验证器 B——依赖方向（MarkdownAgentProfileLoader 不 import application/interfaces；agent_cli 不 import infrastructure；用例仅依赖 domain + application 端口）
-- [ ] Subtask 7.4: 验证器 C——组合根唯一装配（`MarkdownAgentProfileLoader`/`SkillSelector`/`LoadAgentProfileUseCase` 在 src/ 下仅 composition_root.py 与测试中实例化——rglob 全仓扫描类名实例化，AST Call 形态（5-1 D9(c) AST 化先例），扫描技术参照 test_arch_agent_instantiation.py 验证器 D）
-- [ ] Subtask 7.5: 验证器 D——SkillSelector 无打分断言（selector.py 源码 AST 扫描不含排序/权重调用——`sorted`/`score`/`weight` 标识符零命中，GAP-CRITICAL-08b 合规的机器验证）
-- [ ] Subtask 7.6: 循环依赖检测用 ruff/isort（不引入 pylint）
-- [ ] Subtask 7.7: 运行完整测试套件并生成报告（完整套件归并 Task 8 Subtask 8.4 全量回归执行）
+- [x] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_profile_loading.py`
+- [x] Subtask 7.2: 验证器 A——domain 零依赖 + 零 application import（agent_profile.py 白名单式收紧断言：仅标准库 {uuid, dataclasses, __future__} + src.domain；DC-7 架构防线）
+- [x] Subtask 7.3: 验证器 B——依赖方向（MarkdownAgentProfileLoader 仅 domain + application.ports 合法方向；agent_cli 零 infrastructure；用例仅 domain + application）
+- [x] Subtask 7.4: 验证器 C——组合根唯一装配（AST Call 扫描三实现类——func.id/func.attr 命中类名，跳过定义文件与 composition_root.py；组合根注册 grep 三端口）
+- [x] Subtask 7.5: 验证器 D——SkillSelector 无打分断言（sorted/sort/score/weight/ranking/top_k 标识符 AST 零命中 + get_all_slugs 枚举真源 + 无 reverse）
+- [x] Subtask 7.6: 循环依赖检测用 ruff/isort（subprocess ruff --select I，不引入 pylint）
+- [x] Subtask 7.7: 运行完整测试套件并生成报告（完整套件归并 Task 8 Subtask 8.4 全量回归执行）
+- [x] 双变异实证：① selector.py 注入 `sorted(` → 验证器 D 红、还原绿；② agent_profile.py 注入 `import yaml` → 验证器 A 双断言红、还原绿（证明 AST 扫描断言活着）——12 架构测试 + 37 相关单测还原后全绿
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过，任何违规导致测试失败
-- [ ] 输出清晰合规报告（验证器 A-D 分节）
-- [ ] 循环依赖检测不引入额外工具（subprocess ruff --select I）
+- [x] 所有架构约束测试通过，任何违规导致测试失败
+- [x] 输出清晰合规报告（验证器 A-E 分节——A domain 零依赖 4 项 / B 依赖方向 3 项 / C 组合根唯一装配 2 项 / D 无打分 2 项 / E 循环依赖 1 项，共 12 项）
+- [x] 循环依赖检测不引入额外工具（subprocess ruff --select I）
 
 ---
 
@@ -748,18 +749,18 @@ class SkillSelectorPort(Protocol):
 | 🟡 变异 | 突变一处预期文件名（改为不存在路径）→ 收尾场景红 → 还原绿 |
 | 🔄 重构 | 场景命名与断言表达收敛 |
 
-- [ ] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（value_objects/ports×2/events/exceptions/use_cases/infrastructure/entrypoints CLI/composition_root 产出逐项确认）
-- [ ] Subtask 8.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单（测试分类表全文件逐项确认）
-- [ ] Subtask 8.3: 链路接线断言清单 L1-L8 终态核对（L1-L6 绿灯实证、L7/L8 deferred-work.md 登记仍在且未误删——含 Task 0 补登记的组合根 impl 路径失效观察项）
-- [ ] Subtask 8.4: 运行 `poetry run pytest tests/`、`poetry run ruff check src/ tests/`、`poetry run mypy src/` 收尾校验
-- [ ] Subtask 8.5: 更新 sprint-status.yaml（5-2 → review）；同步设计文档（D-1/D-2 不修改历史规划文档——登记在 Story 偏离声明即可；interface-design.md §5.5 的「⚠️ 设计示意，未实现 Epic 5」注记更新为已实现，**并附实现形态标注**——实际注入 `skill_loader` 端口、返回 `tuple[ToolMetadata, ...]`、纯 status 过滤，示意骨架中的 `SkillRepositoryPort`/`Skill` 实体形态未采纳（防「示意=实现」误读）；**interface-design.md §17.1 路线图两行勘正**（L2047-2052：「设计 TOOLS.md 元数据清单｜agents/ceo/TOOLS.md｜Story 5.2」→ DC-2 裁定不落物理文件、「实现 SkillSelector｜Story 5.3」→ 本 Story 5.2 交付）；**architecture.md §11.2.2 MVP 路径注记（D-4 的 Task 8 动作，防漏）**；§10.1 事件行已在 Task 1 同步，此处终态核对）
-- [ ] Subtask 8.6: 验收场景全量转绿核对（14 场景逐一绿 + **收集场景数 == 14 校验**（`pytest --collect-only -q`，防漏绑定静默不收集）——补齐各 Task 未显式转绿核对的 AC-1.2/1.3/2.1/2.3/3.2/6.1/6.2）
+- [x] Subtask 8.1: 场景 1 — 验证 `src` 完成清单（AC-6.3 场景断言全过：10 处 src 产出 + 六档案资产 + 组合根三端口注册 grep）
+- [x] Subtask 8.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单（AC-6.3 场景断言全过：12 处测试文件逐项存在）
+- [x] Subtask 8.3: 链路接线断言清单 L1-L8 终态核对（L1-L6 绿灯实证 grep 可达 + L7/L8 deferred-work.md 登记仍在且未误删——含 Task 0 补登记的组合根 impl 路径失效观察项；AC-6.3 场景断言全过）
+- [x] Subtask 8.4: 运行 `poetry run pytest tests/`、`poetry run ruff check src/ tests/`、`poetry run mypy src/` 收尾校验——**ruff 全仓通过 + mypy 672 文件零错误 + pytest 全量 12363 passed / 32 failed / 46 skipped**；32 个失败逐一分类定谳为**环境性失败与改动面零交集**（Neo4j 测试端口 7475/7688 不可达×10、Qdrant 测试端口 6335 不可达×7、GPU 不可用×1、OCR benchmark 外部模型环境×14；redis_cache P95 ×2 为 -n 8 并行负载抖动——串行重跑 12 passed 全过实证；git status 改动面与失败文件零交集验证；--lf 串行复跑确认）
+- [x] Subtask 8.5: 更新 sprint-status.yaml（5-2 → review）；同步设计文档：interface-design.md §5.5 注记更新为已实现 + 实现形态标注（实际注入 skill_loader 端口、返回 tuple[ToolMetadata, ...]、纯 status 过滤，示意骨架 SkillRepositoryPort/Skill 形态未采纳）；§17.1 两行勘正（TOOLS.md 不落物理文件 DC-2 / SkillSelector 5.2 交付提前于 5.3）；architecture.md §11.2.2 MVP 路径注记（D-4：configs/agents/profiles/ 静态资产 + 工作目录形态延后 + DC-2 TOOLS.md 视图）；§10.1 事件行 Task 1 已同步终态核对通过
+- [x] Subtask 8.6: 验收场景全量转绿核对（**14/14 场景全绿 + 收集场景数 == 14 校验通过**；补齐 AC-1.2/1.3/2.1/2.3/3.2/6.1/6.2 逐一绿）——变异实证：SOUL.md 临时重命名 → AC-6.3 收尾场景红、还原绿
 
 **完成标准/Definition of Done:**
-- [ ] src 与 tests 完成清单逐项验证确认
-- [ ] 开发结束验收测试通过（变异实证：文件名突变→红→还原绿）
-- [ ] 三项质量门禁全绿（ruff / mypy / pytest 全量回归）
-- [ ] Story 可进入 `review`/`done`
+- [x] src 与 tests 完成清单逐项验证确认
+- [x] 开发结束验收测试通过（变异实证：文件名突变→红→还原绿）
+- [x] 三项质量门禁全绿（ruff / mypy 零错误；pytest 全量回归——5-2 相关测试全绿，32 失败均为环境性零交集定谳）
+- [x] Story 可进入 `review`/`done`
 
 ---
 
@@ -1009,48 +1010,69 @@ tests/
 - [x] 项目结构对齐统一规范（R1/R2/R4 层归属 + DC-7 分层裁定防 domain→application 违规）
 - [x] 验收测试规范对齐模板（R6：5-1 最新形态为主体基准 + 用户指定 postgresql 模板三项继承先例显式声明）
 
+### Dev Story 实施记录（2026-10-19）
+
+- [x] Task 0-8 全部完成（每 Task 独立红→绿→变异→重构循环，变异实证 9 处记录在案：443 HTTP 映射/事件 aggregate_type/VO strip 判空/固定名映射/过滤条件/发布点/守卫顺序/UUID 守卫/P95 阈值/验证器 sorted+import yaml/收尾文件名）
+- [x] 14/14 验收场景全绿 + 收集数 == 14 校验
+- [x] 全部 6 项接线（L1-L6）绿灯：三端口 resolve 可达 + 事件双登记 + CLI 端到端真实执行 + skill_loader 新消费方
+- [x] 六档案资产落地（IDENTITY+SOUL 实测 514 chars / 128 tokens，远低于 2000/500 红线）
+- [x] SkillSelector 交付（GAP-CRITICAL-08b 消除：纯 ACTIVE 过滤，23 条，零排序零打分）
+- [x] 质量门禁：ruff 全仓通过 / mypy 672 文件零错误 / 全量 pytest 12363 passed（32 failed 全为环境性零交集定谳：Neo4j 7475/7688 + Qdrant 6335 测试端口不可达、GPU 不可用、OCR benchmark 外部模型、redis_cache 并行 P95 抖动串行全过）
+- [x] 文档同步：sisys-uni-exception-design §3.3.2（442/443 行）+ architecture.md §10.1 事件行 + §11.2.2 MVP 路径注记（D-4）+ interface-design.md §5.5 已实现注记 + §17.1 两行勘正
+- [x] deferred-work.md 补登记组合根 impl 路径失效观察项（l0_storage/memory_file_storage 指向不存在路径）
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-2-agent-identity-profile-loading.md`
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/value_objects/agent_profile.py` - AgentProfile 值对象
-- `src/domain/events/agent_events.py`（追加 AgentProfileLoaded）
-- `src/domain/exceptions/agent_exceptions.py`（追加 442/443）
-- `src/application/ports/agent_profile_loader.py` - 档案加载端口
+**已创建的文件/Created Files（Dev Story 实施，2026-10-19）:**
+- `src/domain/value_objects/agent_profile.py` - AgentProfile 值对象（frozen + 六字段自校验）
+- `src/application/ports/agent_profile_loader.py` - 档案加载端口（AgentProfileLoader Protocol）
 - `src/application/ports/skill_selector.py` - Skill 选择器端口（SkillSelectorPort Protocol）
-- `src/application/skills/registry/__init__.py` - registry 包初始化（目录已存在为空）
-- `src/application/skills/registry/selector.py` - SkillSelector 实现
-- `src/application/use_cases/agent_profile_loading.py` - 加载用例 + 结果 DTO
-- `src/infrastructure/agent_orch/markdown_agent_profile_loader.py` - Markdown 加载器
-- `src/entrypoints/agent_cli.py`（追加 load-profile 子命令）
-- `configs/agents/profiles/ceo/{IDENTITY,CODE,SOUL,USER,MEMORY,HEARTBEAT}.md` - 六档案资产
-- `tests/unit/domain/value_objects/test_agent_profile.py` - 单元测试
-- `tests/unit/domain/events/test_agent_events.py`（追加）
-- `tests/unit/domain/exceptions/test_agent_exceptions.py`（追加）
-- `tests/unit/application/skills/test_skill_selector.py` - 单元测试
-- `tests/unit/application/use_cases/test_agent_profile_loading.py` - 单元测试
-- `tests/unit/infrastructure/agent_orch/test_markdown_agent_profile_loader.py` - 单元测试
-- `tests/unit/interfaces/cli/test_agent_cli.py`（追加）
-- `tests/unit/architecture/test_arch_agent_profile_loading.py` - 架构测试
-- `tests/contracts/test_port_contract_agent_profile_loader.py` - 契约测试
-- `tests/contracts/test_port_contract_skill_selector.py` - 契约测试
-- `tests/contracts/test_port_contract_agent_profile_use_case.py` - 契约测试
-- `tests/integration/test_integration_agent_profile_loading.py` - 集成测试
+- `src/application/skills/registry/__init__.py` - registry 包初始化
+- `src/application/skills/registry/selector.py` - SkillSelector 实现（GAP-CRITICAL-08b）
+- `src/application/use_cases/agent_profile_loading.py` - LoadAgentProfileUseCase + AgentProfileLoadResult DTO
+- `src/infrastructure/agent_orch/markdown_agent_profile_loader.py` - Markdown 加载器（UTF-8 显式/64KB 字节口径/判空主检）
+- `configs/agents/profiles/ceo/IDENTITY.md` - 六档案资产（322 chars）
+- `configs/agents/profiles/ceo/CODE.md` - 行为准则（288 chars）
+- `configs/agents/profiles/ceo/SOUL.md` - 决策价值观（192 chars）
+- `configs/agents/profiles/ceo/USER.md` - 用户偏好（160 chars）
+- `configs/agents/profiles/ceo/MEMORY.md` - 静态种子（233 chars）
+- `configs/agents/profiles/ceo/HEARTBEAT.md` - 心跳配置占位（223 chars）
+- `tests/unit/domain/value_objects/test_agent_profile.py` - 单元测试（29 项）
+- `tests/unit/application/skills/test_skill_selector.py` - 单元测试（8 项）
+- `tests/unit/application/use_cases/test_agent_profile_loading.py` - 单元测试（12 项）
+- `tests/unit/infrastructure/agent_orch/test_markdown_agent_profile_loader.py` - 单元测试（14 项）
+- `tests/unit/architecture/test_arch_agent_profile_loading.py` - 架构测试（12 项验证器 A-E）
+- `tests/contracts/test_port_contract_agent_profile_loader.py` - 契约测试（12 项）
+- `tests/contracts/test_port_contract_skill_selector.py` - 契约测试（12 项）
+- `tests/contracts/test_port_contract_agent_profile_use_case.py` - 契约测试（12 项）
+- `tests/integration/test_integration_agent_profile_loading.py` - 集成测试（3 场景）
 - `tests/acceptance/test_acceptance_agent_profile_loading.feature` - Gherkin 场景（14 场景）
 - `tests/acceptance/test_acceptance_agent_profile_loading.py` - BDD 步骤实现
 
-**待修改的文件/To Be Modified:**
+**已修改的文件/Modified Files（Dev Story 实施）:**
+- `src/domain/events/agent_events.py`（追加 AgentProfileLoaded）+ `src/domain/events/__init__.py`（导出）
+- `src/domain/exceptions/agent_exceptions.py`（追加 442/443 + docstring 继承链理由）
+- `src/domain/exceptions/_code_ranges.py`（预留注释改逐码登记 + _CLASS_TO_SUBDOMAIN 两映射）
+- `src/domain/exceptions/__init__.py`（import + __all__）
+- `src/entrypoints/agent_cli.py`（load-profile 子命令 + _parse_agent_uuid 守卫 + main 分发重构）
 - `src/composition_root.py`（Story 5.2 段：3 端口注册）
 - `configs/event_channels.yaml` + `src/infrastructure/messaging/channel_router.py`（AgentProfileLoaded 双登记）
-- `src/domain/exceptions/_code_ranges.py`（`_CLASS_TO_SUBDOMAIN` 两映射）+ `src/domain/exceptions/__init__.py`（导出）
 - `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 442→500/443→404）
-- `tests/unit/interfaces/api/test_exception_handlers.py`（Map 完备性清单配套维护——5-1 Task 8 先例）
-- `docs/architecture/sisys-uni-exception-design.md`（§3.3.2 编码分配表 442/443）
-- `docs/architecture/architecture.md`（§10.1 事件表 + §11.2.2 路径注记）
-- `docs/architecture/interface-design.md`（§5.5 实现注记）
-- `_bmad-output/implementation-artifacts/deferred-work.md`（组合根 impl 路径失效观察项）
+- `tests/unit/domain/events/test_agent_events.py`（追加 AgentProfileLoaded 9 项）
+- `tests/unit/domain/exceptions/test_agent_exceptions.py`（追加 442/443 测试）
+- `tests/unit/interfaces/api/test_exception_handlers.py`（Map 完备性期望集补 442/443）
+- `tests/unit/interfaces/cli/test_agent_cli.py`（追加 load-profile 11 项）
+- `docs/architecture/sisys-uni-exception-design.md`（§3.3.2 编码分配表 442/443 + 子域范围表）
+- `docs/architecture/architecture.md`（§10.1 事件表 AgentProfileLoaded 行 + §11.2.2 MVP 路径注记）
+- `docs/architecture/interface-design.md`（§5.5 已实现注记 + 实现形态标注 + §17.1 两行勘正）
+- `_bmad-output/implementation-artifacts/deferred-work.md`（组合根 impl 路径失效观察项补登记）
+
+### 变更日志 Change Log
+
+- 2026-10-19: Story 5.2 dev-story 实施完成（Task 0-8 全绿）——领域契约（442/443 + AgentProfileLoaded + AgentProfile）、六档案资产、MarkdownAgentProfileLoader、SkillSelector（GAP-CRITICAL-08b）、LoadAgentProfileUseCase、CLI load-profile、三端口组合根注册、14 验收场景全绿、集成性能（P95<500ms 实测 ~10ms 级）、架构验证器 A-E、文档四处同步；状态 ready-for-dev → review
 
 ---
 

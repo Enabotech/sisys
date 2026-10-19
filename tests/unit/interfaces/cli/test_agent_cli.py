@@ -266,3 +266,161 @@ class TestBootstrapAndCleanupRobustness:
         assert exit_code == 0, "关池失败不得反噬成功结果"
         assert stub.last_result is not None
         assert uuid.UUID(capsys.readouterr().out.strip()) == stub.last_result.agent_id
+
+
+# ===================================================================
+# Story 5-2 — load-profile 子命令（档案加载）
+# ===================================================================
+
+
+class _StubProfile:
+    """档案 VO 替身（六字段对齐 AgentProfile）。"""
+
+    def __init__(self) -> None:
+        self.identity = "# IDENTITY\nCEO 战略方向最终决策高管协调"
+        self.code_of_conduct = "# CODE\n证据优先角色隔离"
+        self.soul = "# SOUL\n高管决策视角"
+        self.user_preferences = "# USER\n结论先行"
+        self.memory = "# MEMORY\n静态种子占位"
+        self.heartbeat = "# HEARTBEAT\n每日频率占位"
+
+
+class _StubLoadResult:
+    """load-profile 用例结果替身（结构对齐 AgentProfileLoadResult）。"""
+
+    def __init__(self) -> None:
+        self.agent_id = uuid.uuid4()
+        self.role = AgentRole.CEO
+        self.profile = _StubProfile()
+        self.tools_l1 = tuple(f"meta-{i}" for i in range(23))
+        self.startup_context_tokens = 342
+
+
+class _StubLoadUseCase:
+    """load-profile 用例替身：记录 agent_id 并可编程抛异常。"""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.calls: list[uuid.UUID] = []
+        self.last_result: _StubLoadResult | None = None
+        self._error = error
+
+    async def execute(self, agent_id: uuid.UUID) -> _StubLoadResult:
+        self.calls.append(agent_id)
+        if self._error is not None:
+            raise self._error
+        self.last_result = _StubLoadResult()
+        return self.last_result
+
+
+class TestLoadProfileBuildParser:
+    """load-profile 子命令参数契约。"""
+
+    def test_load_profile_with_agent_id(self) -> None:
+        agent_id = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        args = agent_cli.build_parser().parse_args(["load-profile", "--agent-id", agent_id])
+        assert args.command == "load-profile"
+        assert args.agent_id == agent_id
+
+    def test_agent_id_short_option(self) -> None:
+        agent_id = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        args = agent_cli.build_parser().parse_args(["load-profile", "-a", agent_id])
+        assert args.agent_id == agent_id
+
+    def test_agent_id_required(self) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["load-profile"])
+        assert exc_info.value.code == 2
+
+
+class TestAgentIdUuidGuard:
+    """_parse_agent_uuid 守卫契约（红线：禁止裸 uuid.UUID 的 ValueError 逃逸）。"""
+
+    def test_valid_uuid_accepted(self) -> None:
+        agent_id = uuid.uuid4()
+        assert agent_cli._parse_agent_uuid(str(agent_id)) == agent_id
+
+    def test_padded_uuid_normalized(self) -> None:
+        """带空白的 UUID 字符串剥离后成功。"""
+        agent_id = uuid.uuid4()
+        assert agent_cli._parse_agent_uuid(f"  {agent_id} ") == agent_id
+
+    def test_invalid_string_maps_201_not_valueerror(self) -> None:
+        """非法字符串 → ValidationError(201) 且 context 携带原始输入。"""
+        from src.domain.exceptions import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            agent_cli._parse_agent_uuid("not-a-uuid")
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context.get("agent_id") == "not-a-uuid", "context 必须携带原始输入"
+
+    def test_empty_string_maps_201(self) -> None:
+        from src.domain.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            agent_cli._parse_agent_uuid("")
+
+    def test_malformed_uuid_variants_all_mapped(self) -> None:
+        """穷举常见非法形态，ValueError 必须全部被映射为 201。"""
+        from src.domain.exceptions import ValidationError
+
+        for raw in ("0f1e2d3c", "uuid", "0f1e2d3c-4b5a-6978-8796", "{}", "00000000-0000-0000-0000-00000000000g"):
+            with pytest.raises(ValidationError):
+                agent_cli._parse_agent_uuid(raw)
+
+
+class TestLoadProfileMain:
+    """load-profile main 路径：成功摘要输出 + 退出码契约。"""
+
+    def test_success_outputs_summary(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功路径输出六档案逐项 OK + 活跃技能 + 启动上下文（多行人类可读摘要）。"""
+        stub = _StubLoadUseCase()
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+        exit_code = agent_cli.main(["load-profile", "--agent-id", str(uuid.uuid4())])
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        for file_label in ("IDENTITY.md", "CODE.md", "SOUL.md", "USER.md", "MEMORY.md", "HEARTBEAT.md"):
+            assert f"{file_label}: OK" in out, f"摘要应含 {file_label}: OK 行"
+        assert "活跃技能" in out and "23" in out, "摘要应含活跃技能数（运行期动态值）"
+        assert "启动上下文" in out and "342" in out, "摘要应含 token 计量"
+        assert stub.last_result is not None
+
+    def test_agent_not_found_exit_1_with_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """用例抛 AgentNotFoundError(443) → 退出码 1 且 stderr 含编码。"""
+        from src.domain.exceptions import AgentNotFoundError
+
+        stub = _StubLoadUseCase(error=AgentNotFoundError(agent_id=str(uuid.uuid4())))
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+        exit_code = agent_cli.main(["load-profile", "--agent-id", str(uuid.uuid4())])
+        assert exit_code == 1
+        assert "EXCEPTION_443" in capsys.readouterr().err
+
+    def test_profile_error_exit_1_with_code(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """用例抛 AgentProfileError(442) → 退出码 1 且 stderr 含编码。"""
+        from src.domain.exceptions import AgentProfileError
+
+        stub = _StubLoadUseCase(error=AgentProfileError(reason="档案文件缺失"))
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+        exit_code = agent_cli.main(["load-profile", "--agent-id", str(uuid.uuid4())])
+        assert exit_code == 1
+        assert "EXCEPTION_442" in capsys.readouterr().err
+
+    def test_invalid_uuid_cli_path_exit_1_with_201(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """main 路径非法 UUID 字符串 → 退出码 1 且 stderr 含 EXCEPTION_201（ValueError 不逃逸）。"""
+        stub = _StubLoadUseCase()
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+        exit_code = agent_cli.main(["load-profile", "--agent-id", "not-a-uuid"])
+        assert exit_code == 1
+        assert "EXCEPTION_201" in capsys.readouterr().err
+        assert stub.calls == [], "UUID 守卫先于用例调用"

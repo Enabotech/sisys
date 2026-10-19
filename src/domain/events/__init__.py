@@ -3,7 +3,7 @@
 提供领域层事件定义，遵循六边形架构零依赖原则
 """
 
-from .agent_events import AgentDecided, AgentInstantiated
+from .agent_events import AgentDecided, AgentInstantiated, AgentProfileLoaded
 from .archive_events import ArchiveCreated, FactBecameStale, ValidityPeriodSet
 from .audit_events import AuditActionType, AuditEvent
 from .auto_execute_events import AutoExecuted
@@ -58,6 +58,7 @@ __all__ = [
     "ToolRolledBack",
     "AgentDecided",
     "AgentInstantiated",
+    "AgentProfileLoaded",
     "CheckpointReached",
     "CheckpointRecovered",
     "CorrectionApproved",

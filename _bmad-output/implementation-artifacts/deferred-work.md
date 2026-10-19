@@ -165,3 +165,9 @@
 - 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前
 - 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
 - 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数
+
+## Deferred from: Story 5-2 Task 0 链路普查 (2026-10-19)
+
+> Story 5-2（Agent 身份档案加载）Task 0 链路接线断言清单 L8 普查新发现——L7（心跳链路）与 L8（系统级记忆）deferred 保持既有登记（2026-10-13 普查段 + 5-1 Task 0 补登记段），本段为 L8 新增观察项。
+
+- 【L8·观察项·P2】组合根休眠记忆端口 impl 路径失效（激活时必炸）— `l0_storage`（组合根 L268-276）impl 字符串 `"src.infrastructure.storage.file_memory_adapter.FileMemoryAdapter"` 与 `memory_file_storage`（组合根 L1111-1119）impl 字符串 `"src.infrastructure.storage.memory_file_storage.MemoryFileStorage"` 均指向不存在的模块路径——实际实现在 `src/infrastructure/storage/fs/` 下（`fs/file_memory_adapter.py`、`fs/memory_file_storage.py`），模块路径缺 `fs` 层级。两端口当前零 resolve 消费（休眠），字符串 impl 延迟导入不触发即不炸；首个消费方 resolve 时 ImportError。触发=记忆链路激活 Story（Story 5-2 的 MEMORY.md 为静态种子，不走系统级动态合并——DC-6/D-3）

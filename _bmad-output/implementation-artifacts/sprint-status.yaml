@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-15
+last_updated: 2026-10-19
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -157,7 +157,7 @@ development_status:
   # ===========================================================================
   epic-5: in-progress
   5-1-ceo-agent-instantiation-mvp: done
-  5-2-agent-identity-profile-loading: ready-for-dev
+  5-2-agent-identity-profile-loading: review
   5-3-single-agent-workflow: backlog
   5-4-eip-basic-elastic-isolation: backlog
   5-5-agent-triple-hard-isolation: backlog

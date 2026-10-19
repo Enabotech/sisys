@@ -917,7 +917,15 @@ skills/pestel/
     └── template.md       # 输出模板
 ```
 
-### 5.5 Skill 选择器（SkillSelector）—— ⚠️ 设计示意，未实现（Epic 5 Story 5-2）
+### 5.5 Skill 选择器（SkillSelector）—— ✅ 已实现（Story 5-2 交付）
+
+> **实现形态标注（防「示意=实现」误读）**：实际交付为 `src/application/skills/registry/selector.py`
+> 的 `SkillSelector` 实现 + `src/application/ports/skill_selector.py` 的 `SkillSelectorPort`
+> 端口——组合注入 `skill_loader` 端口（`SkillLoaderPort`），`list_active_skills()` 返回
+> `tuple[ToolMetadata, ...]`（23 条 ACTIVE L1 元数据，按 slug 清单稳定序），纯 status
+> 过滤零排序零打分。下方示意骨架中的 `SkillRepositoryPort`/`Skill` 实体形态**未采纳**
+> （实际以 SkillLoaderPort + ToolMetadata 实现）；示意中的 BLM/BEM 阶段 + 角色白名单
+> 过滤维度为 L2 语义扩展预留（MVP 仅 ACTIVE 过滤）。
 
 **关键设计决策（对标 Anthropic Claude Code Skills）：**
 
@@ -2047,9 +2055,9 @@ GET    /api/v1/system/metrics               # 监控指标
 |------|-------|-----------|-------|-----------|
 | 定义 sisys CLI 6 个服务模块 | `cli/commands/` 骨架 | Story 7.1 | 2 周 | or.md 1.4.1(1) |
 | 实现 CLI 基础框架 | typer 0.24+ 类型注解驱动 | Story 7.1 | 1 周 | or.md 1.4.1(1) |
-| 设计 TOOLS.md 元数据清单 | `agents/ceo/TOOLS.md` | Story 5.2 | 1 周 | or.md 1.1.3(2) |
+| 设计 TOOLS.md 元数据清单 | ~~`agents/ceo/TOOLS.md`~~ → **不落物理文件**（Story 5.2 实施裁定 DC-2：TOOLS.md 视图 = `skill_loader` 端口 L1 元数据 23 条，单一真源防派生漂移） | Story 5.2（✅ 已交付） | 1 周 | or.md 1.1.3(2) |
 | 编写 3 个 Pilot SKILL.md | pestel/swot/five-forces | Story 4.1 | 2 周 | or.md 1.2.2(3) |
-| 实现 SkillSelector | `list_active_skills()` 列表查询（无硬编码过滤） | Story 5.3 | 2 周 | or.md 1.1.3(1) |
+| 实现 SkillSelector | `list_active_skills()` 列表查询（无硬编码过滤） | Story 5.2（✅ 已交付，提前于原计划 5.3——architecture.md GAP-CRITICAL-08b 指定） | 2 周 | or.md 1.1.3(1) |
 | 定义 LLMRequest/LLMResponse | `domain/llm/protocol.py`（**`@dataclass(frozen=True)` 端口契约**，CLAUDE.md §5 领域层零依赖） + `application/llm/dto.py`（Pydantic DTO 序列化） | Story 1.14b | 1 周 | or.md 1.5.2(2) |
 | 实现 LLM Adapter（LiteLLM） | `infrastructure/llm/` | Story 1.14b | 2 周 | or.md 1.5.2(2) |
 | 定义 ToolCallRequest/Response | `domain/tool/protocol.py`（**`@dataclass(frozen=True)` 端口契约**） + `interfaces/api/v1/schemas/tool_schemas.py`（FastAPI Pydantic） | Story 4.3 | 1 周 | or.md 1.2.2(3) |

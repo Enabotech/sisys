@@ -2735,6 +2735,63 @@ def bootstrap() -> None:
         tags=("agent",),
     )
 
+    # === Story 5.2 — Agent 身份档案加载（六档案 + SkillSelector + 加载用例）===
+    register_port(
+        name="agent_profile_loader",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_profile_loader",
+            fromlist=["AgentProfileLoader"],
+        ).AgentProfileLoader,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.agent_orch.markdown_agent_profile_loader",
+            fromlist=["MarkdownAgentProfileLoader"],
+        ).MarkdownAgentProfileLoader(),
+        module="src.infrastructure.agent_orch.markdown_agent_profile_loader",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "profile"),
+    )
+    register_port(
+        name="skill_selector",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.skill_selector",
+            fromlist=["SkillSelectorPort"],
+        ).SkillSelectorPort,
+        impl=lambda resolver: __import__(
+            "src.application.skills.registry.selector",
+            fromlist=["SkillSelector"],
+        ).SkillSelector(
+            skill_loader=resolver.resolve("skill_loader"),
+        ),
+        module="src.application.skills.registry.selector",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("skills", "selector"),
+    )
+    register_port(
+        name="agent_profile_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.agent_profile_loading",
+            fromlist=["LoadAgentProfileUseCase"],
+        ).LoadAgentProfileUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.agent_profile_loading",
+            fromlist=["LoadAgentProfileUseCase"],
+        ).LoadAgentProfileUseCase(
+            profile_loader=resolver.resolve("agent_profile_loader"),
+            repository=resolver.resolve("agent_repository"),
+            skill_selector=resolver.resolve("skill_selector"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.use_cases.agent_profile_loading",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent",),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线

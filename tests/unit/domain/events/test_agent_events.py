@@ -19,11 +19,16 @@ Run with:
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from src.domain.events import AgentInstantiated
+
+if TYPE_CHECKING:
+    # 类型注解专用（from __future__ annotations 惰性求值）——运行时零 import，
+    # 不违反 Story 5-2 新模块延迟 import 纪律
+    from src.domain.events import AgentProfileLoaded
 
 
 def _make_event(**kwargs) -> AgentInstantiated:
@@ -191,3 +196,103 @@ class TestFromDictRoundtrip:
         with pytest.raises(EntityValidationError) as exc_info:
             DomainEvent.from_dict(data)
         assert exc_info.value.code == "EXCEPTION_242"
+
+
+# ===================================================================
+# Story 5-2 — AgentProfileLoaded 事件（档案加载完成）
+# ===================================================================
+
+
+def _make_profile_event(**kwargs) -> AgentProfileLoaded:
+    """工厂：构造 CEO 档案加载完成事件（可覆盖任意 kw_only 字段）。
+
+    Story 5-2 新事件延迟 import 纪律与验收测试一致——模块顶部 import 会使
+    收集期整文件炸，无法逐 Task 转绿（5-2 尚未实现时本节测试红、5-1 节不受影响）。
+    """
+    from src.domain.events import AgentProfileLoaded
+
+    defaults: dict = {
+        "agent_id": uuid.uuid4(),
+        "role": "ceo",
+        "startup_context_tokens": 718,
+        "active_skill_count": 23,
+    }
+    defaults.update(kwargs)
+    return AgentProfileLoaded(**defaults)
+
+
+class TestAgentProfileLoadedCreation:
+    """AgentProfileLoaded 构造契约（四必填 kw_only 字段）。"""
+
+    def test_full_fields_construction(self) -> None:
+        """全字段构造成功且字段可读。"""
+        agent_id = uuid.uuid4()
+        event = _make_profile_event(agent_id=agent_id, startup_context_tokens=905, active_skill_count=23)
+        assert event.agent_id == agent_id
+        assert event.role == "ceo"
+        assert event.startup_context_tokens == 905
+        assert event.active_skill_count == 23
+
+    def test_event_type_default(self) -> None:
+        """event_type 默认为类名（init=False 不可构造期注入）。"""
+        event = _make_profile_event()
+        assert event.event_type == "AgentProfileLoaded"
+
+    def test_empty_kwargs_raises_type_error(self) -> None:
+        """空 kwargs 触发 TypeError（kw_only 必填缺失）。"""
+        from src.domain.events import AgentProfileLoaded
+
+        kwargs: dict = {}
+        with pytest.raises(TypeError):
+            AgentProfileLoaded(**kwargs)
+
+    def test_missing_single_field_raises_type_error(self) -> None:
+        """缺单个必填字段（active_skill_count）触发 TypeError。
+
+        红阶段自纠先例（5-1）：类型注解不强制运行时校验，用真正省略字段构造断言
+        ——省略经动态 kwargs 解包表达（静态检查不追踪 dict 完备性，5-1 L72-74
+        空 kwargs 同款防误报手法）。
+        """
+        from src.domain.events import AgentProfileLoaded
+
+        partial_kwargs: dict = {"agent_id": uuid.uuid4(), "role": "ceo", "startup_context_tokens": 718}
+        with pytest.raises(TypeError):
+            AgentProfileLoaded(**partial_kwargs)
+
+
+class TestAgentProfileLoadedAggregateSettings:
+    """AgentProfileLoaded 聚合锚点设置（__post_init__）。"""
+
+    def test_aggregate_id_is_agent_id_uuid_object(self) -> None:
+        """aggregate_id == agent_id 且为 UUID 对象（非 str——基类契约 uuid.UUID | None）。"""
+        agent_id = uuid.uuid4()
+        event = _make_profile_event(agent_id=agent_id)
+        assert event.aggregate_id == agent_id
+        assert isinstance(event.aggregate_id, uuid.UUID)
+
+    def test_aggregate_type_is_agent(self) -> None:
+        """aggregate_type 固定为 "Agent"（Agent 聚合事件）。"""
+        event = _make_profile_event()
+        assert event.aggregate_type == "Agent"
+
+    def test_explicit_aggregate_not_overridden(self) -> None:
+        """显式传入 aggregate_type 不覆盖 __post_init__ 设置（对齐 AgentInstantiated 先例）。"""
+        event = _make_profile_event(aggregate_type="")
+        assert event.aggregate_type == "Agent"
+
+
+class TestAgentProfileLoadedFrozenAndRegistry:
+    """AgentProfileLoaded 冻结性与事件注册表登记。"""
+
+    def test_frozen_dataclass(self) -> None:
+        """frozen dataclass：setattr 抛异常。"""
+        event = _make_profile_event()
+        with pytest.raises(Exception, match="cannot assign|frozen"):
+            setattr(event, "role", "cfo")
+
+    def test_registered_in_event_registry(self) -> None:
+        """event_type init=False 自动登记 _registry（from_dict 多态重建依据）。"""
+        from src.domain.events import AgentProfileLoaded
+        from src.domain.events.base import DomainEvent
+
+        assert DomainEvent._registry.get("AgentProfileLoaded") is AgentProfileLoaded

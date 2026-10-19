@@ -184,6 +184,11 @@ event_channels:
     delivery_mode: "reliable"
     description: "Agent实例化完成"
 
+  AgentProfileLoaded:
+    rabbitmq_routing_key: "sisys.events.reliable.agent_profile_loaded"
+    delivery_mode: "reliable"
+    description: "Agent身份档案加载完成"
+
   CheckpointRecovered:
     rabbitmq_routing_key: "sisys.events.reliable.checkpoint_recovered"
     delivery_mode: "reliable"

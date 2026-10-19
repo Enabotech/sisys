@@ -22,6 +22,8 @@ from pydantic import ValidationError as PydanticValidationError
 
 from src.domain.exceptions import (
     AgentConfigError,
+    AgentNotFoundError,
+    AgentProfileError,
     AgentRoleNotSupportedError,
     ArchiveConflictError,
     ArchiveNotFoundError,
@@ -332,6 +334,8 @@ class TestExceptionHttpMap:
             DebateLowDivergenceError,  # 422 — Story 4.5 红蓝分化不足
             AgentConfigError,  # 440 — Story 5.1 Agent 配置资产无效
             AgentRoleNotSupportedError,  # 441 — Story 5.1 MVP 未开放角色
+            AgentProfileError,  # 442 — Story 5.2 Agent 档案资产无效
+            AgentNotFoundError,  # 443 — Story 5.2 Agent 不存在（404）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

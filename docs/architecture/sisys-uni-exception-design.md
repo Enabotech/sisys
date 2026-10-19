@@ -731,7 +731,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_434~439 | （预留 tool_version 子域）| — | — |（后续协调，暂不分配）|
 | EXCEPTION_440 | AgentConfigError | SystemException | 500 |（Story 5.1，配置文件缺失/YAML 解析失败/配置文件不可读（目录占位、权限、TOCTOU）/编码非法（非 UTF-8）/必填字段无效/role 不匹配/可选字段类型非法（preferred_model、default_isolation_level 非 null 非 str）/可选段非映射结构（llm_config/eip_config/memory_config 非 dict）/VO 字段类型非法（responsibilities/domain_knowledge 非 tuple）/state_ttl 非整数或越界——全部失败路径统一 440 禁裸内置异常逃逸（R1-R3 审查补强）；配置资产属系统资源，精确注册避免回退歧义）|
 | EXCEPTION_441 | AgentRoleNotSupportedError | BusinessException | 422 |（Story 5.1，MVP 未开放角色实例化请求——阶段性业务能力范围限制，精确注册避免回退 400）|
-| EXCEPTION_442~449 | （预留 agent 子域）| — | — |（5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常）|
+| EXCEPTION_442 | AgentProfileError | SystemException | 500 |（Story 5.2，档案目录缺失/档案文件缺失/文件不可读（OSError 家族）/编码非法（非 UTF-8）/内容纯空白/单文件超 64KB 上限/VO 字段类型非法（六档案非 str）——档案资产属系统资源（部署缺陷非调用方输入错误），同 440 继承链语义分码监控）|
+| EXCEPTION_443 | AgentNotFoundError | BusinessException | 404 |（Story 5.2，get_by_id(agent_id) 返回 None——键不存在或 TTL 过期后重放旧 agent_id，请求资源不存在语义，精确注册避免回退 400）|
+| EXCEPTION_444~449 | （预留 agent 子域）| — | — |（5.4-5.5 EIP 隔离 / 5.3 工作流异常）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -809,7 +811,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `data_source` | 410–419 | DataSourceError, DataSourceUnavailableError, DataSourceRateLimitError, DataSourceResponseError（Story 4.1b Skills 数据采集；语义归属 external，物理段独立于 301-399——external 已满且 399 已由 Story 4.7 分配） |
 | `debate` | 420–429 | DebateGenerationError, DebateSynthesisError, DebateLowDivergenceError（Story 4.5 红蓝辩论 MVP；420/421 语义归属 external、422 语义归属 business，物理段独立——business 2XX 与 external 3XX 均无整段空位，遵循 data_source 410-419 独立段先例；423-429 预留 V1 多轮辩论 Story 10.6） |
 | `tool_version` | 430–439 | ToolVersionNotFoundError, ToolVersionAlreadyExistsError, ToolVersionTrafficWeightError, ToolVersionRollbackError（Story 4.6 灰度发布与回滚；语义归属 business——继承 NotFoundError/ConflictError/ValidationError/InvalidStateError 具体类，物理段独立——tool 380-389 仅剩 384 保留位、toolchain 390-399 已由 4.7 分配 399（ValidationFeedbackRetryExhaustedError），遵循 data_source/debate 独立段先例；434-439 预留） |
-| `agent` | 440–449 | AgentConfigError, AgentRoleNotSupportedError（Story 5.1 CEO Agent 实例化 MVP；440 语义归属 system（SystemException 子类——配置资产属系统资源）、441 语义归属 business（BusinessException 子类——阶段性业务能力范围限制），物理段独立——遵循 data_source/debate/tool_version 独立段先例；442-449 预留 5.2 档案加载 / 5.4-5.5 EIP 隔离 / 5.3 工作流异常） |
+| `agent` | 440–449 | AgentConfigError, AgentRoleNotSupportedError（Story 5.1 CEO Agent 实例化 MVP）+ AgentProfileError, AgentNotFoundError（Story 5.2 Agent 身份档案加载；440/442 语义归属 system（SystemException 子类——配置/档案资产属系统资源）、441/443 语义归属 business（BusinessException 子类——阶段性能力范围限制/请求资源不存在），物理段独立——遵循 data_source/debate/tool_version 独立段先例；444-449 预留 5.4-5.5 EIP 隔离 / 5.3 工作流异常） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

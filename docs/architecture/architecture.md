@@ -828,6 +828,7 @@ BLM/BEM 阶段完成 → 持久化笔记（必须先执行）→ 上下文压缩
 | **ToolExecuted** | 工具执行完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
 | **AgentDecided** | Agent 决策完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
 | **AgentInstantiated** | Agent 实例化完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型（Story 5.1，携带 config_version 供 5.6/5.7 追溯） |
+| **AgentProfileLoaded** | Agent 身份档案加载完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型（Story 5.2，携带 startup_context_tokens/active_skill_count 供 5.7 追踪与 5.9 漂移检测） |
 | **RoutingDecided** | 路由决策完成 | Redis Pub/Sub + RabbitMQ + WORM | Redis 实时通知 / RabbitMQ 7 年归档（与 §8.5 路由决策日志 WORM 一致） | 审计合规型（双通道） |
 | **CheckpointReached** | 检查点到达 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
 | **CorrectionApproved** | 修正审批完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型（已实现） |
@@ -1021,6 +1022,12 @@ Agent 工作目录（Agent 配置集）
 ├── MEMORY.md           ← 启动时加载（来自系统级，无独立索引）
 └── HEARTBEAT.md        ← 启动时加载（心跳配置）
 ```
+
+> **MVP 实施注记（Story 5-2，D-4 偏离声明）**：MVP 阶段 Agent 身份档案为静态资产，
+> 位于 `configs/agents/profiles/{role}/`（随代码分发；CEO 六档案已落地
+> `configs/agents/profiles/ceo/`）；「Agent 工作目录」属运行时概念，工作目录形态
+> 延后（5.3+ 若引入会话级档案覆写再评估迁移）。TOOLS.md 视图不落物理文件——
+> 经 `skill_loader` 端口 L1 元数据组装（单一真源，DC-2）。
 
 #### 11.2.3 系统级 MEMORY.md 工作原理
 

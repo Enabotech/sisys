@@ -1,24 +1,35 @@
-"""Agent 命令行接口（Story 5-1 — CEO Agent 实例化 MVP）
+"""Agent 命令行接口（Story 5-1 实例化 + Story 5-2 档案加载）
 
-提供 Agent 实例化命令行工具。使用 argparse 标准库（零额外依赖），
+提供 Agent 实例化与档案加载命令行工具。使用 argparse 标准库（零额外依赖），
 通过 pyproject.toml 注册为 sisys-agent 入口点。
 
 架构约束：
 - 位于 entrypoints 组装层（进程入口，D1 方案 A 上移自 interfaces/cli）
-- 通过 composition_root 的 bootstrap() + resolve("agent_instantiation_use_case")
-  获取应用层用例（与 ocr_cli 同款接线模式）
+- 通过 composition_root 的 bootstrap() + resolve("agent_instantiation_use_case" /
+  "agent_profile_use_case") 获取应用层用例（与 ocr_cli 同款接线模式）
 - 角色字符串 → 枚举转换必须守卫（禁止裸 AgentRole(value)——Enum 原生抛
   ValueError 逃逸统一异常体系，统一映射 AgentRoleNotSupportedError）
+- agent_id 字符串 → UUID 转换必须守卫（禁止裸 uuid.UUID(value)——ValueError
+  逃逸统一异常体系，统一映射 ValidationError(201)；argparse 的 type= 参数
+  不得用 uuid.UUID——argparse 会把 ValueError 转 usage error exit 2 绕过
+  统一异常体系）
 
-幂等性：instantiate 非幂等——每次调用创建新 Agent 与新 Redis 键
-（AC-1.3 设计行为，靠 TTL 自然回收）。
+幂等性：
+- instantiate 非幂等——每次调用创建新 Agent 与新 Redis 键（AC-1.3 设计
+  行为，靠 TTL 自然回收）。
+- load-profile 幂等只读——纯读 + 发布事件，不创建/修改任何状态；发布事件
+  是副作用（重复调用会重复发布 AgentProfileLoaded，事件带 event_id 消费方
+  可按其幂等去重）。
 
 运行方式：
     sisys-agent instantiate --role ceo
-    poetry run sisys-agent instantiate --role ceo
+    sisys-agent load-profile --agent-id <uuid>
+    poetry run sisys-agent load-profile --agent-id <uuid>
 
 输出：
-    成功路径 stdout 为纯 UUID 单行（agent_id）；日志与错误走 stderr；
+    instantiate 成功路径 stdout 为纯 UUID 单行（agent_id）；
+    load-profile 成功路径 stdout 为多行人类可读摘要（六档案逐项 OK +
+    活跃技能数 + 启动上下文 token 计量）；日志与错误走 stderr；
     退出码 0=成功 / 1=业务异常（统一异常体系编码） / 2=用法错误（argparse）。
 """
 
@@ -28,10 +39,11 @@ import argparse
 import asyncio
 import logging
 import sys
+import uuid as uuid_module
 
 from src.composition_root import bootstrap
 from src.domain.entities.agent import AgentRole
-from src.domain.exceptions import AgentRoleNotSupportedError, DomainError
+from src.domain.exceptions import AgentRoleNotSupportedError, DomainError, ValidationError
 from src.domain.ports.resolver import get_resolver, resolve
 
 logger = logging.getLogger(__name__)
@@ -74,6 +86,33 @@ def _parse_role(role_str: str) -> AgentRole:
     return role
 
 
+def _parse_agent_uuid(value: str) -> uuid_module.UUID:
+    """agent_id 字符串 → UUID（守卫转换）
+
+    禁止裸 uuid.UUID(value)——ValueError 逃逸统一异常体系；统一映射
+    ValidationError(201)（应用层输入校验语义，对齐 ocr_cli D8 清偿后模式：
+    int 页码转换 → 201 先例）。argparse 的 type= 参数不得用本函数裸包
+    uuid.UUID（argparse 会把 ValueError 转 usage error exit 2）。
+
+    Args:
+        value: 命令行原始输入（如 "0f1e2d3c-4b5a-..."）
+
+    Returns:
+        uuid.UUID 对象
+
+    Raises:
+        ValidationError: EXCEPTION_201——非法 UUID 字符串（context 携带原始输入）
+    """
+    normalized = value.strip()
+    try:
+        return uuid_module.UUID(normalized)
+    except ValueError:
+        raise ValidationError(
+            message=f"agent-id 必须为合法 UUID 字符串: {normalized!r}",
+            context={"agent_id": normalized},
+        ) from None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """构建命令行参数解析器
 
@@ -82,8 +121,8 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="sisys-agent",
-        description="SISYS Agent 命令行工具 — Agent 实例化（MVP: CEO 单 Agent）",
-        epilog="示例: sisys-agent instantiate --role ceo",
+        description="SISYS Agent 命令行工具 — Agent 实例化与身份档案加载（MVP: CEO 单 Agent）",
+        epilog="示例: sisys-agent instantiate --role ceo | sisys-agent load-profile --agent-id <uuid>",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -103,6 +142,19 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="ROLE",
         help='Agent 角色字符串（MVP 仅 "ceo" 开放；大小写不敏感）',
+    )
+
+    load_profile = subparsers.add_parser(
+        "load-profile",
+        help="加载 Agent 身份档案（幂等只读——六档案 + ACTIVE 技能 + token 计量摘要）",
+    )
+    load_profile.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=True,
+        metavar="AGENT_ID",
+        help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
     )
     return parser
 
@@ -136,6 +188,109 @@ async def _instantiate(role: AgentRole) -> object:
         await _close_redis_pool()
 
 
+async def _load_profile(agent_id: uuid_module.UUID) -> object:
+    """执行档案加载并清理 Redis 池（本子命令同样读 Redis——get_by_id 守卫）。"""
+    use_case = resolve("agent_profile_use_case")
+    try:
+        return await use_case.execute(agent_id=agent_id)
+    finally:
+        await _close_redis_pool()
+
+
+def _print_profile_summary(result: object) -> None:
+    """输出档案加载多行人类可读摘要（stdout）。
+
+    六档案逐项 `文件名: OK (N chars)`（N 为 profile 字段 len 直读字符数）+
+    活跃技能数（运行期动态值，不写字面量）+ 启动上下文 token 计量。
+
+    Args:
+        result: AgentProfileLoadResult（属性访问避免 import 依赖）
+    """
+    profile = getattr(result, "profile")
+    file_fields = (
+        ("IDENTITY.md", "identity"),
+        ("CODE.md", "code_of_conduct"),
+        ("SOUL.md", "soul"),
+        ("USER.md", "user_preferences"),
+        ("MEMORY.md", "memory"),
+        ("HEARTBEAT.md", "heartbeat"),
+    )
+    for file_label, field_name in file_fields:
+        content = getattr(profile, field_name)
+        print(f"{file_label}: OK ({len(content)} chars)")
+    print(f"活跃技能: {len(getattr(result, 'tools_l1'))}")
+    print(f"启动上下文: {getattr(result, 'startup_context_tokens')} tokens")
+
+
+def _run_load_profile_cli(agent_id_raw: str) -> int:
+    """load-profile 子命令执行（守卫 → bootstrap → 执行 → 摘要输出）。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+
+    Returns:
+        退出码（0=成功，1=业务异常）
+    """
+    # UUID 守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    try:
+        agent_id = _parse_agent_uuid(agent_id_raw)
+    except ValidationError as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        bootstrap()
+        result = asyncio.run(_load_profile(agent_id))
+        _print_profile_summary(result)
+        logger.info(
+            "Agent 档案加载成功: agent_id=%s tokens=%s",
+            getattr(result, "agent_id"),
+            getattr(result, "startup_context_tokens"),
+        )
+        return 0
+    except DomainError as error:
+        logger.error("Agent 档案加载失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Agent 档案加载异常: %s", error, exc_info=True)
+        return 1
+
+
+def _run_instantiate_cli(role_raw: str) -> int:
+    """instantiate 子命令执行（守卫 → bootstrap → 执行 → UUID 输出）。
+
+    Args:
+        role_raw: --role 原始字符串
+
+    Returns:
+        退出码（0=成功，1=业务异常）
+    """
+    # 角色守卫（先于 bootstrap——用法/输入错误无需初始化端口注册表）
+    try:
+        role = _parse_role(role_raw)
+    except AgentRoleNotSupportedError as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message} (role={error.context.get('role')!r})", file=sys.stderr)
+        return 1
+
+    try:
+        bootstrap()
+        result = asyncio.run(_instantiate(role))
+        # 输出格式定稿：纯 UUID 单行 stdout（日志走 stderr，供脚本消费）
+        print(getattr(result, "agent_id"))
+        logger.info("Agent 实例化成功: role=%s", role.value)
+        return 0
+    except DomainError as error:
+        logger.error("Agent 实例化失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Agent 实例化异常: %s", error, exc_info=True)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 主入口
 
@@ -154,31 +309,9 @@ def main(argv: list[str] | None = None) -> int:
         stream=sys.stderr,
     )
 
-    # 角色守卫（先于 bootstrap——用法/输入错误无需初始化端口注册表）
-    try:
-        role = _parse_role(args.role)
-    except AgentRoleNotSupportedError as error:
-        logger.error("%s", error)
-        print(f"[{error.code}] {error.message} (role={error.context.get('role')!r})", file=sys.stderr)
-        return 1
-
-    # 初始化端口注册表（独立进程内 bootstrap 合法）——纳入统一异常处理：
-    # bootstrap 失败（依赖缺失/二次注册冲突）同样遵守「编码输出 + 退出码」契约，
-    # 禁裸 traceback 逃逸（成功后路径行为不变）
-    try:
-        bootstrap()
-        result = asyncio.run(_instantiate(role))
-        # 输出格式定稿：纯 UUID 单行 stdout（日志走 stderr，供脚本消费）
-        print(getattr(result, "agent_id"))
-        logger.info("Agent 实例化成功: role=%s", role.value)
-        return 0
-    except DomainError as error:
-        logger.error("Agent 实例化失败: %s", error)
-        print(f"[{error.code}] {error.message}", file=sys.stderr)
-        return 1
-    except Exception as error:
-        logger.error("Agent 实例化异常: %s", error, exc_info=True)
-        return 1
+    if args.command == "load-profile":
+        return _run_load_profile_cli(args.agent_id)
+    return _run_instantiate_cli(args.role)
 
 
 # ===================================================================
