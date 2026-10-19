@@ -509,16 +509,16 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_agent_workflow.py`（场景①全链：真实 Redis 仓储（instantiate→run-task 同 agent_id）+ 真实档案加载 + 真实图执行 + Fake LLM（延迟模拟 200ms/调用）→ 六阶段贯通 + 思维链 + 证据 + AgentDecided 事件捕获（recording publisher——真实类子类先例）；场景②P95：warmup 1 + 20 采样 `quantiles(n=20)[18] < 10s`（Fake 延迟下设 6 档延迟确保有意义的计时下界）；场景③并发 10：`asyncio.gather` 10 agent_id 同时执行全成功；场景④真实 LLM 冒烟：`LLM_*` env 探测（`LLMConfig.from_env()` 有 model 时执行 1 次真实全链，否则 pytest.skip——动态跳过禁写死） |
+| 🔴 红 | 编写 `tests/integration/test_integration_agent_workflow.py`（场景①全链：真实 Redis 仓储（instantiate→run-task 同 agent_id）+ 真实档案加载 + 真实图执行 + Fake LLM（延迟模拟 200ms/调用）→ 六阶段贯通 + 思维链 + 证据 + AgentDecided 事件捕获（recording publisher——真实类子类先例）；场景②P95：warmup 1 + 20 采样 `quantiles(n=20)[18] < 10s`（Fake 延迟下设 6 档延迟确保有意义的计时下界）；场景③并发 10：`asyncio.gather` 10 agent_id 同时执行全成功；场景④真实 LLM 冒烟：`LLM_*` env 探测（`LLMConfig.from_env()` 有 model 时执行 1 次真实全链，否则 pytest.skip——动态跳过禁写死）；场景⑤真实发布链路单次时序（R1-DF3 处置）：resolve 真实 `event_publisher`（DualChannelEventBus）+ Fake LLM 执行 run-task 一次 → 断言 PG `event_outbox` 落行（agent_decided routing key）——PG 门控动态 skip；场景①②的发布面口径差（内存/替身 vs 生产 outbox）随文件 docstring 声明 |
 | 🟢 绿 | 全场景转绿（验证型——被测链路已由 Task 1-6 交付） |
 | 🟡 变异 | 阈值突变（10s→0.01s）→ P95 红 → 还原；Fake 延迟突变 → 计时下界红 → 还原 |
 | 🔄 重构 | xdist_group + benchmark 场景级标记 + pytestmark（integration/redis） |
 
-- [ ] Subtask 7.1: 🔴 红 — 四场景编写
+- [ ] Subtask 7.1: 🔴 红 — 五场景编写（含场景⑤真实发布链路——R1-DF3 处置）
 - [ ] Subtask 7.2: 🟢 绿 — 转绿 + 计时校准
 - [ ] Subtask 7.3: 🟡 变异 + 🔄 重构（隔离纪律：Redis 键逐键删除 + LLM env 探测封装 fixture）
 
-**完成标准/Definition of Done:** 集成 4 场景绿（真实 LLM 缺席时 3 绿 1 skip）；性能三指标断言活
+**完成标准/Definition of Done:** 集成 5 场景绿（真实 LLM/PG 缺席时 3 绿 + 2 skip）；性能三指标断言活
 
 ---
 
@@ -693,6 +693,7 @@ agent_id = UUID(agent_id_raw) if agent_id_raw else uuid.uuid4()  # 缺失回退�
 | 上下文装配契约（5-2 风险 #1 + R3-DF1 L1 失败语义） | **本 Story 核销**（Task 3 定契约；L1 失败语义在装配契约中一并定义——TOOLS.md 降级时 387 传播策略） |
 | CLI bootstrap 10.4s（D13，核销=5.3 批量消费前） | **知悉不处置**（run-task 单次调用语义下非阻断；组合根瘦身属架构级决策，登记保持） |
 | R1-DF2 事件观测面（锚=5.3 首个事件消费 Story） | **部分核销**：本 Story 是 AgentDecided 的语义消费方（真实化 confidence）但非首个 AgentProfileLoaded 消费方——登记保持（观测面归 5.7） |
+| R1-DF3 性能计时口径不含生产发布链路（deferred-work L180，核销触发=5.3 批量消费前） | **本 Story 处置**（补齐时遗漏项勘误补录，2026-10-19）：Task 7 新增场景⑤真实发布链路单次时序验证（resolve 真实 `event_publisher`/DualChannelEventBus + PG outbox 落行断言——非 P95 采样，PG 门控动态 skip）+ P95 主口径的发布面口径差声明随测试 docstring 落盘（场景①②为内存/替身发布面——5-2 R1-DF3 同款口径差显式化）；完整生产口径计时（真实 LLM+真实发布 P95 采样）续期至部署验证 |
 
 ### 项目结构说明 Project Structure
 
@@ -816,8 +817,9 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.0.1
 **创建日期/Created:** 2026-10-19
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四视角并行调研：编排引擎底座/LLM 客户端与装配面/SAP 消息分层/六阶段设计与验收模板；10 项关键架构决策 DC-1~DC-10 + 7 项偏离声明 D-1~D-7；5-2 六条下游风险全处置分流；SAPMessage 15 字段含 2 处设计缺陷修正）
+- v1.0.1: 核销触发项核查勘误（deferred-work 全量 grep 对照）——补录 R1-DF3（性能计时口径，deferred-work L180，原遗漏项）：处置表新增行 + Task 7 场景⑤真实发布链路单次时序验证（resolve 真实 event_publisher + PG outbox 落行断言，PG 门控 skip）+ 场景①②发布面口径差声明；五项 5.3 触发 deferred 项全数落实分流
