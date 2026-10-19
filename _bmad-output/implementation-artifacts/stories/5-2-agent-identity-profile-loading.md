@@ -457,7 +457,7 @@ class SkillSelectorPort(Protocol):
 | bootstrap 禁令 | **验收测试禁止调用 `bootstrap()`**——组合根已由 tests/conftest.py session 级 `_bootstrap_once` 完成引导；同进程二次 bootstrap 抛 ConflictError。端口获取直接 `from src.domain.ports.resolver import resolve` |
 | resolve 纪律 | 功能场景一律手动组装（`MarkdownAgentProfileLoader(profile_root=...)` 直构 / 手动仓储 + 场景级客户端）；`resolve` 仅限**无连接构造**端口（`agent_profile_loader`/`skill_loader`/`skill_selector`——本地静态文件只读、无网络连接，跨循环安全；注意 `skill_loader` 构造期同步读 TOOLS.md 一次，非零 IO 但确定性本地读）且 AC-6.1 接线断言禁发命令——**禁 resolve `agent_repository`（SCOPED）与用例端口**（SINGLETON redis_client 跨循环死连接，5-1 文档审查修复 #23 教训） |
 | 清理粒度 | 每个测试只清理自己创建的资源；fixture 显式声明依赖 |
-| 性能测试 | `pytestmark` 标记 `benchmark`；xdist 下用 `xdist_group("agent-profile-loading")` 串行化计时场景（仅保同组串行不保独占 CPU；`-n auto` 下抖动超标时以 `-n 0` 结果为准）；硬断言 500ms 对典型 <20ms 链路约 25 倍余量 |
+| 性能测试 | `benchmark`（AC-5.1/5.2 场景级——R1-F8 裁定，非文件级 pytestmark）；xdist 下用 `xdist_group("agent-profile-loading")` 串行化计时场景（仅保同组串行不保独占 CPU；`-n auto` 下抖动超标时以 `-n 0` 结果为准）；硬断言 500ms 对典型 <20ms 链路约 25 倍余量 |
 
 **禁止行为：**
 - ❌ 验收/集成测试 mock 领域服务/用例/仓储/加载器（真实服务优先）
@@ -657,7 +657,7 @@ class SkillSelectorPort(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 追加 `tests/unit/interfaces/cli/test_agent_cli.py`（**新增 load-profile 用例的红形态 = SystemExit 2**——argparse 未注册子命令即拒，UUID 守卫同（守卫代码尚未触达）；属单元层合法红（Task 0.4 三类合法红为验收域清单，不含此形态故此处显式注明）。build_parser 参数契约：`load-profile` 子命令 + `--agent-id` 必填；**UUID 守卫红线**：合法 UUID 字符串成功、非法串（"not-a-uuid"/空串）→ `ValidationError` EXCEPTION_201 且 context 携带原始输入（**禁止裸 uuid.UUID ValueError 逃逸**）；裸调用 `main([])` → SystemExit 2（既有断言不回归）；成功路径输出多行摘要含「IDENTITY.md: OK」「活跃技能」「启动上下文」字样（monkeypatch `agent_cli` 模块级 `bootstrap`/`resolve` 属性——5-1 Task 5 定稿的唯一可行注入）；业务异常路径退出码 1 且 stderr 含 `EXCEPTION_44`；`instantiate` 子命令既有测试零回归） |
-| 🟢 绿 | 在 `src/entrypoints/agent_cli.py` 追加 `load-profile` 子命令处理（`--agent-id` str 参数；函数体内 `try: agent_id = uuid.UUID(value.strip()) except ValueError: raise ValidationError(...201)`——**argparse type= 不用 uuid.UUID**（会把 ValueError 转 usage error exit 2 绕过统一异常体系）；`asyncio.run()` 执行用例；输出：六档案逐行 `IDENTITY.md: OK (N chars)` + `活跃技能: N` + `启动上下文: N tokens`；Redis 池 finally 关闭沿用 `_close_redis_pool`（本子命令同样读 Redis）；模块 docstring 补 load-profile 幂等只读语义声明） |
+| 🟢 绿 | 在 `src/entrypoints/agent_cli.py` 追加 `load-profile` 子命令处理（`--agent-id` str 参数；函数体内 `try: agent_id = uuid.UUID(value.strip()) except ValueError: raise ValidationError(...201)`——**argparse type= 不用 uuid.UUID**（会把 ValueError 转 usage error exit 2 绕过统一异常体系）；`asyncio.run()` 执行用例；输出：六档案逐行 `IDENTITY.md: OK (N chars)` + `活跃技能: N` + `启动上下文: N tokens`；Redis 池 finally 关闭沿用 `_close_redis_pool`（本子命令同样读 Redis；R1-F7 勘正：已泛化 `_close_connection_pools` 双池——load-profile 亦触达 PG）；模块 docstring 补 load-profile 幂等只读语义声明） |
 | 🟡 变异 | 突变 UUID 守卫（删 except 分支）→ 非法串测试红（ValueError 逃逸被断言捕获）→ 还原绿 |
 | 🔄 重构 | 输出格式收敛、docstring 规范；pyproject script 无需改动（`sisys-agent` 已注册）核对；ruff+mypy |
 
@@ -877,7 +877,7 @@ class SkillSelector(SkillSelectorPort):
 
 （`load_metadata(slug)` 直传 slug 合法——loader `_resolve_slug` L403-429 支持 slug/tool_name/UUID 三形态寻址。）
 
-**CLI 子命令扩展模式（`src/entrypoints/agent_cli.py`）：** `subparsers.add_parser("load-profile", help=...)` + `add_argument("-a", "--agent-id", required=True, metavar="AGENT_ID")`；UUID 守卫 try/except ValueError → ValidationError(201)；`_close_redis_pool` finally 沿用；输出多行摘要；退出码 0/1/2。
+**CLI 子命令扩展模式（`src/entrypoints/agent_cli.py`）：** `subparsers.add_parser("load-profile", help=...)` + `add_argument("-a", "--agent-id", required=True, metavar="AGENT_ID")`；UUID 守卫 try/except ValueError → ValidationError(201)；`_close_connection_pools` finally 沿用（R1-F7 勘正：dev 期为 `_close_redis_pool`，R1 泛化 redis+PG 双池）；输出多行摘要；退出码 0/1/2。
 
 **验收测试骨架（5-1 `test_acceptance_agent_instantiation.py` 605 行）——R6 主体基准：** FEATURE 常量 + `@scenario` 显式绑定（**5-1 为 13 场景形态；本 Story 为 14 场景——收集数校验按 14**）；context fixture（场景级 `redis.asyncio.Redis(decode_responses=True)`（5-1 代码字面别名 `aioredis` 即 `redis.asyncio`）+ `_agent_ids` 记录列表）；`_run_async` helper；场景级 ping 门控（`pytest.skip(f"Redis not available: {exc}")`）；服务组装按场景分档（需 instantiate 的 AC-1.1/4.1/5.1/5.2 = 5-1 用例真实 instantiate → 本 Story 用例手动组装；其余场景见 BDD 约束节分档，端口直连/纯 resolve 场景无服务组装）；异常断言 `isinstance` + `error.code`；teardown 逐 agent_id 精确 delete + 同循环 close；AST 静态扫描场景写法参照 postgresql 模板 L792-819。
 
@@ -1137,7 +1137,7 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-> **Round 1（2026-10-19）**：审查模式 = 实现提交 e6829cb1（44 文件 +4164/-156）四视角并行调研（A 契约一致性 / B 架构合规 / C 测试质量判别力 / D 运行面端到端推演——D 含 CLI 真实运行实测）+ C3 双评审员（①技术正确性 / ②纪律与传播面）+ 主会话实测定谳（全量 12372 passed / 2 预存环境失败甄别 / ruff+mypy+lint-imports 三绿）。发现：**零 P0/P1，4 P2 + 10 P3**；处置：8 项落码（R1-F1~F8）+ 2 项 P2 改判 deferred + 3 项维持 + 5 项记录级。评审员①「优秀」+ 评审员②「需修订（轻量形态级）」→ 修订清单全吸收后落码（场景级 benchmark 标记 / v1.4.0 版本动作 / L694/L702 联动 / docstring 显式重写 / deferred 并入既有条目）。
+> **Round 1（2026-10-19）**：审查模式 = 实现提交 e6829cb1（44 文件 +4164/-156）四视角并行调研（A 契约一致性 / B 架构合规 / C 测试质量判别力 / D 运行面端到端推演——D 含 CLI 真实运行实测）+ C3 双评审员（①技术正确性 / ②纪律与传播面）+ 主会话实测定谳（全量 12372 passed / 2 预存环境失败甄别 / ruff+mypy+lint-imports 三绿）。发现：**零 P0/P1，4 P2 + 10 P3**；处置：8 项落码（R1-F1~F8）+ 2 项 P2 改判 + 1 项 P3 登记 deferred + 3 项维持 + 5 项记录级（R2 公式补注：4 P2 = F1/F2 落码 + DF1/DF2 改判；10 P3 = F3~F8 落码 + DF3 登记 + 3 维持）。评审员①「优秀」+ 评审员②「需修订（轻量形态级）」→ 修订清单全吸收后落码（场景级 benchmark 标记 / v1.4.0 版本动作 / L694/L702 联动 / docstring 显式重写 / deferred 并入既有条目）。
 
 #### 需决策 Decision Needed
 
@@ -1145,7 +1145,7 @@ tests/
 
 #### 已修复 Patch
 
-- [x] **R1-F1【P2】集成测试收尾全库 scan_iter 断言与并行组耦合**（C 视角）→ `tests/integration/test_integration_agent_profile_loading.py` teardown 改自产键 `exists` 断言 + docstring 同步。机理：全库 `sisys:agent:*` 断言与 5-1 xdist 组（agent-instantiation）共享 6380 键空间，in-flight 键瞬时可红 + 24h TTL 残键持续假红；本链路唯一 Redis 写面是仓储单键，scan 的「跨键副作用检测」价值为假设性（评审员①核实）。
+- [x] **R1-F1【P2】集成测试收尾全库 scan_iter 断言与并行组耦合**（C 视角）→ `tests/integration/test_integration_agent_profile_loading.py` teardown 改自产键 `exists` 断言 + docstring 同步。机理：全库 `sisys:agent:*` 断言与 5-1 xdist 组（agent-instantiation）共享 6380 键空间，in-flight 键瞬时可红 + 24h TTL 残键持续假红；本链路唯一 Redis 写面是仓储单键，scan 的「跨键副作用检测」价值为假设性（评审员①核实）。回溯核查注记（R2）：5-1 集成/验收测试 teardown 为逐键 delete 形态、无全库 scan 断言（git log -S 零命中），裁定不回溯 5-1 代码；5-1 Story L699「scan_iter 复核残留 0」为其自有 dev 期表述失实，不属本周期处置面。
 - [x] **R1-F2【P2】加载器读取阶段 OSError 分支（L133-134）零覆盖**（C 视角，Story L324「读取失败（OSError）由 Task 2 单测承接」承诺仅兑现 stat 缺失子集）→ 新用例 `TestFileUnreadable`：同名目录构造（stat 成功 4096 过上限检查 → read_text 抛 IsADirectoryError → 442）+ reason 精确断言 `== "档案文件不可读"`（区分 stat 分支同尾词「缺失或不可读」）+ 突变验证（包装分支突变 RuntimeError → 用例红 → 还原绿）。
 - [x] **R1-F3【P3】裸元组断言**（C 视角，`test_agent_profile_loading.py:352` 原文 `loader.load.assert_awaited_once(), "…"` 无 assert 关键字——消息死代码）→ 拆独立行 + 行尾注释。全仓 grep 同型仅此一处。
 - [x] **R1-F4【P3】profile_path 相对形态守护断言缺位**（C 视角，`_display` 突变 `str(path)` 全套恒绿）→ 两代表位（R1-F2 新用例 + test_missing_directory）补 `str(tmp_path) not in context["profile_path"]`（Task 0 L285「不泄露绝对路径」契约的测试位）。
@@ -1162,6 +1162,17 @@ tests/
 - [x] **R1-DF3【P3·登记】AC-5 性能门禁计时口径不含生产发布链路**（计时注入 InMemoryEventBus，生产经 PG outbox，余量 ~25 倍大概率覆盖但无证据背书）→ deferred-work.md 登记（触发=5.3 批量消费前补计时或明示口径差）。
 - [x] 维持不改 3 项（裁定记录）：①A-P3-1 三档案资产 8-9 行低于「10~40 行」风格指引——Story L212 自声明行数非绑定、chars 红线实测满足（IDENTITY+SOUL 514/2000），凑行降质量；②C-P3-5 三份端口契约测试纯结构检查——11 维度形态与 5-1 契约测试先例逐一同型（grep 实证同族方法名），单点改形态破坏家族一致性；③C-P3-7 验收 9 个无 Redis 场景构造 Redis 客户端对象——redis-py asyncio 构造惰性零连接零副作用，fixture 统一是合理简化（本条即注记）。
 
+#### Round 2 回归核查（2026-10-19，v1.4.1）
+
+> 单 Agent 回归核查（R1 修复的修复：传播完备性/组合交互面/台账-现实一致性，A1~C10 十面）+ 主会话快评门禁（六项全过）。**结论：R1 八项落码本体零回归、零组合互拆**（A5 断言判别力经 `_display → str(path)` 突变实证双向红；B6 `-m benchmark` 恰选 2 场景/12 deselected；B7 CLI 桩 double-close 无可炸形态；C9 八项 diff 逐项吻合）——漏网集中在传播注记与台账编号面：1 P2 + 5 P3，全部当轮清偿：
+
+- [x] **R2-F1【P2】DF 编号双侧错位**——deferred-work「R1-DF2·P3」实为 Story 的 R1-DF3（计时口径），Story 的 R1-DF2（发布观测面）在 deferred-work 无编号锚 → deferred-work L180 改 DF3 + L167 部署面条目补「编号锚 R1-DF2」+ 段前言计数补 P3 登记项；两侧 DF1/DF2/DF3 一一对应。
+- [x] **R2-F2【P3】旧名活性引用**——Story L880「关键代码模式参考」（活性契约表述位）仍写 `_close_redis_pool` → 改新名 + R1-F7 勘正括注；L660（Task 5 TDD 绿行）同款轻注记（与 L694/L702 处置标准统一）。
+- [x] **R2-F3【P3】agent_cli 模块头幂等句失实**——「不创建/修改任何状态」与同文件 R1-F7 docstring 的 outbox 落表事实矛盾 → 收窄为「不创建/修改任何 Agent 领域状态（事件经 RELIABLE 通道落 PG outbox 表）」。
+- [x] **R2-F4【P3】R1-F1 不回溯结论未记录**——台账 R1-F1 条目补「5-1 测试为逐键形态无 scan 断言（git log -S 零命中），裁定不回溯；5-1 Story L699 为其自有 dev 期表述失实」。
+- [x] **R2-F5【P3】docstring 类定义不自洽**——「八类失败/边界」把正向透传项拉入失败清单且与首条 bullet 重复计数 → 改「六类失败 + 一项边界」，透传归首条 bullet。
+- [x] **R2-F6【P3】R1-F8 三查阅位未注记**——验收 pytestmark 注释块补第三行（场景级裁定说明）；Story L460 性能测试行「pytestmark 标记 benchmark」全短语替换为「benchmark（AC-5.1/5.2 场景级——R1-F8 裁定，非文件级 pytestmark）」（快评附注：必须全短语替换防自相矛盾）。
+
 ---
 
 ### 下一步 Next Steps
@@ -1173,7 +1184,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.4.1
 **创建日期/Created:** 2026-10-15
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -1183,3 +1194,4 @@ tests/
 - v1.3.0: Round 3 深度推演修订（单深度 Agent：14 场景三轴推演 + TDD 时序 + 生产失败语义对照；1 P1 + 4 P2 + **3** P3 + 15 项证伪留痕——R5 勘误：原文误记「4 P3」，可枚举实为 3 项，第 4 项 active_skill_count 同源已并入 #21 tripwire 注记）——Task 4 发布失败两分支定稿换 AsyncMock(spec=EventPublisher)（真实总线失败面不可达机理 + 5-1 L264-277 先例）；判空主检定稿在加载器（DC-5 观测锚点 + Task 2 红行 context 断言）；AC-1.3/2.3 补同码多因区分断言与 tmp_path/ceo/ 子目录层级；23 计数 tripwire 全局注记 + active_skill_count 同源派生；Task 7 补验证型四行循环表（转绿声明 + sorted/import 双变异）；64KB 字节口径定稿；Task 5 SystemExit 2 合法红注明；AC-2.2 断言 str 形态定稿
 - v1.3.1: Round 4/5 收敛轮（R4 纯验证零发现——24 组锚点全精确/结构完整/台账存续/零游离；R5 独立终审六节双向取证判收敛——六项关键修复抽验全属实/红线全绿）——v1.3.0 P3 计数勘误（4→3，内联标注）+ 修复表 #23 + 收敛声明节落盘
 - v1.4.0: 代码审查周期 Round 1（实施提交 e6829cb1 四视角调研 + C3 双评审；零 P0/P1，4 P2 + 10 P3）——8 项落码：R1-F1 集成收尾全库 scan_iter→自产键 exists（并行组/24h TTL 残键假红根除）/R1-F2 读取阶段 OSError 用例（同名目录构造 + reason 精确断言 + 突变验证，兑现 L324 承诺）/R1-F3 裸元组断言/R1-F4 profile_path 脱敏守护断言/R1-F5 子目录缺失 reason 断言/R1-F6 CLI 摘要整行锚定/R1-F7 CLI 连接池 PG 对称清理（_close_connection_pools）/R1-F8 AC-5.1/5.2 场景级 benchmark 标记（评审裁定不打文件级）；2 P2 改判 deferred（L1 幽灵条目 4-1a 遗留 + 发布观测面归 5.3）+ 3 维持；L694/L702 scan_iter 表述勘正 + 风险#3 捕获方补记 + deferred-work 两项登记
+- v1.4.1: 代码审查周期 Round 2 回归核查（单 Agent 十面核查 + 快评门禁；R1 落码本体零回归零互拆——突变实证/标记收集实证/桩兼容实证；1 P2 + 5 P3 全为传播注记与台账编号漏网，当轮清偿）——R2-F1 DF 编号双侧统一（deferred-work DF2→DF3 勘正 + 编号锚）/R2-F2 旧名活性引用勘正（L880 模式参考 + L660 轻注记）/R2-F3 agent_cli 模块头幂等句收窄（outbox 落表事实对齐）/R2-F4 R1-F1 不回溯结论入账/R2-F5 docstring 六类失败+一项边界/R2-F6 R1-F8 三查阅位注记

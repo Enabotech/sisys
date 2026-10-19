@@ -164,7 +164,7 @@
 - 【D12·P2】wheel 形态 configs/ 分发缺口 — pyproject packages=[{include="src"}] 不含 configs/（非 Python 包），wheel/pip 安装形态 agent CLI 必现 440；源码树/Docker/k8s 三形态自洽，CI 零 wheel 构建环节无消费方 — 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态限定）
 - 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前
 - 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
-- 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数。**5-2 R1 追记（2026-10-19）**：AgentProfileLoaded（5-2 交付，reliable 单通道同族）同形态累积；且发布失败（outbox 写失败/raise）在 CLI 路径仅 stderr 日志 + exit 0，无程序化可观测信号（exit 码/输出标记均无）——观测面增强（发布失败退码化/结果对象标记/指标计数）与 poller 宿主同归 — 核销触发：5.3 首个事件消费 Story 立项时一并定夺
+- 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数。**5-2 R1 追记（2026-10-19，编号锚 R1-DF2）**：AgentProfileLoaded（5-2 交付，reliable 单通道同族）同形态累积；且发布失败（outbox 写失败/raise）在 CLI 路径仅 stderr 日志 + exit 0，无程序化可观测信号（exit 码/输出标记均无）——观测面增强（发布失败退码化/结果对象标记/指标计数）与 poller 宿主同归 — 核销触发：5.3 首个事件消费 Story 立项时一并定夺
 
 ## Deferred from: Story 5-2 Task 0 链路普查 (2026-10-19)
 
@@ -174,7 +174,7 @@
 
 ## Deferred from: code review of 5-2-agent-identity-profile-loading Round 1 (2026-10-19)
 
-> 审查台账见 Story 5-2「Review Findings」节（4 并行视角调研 + C3 双评审员评审，零 P0/P1，4 P2 + 10 P3；8 项落码修复 + 2 项 P2 改判 deferred + 3 项维持——改判裁定见该节）。本段为改判留项分流。
+> 审查台账见 Story 5-2「Review Findings」节（4 并行视角调研 + C3 双评审员评审，零 P0/P1，4 P2 + 10 P3；8 项落码修复 + 2 项 P2 改判 + 1 项 P3 登记 deferred + 3 项维持——改判裁定见该节）。本段为改判/登记留项分流。
 
 - 【R1-DF1·P2】InMemorySkillLoader L1 缓存表头幽灵条目（4-1a 遗留，非 5-2 引入）— `src/application/skills/loader.py` `_init_metadata_cache`（L126-141 附近）的行跳过条件只拦 `#`/`---`/空行，TOOLS.md 表头行 `| slug | tool_name | ... |` 被 `_TABLE_ROW_PATTERN` 解析为数据条目——实测 L1 缓存 24 条（manifest 23 + ghost `slug='slug'`，ghost status='active'）；`match_by_tag`/`match_by_capability` 等直接遍历缓存的接口会命中幽灵（当前生产消费方为零——grep 实证仅契约测试/单测引用）。5-2 的 SkillSelector 经 `get_all_slugs()` 静态清单枚举天然免疫（tools_l1==23 不受影响）。修复形态：`_init_metadata_cache` 增表头行过滤（如 `cells[0] == 'slug'` 跳过）——属 4-1a 交付资产域（回归面含 4-1a 套件），审查周期不动他 Story 文件 — 核销触发：下次 Skills 资产演进（SKILL.md 增删/TOOLS.md 改版）或 5.9 漂移检测立项（ACTIVE 基线数消费该面）
-- 【R1-DF2·P3】AC-5 性能门禁计时口径不含生产发布链路 — 集成/验收 P95<500ms 计时注入 `InMemoryEventBus`（内存发布），生产 CLI 路径发布经 DualChannelEventBus→PG outbox 写入（网络 RTT + 失败重试面），口径差余量约 25 倍（实测 P95 ~10ms 级）大概率覆盖但无证据背书 — 核销触发：5.3 批量消费前补含真实发布链路的计时（或明示口径差）
+- 【R1-DF3·P3】AC-5 性能门禁计时口径不含生产发布链路 — 集成/验收 P95<500ms 计时注入 `InMemoryEventBus`（内存发布），生产 CLI 路径发布经 DualChannelEventBus→PG outbox 写入（网络 RTT + 失败重试面），口径差余量约 25 倍（实测 P95 ~10ms 级）大概率覆盖但无证据背书 — 核销触发：5.3 批量消费前补含真实发布链路的计时（或明示口径差）

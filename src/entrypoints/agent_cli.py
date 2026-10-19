@@ -17,9 +17,10 @@
 幂等性：
 - instantiate 非幂等——每次调用创建新 Agent 与新 Redis 键（AC-1.3 设计
   行为，靠 TTL 自然回收）。
-- load-profile 幂等只读——纯读 + 发布事件，不创建/修改任何状态；发布事件
-  是副作用（重复调用会重复发布 AgentProfileLoaded，事件带 event_id 消费方
-  可按其幂等去重）。
+- load-profile 幂等只读——纯读 + 发布事件，不创建/修改任何 Agent 领域状态
+  （事件经 RELIABLE 通道落 PG outbox 表——进程外副作用，见 _close_connection_pools
+  docstring）；发布事件是副作用（重复调用会重复发布 AgentProfileLoaded，
+  事件带 event_id 消费方可按其幂等去重）。
 
 运行方式：
     sisys-agent instantiate --role ceo

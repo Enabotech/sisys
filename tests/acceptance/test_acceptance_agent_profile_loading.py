@@ -56,6 +56,7 @@ PROFILE_FILE_NAMES = ("IDENTITY.md", "CODE.md", "SOUL.md", "USER.md", "MEMORY.md
 
 # 文件名不含服务关键词，acceptance conftest 不会自动添加 marker——显式声明；
 # xdist_group 使本文件全部场景（含 AC-5.1 计时）在同一 worker 串行执行
+# AC-5.1/5.2 另挂场景级 benchmark 标记（R1-F8 裁定不打文件级——12 个非计时场景不挂 P95 语义）
 pytestmark = [
     pytest.mark.acceptance,
     pytest.mark.redis,
