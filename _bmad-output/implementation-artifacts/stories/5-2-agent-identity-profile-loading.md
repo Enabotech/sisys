@@ -1104,6 +1104,11 @@ tests/
 | 20 | 【Round 3】空白校验主检位置两读缝隙——「加载器内实施」（AC-2）vs「VO 兜底」（DC-5/Task 2 绿）双读下 442 的 context 形状不同（VO 路径 profile_path 失文件名），AC-1 checklist「context 携带缺失文件名」在读法 B 下不可满足；两种实现全测绿但期望不唯一 | P2 | DC-5 定稿「判空**主检在加载器**（context.profile_path 携带文件名——AC-2 观测锚点），VO 为直接构造兜底（profile_path 可空）」；Task 2 红行空白用例补 context 断言钉住加载器实施 |
 | 21 | 【Round 3】AC-1.3/2.3 同码多因断言不足——442 覆盖七类成因，仅断言错误码无区分力；场景未写明 `tmp_path/"ceo"/` 角色子目录（fixture 写根级报目录缺失 442 亦假绿）；`==23` 计数七处无 tripwire 注记（4-1f 验收资产计数联动同款教训未吸收） | P2 | AC-1.3/2.3 补 context 区分断言 + 子目录层级写明；AC-3 checklist 补 23-tripwire 全局注记（资产演进同步更新 + active_skill_count 写 `== len(result.tools_l1)` 同源派生） |
 | 22 | 【Round 3】Task 7 无 TDD 循环表/无转绿声明/无变异背书（四验证器为恒真风险池——违反 Story 自身「每 Task 完整循环」全局约束）；64KB「读后 len 判定」字符/字节歧义（中文差 3 倍，与 MAX_BYTES 常量名冲突）；Task 5 新增用例红形态（SystemExit 2）未注明；AC-2.2 断言 str/UUID 形态未定稿 | P2/P3 | Task 7 补四行验证型循环表（转绿声明 + sorted/import 双变异）；DC-5/Task 2 定稿字节口径（stat 或 encode 后 len）；Task 5 红行注明 SystemExit 2 合法红；AC-2.2 定稿 `== str(agent_id)` 断言形态 |
+| 23 | 【Round 5】独立终审移交簿记：v1.3.0 版本行「4 P3」计数偏差（可枚举实为 3 项，第 4 项已并入 #21）；收敛声明落盘 | P3 | 版本行内联勘误（标注 R5）；收敛声明节新增 |
+
+### 🏁 收敛声明（Round 5 独立终审，2026-10-19）
+
+> Story 5.2 审查周期五轮收敛：R1 文档审查 2P0+4P1+7P2+1P3（#1~14）、R2 回归核查 1P2+13P3（#15~18）、R3 深度推演 1P1+4P2+3P3（#19~22）另附 15 项证伪留痕、R4 纯验证零发现（24 组锚点抽验全精确 + 结构完整性 + 台账存续 + 游离残留零）、R5 独立终审双向取证：三个修订提交（8719b7ad/a6ffed8f/eb4e74ba）均仅含本文件且无 AI 署名；六项关键修复抽验全属实（SkillSelectorPort 四处一致、token 双口径 1104/218 与仓库实测逐字符吻合、UTF-8 两规范位、AsyncMock(EventPublisher) 先例 5-1 L264-277/L50-67 实证且「空 results」处方经 PublishResult 实现 L36-38 定谳可执行、23-tripwire 在位、Task 7 四行循环表完整）；语义层快扫零新硬伤，三处照抄先例与十余处行号锚点全部实证。**结论：收敛，保持 `ready-for-dev` 交付 `dev-story`。** 移交簿记：v1.3.0 版本行 P3 计数勘误一处（已内联标注），无阻断项。
 
 ---
 
@@ -1134,11 +1139,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-15
-**最后更新/Last Updated:** 2026-10-16
+**最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/规划文档/Skills 基础设施/记忆心跳基础设施/测试模板调研 + 关键签名人工核验；含链路接线断言清单 L1-L8、10 项关键架构决策 DC-1~DC-10、8 项偏离声明 D-1~D-8（SkillSelector 新旧口径/token 预算口径两处规划冲突裁决）、组合根 impl 路径失效观察项登记要求、deferred-work 分流处置）
 - v1.1.0: Round 1 文档审查修订（5 调研 Agent + 2 审查 Agent 并行 + 主会话实测定谳；2 P0 + 4 P1 + 7 P2 + 1 P3 批量 = 修复表 #1~#14）——档案破坏场景定稿 loader 端口直连（443/442 守卫陷阱）、SkillSelectorPort 端口定名（同名矛盾消除）、AC-6.3 时点对齐 5-1（Task 0 落盘 14 场景）、token 两口径分述（文件 1104 vs 拼接 ~218）、read_text 显式 UTF-8、守卫变异可编码改述、行号/计数/溯源逐项勘正（19→18 字段、event_channels L182-185、#23 教训、prd.md L1838 等）
 - v1.2.0: Round 2 回归核查修订（传播核查 + 增量面双 Agent；1 P2 + 13 P3）——BDD 约束/隔离表两处「先 instantiate」全局表述分档化（P0 修复的同语义漏网，适用范围定为四场景 AC-1.1/4.1/5.1/5.2）；R1 台账两子项补落地（「无状态」→「无连接状态」两处、资产红线 chars≤2000 绑定约束入正文）；TOOL_ID_TO_SLUG 行号勘正、AC-3.1 tripwire 红绿形态注记、AC-5 生产语义注记、§11.2.4 顺序差异注记、D-9 偏离声明（epics TOOLS.md 物理文件语义）、调试日志表补三行（or.md/异常设计/deferred-work）、中文 token 低估倍数勘正、docker_sandbox 全路径、AC-1 块 And 子句端口级限定、「唯一 instantiate」措辞、R6 骨架组装分档、registry/__init__.py 入 Task 3 绿行
-- v1.3.0: Round 3 深度推演修订（单深度 Agent：14 场景三轴推演 + TDD 时序 + 生产失败语义对照；1 P1 + 4 P2 + 4 P3 + 15 项证伪留痕）——Task 4 发布失败两分支定稿换 AsyncMock(spec=EventPublisher)（真实总线失败面不可达机理 + 5-1 L264-277 先例）；判空主检定稿在加载器（DC-5 观测锚点 + Task 2 红行 context 断言）；AC-1.3/2.3 补同码多因区分断言与 tmp_path/ceo/ 子目录层级；23 计数 tripwire 全局注记 + active_skill_count 同源派生；Task 7 补验证型四行循环表（转绿声明 + sorted/import 双变异）；64KB 字节口径定稿；Task 5 SystemExit 2 合法红注明；AC-2.2 断言 str 形态定稿
+- v1.3.0: Round 3 深度推演修订（单深度 Agent：14 场景三轴推演 + TDD 时序 + 生产失败语义对照；1 P1 + 4 P2 + **3** P3 + 15 项证伪留痕——R5 勘误：原文误记「4 P3」，可枚举实为 3 项，第 4 项 active_skill_count 同源已并入 #21 tripwire 注记）——Task 4 发布失败两分支定稿换 AsyncMock(spec=EventPublisher)（真实总线失败面不可达机理 + 5-1 L264-277 先例）；判空主检定稿在加载器（DC-5 观测锚点 + Task 2 红行 context 断言）；AC-1.3/2.3 补同码多因区分断言与 tmp_path/ceo/ 子目录层级；23 计数 tripwire 全局注记 + active_skill_count 同源派生；Task 7 补验证型四行循环表（转绿声明 + sorted/import 双变异）；64KB 字节口径定稿；Task 5 SystemExit 2 合法红注明；AC-2.2 断言 str 形态定稿
+- v1.3.1: Round 4/5 收敛轮（R4 纯验证零发现——24 组锚点全精确/结构完整/台账存续/零游离；R5 独立终审六节双向取证判收敛——六项关键修复抽验全属实/红线全绿）——v1.3.0 P3 计数勘误（4→3，内联标注）+ 修复表 #23 + 收敛声明节落盘
