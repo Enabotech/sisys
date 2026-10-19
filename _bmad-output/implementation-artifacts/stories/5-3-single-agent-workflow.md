@@ -848,7 +848,7 @@ tests/
 
 > 编号规则：R<轮>-F<序号>（修复）/ R<轮>-D<序号>（改判不修·登记）。Round 1 由四视角代码调研（编排引擎/LLM 装配面/SAP 组合根事件/工具档案 CLI 测试基建）+ 双视角审查（科学性可行性/一致性完整性）驱动，v1.0.1→v1.1.0。
 
-**Round 1（v1.0.1→v1.1.0）：3 P0 + 10 P1 + 14 P2 + 18 P3，45 修复 + 证伪留痕 25+**
+**Round 1（v1.0.1→v1.1.0）：3 P0 + 11 P1 + 14 P2 + 5 P3 合并行（展开 20 项）——33 表行 / 分级展开 48 项 + 证伪留痕 25+**（R5 勘误：创建时声明「10 P1 + 18 P3 = 45 修复」系分级概数算术误差——P1 实为 11 行、P3 为 5 合并行展开 20 项，本行为 R5 终审逐行对账后精确口径）
 
 | # | 级别 | 问题 | 修复 |
 |---|------|------|------|
@@ -930,6 +930,16 @@ tests/
 
 **Round 3 场景推演结论（18 场景三轴）**：✅ 可满足 8（AC-1 场景1/AC-2×2/AC-3 场景1/AC-4×3/AC-6 接线/收尾）；⚠️ 需注记 8（AC-1 场景2/3 受 R3-F1 波及、场景4 受 R3-F4、AC-3 场景2 受 R3-F1、AC-5×3 受 R3-F1/F3、AC-6 场景2 受 R3-F4/F5——全部随本轮修复闭合）；❌ 不可满足 1（AC-6 CLI 全链——R3-F1/F2/F6/F7 四重叠加，随本轮修复转可达）。**推演留痕（排除疑点）**：四路径终局 state 产物齐备（PackageOutcome 拆写后）；execution 聚合分工闭合；revised_plan 回灌×PlanSchema 不变量一致；七 dataclass 依赖方向合法（application 引 domain VO）；两种 Fake 形态文档已区分；DualChannelEventBus 构造零网络连接（惰性）——CLI 守卫 resolve 链可行。
 
+### 🏁 文档审查周期收敛声明（R5 独立终审，2026-10-19）
+
+> 五节终审结论：**周期闭合 PASS**（R1 151c0426 / R2 91bd543e / R3 adef8bcb 三提交逐一对应、diff 仅动本 Story、工作区净；R4 纯验证零发现无提交自洽）；**关键修复双向取证 PASS 10/10**（Story 声明与仓库实测双向吻合——引擎异常包装现状/agent 端口预留段/resolver 实例缓存/registry ConflictError/CLI handler bootstrap 位/工具链 Think/Code/Validate generate 面/from_env model 恒真陷阱全部实证）；**修复台账抽查 18/18 实证**（R2/R3 计数自洽；R1 台账经 R5 逐行对账已勘误精确口径）；**文档红线终扫 PASS 6/6**（异常 4 项 checklist/端口契约纪律/测试文件名零故事编号/覆盖率四档与仓库门禁一致/AC↔Task↔矩阵↔分类表四方对齐/状态字段自洽）。
+>
+> 周期统计：**4 轮审查 + 1 轮终审，61 表行修复**（R1 33 + R2 15 + R3 13，分级展开约 76 项）+ **证伪留痕 40+ 条**，零 P0/P1/P2 残留。
+>
+> 特权发现随收敛清偿 1 项：R1 台账分级声明算术误差（「10 P1 + 18 P3 = 45 修复」→ R5 对账精确口径「11 P1 + 5 P3 合并行展开 20 项」，内联勘误标注）。
+>
+> **判定：文档审查周期收敛（v1.3.1），Story 5.3 可进入 dev-story 实施。**
+
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 > （实施后由 code-review 工作流填写。）
@@ -943,7 +953,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-19
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -952,3 +962,4 @@ tests/
 - v1.1.0: 文档审查周期 Round 1 系统修订（四视角代码调研 + 双视角审查：3 P0 + 10 P1 + 14 P2 + 18 P3，45 修复）——P0：节点适配器模式定稿（LangGraph 节点契约 + 谓词键↔写入者对照表——DC-1）/ AgentEnginePort.get_graph_result 结果取回扩展（DC-11）/ heartbeat 档案不入 prompt 裁决（DC-3）；P1 要点：引擎 DomainError 透传（444 端到端可达）/ execute 阶段级聚合 + tool_registry_service 名字→实体映射（DC-10）/ 思维链组装覆写+终局单次合成定稿（DC-2）/ 冒烟 skip 双 env 门控（from_env model 恒真陷阱）/ CLI 成功路径端口覆写替身（DC-12）/ 工具沙箱替身边界 / retry 语义精确化（reflect 递增 + `<=` 谓词，plan ≤3 次）+ 第四路径 revised=False 早退 / 事实修正（ToolMetadata 18 字段 / CJK 计量先例 domain `_estimate_chars_tokens` L408-425 / loader L174-246 / 行号组 4 处）
 - v1.2.0: Round 2 回归核查轮（R1 传播完备性核验零残留 + 新引入 8 组行号实测全准；组合交互面推演：3 P1 互拆 + 5 P2 + 7 P3，15 修复）——PackageOutcome 复合产物（chain 传输通道）/ DTO 增补 executed_phases 第五字段 / DC-12 测试序三件套（bootstrap 幂等守卫 + unregister+register 两步覆写）/ revised_plan 回灌 + execution 轨迹历史聚合（反思-重试闭环信息流）/ 445 三层校验次序（242→445 改写）/ workflow_status 同源 evidence.status / 序列 Fake 形态 / WorkflowContext 五字段定稿 / str(agent_id) 序列化约定
 - v1.3.0: Round 3 场景级可满足性深度推演（18 场景三轴：前置可达/期望唯一可写/环境可观测——2 P1 + 5 P2 + 6 P3，13 修复）——**工具链 LLM 面纳入替身边界**（引擎 Think/Validate 每工具步 ≥2 次 generate 实证、e2e 先例双 mock 只被抄了一半、DC-7 双层调用口径、Fake generate 面设计）/ **resolver 实例缓存盲区**（unregister 不驱逐 _instances——DC-12 升级四件套：clear_singleton 第 0 步 + 场景序约束）/ AC-5×3 验收归属（共享计时 helper）/ 验收事件捕获注入缝隙（手工装配引擎构造位）/ decision_result 投影第四轨同源 / BDD 与隔离节同步 DC-12 / bootstrap 由 conftest 承载注记 / Fake 回声防恒真 / AC-4 tripwire 定位
+- v1.3.1: R5 独立收敛终审（五节全 PASS：周期闭合/关键修复双向取证 10⁄10/台账抽查 18⁄18/红线终扫 6⁄6）——R1 台账分级声明勘误（11 P1 + 5 P3 合并行展开 20 项的精确口径）+ 收敛声明入 Story；判定：文档审查周期收敛，可进入 dev-story
