@@ -5,8 +5,9 @@
 
 场景：
 ① instantiate→load-profile 全链路：六档案内容非空 + 23 工具 + 计量断言 →
-  teardown 按 context 记录的 agent_id 逐键精确 delete + 收尾 scan_iter
-  复核残留 0（禁 delete_pattern/flush——多 worker 共享 Redis 实例）
+  teardown 按 context 记录的 agent_id 逐键精确 delete + 收尾 exists 复核
+  自产键已删净（禁 delete_pattern/flush——多 worker 共享 Redis 实例；亦禁
+  全库 scan_iter 复核——并行组 in-flight 键/24h TTL 残键会假红，R1-F1）
 ② P95 计时：perf_counter + warmup 剔除 1 次 + 20 采样 +
   statistics.quantiles(n=20)[18] < 500ms（AC-5.1；先例
   tests/acceptance/test_acceptance_docker_sandbox.py L1001-1012）
@@ -107,11 +108,12 @@ class TestFullChainProfileLoading:
             assert result.startup_context_tokens == expected
             assert result.startup_context_tokens <= 1700, "总量预算 ≤1700"
         finally:
-            # teardown: 仅精确删除本测试创建的键（禁通配/flush）
+            # teardown: 仅精确删除本测试创建的键（禁通配/flush——多 worker 共享 Redis 实例）
             await client.delete(key)
-            # 收尾复核：sisys:agent:* 残留为 0（本测试不产生跨键副作用）
-            remaining = [k async for k in client.scan_iter(match="sisys:agent:*", count=100)]
-            assert remaining == [], f"残留键未清理: {remaining}"
+            # 收尾复核：本测试自产键已删净（exists 断言收敛到自产键——R1-F1。全库
+            # scan_iter 会与并行 xdist 组共享的 5-1 键空间耦合（agent-instantiation
+            # 组的 in-flight 键瞬时可红），且 24h TTL 残键会让本测试持续假红）
+            assert not await client.exists(key), f"本测试自产键未清理: {key}"
 
 
 # ===================================================================

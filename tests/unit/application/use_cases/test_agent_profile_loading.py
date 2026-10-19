@@ -349,7 +349,7 @@ class TestPublishFailureDoesNotRollback:
         publisher.publish = AsyncMock(side_effect=RuntimeError("bus broken"))
         use_case, loader, _, _, _, _ = _make_use_case(publisher=publisher)
         await use_case.execute(agent_id=_make_agent().agent_id)  # 不抛
-        loader.load.assert_awaited_once(), "发布失败不得回滚已完成的加载"
+        loader.load.assert_awaited_once()  # 发布失败不得回滚已完成的加载（R1-F3：裸元组修正）
 
     async def test_publish_is_success_false_path_returns_result(self) -> None:
         """is_success=False 路径（空 results 的 PublishResult）→ 不抛、结果仍返回。"""

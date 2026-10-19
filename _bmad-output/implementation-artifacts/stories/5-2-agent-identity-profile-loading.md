@@ -691,7 +691,7 @@ class SkillSelectorPort(Protocol):
 | 🔄 重构 | 场景命名收敛、超时防护；ruff+mypy |
 
 - [x] Subtask 6.1: 🔴 红 — 集成与性能测试编写（验证型——直接转绿为合法预期，3 passed）
-- [x] Subtask 6.2: 🟢 绿 — 真实 Redis + 真实文件全链路通过（全链路含收尾 scan_iter 复核零残留 + P95 + 20 次成功率 + 事件计数 20）
+- [x] Subtask 6.2: 🟢 绿 — 真实 Redis + 真实文件全链路通过（全链路含收尾复核 + P95 + 20 次成功率 + 事件计数 20；收尾复核形态 R1-F1 勘正：dev 期为全库 scan_iter，代码审查 R1 改为自产键 exists 断言——全库 scan 与并行 xdist 组共享键空间耦合会假红）
 - [x] Subtask 6.3: 🟡 变异 — 阈值突变实证（500→0.5 → P95 测试红、还原绿）
 - [x] Subtask 6.4: 🔄 重构 — 隔离与稳定性（连续运行 5 次全绿无随机失败；ruff 全过）
 - [x] Subtask 6.5: 验收场景 AC-5.1/5.2 转绿核对（2 passed）
@@ -699,7 +699,7 @@ class SkillSelectorPort(Protocol):
 **完成标准/Definition of Done:**
 - [x] 真实 Redis 环境全绿（不可用时动态 skip 而非失败——real_redis fixture ping 失败 pytest.skip）
 - [x] P95<500ms 与成功率 100% 断言有变异实证背书
-- [x] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除——收尾 scan_iter 复核残留 0）
+- [x] teardown 零残留（按 context 记录的 agent_id 逐键精确清理，无通配删除——收尾复核自产键已删净；R1-F1 勘正：原「scan_iter 复核残留 0」全库形态与并行 xdist 组耦合，改 exists 断言）
 
 ---
 
@@ -797,7 +797,7 @@ class SkillSelectorPort(Protocol):
 
 1. **启动上下文的 LLM 注入契约未定**：本 Story 交付 `AgentProfileLoadResult`（六档案 str + L1 元数据 + 计量），但「如何拼装为 LLM 系统提示」（IDENTITY/SOUL/USER 的模板化、L1 description 的注入格式、核心约束文本从哪来）属 5.3 工作流——5.3 立项时定上下文装配契约，届时可能需要本 Story 结果对象的字段演进（DTO 字段追加零成本，非端口签名变更）。**口径警示**：`startup_context_tokens` 只计 IDENTITY+SOUL+L1 拼接视图（不含 CODE/USER/MEMORY/HEARTBEAT 四档案，L1 为拼接口径 ~218 非 TOOLS.md 全文 1104）——5.3 六档案全量装配时实际上下文将显著大于该计量，装配契约订立时须重定义口径；且 `chars//4` 对中文显著低估（`_estimate_tokens` docstring 自述中文约 1.5 token/字符，估算口径 0.25 token/字符——中文内容低估可达数倍），真实 tokenizer 语义下预算偏松，5.3 注入 LLM 前需按真实 tokenizer 复算。
 2. **LangGraph 引擎 agent_id 双轨道**（5-1 遗留风险的 5-2 延续）：本 Story 用例以实体 agent_id 为锚（get_by_id），而 `LangGraphEngine`（langgraph_engine.py L71-72）执行时自铸 agent_id——5.3 引擎消费档案时必须收敛（复用实例化 agent_id 或桥接映射），否则 AgentProfileLoaded（实体 id）与 AgentDecided（引擎铸 id）无法按 aggregate_id 关联。
-3. **`skill_loader` SCOPED 被 SINGLETON 用例捕获**（captive dependency，5-1 D7 同款）：`InMemorySkillLoader` 无连接状态（有 L1/L2 缓存但只读复用）、L1 缓存在 `__init__` 构建——被钉住反而保证缓存跨调用复用（性能有利），但请求级 scope 启用时需改为用例内按调用解析。归 5-1 D7 留项（5.4 lifetime 语义决策回迁时一并评估）。
+3. **`skill_loader` SCOPED 被 SINGLETON 用例捕获**（captive dependency，5-1 D7 同款）：`InMemorySkillLoader` 无连接状态（有 L1/L2 缓存但只读复用）、L1 缓存在 `__init__` 构建——被钉住反而保证缓存跨调用复用（性能有利），但请求级 scope 启用时需改为用例内按调用解析。归 5-1 D7 留项（5.4 lifetime 语义决策回迁时一并评估）。**R1 补记（2026-10-19，架构合规调研 B-P3）**：`skill_selector`（SINGLETON，组合注入 skill_loader，组合根 L2769 附近）为第二个捕获方；`agent_profile_use_case`（SINGLETON → agent_repository SCOPED，L2790 附近）与 5-1 用例同构为第三捕获方——同归 5-1 D7 / 5.4 lifetime 决策评估清单。
 4. **MEMORY.md 系统级合并缺失**：MVP 静态种子不含任何真实记忆——5.3+ 若期望 Agent 带记忆启动，需先激活记忆链路（l0_storage impl 路径修复 + MemoryConfig from_env）并在档案加载用例中插入合并步骤（本 Story 的 loader 端口签名 `load(role, agent_id)` 不变，合并发生在用例编排层）。
 5. **档案资产的单角色覆盖**：仅 CEO 档案落地——V1 开放 CFO/CMO 等角色时需按 DC-1 路径补 `profiles/{role}/` 六件 + `configs/agents/{role}_agent.yaml`（5-1 DC-3 回填同步），`SUPPORTED_ROLES` 常量扩展（5-1 留好的单点）。
 
@@ -1073,6 +1073,7 @@ tests/
 ### 变更日志 Change Log
 
 - 2026-10-19: Story 5.2 dev-story 实施完成（Task 0-8 全绿）——领域契约（442/443 + AgentProfileLoaded + AgentProfile）、六档案资产、MarkdownAgentProfileLoader、SkillSelector（GAP-CRITICAL-08b）、LoadAgentProfileUseCase、CLI load-profile、三端口组合根注册、14 验收场景全绿、集成性能（P95<500ms 实测 ~10ms 级）、架构验证器 A-E、文档四处同步；状态 ready-for-dev → review
+- 2026-10-19: 代码审查周期 Round 1（v1.4.0）——4 视角调研（契约/架构/测试判别力/运行面实测）+ 双评审员 C3 门禁；零 P0/P1，4 P2 + 10 P3；8 项落码（R1-F1 scan 收敛 / R1-F2 read-OSError 用例+突变验证 / R1-F3 裸元组 / R1-F4 脱敏守护 / R1-F5 reason 断言 / R1-F6 整行锚定 / R1-F7 PG 对称清理 / R1-F8 场景级 benchmark）+ 2 P2 改判 deferred + 3 维持；Review Findings 台账落盘
 
 ---
 
@@ -1136,19 +1137,30 @@ tests/
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-> （实施后由 code-review 工作流填写。）
+> **Round 1（2026-10-19）**：审查模式 = 实现提交 e6829cb1（44 文件 +4164/-156）四视角并行调研（A 契约一致性 / B 架构合规 / C 测试质量判别力 / D 运行面端到端推演——D 含 CLI 真实运行实测）+ C3 双评审员（①技术正确性 / ②纪律与传播面）+ 主会话实测定谳（全量 12372 passed / 2 预存环境失败甄别 / ruff+mypy+lint-imports 三绿）。发现：**零 P0/P1，4 P2 + 10 P3**；处置：8 项落码（R1-F1~F8）+ 2 项 P2 改判 deferred + 3 项维持 + 5 项记录级。评审员①「优秀」+ 评审员②「需修订（轻量形态级）」→ 修订清单全吸收后落码（场景级 benchmark 标记 / v1.4.0 版本动作 / L694/L702 联动 / docstring 显式重写 / deferred 并入既有条目）。
 
 #### 需决策 Decision Needed
 
-- [ ] （待实施后审查）
+- [x] 无未决策项（本轮全部发现已有明确处置裁定）。
 
 #### 已修复 Patch
 
-- [ ] （待实施后审查）
+- [x] **R1-F1【P2】集成测试收尾全库 scan_iter 断言与并行组耦合**（C 视角）→ `tests/integration/test_integration_agent_profile_loading.py` teardown 改自产键 `exists` 断言 + docstring 同步。机理：全库 `sisys:agent:*` 断言与 5-1 xdist 组（agent-instantiation）共享 6380 键空间，in-flight 键瞬时可红 + 24h TTL 残键持续假红；本链路唯一 Redis 写面是仓储单键，scan 的「跨键副作用检测」价值为假设性（评审员①核实）。
+- [x] **R1-F2【P2】加载器读取阶段 OSError 分支（L133-134）零覆盖**（C 视角，Story L324「读取失败（OSError）由 Task 2 单测承接」承诺仅兑现 stat 缺失子集）→ 新用例 `TestFileUnreadable`：同名目录构造（stat 成功 4096 过上限检查 → read_text 抛 IsADirectoryError → 442）+ reason 精确断言 `== "档案文件不可读"`（区分 stat 分支同尾词「缺失或不可读」）+ 突变验证（包装分支突变 RuntimeError → 用例红 → 还原绿）。
+- [x] **R1-F3【P3】裸元组断言**（C 视角，`test_agent_profile_loading.py:352` 原文 `loader.load.assert_awaited_once(), "…"` 无 assert 关键字——消息死代码）→ 拆独立行 + 行尾注释。全仓 grep 同型仅此一处。
+- [x] **R1-F4【P3】profile_path 相对形态守护断言缺位**（C 视角，`_display` 突变 `str(path)` 全套恒绿）→ 两代表位（R1-F2 新用例 + test_missing_directory）补 `str(tmp_path) not in context["profile_path"]`（Task 0 L285「不泄露绝对路径」契约的测试位）。
+- [x] **R1-F5【P3】test_missing_role_subdirectory 只断错误码**（C 视角，孪生用例有 reason 断言）→ 补 `"目录" in reason`。
+- [x] **R1-F6【P3】CLI 摘要断言裸子串**（C 视角，`"23" in out` 可被 "(223 chars)" 误配）→ 整行锚定 `"活跃技能: 23"` / `"启动上下文: 342 tokens"`。
+- [x] **R1-F7【P3】CLI 连接池清理不对称**（D 视角，load-profile 的 outbox 链路实例化 PG engine 但退出只关 Redis）→ `_close_redis_pool` 泛化 `_close_connection_pools`（redis+PG 逐 manager 独立 try/except peek-close，单点失败不跳过另一点）；docstring 重写含 PG 触达理由。既有「关池失败不反噬」测试（`_StubResolverWithManager` 任意名返回失败 manager）自然守护双失败路径。
+- [x] **R1-F8【P3】验收侧性能场景缺 benchmark 标记**（C 视角，Story L138/L460 要求；集成侧 L47 已有）→ **场景级** `@pytest.mark.benchmark` 加于 AC-5.1/5.2 两场景函数（评审员②形态裁定：不打文件级——14 场景中 12 个非计时场景不应挂「P95 延迟测量」语义，且不与 5-1 验收文件分叉；CI 无 `-m` 排除面，零执行影响）。
+- [x] 记录级（随轮清偿）：Story L694/L702「scan_iter 复核」表述勘正（R1-F1 联动）；已知下游风险 #3 补 skill_selector/agent_profile_use_case 捕获方（B-P3）；测试文件 docstring 七类→八类（R1-F2 联动）。
 
 #### 已推迟 Defer
 
-- [ ] （待实施后审查）
+- [x] **R1-DF1【P2·改判】InMemorySkillLoader L1 缓存表头幽灵条目**（D 视角实测：cache 24 条 vs manifest 23，ghost `slug='slug'` status='active'；`match_by_tag`/`match_by_capability` 直接遍历缓存会命中，当前生产消费方为零；5-2 SkillSelector 经 get_all_slugs 枚举天然免疫）→ 改判 deferred 而非落码：4-1a 交付资产域（回归面含 4-1a 套件），审查周期不动他 Story 文件（Surgical 纪律）；双评审员改判核验均成立。登记 deferred-work.md 5-2 R1 段（触发=Skills 资产演进或 5.9 立项）。
+- [x] **R1-DF2【P2·改判】AgentProfileLoaded 发布失败运行时不可观测**（D 视角实测抓到「发布失败 ERROR 日志 + exit 0」并存）→ 改判 deferred 而非落码：Story v1.3.1 契约定稿「发布失败记日志不回滚（两分支对齐 5-1 AC-4 语义）」，改退码违反已批准 AC；失败经 logger.error 落 stderr 人类可观测，缺的是程序化信号（该面归 5.3 首个事件消费 Story 决策）；实测失败源于本机 PG 密码环境问题非生产常态。并入 deferred-work.md 既有【部署面注记补充】条目（5-1 R2/3 段，AgentInstantiated 同族累积 + 观测面增强）。
+- [x] **R1-DF3【P3·登记】AC-5 性能门禁计时口径不含生产发布链路**（计时注入 InMemoryEventBus，生产经 PG outbox，余量 ~25 倍大概率覆盖但无证据背书）→ deferred-work.md 登记（触发=5.3 批量消费前补计时或明示口径差）。
+- [x] 维持不改 3 项（裁定记录）：①A-P3-1 三档案资产 8-9 行低于「10~40 行」风格指引——Story L212 自声明行数非绑定、chars 红线实测满足（IDENTITY+SOUL 514/2000），凑行降质量；②C-P3-5 三份端口契约测试纯结构检查——11 维度形态与 5-1 契约测试先例逐一同型（grep 实证同族方法名），单点改形态破坏家族一致性；③C-P3-7 验收 9 个无 Redis 场景构造 Redis 客户端对象——redis-py asyncio 构造惰性零连接零副作用，fixture 统一是合理简化（本条即注记）。
 
 ---
 
@@ -1161,7 +1173,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-10-15
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -1170,3 +1182,4 @@ tests/
 - v1.2.0: Round 2 回归核查修订（传播核查 + 增量面双 Agent；1 P2 + 13 P3）——BDD 约束/隔离表两处「先 instantiate」全局表述分档化（P0 修复的同语义漏网，适用范围定为四场景 AC-1.1/4.1/5.1/5.2）；R1 台账两子项补落地（「无状态」→「无连接状态」两处、资产红线 chars≤2000 绑定约束入正文）；TOOL_ID_TO_SLUG 行号勘正、AC-3.1 tripwire 红绿形态注记、AC-5 生产语义注记、§11.2.4 顺序差异注记、D-9 偏离声明（epics TOOLS.md 物理文件语义）、调试日志表补三行（or.md/异常设计/deferred-work）、中文 token 低估倍数勘正、docker_sandbox 全路径、AC-1 块 And 子句端口级限定、「唯一 instantiate」措辞、R6 骨架组装分档、registry/__init__.py 入 Task 3 绿行
 - v1.3.0: Round 3 深度推演修订（单深度 Agent：14 场景三轴推演 + TDD 时序 + 生产失败语义对照；1 P1 + 4 P2 + **3** P3 + 15 项证伪留痕——R5 勘误：原文误记「4 P3」，可枚举实为 3 项，第 4 项 active_skill_count 同源已并入 #21 tripwire 注记）——Task 4 发布失败两分支定稿换 AsyncMock(spec=EventPublisher)（真实总线失败面不可达机理 + 5-1 L264-277 先例）；判空主检定稿在加载器（DC-5 观测锚点 + Task 2 红行 context 断言）；AC-1.3/2.3 补同码多因区分断言与 tmp_path/ceo/ 子目录层级；23 计数 tripwire 全局注记 + active_skill_count 同源派生；Task 7 补验证型四行循环表（转绿声明 + sorted/import 双变异）；64KB 字节口径定稿；Task 5 SystemExit 2 合法红注明；AC-2.2 断言 str 形态定稿
 - v1.3.1: Round 4/5 收敛轮（R4 纯验证零发现——24 组锚点全精确/结构完整/台账存续/零游离；R5 独立终审六节双向取证判收敛——六项关键修复抽验全属实/红线全绿）——v1.3.0 P3 计数勘误（4→3，内联标注）+ 修复表 #23 + 收敛声明节落盘
+- v1.4.0: 代码审查周期 Round 1（实施提交 e6829cb1 四视角调研 + C3 双评审；零 P0/P1，4 P2 + 10 P3）——8 项落码：R1-F1 集成收尾全库 scan_iter→自产键 exists（并行组/24h TTL 残键假红根除）/R1-F2 读取阶段 OSError 用例（同名目录构造 + reason 精确断言 + 突变验证，兑现 L324 承诺）/R1-F3 裸元组断言/R1-F4 profile_path 脱敏守护断言/R1-F5 子目录缺失 reason 断言/R1-F6 CLI 摘要整行锚定/R1-F7 CLI 连接池 PG 对称清理（_close_connection_pools）/R1-F8 AC-5.1/5.2 场景级 benchmark 标记（评审裁定不打文件级）；2 P2 改判 deferred（L1 幽灵条目 4-1a 遗留 + 发布观测面归 5.3）+ 3 维持；L694/L702 scan_iter 表述勘正 + 风险#3 捕获方补记 + deferred-work 两项登记

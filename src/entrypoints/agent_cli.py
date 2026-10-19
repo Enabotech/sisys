@@ -159,42 +159,46 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-async def _close_redis_pool() -> None:
-    """关闭已实例化的 Redis 连接池（若存在）——关闭失败仅记日志不抛。
+async def _close_connection_pools() -> None:
+    """关闭已实例化的连接池（Redis/PostgreSQL——若存在），关闭失败仅记日志不抛。
 
-    agent_cli 是首个打开 Redis 池的 CLI（ocr_cli 不触碰 Redis）——退出不关池
-    留 ResourceWarning。仅关闭已实例化的 redis_connection_manager（peek 不触发
-    懒实例化）；禁用全量 shutdown()——它会在退出路径惰性实例化 PG/Qdrant/Neo4j
-    manager。
+    agent_cli 是首个打开 Redis 池的 CLI（instantiate 经仓储读写；ocr_cli 不
+    触碰 Redis）；load-profile 侧 event_publisher → outbox 链路会实例化 PG
+    engine（RELIABLE 事件落 outbox 表）——退出不关均留 ResourceWarning
+    （R1-F7 对称清理）。仅关闭已实例化的 manager（peek 不触发懒实例化）；
+    禁用全量 shutdown()——它会在退出路径惰性实例化 Qdrant/Neo4j 等
+    本 CLI 未触达的 manager。
 
-    本方法在 finally 中调用：关闭异常（如断连超时）若上抛会反噬主结果——
-    实例化成功被误报 exit 1、失败路径丢失根因异常，故内部消化记 warning
-    （对齐 run_tool_chain 发布失败「记日志不回滚」先例的防御面收窄）。
+    逐 manager 独立 try/except：一处关闭失败不跳过另一处（Redis 失败仍关
+    PG）。本方法在 finally 中调用：关闭异常（如断连超时）若上抛会反噬主
+    结果——实例化成功被误报 exit 1、失败路径丢失根因异常，故内部消化记
+    warning（对齐 run_tool_chain 发布失败「记日志不回滚」先例的防御面收窄）。
     """
-    try:
-        manager = get_resolver().peek_singleton("redis_connection_manager")
-        if manager is not None:
-            await manager.close()
-    except Exception as exc:
-        logger.warning("Redis 连接池关闭失败（忽略，不影响主结果）: %s: %s", type(exc).__name__, exc)
+    for manager_name in ("redis_connection_manager", "postgresql_connection_manager"):
+        try:
+            manager = get_resolver().peek_singleton(manager_name)
+            if manager is not None:
+                await manager.close()
+        except Exception as exc:
+            logger.warning("%s 关闭失败（忽略，不影响主结果）: %s: %s", manager_name, type(exc).__name__, exc)
 
 
 async def _instantiate(role: AgentRole) -> object:
-    """执行实例化并清理 Redis 池（组合根经 bootstrap 引导后 resolve 用例）。"""
+    """执行实例化并清理已打开的连接池（组合根经 bootstrap 引导后 resolve 用例）。"""
     use_case = resolve("agent_instantiation_use_case")
     try:
         return await use_case.execute(role=role)
     finally:
-        await _close_redis_pool()
+        await _close_connection_pools()
 
 
 async def _load_profile(agent_id: uuid_module.UUID) -> object:
-    """执行档案加载并清理 Redis 池（本子命令同样读 Redis——get_by_id 守卫）。"""
+    """执行档案加载并清理已打开的连接池（读 Redis get_by_id 守卫 + outbox 触达 PG）。"""
     use_case = resolve("agent_profile_use_case")
     try:
         return await use_case.execute(agent_id=agent_id)
     finally:
-        await _close_redis_pool()
+        await _close_connection_pools()
 
 
 def _print_profile_summary(result: object) -> None:

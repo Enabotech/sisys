@@ -2,8 +2,10 @@
 
 tmp_path 真实文件 IO 零 mock 覆盖：
 - 正常六档案加载（字段一致 + agent_id/role 透传——VO 归属锚点）
-- 七类失败/边界：目录缺失/单文件缺失/内容空白（三形态）/大小超限（字节口径）/
-  编码非法（GBK 字节）/未知文件忽略（前向兼容）
+- 八类失败/边界：目录缺失/单文件缺失/内容空白（三形态）/大小超限（字节口径）/
+  编码非法（GBK 字节）/读取阶段不可读（同名目录形态——R1-F2 补 Story L324
+  「读取失败（OSError）」承诺兑现）/未知文件忽略（前向兼容）/agent_id-role 透传
+- profile_path 相对形态守护（context 不含 tmp_path 绝对前缀——R1-F4 脱敏契约断言）
 - 判空主检在加载器断言（context.profile_path 携带文件名——DC-5 观测锚点，
   防实现滑入 VO 兜底路径致 context 失文件名）
 - 内置资产冒烟：默认 profile_root 加载 configs/agents/profiles/ceo/ 六档案成功
@@ -106,6 +108,10 @@ class TestDirectoryMissing:
             await _load(loader)
         assert exc_info.value.code == "EXCEPTION_442"
         assert "目录" in exc_info.value.context.get("reason", ""), "reason 应含目录缺失语义"
+        # profile_path 相对形态守护（R1-F4——_display 突变为 str(path) 时此处必红）
+        assert str(tmp_path) not in exc_info.value.context.get("profile_path", ""), (
+            "context.profile_path 不得泄露绝对路径（脱敏契约）"
+        )
 
     async def test_missing_role_subdirectory_raises_442(self, tmp_path: Path) -> None:
         """profile_root 存在但角色子目录缺失 → 442。"""
@@ -114,6 +120,7 @@ class TestDirectoryMissing:
         with pytest.raises(AgentProfileError) as exc_info:
             await _load(loader)
         assert exc_info.value.code == "EXCEPTION_442"
+        assert "目录" in exc_info.value.context.get("reason", ""), "与孪生用例同 raise 位应同 reason 语义"
 
 
 # ===================================================================
@@ -132,6 +139,39 @@ class TestFileMissing:
             await _load(loader)
         assert exc_info.value.code == "EXCEPTION_442"
         assert "IDENTITY.md" in exc_info.value.context.get("profile_path", "")
+
+
+# ===================================================================
+# 失败路径二点五：读取阶段不可读（stat 成功但 read_text 抛 OSError）
+# ===================================================================
+
+
+class TestFileUnreadable:
+    """同名目录构造：stat().st_size 有值（目录 4096）过大小检查 → read_text 抛
+    IsADirectoryError（OSError 子族）→ 442「不可读」（读取阶段分支 L133-134）。
+
+    构造形态选同名目录而非 chmod 0o000：权限形态在 root 环境失效需 skipif，
+    目录形态全环境稳定（R1-F2——补齐 Story L324「读取失败（OSError）由 Task 2
+    单测承接」承诺；此前仅覆盖 stat 阶段的「缺失」子集）。
+    """
+
+    async def test_directory_named_as_profile_file_raises_442(self, tmp_path: Path) -> None:
+        _write_six_profiles(tmp_path / "ceo")
+        (tmp_path / "ceo" / "IDENTITY.md").unlink()
+        (tmp_path / "ceo" / "IDENTITY.md").mkdir()  # 同名目录：stat 成功 + read 失败
+        loader = _make_loader(tmp_path)
+        with pytest.raises(AgentProfileError) as exc_info:
+            await _load(loader)
+        assert exc_info.value.code == "EXCEPTION_442"
+        # 精确匹配区分 stat 分支的同尾词「缺失或不可读」（评审员①微调）
+        assert exc_info.value.context.get("reason", "") == "档案文件不可读", (
+            "读取阶段 OSError 的 reason 应为不可读（区别于 stat 阶段的缺失或不可读）"
+        )
+        assert "IDENTITY.md" in exc_info.value.context.get("profile_path", "")
+        # profile_path 相对形态守护（R1-F4——tmp_path 不入 context）
+        assert str(tmp_path) not in exc_info.value.context.get("profile_path", ""), (
+            "context.profile_path 不得泄露绝对路径（脱敏契约）"
+        )
 
 
 # ===================================================================

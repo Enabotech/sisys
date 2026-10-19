@@ -113,11 +113,13 @@ def test_ac_4_1_startup_budget_and_event(context: dict[str, Any]) -> None:
     """AC-4.1: 分项/总量预算 + InMemoryEventBus 捕获 AgentProfileLoaded 四字段。"""
 
 
+@pytest.mark.benchmark  # 性能场景级标记（AC-5 checklist L138/L460——R1-F8 场景级形态，不打文件级以防 12 个非计时场景误挂语义）
 @scenario(FEATURE, "AC-5.1 - 档案加载延迟 P95 小于 500 毫秒")
 def test_ac_5_1_p95_under_500ms(context: dict[str, Any]) -> None:
     """AC-5.1: 真实 Redis ≥20 采样 P95<500ms（warmup 剔除 1 次）。"""
 
 
+@pytest.mark.benchmark  # 性能场景级标记（同上——R1-F8）
 @scenario(FEATURE, "AC-5.2 - 二十次重复档案加载全部成功")
 def test_ac_5_2_twenty_repeated_loads(context: dict[str, Any]) -> None:
     """AC-5.2: 同一 agent_id 20 次重复加载全部成功（幂等只读）。"""

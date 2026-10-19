@@ -382,8 +382,8 @@ class TestLoadProfileMain:
         out = capsys.readouterr().out
         for file_label in ("IDENTITY.md", "CODE.md", "SOUL.md", "USER.md", "MEMORY.md", "HEARTBEAT.md"):
             assert f"{file_label}: OK" in out, f"摘要应含 {file_label}: OK 行"
-        assert "活跃技能" in out and "23" in out, "摘要应含活跃技能数（运行期动态值）"
-        assert "启动上下文" in out and "342" in out, "摘要应含 token 计量"
+        assert "活跃技能: 23" in out, "摘要应含活跃技能数整行（整行锚定防子串误配——R1-F6）"
+        assert "启动上下文: 342 tokens" in out, "摘要应含 token 计量整行"
         assert stub.last_result is not None
 
     def test_agent_not_found_exit_1_with_code(
