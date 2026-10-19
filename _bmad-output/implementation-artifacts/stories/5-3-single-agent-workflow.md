@@ -133,7 +133,7 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 - [ ] 枚举值集合断言（5 类型/4 优先级）
 - [ ] 默认值断言（priority=NORMAL/isolation_level=L4_HARD/blackboard_visible=False/timeout_seconds=300）
 - [ ] conversation_id 必填（无默认）+ correlation_id 可空（`UUID | None = None`——修正设计文档 `UUID = None` 缺陷）+ 非法枚举值构造被拒（ValidationError）
-- [ ] **不含**：bus/传输/序列化性能/黑板交互（全部归 5.11）
+- [ ] **不含**：bus/传输/序列化性能/黑板交互（全部归 5.11）。验收形态注记：AC-4×3 与 Task 2 单测断言面重复（纯 Schema 零环境依赖）——保留为**验收 tripwire**（5-2 AC-6.2 静态 tripwire 先例），非集成价值场景
 
 ### AC-5: 性能指标
 
@@ -226,7 +226,7 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_agent_workflow.py`
 - [ ] 场景组织：AC 注释横幅分组（PG 模板形态）+ 全场景逐一 @scenario 显式绑定（5-2 形态，**禁 scenarios() 批量绑定与 then-pass 占位**）
 - [ ] 覆盖：AC-1×4（六阶段顺序/反思重试/重试耗尽/agent_id 贯通）+ AC-2×2（五段完备/展示形态）+ AC-3×2（字段完备/失败终态产包）+ AC-4×3（字段/枚举默认值/非法拒绝）+ AC-5×3（P95/完整率/并发）+ AC-6×3（接线/事件/CLI 全链）= **17 场景**（AC-5×3 由 Task 7 集成转绿并同步验收文件；Task 9 追加收尾场景后全量 18——收尾场景按模板钦定归 Task 9）
-- [ ] BDD 步骤约束：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；Fake LLM 经 context dict 注入（LLM 是外部 SaaS——端口级 Fake 是既有豁免面，验收其余组件全真实：真实图执行/真实 Redis 仓储/真实档案加载）；**CLI 成功路径验收 = 进程内 main() 调用 + bootstrap 后将 `llm_client` 端口覆写注册为 Fake LLM**（端口注册覆写非 mock——LLM 豁免面在 CLI 链路的落地形态；组合根 `llm_client` 注册的是真实 LitellmLLMClient 无替身开关，5-2 的 load-profile 不触 LLM 故无此问题，本 Story 首次定义——见测试隔离约束节）
+- [ ] BDD 步骤约束：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；Fake LLM 经 context dict 注入（LLM 是外部 SaaS——端口级 Fake 是既有豁免面，验收其余组件全真实：真实图执行/真实 Redis 仓储/真实档案加载）；**CLI 成功路径验收 = 进程内 main() 调用 + DC-12 测试序四件套**（bootstrap 由 conftest `_bootstrap_once` 承载 + `clear_singleton()` 实例缓存驱逐 + unregister/register 两步覆写 Fake LLM + 幂等守卫下 main()——细节以 **DC-12 决策表为唯一真源**；组合根 `llm_client` 注册的是真实 LitellmLLMClient 无替身开关，5-2 的 load-profile 不触 LLM 故无此问题，本 Story 首次定义）
 
 **Task 0 完成标志：**
 
@@ -277,7 +277,7 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 > 基线同模板（事务隔离/UUID 唯一/并行隔离/清理粒度/asyncio 纪律全表）。本 Story 特别注意：
 
 - [ ] Fake LLM 分派锚 = `response_schema is X` 身份（**禁与断言锚同源**——4-5 循环论证教训：分派键与断言锚必须独立信号）；`system_prompt` 前缀作辅助分派键时前缀稳定性入注释；**六阶段 Schema 类两两不同是身份分派的前提**（perceive/plan/verify/reflect/终局 ChainOfThought 五 Schema——若任两处共用 Schema 需补次级分派键，debate Fake L143 温度二次分派先例）；**序列 Fake 形态**（「反思重试→成功」场景需同一 VerificationSchema 先 fail 后 pass——常量身份分派不可承载，用 side_effect 闭包 call_count 分支或预置应答队列；分派键≠断言锚纪律同样适用）
-- [ ] **三处替身边界定稿**（集成/验收可落性）：① 工具执行面 = fixture 注册轻量工具 + `tool_execution_service` 真实服务链 + 沙箱执行器替身（e2e 先例 `test_integration_strategic_tool_e2e.py` Mock SandboxExecutor——Docker 依赖既有豁免面，禁拖真实沙箱进验收）；② CLI 成功路径 = 进程内 main() + bootstrap 后 `llm_client` 端口覆写注册为 Fake LLM（组合根无 LLM 替身开关，5-2 无此问题本 Story 首次定义）；③ 并发场景发布面 = recording publisher 真实类子类（与场景①②同款口径差声明——真实发布面归场景⑤）
+- [ ] **三处替身边界定稿**（集成/验收可落性）：① 工具执行面 = fixture 注册轻量工具 + `tool_execution_service` **手工装配真实服务链**（`build_tool_execution_chain` 同款组装、**Fake llm_client 注入链内**）+ 沙箱执行器替身（e2e 先例 `test_integration_strategic_tool_e2e.py` Mock **SandboxExecutor 与 LLMClient 两项**——禁只抄沙箱面：引擎 Think/Code/Validate 每工具步 ≥2 次 `generate` 真实调用（`tool_execution_engine.py` 端口映射实证），组合根 resolve 装配则链内 llm_client 是真实 LitellmLLMClient 必打外网；**工具链走 `generate()` 非 `structured_generate`**——Fake 需按 prompt 前缀分派并返回合法 LLMResponse，Schema 身份分派锚不覆盖该面；备选：场景任务规划零工具步（tools_used 空元组合法——AC-4 类纯 Schema 场景适用））；② CLI 成功路径 = **DC-12 测试序四件套**（以 DC-12 决策表为唯一真源——含实例缓存驱逐，BDD 节与隔离节概述不重复展开）；③ 并发场景发布面 = recording publisher 真实类子类（与场景①②同款口径差声明——真实发布面归场景⑤）。**验收事件捕获缝隙**：AC-1 场景 4/AC-6 场景 2 需 recording——手工装配 `LangGraphEngine(config, event_publisher=_RecordingEventPublisher)`（InMemoryEventBus 真实类子类先例，引擎构造注入位实证可行），Subtask 0.6 分档表登记
 - [ ] 计时场景 xdist_group 串行 + benchmark 场景级标记（5-2 R1-F8 形态——不打文件级）
 - [ ] Redis 场景级独立客户端 + teardown 逐键精确删除（**禁全库 scan_iter 复核**——5-2 R1-F1 教训：与并行组共享键空间耦合假红）
 - [ ] 验收/集成测试零真实 LLM 调用（Fake LLM 端口替身豁免面；真实 LLM 仅冒烟场景 env 门控动态 skip）
@@ -464,7 +464,7 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | `test_langgraph_engine.py` 追加（`_SUPPORTED_GRAPHS` 含 "SingleAgentWorkflow"/parameters["agent_id"] 透传——**AgentDecided.agent_id == parameters 传入值**（自铸收敛断言——uuid4 新铸必红）/decision_result 含 {workflow_status, retry_count, evidence_ref 摘要}（**图身份锚**——防未知图名静默回退 BasicAgent 仍绿）/confidence 来自 state（非硬编码——突变断言：state.confidence=0.72 → 事件 confidence=0.72；**取值 `state.get("confidence", 0.9)`**——BasicAgent 存量断言 0.9 保持绿，DC-6 范围仅新图）/构造注入 workflow_service 端口/**get_graph_result(graph_run_id) → dict \| None**（终态 state 取回——新图路径写入；未知/过期 id 返回 None 区分于 get_graph_status 的 FAILED 默认）/**DomainError 透传**（节点内抛 444 → submit_graph 上抛 444 非 RuntimeError 改写——引擎级测试）） |
-| 🟢 绿 | 改造 `langgraph_engine.py`（构造签名扩展 `workflow_service: AgentWorkflowServicePort | None = None`——默认 None 保持 BasicAgent 向后兼容；`_build_graph` 按图名分派到新图工厂（**现状未知图名静默回退 BasicAgent**——注册遗漏被身份锚断言抓红）；L71-72 agent_id 收敛：`parameters.get("agent_id")` 存在时复用，否则回退自铸（BasicAgent 兼容）；`_publish_agent_decided` 从 state 取 confidence（BasicAgent 默认 0.9 保存量）；**decision_result 投影仅新图路径**（`{workflow_status, task_summary, chain_summary, evidence_ref, retry_count}` 纯标量投影——chain_summary=final_answer[:200]/task_summary=input_summary[:200]/evidence_ref=input_hash，**VO 实例禁入 decision_result dict**（JSON 序列化炸——4-5 UUID 直塞 metadata 教训）；BasicAgent 路径保持 state 全量透传不变）；**submit_graph 异常处理改 DomainError 透传**（444/445 等领域异常原样上抛、仅非 DomainError 包 RuntimeError）；**get_graph_result 实现**（_runs 同步存终态 state——与 FlowStatus 同存储位）） |
+| 🟢 绿 | 改造 `langgraph_engine.py`（构造签名扩展 `workflow_service: AgentWorkflowServicePort | None = None`——默认 None 保持 BasicAgent 向后兼容；`_build_graph` 按图名分派到新图工厂（**现状未知图名静默回退 BasicAgent**——注册遗漏被身份锚断言抓红）；L71-72 agent_id 收敛：`parameters.get("agent_id")` 存在时复用，否则回退自铸（BasicAgent 兼容）；`_publish_agent_decided` 从 state 取 confidence（BasicAgent 默认 0.9 保存量）；**decision_result 投影仅新图路径**（`{workflow_status, task_summary, chain_summary, evidence_ref, retry_count}` 纯标量投影——**workflow_status = state["evidence"].status**（与 DTO/CLI 三轨同源——R2-F7 的第四轨闭合）、chain_summary=final_answer[:200]/task_summary=input_summary[:200]/evidence_ref=input_hash，**VO 实例禁入 decision_result dict**（JSON 序列化炸——4-5 UUID 直塞 metadata 教训）；BasicAgent 路径保持 state 全量透传不变）；**submit_graph 异常处理改 DomainError 透传**（444/445 等领域异常原样上抛、仅非 DomainError 包 RuntimeError）；**get_graph_result 实现**（_runs 同步存终态 state——与 FlowStatus 同存储位）） |
 | 🟡 变异 | 移除 parameters agent_id 读取 → 贯通断言红 → 还原 |
 | 🔄 重构 | 全部引擎测试绿（存量 BasicAgent 测试零回归） |
 
@@ -512,7 +512,7 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_agent_workflow.py`（场景①全链：真实 Redis 仓储（instantiate→run-task 同 agent_id）+ 真实档案加载 + 真实图执行 + Fake LLM（延迟模拟 200ms/调用——仓内 Fake 延迟先例 0.01-0.3s 区间内）+ **工具执行面替身边界**：fixture 注册轻量工具 + tool_execution_service 真实服务链 + 沙箱执行器替身（e2e 先例 test_integration_strategic_tool_e2e——Docker 依赖既有豁免面，禁拖真实沙箱）→ 六阶段贯通 + 思维链 + 证据 + AgentDecided 事件捕获（recording publisher——真实类子类先例）；场景②P95：warmup 1 + 20 采样 `quantiles(n=20)[18] < 10s`（**采样场景=成功路径**：Fake 对 verify 恒 pass——每链 4 次 LLM 调用（perceive/plan/verify/终局合成），延迟下界 ≈4×0.2s=0.8s；**5 档延迟**对应 5 类 LLM 调用——perceive/plan/verify/reflect/终局各一档，防延迟同值掩盖调用数差异）；场景③并发 10：`asyncio.gather` 10 agent_id 同时执行全成功（发布面=recording publisher，与场景①同款口径差声明）；场景④真实 LLM 冒烟：**skip 门控 = `LLM_ENDPOINT` 与 `LLM_API_KEY` 双探测**（禁用「from_env 有 model」——model 默认 qwen2.5:7b 永非空，恒真陷阱；两变量齐备才执行 1 次真实全链，否则 pytest.skip 动态跳过禁写死；冒烟调用沿用 `_build_call_config` 紧 timeout 禁继承 600s 默认）；场景⑤真实发布链路单次时序（R1-DF3 处置）：resolve 真实 `event_publisher`（DualChannelEventBus）+ Fake LLM 执行 run-task 一次 → 断言 PG `event_outbox` 落行——**仓内首例，隔离方案**：outbox 经 session_factory 独立 session 提交不受测试事务 savepoint 回滚覆盖，断言按 `event_type + aggregate_id(=agent_id)` 精确查询（真实发布下测试无从预知 event_id——禁全表计数；最近似模板=dead_letter_queue 的 text SELECT 断言先例；outbox 表追加语义无清理面，PG 门控动态 skip）；场景①②③的发布面口径差（recording 替身 vs 生产 outbox）随文件 docstring 声明 |
+| 🔴 红 | 编写 `tests/integration/test_integration_agent_workflow.py`（场景①全链：真实 Redis 仓储（instantiate→run-task 同 agent_id）+ 真实档案加载 + 真实图执行 + Fake LLM（延迟模拟 200ms/调用——仓内 Fake 延迟先例 0.01-0.3s 区间内）+ **工具执行面替身边界（隔离约束①）**：fixture 注册轻量工具 + `build_tool_execution_chain` 同款**手工装配真实服务链（Fake llm_client 注入链内）** + 沙箱执行器替身（e2e 先例 mock SandboxExecutor 与 LLMClient 两项——工具链 Think/Validate 每步 ≥2 次 generate，漏 LLM 面必打外网）→ 六阶段贯通 + 思维链 + 证据 + AgentDecided 事件捕获（recording publisher——真实类子类先例）；场景②P95：warmup 1 + 20 采样 `quantiles(n=20)[18] < 10s`（**采样场景=成功路径**：Fake 对 verify 恒 pass——**双层调用口径**：工作流级 4 次（perceive/plan/verify/终局合成）+ 工具链级每工具步 2 次 generate（Think/Validate——Fake 延迟同注入链内 LLM 面），单链下界 = 4×0.2 + 工具步数×2×档值；**5 档延迟**对应 5 类工作流级调用——perceive/plan/verify/reflect/终局各一档 + 工具链 generate 统一档，防延迟同值掩盖调用数差异）；**验收 .feature 的 AC-5×3 步骤实现同 Task 7 交付**（集成与验收**共享计时 helper**——禁 20 采样双跑拖慢套件；验收场景断言同 helper 结果）；场景③并发 10：`asyncio.gather` 10 agent_id 同时执行全成功（发布面=recording publisher，与场景①同款口径差声明）；场景④真实 LLM 冒烟：**skip 门控 = `LLM_ENDPOINT` 与 `LLM_API_KEY` 双探测**（禁用「from_env 有 model」——model 默认 qwen2.5:7b 永非空，恒真陷阱；两变量齐备才执行 1 次真实全链，否则 pytest.skip 动态跳过禁写死；冒烟调用沿用 `_build_call_config` 紧 timeout 禁继承 600s 默认）；场景⑤真实发布链路单次时序（R1-DF3 处置）：resolve 真实 `event_publisher`（DualChannelEventBus）+ Fake LLM 执行 run-task 一次 → 断言 PG `event_outbox` 落行——**仓内首例，隔离方案**：outbox 经 session_factory 独立 session 提交不受测试事务 savepoint 回滚覆盖，断言按 `event_type + aggregate_id(=agent_id)` 精确查询（真实发布下测试无从预知 event_id——禁全表计数；最近似模板=dead_letter_queue 的 text SELECT 断言先例；outbox 表追加语义无清理面，PG 门控动态 skip）；场景①②③的发布面口径差（recording 替身 vs 生产 outbox）随文件 docstring 声明 |
 | 🟢 绿 | 全场景转绿（验证型——被测链路已由 Task 1-6 交付） |
 | 🟡 变异 | 阈值突变（10s→0.01s）→ P95 红 → 还原；Fake 延迟突变 → 计时下界红 → 还原；**组装字段来源断供**（perceive 产物传递链断供→input_summary 空→445 路径触发）→ 完整率红 → 还原（**变异作用于真实组装代码**——非 Fake 返回面，Fake 返回空会被 NonEmptyStr 拦截走 331→444 是另一条路径；失败 run 计入完整率分母——组装链判别力变异，完整率 100% 非恒真的实证） |
 | 🔄 重构 | xdist_group + benchmark 场景级标记 + pytestmark（integration/redis） |
@@ -582,12 +582,12 @@ Epic 5「单 Agent 战略规划能力」价值组的第三环：5-1 交付 Agent
 | DC-4 | SAPMessage 落位与类型 | **`src/interfaces/sap/`**（architecture.md §13.5 L2128-2133 钦定：message.py/types.py/bus.py[5.11]/middleware.py[V2]）；15 字段全量；`isolation_level: IsolationLevel`（复用 domain `events/enums.py` L39-45——str,Enum 与 pydantic v2 原生兼容，与 IsolationLevelSwitched 事件同源）；修正设计缺陷 `correlation_id: UUID \| None = None` | a) application 层（debate_schemas 先例——弃用：架构文档钦定 interfaces/sap/，SAP 是外部通信协议归接口层 R4）；b) isolation_level 用裸 str（弃用：domain 枚举已存在，重复定义违反 SSOT）；c) 自定义独立枚举（弃用：与 domain IsolationLevel 语义重复） | architecture.md §13.5 L2128-2133；interface-design §7.4 L1302-1335；两份设计文档一致 |
 | DC-5 | agent_id 双轨收敛（5-2 风险#2 核销） | **parameters 透传实体 agent_id**：用例在 parameters 携带 agent_id/task/context（**agent_id 必须 `str(agent_id)` 序列化入 parameters**——引擎收敛位 `UUID(agent_id_raw)` 按 str 构造，UUID 实例直塞实测抛 AttributeError）→ 引擎优先 `parameters["agent_id"]`（存在即复用，缺失回退自铸保 BasicAgent 兼容）→ AgentDecided(实体 id) 与 AgentProfileLoaded(实体 id) 可按 aggregate_id 关联 | a) 引擎内查仓储反查（弃用：引擎依赖仓储端口越界——编排引擎不该有持久化职责）；b) 桥接映射表（弃用：单 Agent 直传即可，映射是过度设计） | 5-2 风险 #2；langgraph_engine.py L71-72 收敛位；uuid.UUID(UUID实例) AttributeError 实测 |
 | DC-6 | 工作流完成事件 | **复用 `AgentDecided`**（不新建事件）：`decision_result` 携带 `{workflow_status, task_summary, chain_summary, evidence_ref, retry_count}`；`confidence` 真实化（state 里的验证置信度——引擎 L153 硬编码 0.9 移除）；发布点保持引擎内（用例零发布防双发） | a) 新建 AgentWorkflowCompleted 事件（弃用：与 AgentDecided「Agent 做出决策」语义重叠——禁止同义事件；下游 5.7/5.9 以 AgentDecided 为锚的设计不变）；b) 用例发布（弃用：双发风险，引擎发布是 1.18b 既有接线） | epics 零新事件要求；agent_events.py L15-36；模板「禁止同义接口重复定义」 |
-| DC-7 | P95<10s 验收口径 | **Fake LLM 延迟模拟为主口径**（每调用注入 200ms 级模拟延迟——仓内 Fake 延迟先例 0.01-0.3s 区间内，计时有真实下界；LLM 调用数口径：成功路径 4 次（perceive/plan/verify/package 终局合成——执行阶段无独立 LLM 调用，Think 由 plan 承载）、最坏 11 次（含 2 轮重试各 plan/verify/reflect），单链延迟下界 ≈0.8s）+ **真实 LLM 冒烟场景**（`LLM_ENDPOINT`+`LLM_API_KEY` 双 env 门控动态 skip——from_env 的 model 永非空不可作门控；跑通即证链路兼容不设硬阈值——外部 SaaS 延迟不可控） | a) 仅 Fake 零延迟计时（弃用：计时无下界，恒真风险）；b) CI 硬性真实 LLM（弃用：外部依赖+费用+不稳定，项目豁免面惯例） | epics L1571；4-5/3-2b Fake LLM 先例；5-2 性能验收形态 |
-| DC-8 | LLM 调用配置 | **TEMPERATURE_PROFILE 五档**（perceive 0.3/plan 0.2/verify 0.1/reflect 0.4/package 终局 0.1——规划反思略高发散、验证低温确定；**无 execute 档**：执行阶段无独立 LLM 调用，Think→Code→Execute→Observe→Validate 原子循环中 Think 由 plan 产物承载）+ `_build_call_config` 完整派生 + **per-call timeout ≤8s**（全链 10s 预算内单阶段上限；禁依赖 from_env 默认 600s——辩论 12s 先例的紧缩版）+ **structured_generate 返回 isinstance 守卫**（非 Schema 实例包 444——red_blue L350-356 先例） | 统一温度（弃用：阶段语义分化是 4-5 验证过的模式）；裸 LLMConfig()（弃用：丢连接字段——B 视角调研实证契约）；execute 独立 Think 调用（弃用：与 plan 冗余——Simplicity First，DC-10 步结构已含思考产物） | red_blue L76/L490-510/L83 先例 |
+| DC-7 | P95<10s 验收口径 | **Fake LLM 延迟模拟为主口径**（每调用注入 200ms 级模拟延迟——仓内 Fake 延迟先例 0.01-0.3s 区间内，计时有真实下界；**LLM 调用数双层口径**：工作流服务级 = 成功路径 4 次（perceive/plan/verify/package 终局合成——工作流服务无 execute 档）、最坏 11 次（含 2 轮重试各 plan/verify/reflect）；**工具链级另计** = 每工具步 ≥2 次 `generate`（引擎 Think/Validate——Fake 延迟须注入工具链 LLM 面同款，单链下界 = 4×0.2 + 工具步数×2×档值））+ **真实 LLM 冒烟场景**（`LLM_ENDPOINT`+`LLM_API_KEY` 双 env 门控动态 skip——from_env 的 model 永非空不可作门控；跑通即证链路兼容不设硬阈值——外部 SaaS 延迟不可控） | a) 仅 Fake 零延迟计时（弃用：计时无下界，恒真风险）；b) CI 硬性真实 LLM（弃用：外部依赖+费用+不稳定，项目豁免面惯例） | epics L1571；4-5/3-2b Fake LLM 先例；5-2 性能验收形态；tool_execution_engine Think/Validate generate 实证 |
+| DC-8 | LLM 调用配置 | **TEMPERATURE_PROFILE 五档**（perceive 0.3/plan 0.2/verify 0.1/reflect 0.4/package 终局 0.1——规划反思略高发散、验证低温确定；**无 execute 档**：工作流服务 execute 阶段无独立 LLM 调用——原子循环的 Think 由 plan 产物承载；**注意工具执行链内部的 Think/Code/Validate 走 `generate()`**（引擎端口映射）属工具链行为非工作流温度档管辖，其 LLM 面替身见测试隔离约束①）+ `_build_call_config` 完整派生 + **per-call timeout ≤8s**（全链 10s 预算内单阶段上限；禁依赖 from_env 默认 600s——辩论 12s 先例的紧缩版）+ **structured_generate 返回 isinstance 守卫**（非 Schema 实例包 444——red_blue L350-356 先例） | 统一温度（弃用：阶段语义分化是 4-5 验证过的模式）；裸 LLMConfig()（弃用：丢连接字段——B 视角调研实证契约）；execute 独立 Think 调用（弃用：与 plan 冗余——Simplicity First，DC-10 步结构已含思考产物） | red_blue L76/L490-510/L83 先例；tool_execution_engine.py 文件头端口映射 |
 | DC-9 | session_storage 与九步可选步处置 | **续期 defer**：`session_storage`（deferred-work L130 原触发=5.3）续期至多轮会话需求 Story（5-4+）——MVP 单次 CLI 调用内会话闭合，无跨调用状态需求；**九步中的可选步不实现**：深度思考（L297 并行多路径——9-8 域）/演化（L301——V1）；初始化（L293）内化为用例前置（档案加载+装配即初始化） | 激活 session_storage（弃用：YAGNI——无消费方）；实现深度思考（弃用：epics AC 未要求，属 9-8 深度推演域） | epics AC 六阶段口径；Simplicity First |
 | DC-10 | 工具选择机制 | **规划阶段 LLM 自主选择**（PlanSchema 含 `selected_tools: list[NonEmptyStr]` 与步结构 `steps: list[PlanStep{description, tool_name, arguments: dict}]`——从 system_prompt 的 L1 视图自判，interface-design §5.6 Step5「description 即触发器」）；执行阶段按规划顺序逐工具：**名字→实体经 `tool_registry_service.get_tool(tool_name=)`**（取 tool_id——ToolMetadata 无 tool_id 字段，注册端口现成 `tool_id/tool_name` 二选一查询）→ `tool_execution_service.execute(tool_id, ToolCall, ExecutionContext)`（tenant_id 自 WorkflowContext——MVP 固定单租户 UUID 常量，Agent 实体无租户字段）；**不建** SkillSelector 排序/Top-K（5-2 DC-4 已废弃该口径） | 关键词预筛 + LLM 复核（弃用：双阶段复杂度，L1 全量 23 条注入后 LLM 自判足够——P5 Less scaffolding）；MVP 空 arguments 起步（弃用：PlanSchema 结构化步已含 arguments 字段，Schema 驱动零额外成本） | interface-design §5.5/§5.6；tool_registry_service.py get_tool 签名；GAP-CRITICAL-08b 哲学 |
 | DC-11 | 引擎结果取回通道 | **`AgentEnginePort` 追加 `get_graph_result(graph_run_id) -> dict[str, Any] \| None`**（既有端口扩展：现端口仅 submit→str + status→FlowStatus，ainvoke 终态 state 只进 AgentDecided 后即丢弃——用例/CLI 的 AgentWorkflowResult 与摘要输出在端口面无数据来源；引擎 `_runs` 同步存终态 state；未知/过期 id 返回 None——与 get_graph_status 的 FAILED 默认语义区分）；**decision_result 投影仅新图路径**（五键纯标量投影，VO 禁入 dict——JSON 序列化炸，4-5 教训；BasicAgent 保持 state 全量透传零回归）；同步 `submit_graph` 异常 DomainError 透传（444/445 原样上抛——现 RuntimeError 改写致 CLI 编码断言不可达） | a) submit_graph 改返回结构化结果（弃用：改既有签名破坏 1.18b 契约与全调用方）；b) 用例订阅 AgentDecided 事件取数（弃用：事件是通知非数据通道，decision_result 仅投影摘要非全量）；c) 维持现状用例组装（弃用：无数据源——P0 级缺口） | agent_engine.py L13-42；langgraph_engine.py L74-79 异常包装位/L140-163 发布位；模板「禁止同义接口重复定义」——本扩展非新建端口是登记过的契约变更 |
-| DC-12 | CLI 成功路径验收替身 | **进程内 main() + 测试序三件套**：①`bootstrap()` 一次 → ②**覆写两步** `unregister("llm_client")` + `register_port(Fake LLM spec)`（同名**异 spec** 直接 register 抛 ConflictError——registry L80-87，覆写必须两步）→ ③`main(["run-task", ...])`（**run-task 子命令 bootstrap 幂等守卫**——关键端口已存在即跳过重放，否则 main 内二次 bootstrap 以真实 spec 重注册 llm_client 再抛 ConflictError，三方互拆）。端口覆写非 mock——LLM 外部 SaaS 豁免面在 CLI 链路的落地（组合根 llm_client 注册真实 LitellmLLMClient 无替身开关，CLI 成功路径必触 LLM；5-2 load-profile 不触 LLM 无此问题，本 Story 首次定义）；CLI 子进程形态仅守卫路径（443/441/201/参数错误——不触 LLM 可无条件跑） | a) env 门控动态 skip（弃用为主口径：无 LLM 环境下 CLI 成功路径零覆盖——降级备选，真实 LLM 冒烟场景已承载）；b) 组合根加 SISYS_FAKE_LLM 测试钩子（弃用：生产代码侵入面大，端口覆写在测试侧达成同效）；c) 直接 register 同名（弃用：异 spec 抛 ConflictError——实测不可达） | agent_cli.py main 形态；组合根 llm_client 注册 L2004-2013；registry register/ConflictError L80-87；bootstrap 幂等守卫改造项（Task 6 绿） |
+| DC-12 | CLI 成功路径验收替身 | **进程内 main() + 测试序四件套**：⓪ **`get_resolver().clear_singleton()`**（实例缓存驱逐——resolver `_create_instance` 缓存键=port name 且 `unregister` 只删 spec **不驱逐 `_instances`**（resolver.py L181-184 实证）：不先清缓存则两步覆写后 `resolve("llm_client")` 仍返回缓存的真实实例**静默失效**，xdist 下任何先前 resolve（如契约测试）均污染——非确定性假红/真调 LLM；clear_singleton 是唯一公开驱逐 API，全清——旧池不关的泄漏权衡注记 + 后续惰性重建）→ ① bootstrap **由 conftest `_bootstrap_once` session 级承载，场景内禁自调**（验收纪律：二次 bootstrap 因 lambda 工厂 spec 不幂等必抛 ConflictError）→ ② **覆写两步** `unregister("llm_client")` + `register_port(Fake LLM spec)`（同名异 spec 直接 register 抛 ConflictError——registry L80-87）→ ③ `main(["run-task", ...])`（**run-task 子命令 handler 内 bootstrap 幂等守卫**（agent_cli.py L248/L284 形态——关键端口已存在即跳过重放））。**场景序约束：CLI 覆写场景先于 AC-6.1 接线场景**（接线场景 resolve 即缓存全真实链，后行 CLI 覆写失效）。端口覆写非 mock——LLM 外部 SaaS 豁免面在 CLI 链路的落地；CLI 子进程形态仅守卫路径（443/441/201/参数错误——443 守卫触 Redis get_by_id 需 Redis 门控，非无条件） | a) env 门控动态 skip（弃用为主口径：无 LLM 环境下 CLI 成功路径零覆盖——降级备选）；b) 组合根加 SISYS_FAKE_LLM 测试钩子（弃用：生产代码侵入面大）；c) 直接 register 同名（弃用：异 spec 抛 ConflictError）；d) monkeypatch resolver 属性（弃用：5-1 头注证 monkeypatch 可行但属 mock 形态——端口覆写是装配级替身更贴豁免面语义） | resolver.py `_create_instance` 缓存/clear_singleton；registry L80-87 ConflictError；agent_cli.py L248/L284 handler bootstrap 形态；tests/conftest.py `_bootstrap_once`；5-1 CLI 单测头注（无 override 公开 API） |
 
 ### 已知下游风险（本 Story 不处置，消费方 Story 决策）
 
@@ -644,8 +644,9 @@ def build_single_agent_workflow_graph(service: AgentWorkflowServicePort):
             "executed_phases": [*state.get("executed_phases", []), "reflect"],
         }
 
-    # ... plan/execute/package_evidence 适配器同款（plan→"plan"、execute→"execution"、
-    #     package_evidence→"evidence"+"chain" 产物入 state）
+    # ... plan/execute/package_evidence 适配器同款（plan→"plan"、execute→"execution"（直接写
+    #     ExecutionResult 全量——服务已聚合历史，适配器勿二次合并）、package_evidence→自 PackageOutcome
+    #     拆写 "evidence"+"chain" 产物入 state）；MAX_RETRIES = 2 为图工厂模块常量（AC-1 口径锚）
 
     graph = StateGraph(WorkflowAgentState)
     graph.add_node("perceive", _perceive_node)
@@ -684,6 +685,12 @@ def _make_fake_llm() -> AsyncMock:
         if response_schema is PlanSchema:
             return PlanSchema(steps=[PlanStep(description="...", tool_name="pestel", arguments={})], selected_tools=["pestel"])
         # ... verify(VerificationSchema)/reflect(ReflectionSchema)/终局合成(ChainOfThoughtSchema) 各一分支
+        # 注意：终局分支的 tools_used 应返回与真实轨迹【相异】的值（防 Fake 回声——覆写制断言「tools_used==真实轨迹」
+        # 在 Fake 回声时退化为恒真；相异值 + 覆写后相等 = 判别力实证）。工具链 generate() 面另行分派（prompt 前缀——
+        # 返回合法 LLMResponse，见隔离约束①）。
+    async def _generate(prompt, config=None, system_prompt=None):  # 工具链 Think/Validate 面
+        return LLMResponse(content="...", ...)
+    fake.generate.side_effect = _generate
     fake.structured_generate.side_effect = _structured_generate
     return fake
 ```
@@ -903,6 +910,26 @@ tests/
 
 **Round 2 推演留痕（排除的疑点）**：最坏路径全推演（executed_phases=14 元素/retry_count 终值 3/LLM 调用 11 次/组装齐备）自洽；第四路径 status 语义已闭合；成功路径终局合成数据齐备；plan/verification 键覆盖是正确行为（终局读末值）；VO 直读机制自洽（InMemorySaver 无序列化）；五 Schema 身份分派前提成立；ExecutionContext 仅 tenant_id 必填（其余有默认——候选缺口证伪）；DC-8 五档 ≥ 成功路径 4 档不矛盾；「未耗尽早退 vs 耗尽」在 evidence 面由 retry_count 可推断（AC 未要求区分，不立发现）。
 
+**Round 3（v1.2.0→v1.3.0）：场景级可满足性深度推演（18 场景三轴：前置可达/期望唯一可写/环境可观测）——2 P1 + 5 P2 + 6 P3，13 修复**
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R3-F1 | P1 | **工具链 LLM 面未纳入替身边界**：引擎 Think/Code/Validate 每工具步 ≥2 次 `generate`（tool_execution_engine 端口映射实证）、ValidationFeedbackService 亦注入 llm_client——e2e 先例 mock 了 SandboxExecutor 与 LLMClient **两项**，Story 只抄沙箱面；组合根 resolve 装配则链内真实 LitellmLLMClient 必打外网；DC-7 调用数/延迟档口径全漏计工具链；Fake 的 `generate()` 面未设计（Schema 身份分派不覆盖） | 隔离约束①重写：手工装配链（build_tool_execution_chain 同款 + **Fake llm_client 注入链内**）+ generate 面 Fake（prompt 前缀分派返回合法 LLMResponse）+ 零工具步备选；DC-7 双层调用口径；DC-8 工具链行为注记；Fake 示例补 generate 分支 |
+| R3-F2 | P1 | **resolver 实例缓存盲区**：`_create_instance` 缓存键=port name 且 `unregister` 不驱逐 `_instances`（resolver.py L181-184 实证）——DC-12 两步覆写后 resolve 仍返回缓存真实实例**静默失效**；xdist 下任何先前 resolve 污染（非确定性假红/真调 LLM） | DC-12 升级四件套：第 0 步 `clear_singleton()`（唯一公开驱逐 API + 泄漏权衡注记）+ 场景序约束（CLI 覆写先于接线场景）+ 5-1 头注佐证 |
+| R3-F3 | P2 | AC-5×3 验收场景无实现归属（Task 7 红只写集成文件）；两文件重复计时风险 | Task 7 补「验收 AC-5×3 步骤实现 + 共享计时 helper（禁 20 采样双跑）」 |
+| R3-F4 | P2 | 验收事件捕获注入缝隙未定义（AC-1 场景 4/AC-6 场景 2 需 recording publisher） | 隔离约束补：手工装配 `LangGraphEngine(config, event_publisher=_RecordingEventPublisher)`（构造注入位实证可行）+ Subtask 0.6 分档表登记 |
+| R3-F5 | P2 | decision_result 投影 workflow_status 取值源未定义（第四轨——R2-F7 修了 DTO 三轨漏了事件投影） | Task 5 绿投影补 `workflow_status = state["evidence"].status` |
+| R3-F6 | P2 | BDD 约束节与隔离约束节仍为 R1 单步旧表述（R2-F3 只改了 DC-12 表——传播漏网） | 两节改为「DC-12 四件套概述 + 以 DC-12 决策表为唯一真源」 |
+| R3-F7 | P2 | DC-12 步①「bootstrap() 一次」与验收纪律冲突（conftest `_bootstrap_once` 已 session 级引导，场景内自调必炸 ConflictError） | 步①注记「由 conftest 承载，场景内禁自调」 |
+| R3-F8 | P3 | tools_used 覆写断言 Fake 回声恒真风险 | Fake 示例注记「终局分支返回与真实轨迹相异的值」 |
+| R3-F9 | P3 | AC-4×3 验收与 Task 2 单测重复、零集成价值 | AC-4 注记「保留为验收 tripwire（5-2 AC-6.2 先例）」 |
+| R3-F10 | P3 | execution 双重聚合误读（服务已聚合 + 适配器再合并） | 代码示例注记「适配器直接写全量，勿二次合并」 |
+| R3-F11 | P3 | MAX_RETRIES 常量落位未定义 | 图工厂模块常量注记（AC-1 口径锚） |
+| R3-F12 | P3 | 「main() 内置 bootstrap」表述不精确（实在子命令 handler L248/L284） | DC-12 精确化为 handler 位 |
+| R3-F13 | P3 | CLI 子进程守卫路径「不触 LLM 可无条件跑」过强（443 守卫触 Redis get_by_id） | DC-12 补 Redis 门控注记 |
+
+**Round 3 场景推演结论（18 场景三轴）**：✅ 可满足 8（AC-1 场景1/AC-2×2/AC-3 场景1/AC-4×3/AC-6 接线/收尾）；⚠️ 需注记 8（AC-1 场景2/3 受 R3-F1 波及、场景4 受 R3-F4、AC-3 场景2 受 R3-F1、AC-5×3 受 R3-F1/F3、AC-6 场景2 受 R3-F4/F5——全部随本轮修复闭合）；❌ 不可满足 1（AC-6 CLI 全链——R3-F1/F2/F6/F7 四重叠加，随本轮修复转可达）。**推演留痕（排除疑点）**：四路径终局 state 产物齐备（PackageOutcome 拆写后）；execution 聚合分工闭合；revised_plan 回灌×PlanSchema 不变量一致；七 dataclass 依赖方向合法（application 引 domain VO）；两种 Fake 形态文档已区分；DualChannelEventBus 构造零网络连接（惰性）——CLI 守卫 resolve 链可行。
+
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 > （实施后由 code-review 工作流填写。）
@@ -916,7 +943,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-10-19
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -924,3 +951,4 @@ tests/
 - v1.0.1: 核销触发项核查勘误（deferred-work 全量 grep 对照）——补录 R1-DF3（性能计时口径，deferred-work L180，原遗漏项）：处置表新增行 + Task 7 场景⑤真实发布链路单次时序验证（resolve 真实 event_publisher + PG outbox 落行断言，PG 门控 skip）+ 场景①②发布面口径差声明；五项 5.3 触发 deferred 项全数落实分流
 - v1.1.0: 文档审查周期 Round 1 系统修订（四视角代码调研 + 双视角审查：3 P0 + 10 P1 + 14 P2 + 18 P3，45 修复）——P0：节点适配器模式定稿（LangGraph 节点契约 + 谓词键↔写入者对照表——DC-1）/ AgentEnginePort.get_graph_result 结果取回扩展（DC-11）/ heartbeat 档案不入 prompt 裁决（DC-3）；P1 要点：引擎 DomainError 透传（444 端到端可达）/ execute 阶段级聚合 + tool_registry_service 名字→实体映射（DC-10）/ 思维链组装覆写+终局单次合成定稿（DC-2）/ 冒烟 skip 双 env 门控（from_env model 恒真陷阱）/ CLI 成功路径端口覆写替身（DC-12）/ 工具沙箱替身边界 / retry 语义精确化（reflect 递增 + `<=` 谓词，plan ≤3 次）+ 第四路径 revised=False 早退 / 事实修正（ToolMetadata 18 字段 / CJK 计量先例 domain `_estimate_chars_tokens` L408-425 / loader L174-246 / 行号组 4 处）
 - v1.2.0: Round 2 回归核查轮（R1 传播完备性核验零残留 + 新引入 8 组行号实测全准；组合交互面推演：3 P1 互拆 + 5 P2 + 7 P3，15 修复）——PackageOutcome 复合产物（chain 传输通道）/ DTO 增补 executed_phases 第五字段 / DC-12 测试序三件套（bootstrap 幂等守卫 + unregister+register 两步覆写）/ revised_plan 回灌 + execution 轨迹历史聚合（反思-重试闭环信息流）/ 445 三层校验次序（242→445 改写）/ workflow_status 同源 evidence.status / 序列 Fake 形态 / WorkflowContext 五字段定稿 / str(agent_id) 序列化约定
+- v1.3.0: Round 3 场景级可满足性深度推演（18 场景三轴：前置可达/期望唯一可写/环境可观测——2 P1 + 5 P2 + 6 P3，13 修复）——**工具链 LLM 面纳入替身边界**（引擎 Think/Validate 每工具步 ≥2 次 generate 实证、e2e 先例双 mock 只被抄了一半、DC-7 双层调用口径、Fake generate 面设计）/ **resolver 实例缓存盲区**（unregister 不驱逐 _instances——DC-12 升级四件套：clear_singleton 第 0 步 + 场景序约束）/ AC-5×3 验收归属（共享计时 helper）/ 验收事件捕获注入缝隙（手工装配引擎构造位）/ decision_result 投影第四轨同源 / BDD 与隔离节同步 DC-12 / bootstrap 由 conftest 承载注记 / Fake 回声防恒真 / AC-4 tripwire 定位
