@@ -147,7 +147,9 @@ class MarkdownAgentProfileLoader(AgentProfileLoader):
             path: 档案绝对路径
 
         Returns:
-            str: configs/agents/profiles/{role}/{file} 相对形态
+            str: profiles/{role}/{file} 相对形态（marker 截断自最后一个
+            profiles 路径段起——不含 configs/agents/ 前缀；路径无 profiles
+            段时退化为文件名——R3-F3 勘正）
         """
         parts = path.parts
         marker = "profiles"

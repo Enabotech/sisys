@@ -139,6 +139,9 @@ class TestFileMissing:
             await _load(loader)
         assert exc_info.value.code == "EXCEPTION_442"
         assert "IDENTITY.md" in exc_info.value.context.get("profile_path", "")
+        assert "缺失" in exc_info.value.context.get("reason", ""), (
+            "stat 分支 reason 锚定（与 read 分支精确匹配断言互补成对——R3-F1）"
+        )
 
 
 # ===================================================================

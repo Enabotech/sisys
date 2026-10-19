@@ -121,6 +121,10 @@ class LoadAgentProfileUseCase:
             AgentRoleNotSupportedError: EXCEPTION_441——实体角色不在
                 SUPPORTED_ROLES（MVP 仅 CEO）
             AgentProfileError: EXCEPTION_442——档案加载失败（加载器传播）
+            SkillNotFoundError: EXCEPTION_387——L1 组装失败（TOOLS.md L1 索引
+                与 skill_manifest 漂移、或 TOOLS.md 不可读被降级回退空索引时，
+                枚举 slug 查元数据未命中；SkillSelector 传播不静默——Skill
+                资产缺陷归 skill 异常族，非 442 第 8 类——R3-F2）
         """
         # 1. 存在性守卫（必须最先——不存在实体的 role 无从判定）
         agent = await self._repository.get_by_id(agent_id)

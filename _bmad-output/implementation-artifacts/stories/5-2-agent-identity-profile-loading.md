@@ -795,11 +795,12 @@ class SkillSelectorPort(Protocol):
 
 ### 已知下游风险（本 Story 不处置，消费方 Story 决策）
 
-1. **启动上下文的 LLM 注入契约未定**：本 Story 交付 `AgentProfileLoadResult`（六档案 str + L1 元数据 + 计量），但「如何拼装为 LLM 系统提示」（IDENTITY/SOUL/USER 的模板化、L1 description 的注入格式、核心约束文本从哪来）属 5.3 工作流——5.3 立项时定上下文装配契约，届时可能需要本 Story 结果对象的字段演进（DTO 字段追加零成本，非端口签名变更）。**口径警示**：`startup_context_tokens` 只计 IDENTITY+SOUL+L1 拼接视图（不含 CODE/USER/MEMORY/HEARTBEAT 四档案，L1 为拼接口径 ~218 非 TOOLS.md 全文 1104）——5.3 六档案全量装配时实际上下文将显著大于该计量，装配契约订立时须重定义口径；且 `chars//4` 对中文显著低估（`_estimate_tokens` docstring 自述中文约 1.5 token/字符，估算口径 0.25 token/字符——中文内容低估可达数倍），真实 tokenizer 语义下预算偏松，5.3 注入 LLM 前需按真实 tokenizer 复算。
+1. **启动上下文的 LLM 注入契约未定**：本 Story 交付 `AgentProfileLoadResult`（六档案 str + L1 元数据 + 计量），但「如何拼装为 LLM 系统提示」（IDENTITY/SOUL/USER 的模板化、L1 description 的注入格式、核心约束文本从哪来）属 5.3 工作流——5.3 立项时定上下文装配契约，届时可能需要本 Story 结果对象的字段演进（DTO 字段追加零成本，非端口签名变更）。**口径警示**：`startup_context_tokens` 只计 IDENTITY+SOUL+L1 拼接视图（不含 CODE/USER/MEMORY/HEARTBEAT 四档案，L1 为拼接口径 ~218 非 TOOLS.md 全文 1104）——5.3 六档案全量装配时实际上下文将显著大于该计量，装配契约订立时须重定义口径；且 `chars//4` 对中文显著低估（`_estimate_tokens` docstring 自述中文约 1.5 token/字符，估算口径 0.25 token/字符——中文内容低估可达数倍），真实 tokenizer 语义下预算偏松，5.3 注入 LLM 前需按真实 tokenizer 复算。**R3 注记（CLI 标签语义，2026-10-19）**：CLI 摘要「启动上下文: N tokens」紧邻六档案清单但只计 IDENTITY+SOUL+L1（DC-3 口径②）——六档案 chars 显示与 tokens 计量两口径在输出层不可互相推导（CODE/USER/MEMORY/HEARTBEAT 显示不计入、L1 计入不显示），操作者无法从输出验证该数；5.3 装配契约重定义口径时一并处理标签语义（如「启动上下文(身份+工具)」）。
 2. **LangGraph 引擎 agent_id 双轨道**（5-1 遗留风险的 5-2 延续）：本 Story 用例以实体 agent_id 为锚（get_by_id），而 `LangGraphEngine`（langgraph_engine.py L71-72）执行时自铸 agent_id——5.3 引擎消费档案时必须收敛（复用实例化 agent_id 或桥接映射），否则 AgentProfileLoaded（实体 id）与 AgentDecided（引擎铸 id）无法按 aggregate_id 关联。
 3. **`skill_loader` SCOPED 被 SINGLETON 用例捕获**（captive dependency，5-1 D7 同款）：`InMemorySkillLoader` 无连接状态（有 L1/L2 缓存但只读复用）、L1 缓存在 `__init__` 构建——被钉住反而保证缓存跨调用复用（性能有利），但请求级 scope 启用时需改为用例内按调用解析。归 5-1 D7 留项（5.4 lifetime 语义决策回迁时一并评估）。**R1 补记（2026-10-19，架构合规调研 B-P3）**：`skill_selector`（SINGLETON，组合注入 skill_loader，组合根 L2769 附近）为第二个捕获方；`agent_profile_use_case`（SINGLETON → agent_repository SCOPED，L2790 附近）与 5-1 用例同构为第三捕获方——同归 5-1 D7 / 5.4 lifetime 决策评估清单。
 4. **MEMORY.md 系统级合并缺失**：MVP 静态种子不含任何真实记忆——5.3+ 若期望 Agent 带记忆启动，需先激活记忆链路（l0_storage impl 路径修复 + MemoryConfig from_env）并在档案加载用例中插入合并步骤（本 Story 的 loader 端口签名 `load(role, agent_id)` 不变，合并发生在用例编排层）。
 5. **档案资产的单角色覆盖**：仅 CEO 档案落地——V1 开放 CFO/CMO 等角色时需按 DC-1 路径补 `profiles/{role}/` 六件 + `configs/agents/{role}_agent.yaml`（5-1 DC-3 回填同步），`SUPPORTED_ROLES` 常量扩展（5-1 留好的单点）。
+6. **event_id 幂等去重的语义边界**（R3 推演发现，2026-10-19）：`event_id` 为 `default_factory=uuid4`——每事件实例新 id，event_id 去重仅对 transport 级 at-least-once 重投递（同一事件再送达）有效；「重复 load-profile 产等值不同 id 事件」无法按 event_id 折叠，需消费方按 (agent_id, 内容哈希) 或窗口聚合。agent_cli docstring「重复调用会重复发布……消费方可按 event_id 幂等去重」并置表述对重复调用场景过强（use_case L147-148 注释同款）——消费 Story 落地时同步修正措辞 — 触发：5.3 首个消费 Story / 5.9 漂移检测立项（消费语义订立，与 R1-DF2 同锚）。
 
 ### 设计文档偏离声明
 
@@ -1173,6 +1174,19 @@ tests/
 - [x] **R2-F5【P3】docstring 类定义不自洽**——「八类失败/边界」把正向透传项拉入失败清单且与首条 bullet 重复计数 → 改「六类失败 + 一项边界」，透传归首条 bullet。
 - [x] **R2-F6【P3】R1-F8 三查阅位未注记**——验收 pytestmark 注释块补第三行（场景级裁定说明）；Story L460 性能测试行「pytestmark 标记 benchmark」全短语替换为「benchmark（AC-5.1/5.2 场景级——R1-F8 裁定，非文件级 pytestmark）」（快评附注：必须全短语替换防自相矛盾）。
 
+#### Round 3 深度推演（2026-10-19，v1.5.0）
+
+> 单深度 Agent（D1~D6 六维推演：数据流转字段级全链/442 矩阵 7×3 穷举/六条长状态时间线/测试不可满足性/跨 Story 交互面/R1-R2 修复第三层破口）+ 快评门禁（三项微落码全过，附折行与锚对齐两条件均采纳）。**结论：零 P0/P1/P2，5 P3**（3 微落码 + 3 登记）+ **8 项证伪留痕**（SKILL.md 不触达 L1 链/strip-vs-raw 计量零差/单次调用共享 tools/CI 全 Linux 无 Windows 面/DTO 构造无失败路径/PG close 失败态安全/outbox 措辞精确/441 防御守卫健全——详见推演报告，防 R4/R5 重推）：
+>
+> - [x] **R3-F1【P3】stat 分支 reason 零断言锚定**（442 最高频成因「文件缺失」的 reason 字符串全仓零断言——重构改写文案会静默通过）→ TestFileMissing 补 `"缺失" in reason`（与 read 分支精确匹配断言互补成对——stat/read/目录三 raise 位三方锚定互斥）。
+> - [x] **R3-F2【P3】use_case Raises 契约沉默放走 387**（L1 组装失败链：TOOLS.md 降级回退空索引 → manifest 漂移 → SkillNotFoundError(387) 穿透）→ docstring Raises 补第四条（387 传播语义 + 「Skill 资产缺陷归 skill 异常族非 442 第 8 类」边界裁定；三行折行 ≤128）。
+> - [x] **R3-F3【P3】_display docstring 示例失真**（称返回 configs/agents/profiles/... 前缀，实测 marker 截断自 profiles 段起）→ 修正示例 + 兜底分支注记。
+> - [x] **R3-DF1【P3·登记】L1 组装失败根因不可观测**（387 落地无 TOOLS.md 指向——4-1a 吞错降级因 5-2 首次接线成为承载面）→ deferred-work 登记（触发=5.3 装配契约，与 R1-DF2 同锚）。
+> - [x] **R3-DF2【P3·注记】CLI「启动上下文」标签覆盖面**（两口径输出层不可互导）→ 已知下游风险 #1 追加 R3 注记（5.3 装配契约时处理标签语义）。
+> - [x] **R3-DF3【P3·登记】event_id 幂等去重语义边界**（仅 transport 级重投递有效，重复调用产等值不同 id 事件不可折叠）→ 已知下游风险 #6 新条目 + deferred 触发 5.3/5.9（与 R1-DF2 同锚；agent_cli/use_case 措辞回改提示在案）。
+>
+> 六条时间线终态关键结论：T1 重复 load 不刷新 TTL（幂等只读语义自洽）；T2 中断重试无部分状态（VO 六字段齐后一次构造）；T5 检查序 stat→size→read→decode→strip（三态实测）；T6 Ctrl-C 清理完整执行（exit 130，finally 跑完）。442 矩阵 8 格实测：#1/#2 三键全同但同语义成因（寻址路径目录不存在），判别力成立。
+
 ---
 
 ### 下一步 Next Steps
@@ -1184,7 +1198,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.4.1
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-10-15
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -1195,3 +1209,4 @@ tests/
 - v1.3.1: Round 4/5 收敛轮（R4 纯验证零发现——24 组锚点全精确/结构完整/台账存续/零游离；R5 独立终审六节双向取证判收敛——六项关键修复抽验全属实/红线全绿）——v1.3.0 P3 计数勘误（4→3，内联标注）+ 修复表 #23 + 收敛声明节落盘
 - v1.4.0: 代码审查周期 Round 1（实施提交 e6829cb1 四视角调研 + C3 双评审；零 P0/P1，4 P2 + 10 P3）——8 项落码：R1-F1 集成收尾全库 scan_iter→自产键 exists（并行组/24h TTL 残键假红根除）/R1-F2 读取阶段 OSError 用例（同名目录构造 + reason 精确断言 + 突变验证，兑现 L324 承诺）/R1-F3 裸元组断言/R1-F4 profile_path 脱敏守护断言/R1-F5 子目录缺失 reason 断言/R1-F6 CLI 摘要整行锚定/R1-F7 CLI 连接池 PG 对称清理（_close_connection_pools）/R1-F8 AC-5.1/5.2 场景级 benchmark 标记（评审裁定不打文件级）；2 P2 改判 deferred（L1 幽灵条目 4-1a 遗留 + 发布观测面归 5.3）+ 3 维持；L694/L702 scan_iter 表述勘正 + 风险#3 捕获方补记 + deferred-work 两项登记
 - v1.4.1: 代码审查周期 Round 2 回归核查（单 Agent 十面核查 + 快评门禁；R1 落码本体零回归零互拆——突变实证/标记收集实证/桩兼容实证；1 P2 + 5 P3 全为传播注记与台账编号漏网，当轮清偿）——R2-F1 DF 编号双侧统一（deferred-work DF2→DF3 勘正 + 编号锚）/R2-F2 旧名活性引用勘正（L880 模式参考 + L660 轻注记）/R2-F3 agent_cli 模块头幂等句收窄（outbox 落表事实对齐）/R2-F4 R1-F1 不回溯结论入账/R2-F5 docstring 六类失败+一项边界/R2-F6 R1-F8 三查阅位注记
+- v1.5.0: 代码审查周期 Round 3 深度推演（单深度 Agent 六维推演 + 快评门禁；零 P0/P1/P2，5 P3 + 8 项证伪留痕）——3 微落码：R3-F1 stat 分支 reason 断言锚定（与 read/目录三 raise 位三方互斥锚）/R3-F2 use_case Raises 补 387 传播契约（L1 组装失败链显式化）/R3-F3 _display docstring 示例勘正；3 登记：R3-DF1 L1 失败根因可观测（5.3 触发）/R3-DF2 CLI 标签语义注记（风险#1 追加）/R3-DF3 event_id 去重语义边界（风险#6 新条目，5.3/5.9 触发）；六条时间线终态表 + 442 矩阵 8 格实测入账
