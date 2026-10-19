@@ -1,6 +1,6 @@
 # Story 5.2: Agent 身份档案加载
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1075,6 +1075,7 @@ tests/
 
 - 2026-10-19: Story 5.2 dev-story 实施完成（Task 0-8 全绿）——领域契约（442/443 + AgentProfileLoaded + AgentProfile）、六档案资产、MarkdownAgentProfileLoader、SkillSelector（GAP-CRITICAL-08b）、LoadAgentProfileUseCase、CLI load-profile、三端口组合根注册、14 验收场景全绿、集成性能（P95<500ms 实测 ~10ms 级）、架构验证器 A-E、文档四处同步；状态 ready-for-dev → review
 - 2026-10-19: 代码审查周期 Round 1（v1.4.0）——4 视角调研（契约/架构/测试判别力/运行面实测）+ 双评审员 C3 门禁；零 P0/P1，4 P2 + 10 P3；8 项落码（R1-F1 scan 收敛 / R1-F2 read-OSError 用例+突变验证 / R1-F3 裸元组 / R1-F4 脱敏守护 / R1-F5 reason 断言 / R1-F6 整行锚定 / R1-F7 PG 对称清理 / R1-F8 场景级 benchmark）+ 2 P2 改判 deferred + 3 维持；Review Findings 台账落盘
+- 2026-10-19: 代码审查周期 Round 2~5 收敛（v1.4.1→v1.5.1）——R2 回归核查（R1 落码零回归零互拆，1 P2 + 5 P3 传播注记清偿）；R3 深度推演（6 P3：3 微落码 + 3 登记，8 项证伪留痕）；R4 纯验证（七维度零发现：全量 12373 passed + 3 预存甄别 + 三门禁绿 + 锚点存续 + 结构完整）；R5 独立终审六节全过判收敛——周期总计 26 项发现 / 17 项修复 / 6 项 deferred / 3 项维持；Status review → done
 
 ---
 
@@ -1134,6 +1135,10 @@ tests/
 
 > Story 5.2 审查周期五轮收敛：R1 文档审查 2P0+4P1+7P2+1P3（#1~14）、R2 回归核查 1P2+13P3（#15~18）、R3 深度推演 1P1+4P2+3P3（#19~22）另附 15 项证伪留痕、R4 纯验证零发现（24 组锚点抽验全精确 + 结构完整性 + 台账存续 + 游离残留零）、R5 独立终审双向取证：三个修订提交（8719b7ad/a6ffed8f/eb4e74ba）均仅含本文件且无 AI 署名；六项关键修复抽验全属实（SkillSelectorPort 四处一致、token 双口径 1104/218 与仓库实测逐字符吻合、UTF-8 两规范位、AsyncMock(EventPublisher) 先例 5-1 L264-277/L50-67 实证且「空 results」处方经 PublishResult 实现 L36-38 定谳可执行、23-tripwire 在位、Task 7 四行循环表完整）；语义层快扫零新硬伤，三处照抄先例与十余处行号锚点全部实证。**结论：收敛，保持 `ready-for-dev` 交付 `dev-story`。** 移交簿记：v1.3.0 版本行 P3 计数勘误一处（已内联标注），无阻断项。
 
+### 🏁 收敛声明（代码审查周期独立终审，2026-10-19）
+
+> Story 5.2 代码审查周期四轮收敛（R1 四视角调研+双评审 → R2 回归核查 → R3 深度推演 → R4 纯验证）+ 独立终审六节复核：周期提交闭合（72244c04/227dd2a2/b89ffc80 三修订提交 + 2 CI bot 自动提交，工作树干净零游离）；六项关键修复抽验双向属实（scan→exists 收敛、read-OSError 用例+分支可达、`_close_connection_pools` 双池对称、benchmark 恰选 2/14 实证、DF 编号双侧一一对应、Raises 四条契约）；留项 4 条核销触发全落位（5.3/5.9 均在 backlog 实证）；12 组 file:line 锚点零失实；独立实跑全绿（单元三件套 116 passed + 集成 3 passed + ruff/mypy/lint-imports 三绿 + 验收收集 14；全量 12373 passed + 3 失败经隔离复跑甄别为预存——gpu 确定性预存 2026-05-06 遗留 + docker/redis 并发抖动）；三条红线 15 文件面零命中。**周期统计：4 轮，发现 26 项**（R1：4 P2 + 10 P3；R2：1 P2 + 5 P3；R3：6 P3——原记「5 P3」系计数笔误，终审勘正；R4：0），**修复 17 项**（R1×8 + R2×6 + R3×3 落码/清偿），**deferred 6 项**（deferred-work 4 条：R1-DF1/R1-DF2 锚/R1-DF3/R3-DF1；Story 风险面 2 条：R3-DF2 注记风险#1、R3-DF3 风险#6），R1 另 3 项维持原判。**版本链 v1.3.1→v1.4.0→v1.4.1→v1.5.0→v1.5.1。结论：收敛，Status review → done。** 终审特权发现随收敛提交清偿：R3 计数勘误两处（已内联标注）。终审非阻断观察 2 项留痕：deferred-work Task 0 段 L8 触发器为描述性表述（记忆链路立项时补锚）；验收文件 `@scenario` 裸 grep 计 15（docstring 提及 +1）——场景数统计以 pytest 收集数为准。
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -1176,7 +1181,7 @@ tests/
 
 #### Round 3 深度推演（2026-10-19，v1.5.0）
 
-> 单深度 Agent（D1~D6 六维推演：数据流转字段级全链/442 矩阵 7×3 穷举/六条长状态时间线/测试不可满足性/跨 Story 交互面/R1-R2 修复第三层破口）+ 快评门禁（三项微落码全过，附折行与锚对齐两条件均采纳）。**结论：零 P0/P1/P2，5 P3**（3 微落码 + 3 登记）+ **8 项证伪留痕**（SKILL.md 不触达 L1 链/strip-vs-raw 计量零差/单次调用共享 tools/CI 全 Linux 无 Windows 面/DTO 构造无失败路径/PG close 失败态安全/outbox 措辞精确/441 防御守卫健全——详见推演报告，防 R4/R5 重推）：
+> 单深度 Agent（D1~D6 六维推演：数据流转字段级全链/442 矩阵 7×3 穷举/六条长状态时间线/测试不可满足性/跨 Story 交互面/R1-R2 修复第三层破口）+ 快评门禁（三项微落码全过，附折行与锚对齐两条件均采纳）。**结论：零 P0/P1/P2，6 P3**（终审勘误：原记「5 P3」系计数笔误——3 微落码 + 3 登记 = 6）+ **8 项证伪留痕**（SKILL.md 不触达 L1 链/strip-vs-raw 计量零差/单次调用共享 tools/CI 全 Linux 无 Windows 面/DTO 构造无失败路径/PG close 失败态安全/outbox 措辞精确/441 防御守卫健全——详见推演报告，防 R4/R5 重推）：
 >
 > - [x] **R3-F1【P3】stat 分支 reason 零断言锚定**（442 最高频成因「文件缺失」的 reason 字符串全仓零断言——重构改写文案会静默通过）→ TestFileMissing 补 `"缺失" in reason`（与 read 分支精确匹配断言互补成对——stat/read/目录三 raise 位三方锚定互斥）。
 > - [x] **R3-F2【P3】use_case Raises 契约沉默放走 387**（L1 组装失败链：TOOLS.md 降级回退空索引 → manifest 漂移 → SkillNotFoundError(387) 穿透）→ docstring Raises 补第四条（387 传播语义 + 「Skill 资产缺陷归 skill 异常族非 442 第 8 类」边界裁定；三行折行 ≤128）。
@@ -1192,13 +1197,13 @@ tests/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（从 Task 0 开始）
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施（从 Task 0 开始）——已完成（2026-10-19，提交 e6829cb1）：Task 0-8 全绿（44 文件 +4164/-156），Status → review
+- [x] 运行 `code-review` 进行代码审查——已完成（2026-10-19，代码审查周期四轮收敛 + 独立终审判收敛）：R1 四视角调研+双评审（8 落码+2 改判）→ R2 回归核查（R1 落码零回归，6 项传播清偿）→ R3 深度推演（6 P3：3 微落码+3 登记，另 8 项证伪留痕）→ R4 纯验证（七维度零发现）→ R5 独立终审六节全过；版本链 v1.3.1→v1.5.1，Status → done
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.5.1
 **创建日期/Created:** 2026-10-15
 **最后更新/Last Updated:** 2026-10-19
 **更新说明/Description:**
@@ -1209,4 +1214,5 @@ tests/
 - v1.3.1: Round 4/5 收敛轮（R4 纯验证零发现——24 组锚点全精确/结构完整/台账存续/零游离；R5 独立终审六节双向取证判收敛——六项关键修复抽验全属实/红线全绿）——v1.3.0 P3 计数勘误（4→3，内联标注）+ 修复表 #23 + 收敛声明节落盘
 - v1.4.0: 代码审查周期 Round 1（实施提交 e6829cb1 四视角调研 + C3 双评审；零 P0/P1，4 P2 + 10 P3）——8 项落码：R1-F1 集成收尾全库 scan_iter→自产键 exists（并行组/24h TTL 残键假红根除）/R1-F2 读取阶段 OSError 用例（同名目录构造 + reason 精确断言 + 突变验证，兑现 L324 承诺）/R1-F3 裸元组断言/R1-F4 profile_path 脱敏守护断言/R1-F5 子目录缺失 reason 断言/R1-F6 CLI 摘要整行锚定/R1-F7 CLI 连接池 PG 对称清理（_close_connection_pools）/R1-F8 AC-5.1/5.2 场景级 benchmark 标记（评审裁定不打文件级）；2 P2 改判 deferred（L1 幽灵条目 4-1a 遗留 + 发布观测面归 5.3）+ 3 维持；L694/L702 scan_iter 表述勘正 + 风险#3 捕获方补记 + deferred-work 两项登记
 - v1.4.1: 代码审查周期 Round 2 回归核查（单 Agent 十面核查 + 快评门禁；R1 落码本体零回归零互拆——突变实证/标记收集实证/桩兼容实证；1 P2 + 5 P3 全为传播注记与台账编号漏网，当轮清偿）——R2-F1 DF 编号双侧统一（deferred-work DF2→DF3 勘正 + 编号锚）/R2-F2 旧名活性引用勘正（L880 模式参考 + L660 轻注记）/R2-F3 agent_cli 模块头幂等句收窄（outbox 落表事实对齐）/R2-F4 R1-F1 不回溯结论入账/R2-F5 docstring 六类失败+一项边界/R2-F6 R1-F8 三查阅位注记
-- v1.5.0: 代码审查周期 Round 3 深度推演（单深度 Agent 六维推演 + 快评门禁；零 P0/P1/P2，5 P3 + 8 项证伪留痕）——3 微落码：R3-F1 stat 分支 reason 断言锚定（与 read/目录三 raise 位三方互斥锚）/R3-F2 use_case Raises 补 387 传播契约（L1 组装失败链显式化）/R3-F3 _display docstring 示例勘正；3 登记：R3-DF1 L1 失败根因可观测（5.3 触发）/R3-DF2 CLI 标签语义注记（风险#1 追加）/R3-DF3 event_id 去重语义边界（风险#6 新条目，5.3/5.9 触发）；六条时间线终态表 + 442 矩阵 8 格实测入账
+- v1.5.0: 代码审查周期 Round 3 深度推演（单深度 Agent 六维推演 + 快评门禁；零 P0/P1/P2，6 P3【终审勘误：原记 5 系计数笔误】 + 8 项证伪留痕）——3 微落码：R3-F1 stat 分支 reason 断言锚定（与 read/目录三 raise 位三方互斥锚）/R3-F2 use_case Raises 补 387 传播契约（L1 组装失败链显式化）/R3-F3 _display docstring 示例勘正；3 登记：R3-DF1 L1 失败根因可观测（5.3 触发）/R3-DF2 CLI 标签语义注记（风险#1 追加）/R3-DF3 event_id 去重语义边界（风险#6 新条目，5.3/5.9 触发）；六条时间线终态表 + 442 矩阵 8 格实测入账
+- v1.5.1: 代码审查周期 R4 纯验证 + R5 独立终审判收敛（六节取证全过：周期闭合/关键修复抽验 6/6/留项台账/12 组锚点零失实/门禁与测试独立全绿/红线零命中）——R3 计数勘误两处（5 P3→6 P3 内联标注）；收敛声明节落盘；Next Steps 双框勾选；Status review → done（sprint-status 同步）

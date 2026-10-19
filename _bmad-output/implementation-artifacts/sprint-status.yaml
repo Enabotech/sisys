@@ -157,7 +157,7 @@ development_status:
   # ===========================================================================
   epic-5: in-progress
   5-1-ceo-agent-instantiation-mvp: done
-  5-2-agent-identity-profile-loading: review
+  5-2-agent-identity-profile-loading: done
   5-3-single-agent-workflow: backlog
   5-4-eip-basic-elastic-isolation: backlog
   5-5-agent-triple-hard-isolation: backlog
