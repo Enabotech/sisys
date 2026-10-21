@@ -188,3 +188,4 @@
 - 【R1-DF2·P2】谓词键可经 parameters 预设（外部可控内部控制流初值）— 引擎 ainvoke 将 parameters 原样作初始 state，外部可预设 retry_count/executed_phases 初值（用例链路只传 agent_id/task/context 三键不触发；orchestration_service API 面直通）— 核销触发：7-2 REST 入口立项时初始 state 键白名单过滤
 - 【R1-DF3·P3】ChainOfThoughtSchema.input_summary 必填与「系统覆写」语义冗余 — R1-F8 采用文案修正（最小面），Schema 给 default（回声面字段值不被消费）为更根治形态 — 核销触发：下次 Schema 演进（联动既有 5 测试面）
 - 【R1-DF4·P3】测试基建耗时债：session autouse bootstrap() 7.35s×worker（D13 既有登记的 pytest 形态）— 纯 domain/SAP 单测 worker 被强制付组合根全量注册成本；本 Story 测试自身执行全亚秒（D 视角实证），耗时大头为共享基建 — 核销触发：组合根瘦身（D13 架构级决策）或 conftest 按需 bootstrap 分层（影响全仓测试，需专项评估）
+- 【R3-DF1·P3】终局合成多轮反思素材截断 — package 阶段终局 prompt 的 reflection 素材仅取 state["reflection"]（末次 reflect 产物），两轮重试时间线中第 1 轮的 error_analysis/revised_plan 不进终局 prompt（「历经 N 次重试」描述与单轮素材不完全对应——素材真实无虚构，属总结素材不完整的简化面）；完整化需 reflection 历史聚合设计（state 键扩展或服务侧聚合） — 核销触发：反思轮信息流扩展时（与 R1-DF1 工具选择韧性同 Story 评估）

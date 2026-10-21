@@ -807,6 +807,29 @@ class TestStructuredGenerateAnthropicChannel:
         )
 
     @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_anthropic_flat_schema_also_via_tools_channel(
+        self, mock_acompletion: MagicMock, client: LitellmLLMClient
+    ) -> None:
+        """扁平 Schema 同走 tools 通道（R3-N5 补位——机制形态无关性单测锚）。
+
+        tools 传法 parameters=Schema.model_json_schema() 原样直传，扁平=简单
+        object 与嵌套同机制；真实端点背书见集成场景④（Perception/
+        ChainOfThoughtSchema 扁平 Schema 真实调用通过）。
+        """
+
+        class FlatSchema(BaseModel):
+            summary: str = Field(min_length=1)
+
+        mock_acompletion.return_value = _make_tool_call_response(json.dumps({"summary": "扁平摘要"}))
+
+        result = await client.structured_generate("感知任务", response_schema=FlatSchema, config=_make_anthropic_config())
+
+        kwargs = mock_acompletion.call_args.kwargs
+        assert "response_format" not in kwargs
+        assert kwargs["tools"][0]["function"]["name"] == "FlatSchema"
+        assert result.summary == "扁平摘要"
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
     async def test_openai_keeps_response_format_channel(self, mock_acompletion: MagicMock, client: LitellmLLMClient) -> None:
         """openai 通道零回归：保持 response_format=json_schema 传法（原生直传无缺陷）。"""
         plan = _make_nested_pydantic_schema()

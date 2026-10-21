@@ -28,11 +28,11 @@ class ToolExecutionEnginePort(Protocol):
     实现位于 src/application/services/tool_execution_engine.py
 
     五阶段工作流：
-    - Think: LLMClientPort.structured_generate
-    - Code: LLMClientPort.structured_generate
+    - Think: LLMClientPort.generate
+    - Code: LLMClientPort.generate
     - Execute: SandboxExecutor.execute_code
     - Observe: SandboxExecutor.execute_code
-    - Validate: LLMClientPort.structured_generate
+    - Validate: LLMClientPort.generate
     """
 
     async def execute(

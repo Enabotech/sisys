@@ -1036,7 +1036,7 @@ tests（追加/同步 4）：
 | R1-F1 | P1 | 终局合成 prompt 缺反思阶段素材——build_final_synthesis_prompt 仅传四参，reflection（error_analysis/revised_plan）与 retry_count 未传入；重试耗尽路径 LLM 被要求「总结修正过程」却无素材，逼 LLM 虚构（违 CORE_CONSTRAINTS「不得虚构数据」）；**C3 评审连带发现**：验收 `then_retry_plan_prompt_contains_revision` 断言已空心化（「规划 in system_prompt」对全部调用恒真 + OR 兜底「修正」是终局模板静态文本——R2-F4 注入断裂时仍绿） | prompts 增 `reflection_summary`/`retry_count` 默认参数（条件渲染分节）+ service 自 state 取 reflection 传入；验收锚改按 PlanSchema 身份选第 2 次调用 + Fake 产物精确串断言（删 OR 兜底）；新增单测（重试素材注入 + 成功路径无分节） |
 | R1-F2 | P1 | 验收 AC-3.2 跨轮轨迹断言恒真（`len(trace)>=0`）+ 同源弱断言——「键覆盖丢前轮轨迹即红」在验收面失守 | `isinstance(trace, tuple)` + 同源派生 `len(trace) >= plan_count`（3 轮 plan×1 工具步实测准确） |
 | R1-F3 | P1 | `test_arch_agent_workflow.py` 两处 `# noqa: F401`——违 CLAUDE.md 红线（Dev 记录 Task 9「零抑制注释」声明失实） | 改 `assert issubclass(SAPMessage, pydantic.BaseModel)`（判别力增强——「退化为 dataclass」变异可红） |
-| R1-F4 | P2 | 引擎 agent_id 收敛位裸 `uuid.UUID()` 在异常保护区外——畸形串 ValueError/UUID 实例 AttributeError 逃逸统一异常体系（orchestration_service API 直通面可触发）；空串静默回退自铸（实体 id 断链复发）；异常路径不写 _runs 且不调 _cleanup_runs（连续失败 _runs 无界增长） | 守卫移入保护区前段：非 str/空串/畸形串 → ValidationError(201)（复用既有异常零新增）；None/缺失回退自铸保 BasicAgent 兼容（存量零回归——参数化 5 形态测试）；DomainError/RuntimeError 分支补 `_cleanup_runs()` |
+| R1-F4 | P2 | 引擎 agent_id 收敛位裸 `uuid.UUID()` 在异常保护区外——畸形串 ValueError/UUID 实例 AttributeError 逃逸统一异常体系（orchestration_service 直通面可触发——R3 勘误注记：该面当前无 HTTP 路由暴露，为 7-2 潜在面）；空串静默回退自铸（实体 id 断链复发）；异常路径不写 _runs 且不调 _cleanup_runs（连续失败 _runs 无界增长） | 守卫移入保护区前段：非 str/空串/畸形串 → ValidationError(201)（复用既有异常零新增）；None/缺失回退自铸保 BasicAgent 兼容（存量零回归——参数化 5 形态测试）；DomainError/RuntimeError 分支补 `_cleanup_runs()` |
 | R1-F5 | P2 | File List 漏报 6 变更文件（含 litellm_llm_client.py 生产代码行为变更——回归面追溯断点） | File List 补录（src 1 + tests 3 + 配置 2，注记行为变更性质） |
 | R1-F6 | P2 | conftest litellm worker patch 无版本守卫——litellm 升级改名即 pytest 收集期全军覆没 | `hasattr` 存在性守卫 + `warnings.warn(RuntimeWarning)` 显式可观测（禁静默——静默即掩盖） |
 | R1-F7 | P2 | `_structured_call` 444 包装恒 `agent_id=""`——异常契约 {agent_id, phase, reason} 三键在全部 LLM 失败面缺锚（DC-5 agent_id 关联目标削弱） | 增 agent_id 参数（调用面 5 处——execute 无 LLM 调用）+ 参数化 5 阶段 444 context 断言（防漏位） |
@@ -1056,6 +1056,19 @@ tests（追加/同步 4）：
 | R2-F2 | P3 | AgentWorkflowError docstring「现引擎对 ainvoke 任意异常包 RuntimeError」失实——描述的是 Task 5 改造前状态（透传已落地） | 改过去时态 + 已闭合注记 |
 
 **Round 2 核查结论（核查①+ 主会话全量）**：12 项 R1 修复 + 10 处 mypy 修复逐项 PASS（4 项 note：验收/集成 Fake 的 error_analysis 文本前缀差——判别力不受影响；场景③ delay_sec 硬编码微瑕；F4 测试第二断言对 fresh engine 冗余——判别力由主断言承载；台账「3 新单测」口径实为 2+1 锚重写）；传播完备性差集仅 R2-F1 一处；组合交互面（F1×F8×既有断言/F4×存量/F9×场景断言/F12 spec×挂载）全 PASS。**全量回归（-n 8，28:53）：12685 passed + 37 skipped + 19 failed（环境性能类预存——三轮甄别：可见失败全为 ocr benchmark/qdrant 延迟/hybrid/docker sandbox 族与本 Story 改动面零交集；本 Story 三文件隔离复跑 70 passed 全绿；qdrant 失败项隔离复跑 1 passed 抖动实锤）**。
+
+**Round 3（2026-10-21）：深度推演轮——六时间线/F1-F12 修复面边界/litellm 双通道消费方/台账终态一致性，零 P0-P2 + 6 P3（5 清偿 1 登记）**
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R3-N1 | P3 | 多轮反思素材截断：终局 prompt 反思素材仅取末次 reflect 产物（两轮重试的第 1 轮素材不进 prompt——素材真实无虚构，总结不完整的简化面） | **deferred 登记 R3-DF1**（reflection 历史聚合设计归后续） |
+| R3-N2 | P3 | 集成 Fake `_tool_llm_call_count` 死属性（赋值后全仓零消费——调用数锁实际用 mock 内建 call_count） | 删除（2 行） |
+| R3-N3 | P3 | tool_execution_engine 三层 docstring 声称 Think/Code/Validate 走 structured_generate，实现实为 generate（预存 doc rot——后续照 docstring 写替身会 mock 错方法） | 勘误清零（4 文件位 grep 零残留） |
+| R3-N4 | P3 | 台账 R1-F4「API 直通面可触发」措辞超前（orchestration_service 当前无 HTTP 路由——7-2 潜在面） | R1-F4 表行内联勘误注记 |
+| R3-N5 | P3 | anthropic tools 通道单测全用嵌套 Schema，扁平形态缺席（机制形态无关性无单测锚） | 补扁平 Schema 单测（FlatSchema tools 通道 + tool_use 解析） |
+| R3-N6 | P3 | litellm docstring「标准 tool 格式两通道均实证可靠」与场景④「嵌套 Schema 服务端 500」单读歧义（传输层可靠 ≠ 嵌套可用） | docstring 补运维注记（嵌套在 anthropic 端点需服务端修复或切 openai 兼容端点） |
+
+**Round 3 推演结论**：六条时间线（一次通过/fail_once/恒失败耗尽/revised=False 早退/package 444 熔断/execute 380 穿透）逐字段推演与测试断言零冲突——a-d 四路径被图/引擎/验收断言钉死，e/f（异常熔断）为结构性保证（无终态可残留、`_runs=(FAILED,None)` 自洽、事件不发布、DomainError 透传致 CLI 编码可达——live 实证）；R1 修复新行为面边界（F4/201→HTTP_400 映射、F1 时序 plan 不覆盖 reflection 键、F9 零绝对耗时依赖、F12 未知图名回退不误投影）全 PASS；litellm 双通道全消费方（6 structured 消费方）api_type 单源（UDMR SSOT）无滞留异轨；台账-代码一致性抽验 6/6（5ef3b66f/12b43ec4 diff 内含性）。证伪留痕 8 条（VO 泄入事件/reflection 覆盖断链/半成品残留/380 改写/绝对耗时断言/HTTP 201 行/谓词键预设不可达/失败态 FlowStatus）。
 
 **Round 1 耗时基线台账（用户专项——主会话实测）**：单元/契约/架构 515 tests 35.81s（自身执行全亚秒 ✅；~20s/worker 为共享基建：bootstrap() 7.35s×session×worker + litellm import 1.4s + coverage 启动——D13 既有债非本 Story 引入）；集成+验收 23 tests 167.86s→（F9 后）~140s（scenario_4 真实 LLM 102-124s 网络主导 + 采样 8s + setup 20s）；无 LLM 环境同面 ~55s→~30s。
 

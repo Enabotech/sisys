@@ -4,7 +4,7 @@
 委托 ToolExecutionRepository 持久化，委托 SkillLoaderPort 加载 SOP。
 
 设计依据：Story 4.1a AC-4
-- 五阶段端口映射：Think/Code/Validate → LLMClientPort.structured_generate
+- 五阶段端口映射：Think/Code/Validate → LLMClientPort.generate
                   Execute/Observe → SandboxExecutor.execute_code
 - RetryPolicy frozen dataclass（指数退避，最多 3 次）
 - 证据包双轨存储（L2_rdb 结构化 + L4_object 大文本）
@@ -387,7 +387,7 @@ class ToolExecutionEngine:
         tool_call: ToolCall,
         context: ExecutionContext,
     ) -> str:
-        """Think 阶段：调用 LLMClientPort.structured_generate 产出 plan
+        """Think 阶段：调用 LLMClientPort.generate 产出 plan
 
         Args:
             tool: 工具实体
@@ -416,7 +416,7 @@ class ToolExecutionEngine:
         tool: Tool,
         context: ExecutionContext,
     ) -> str:
-        """Code 阶段：调用 LLMClientPort.structured_generate 产出 code
+        """Code 阶段：调用 LLMClientPort.generate 产出 code
 
         Story 4.7：Code stage 是唯一代码产出作者——必消费 suggested_fix（优先
         采纳指令）+ prior_attempts（含前次方案摘要——R8-1）+ stderr_excerpt +
@@ -457,7 +457,7 @@ class ToolExecutionEngine:
         observation: str,
         context: ExecutionContext,
     ) -> str:
-        """Validate 阶段:调用 LLMClientPort.structured_generate 产出 validation
+        """Validate 阶段:调用 LLMClientPort.generate 产出 validation
 
         P0-D 修复:从 context.extensions["schema_last_violations"] 读取上轮 violations,
         由 ToolOutputValidator 装饰器在重试前注入,实现"重试 prompt 携带 violations"反馈

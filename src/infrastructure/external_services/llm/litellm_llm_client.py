@@ -631,7 +631,10 @@ class LitellmLLMClient(LLMClientPort):
         # 原生直传（json_schema）；anthropic 协议改用标准 tools 传法 +
         # tool_choice 强制（litellm 1.83 对 anthropic 的 response_format=
         # json_schema 转换生成病态请求——嵌套 Schema 实测触发 GLM-5.3 端点
-        # 服务端 500 StackOverflowError，标准 tool 格式两通道均实证可靠）
+        # 服务端 500 StackOverflowError；**注意**：tools 传法仅解决传输层
+        # 可靠性——GLM-5.3 anthropic 端点对「嵌套 Schema」本身的服务端栈
+        # 溢出仍在（扁平 Schema 正常，见集成场景④豁免注记）——嵌套结构化
+        # 输出在 anthropic 端点需等服务端修复或切 openai 兼容端点）
         schema_name = getattr(response_schema, "__name__", "response")
         if hasattr(response_schema, "model_json_schema"):
             schema_dict: dict[str, Any] = response_schema.model_json_schema()

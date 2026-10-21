@@ -187,7 +187,6 @@ def _make_fake_llm(
     fake = AsyncMock(spec=LLMClientPort)
     fake.structured_generate.side_effect = _structured_generate
     fake.generate.side_effect = _generate
-    fake._tool_llm_call_count = tool_llm_calls
     return fake
 
 
