@@ -362,6 +362,43 @@ def _get_real_llm_config() -> LLMConfig | None:
     return None
 
 
+async def _probe_structured_latency(client: Any, config: LLMConfig) -> float:
+    """单次结构化调用延迟预探测（慢端点防挂死前置——R4-OBS 清偿）。
+
+    辩论端到端 = ≥3 次结构化调用（红/蓝视角 + 终局共识）+ 编排开销，
+    总时长 ≥ 3×单次辩论延迟 d_debate；30s 目标前提要求 3·d_debate < 30s
+    即 d_debate < 10s。**探测必须用辩论真实 Schema**（PerspectiveAnalysisSchema
+    原版——同 Schema 同类输出使 d_probe ≈ d_debate，判定双侧有效）：
+    - d_probe ≥ 10 ⇒ 3·d_debate ≥ 30 ⇒ 目标前提不成立 → 提前 skip（同既有
+      「elapsed ≥ 30s → skip」语义，判定从跑完之后提前到开跑之前）
+    - d_probe < 10 ⇒ d_debate ≈ d_probe < 10 ⇒ 辩论大概率可达标 → 正常跑
+    首版独立小 Schema 探测实测漏放行（d_probe ~8s 放行而 d_debate 40s+，
+    辩论仍打满 180s 防挂死——小 Schema 下界过松，代表性探测必须同 Schema）。
+
+    慢端点省 41-186s 白烧；快端点仅多付一次探测调用（≈一次视角分析时长）。
+
+    Returns:
+        探测调用耗时（秒）；探测调用失败/超时（25s 上限）返回 +inf（三重门
+        已过而调用失败 = 端点不稳，按慢端点同归 skip）
+    """
+    import dataclasses
+
+    probe_config = dataclasses.replace(config, timeout=25.0)
+    start = time.perf_counter()
+    try:
+        await asyncio.wait_for(
+            client.structured_generate(
+                prompt=("辩论延迟预探测：议题「是否应在下一财年进入东南亚市场」，请给出红方（保守视角）的完整单视角分析。"),
+                response_schema=PerspectiveAnalysisSchema,
+                config=probe_config,
+            ),
+            timeout=25.0,
+        )
+    except Exception:
+        return float("inf")
+    return time.perf_counter() - start
+
+
 @pytest.mark.llm
 class TestRealLLMDebate:
     async def test_real_debate_end_to_end_under_30s(self) -> None:
@@ -378,6 +415,18 @@ class TestRealLLMDebate:
             pytest.skip("LLM 端点不可用或未配置 api_key，动态跳过")
 
         from src.infrastructure.external_services.llm.litellm_llm_client import LitellmLLMClient
+
+        # 延迟预探测（慢端点防挂死前置——R4-OBS 清偿）：单次结构化探测 ≥ 10s
+        # ⇒ 辩论 ≥3 次调用总时长 ≥30s，30s 目标前提不成立——提前 skip（同
+        # elapsed ≥ 30s 分支语义），慢端点省 41-180s 白烧；探测失败（端点
+        # 不稳）同归 skip。快端点（探测 <10s）正常继续跑辩论。
+        probe_latency = await _probe_structured_latency(LitellmLLMClient(config=config), config)
+        if probe_latency >= 10.0:
+            pytest.skip(
+                f"端点单次结构化调用延迟 {probe_latency:.1f}s ≥ 10s 预算——三视角辩论预估 "
+                f"≥{3 * probe_latency:.0f}s，30s 目标前提不成立（预探测前置判定，语义同 "
+                f"elapsed ≥ 30s 分支；目标验收移交达标环境/Story 5.7 批量基准）"
+            )
 
         real_client = LitellmLLMClient(config=config)
         repository = InMemoryDebateSessionRepository()
