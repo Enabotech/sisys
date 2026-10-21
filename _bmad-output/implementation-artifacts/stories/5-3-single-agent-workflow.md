@@ -1,6 +1,6 @@
 # Story 5.3: 单 Agent 标准工作流
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -880,7 +880,7 @@ src（扩展 6 + 异常体系 3）：
 - `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 444/445）
 - `src/infrastructure/external_services/llm/litellm_llm_client.py`（structured_generate 按 api_type 分派——anthropic 端点标准 tools 传法 + tool_choice 强制 + `_extract_structured_tool_arguments` 解析；**生产代码行为变更**（2026-10-20 真实 LLM 接入后补方案 B 根治），LLM 消费方回归面=113 测试；R1 代码审查 F5 补录——原 File List 漏登）
 
-tests（追加/同步 4）：
+tests（追加/同步 9——原始 6 + R1-F5 补录 3；Change Log 实施行「追加 6」为补录前口径）：
 - `tests/unit/domain/exceptions/test_agent_exceptions.py`（444/445 测试追加）
 - `tests/unit/interfaces/api/test_exception_handlers.py`（expected_types 同步）
 - `tests/unit/infrastructure/agent_orch/test_langgraph_engine.py`（引擎扩展 8 测试 + 白盒三元组同步）
@@ -1029,7 +1029,7 @@ tests（追加/同步 4）：
 
 > 编号规则：R<轮>-F<序号>（修复）/ R<轮>-D<序号>（改判不修·登记）。Round 1 由四视角并行调研（A 应用层正确性 / B 图与引擎 / C 接线与一致性 / D 测试质量与耗时专项）+ 双评审员 C3 门禁（方案质量 + 判别力风险）驱动。**零 P0**；耗时优化为用户专项诉求（D 视角 + 主会话耗时基线实测）。
 
-**Round 1（2026-10-21）：P1×3 + P2×6 + P3 批 12 + 耗时优化 3 项（1 项裁掉）**
+**Round 1（2026-10-21）：P1×3 + P2×5 + P3 批 12 + 耗时优化 3 项（1 项裁掉）**（R5 终审勘误：标题原写「P2×6」系计数笔误——表实数 P2 为 F4-F8 共 5 行，F9/F10/F11 为耗时级非 P2；R2 commit message 中同款笔误不可改，以本勘误为准）
 
 | # | 级别 | 问题 | 修复 |
 |---|------|------|------|
@@ -1070,6 +1070,14 @@ tests（追加/同步 4）：
 
 **Round 3 推演结论**：六条时间线（一次通过/fail_once/恒失败耗尽/revised=False 早退/package 444 熔断/execute 380 穿透）逐字段推演与测试断言零冲突——a-d 四路径被图/引擎/验收断言钉死，e/f（异常熔断）为结构性保证（无终态可残留、`_runs=(FAILED,None)` 自洽、事件不发布、DomainError 透传致 CLI 编码可达——live 实证）；R1 修复新行为面边界（F4/201→HTTP_400 映射、F1 时序 plan 不覆盖 reflection 键、F9 零绝对耗时依赖、F12 未知图名回退不误投影）全 PASS；litellm 双通道全消费方（6 structured 消费方）api_type 单源（UDMR SSOT）无滞留异轨；台账-代码一致性抽验 6/6（5ef3b66f/12b43ec4 diff 内含性）。证伪留痕 8 条（VO 泄入事件/reflection 覆盖断链/半成品残留/380 改写/绝对耗时断言/HTTP 201 行/谓词键预设不可达/失败态 FlowStatus）。
 
+### 🏁 代码审查周期收敛声明（R5 独立终审，2026-10-21）
+
+> **R5 独立收敛终审六节全 PASS**：①周期闭合（R1 `5ef3b66f` / R2 `12b43ec4` / R3 `6573bda7`（rebase 后）三轮提交逐一对应，`fa207ed8` 为 argocd-image-updater bot 自动提交甄别豁免，工作区净）；②关键修复双向取证 **8/8** 在场（R1-F1/F2/F3/F4/F7/F9/F11 + R2-F1 台账声明与 HEAD 代码双向吻合）；③实跑证据链（三文件 82 passed + ruff/mypy 684 文件零告警复核 + R2/R4 两轮全量 12685→12686 passed 数字自洽——净增 1 = R3-N5 新测试）；④留项台账完整（R1-DF1~DF5 + R3-DF1 逐项带核销触发器）；⑤文档-仓库一致（File List ↔ 56 文件双向零差集）；⑥红线终扫零命中（交付面零 noqa/零裸异常/零内置继承，BDD 零 asyncio 装饰器）。
+>
+> 周期统计：**R1 12 表行（P1×3 + P2×5——标题原 ×6 系笔误经终审勘误 + P3 批 12 + 耗时 3）+ R2 2 行 + R3 6 行，零 P0/P1/P2 残留**；特权发现 4 项 P3（P2 计数勘误 / Change Log 补 R2-R5 行 / File List 节标题计数 / checkpointer 留项入 deferred R1-DF5）全部随收敛提交清偿。R4 纯验证轮零发现零提交（全量 19 failed 为 ocr benchmark/qdrant 延迟/hybrid/sandbox/gpu 环境性能类预存——与 R2 基线逐文件同族 + 三轮隔离复跑甄别）。
+>
+> **判定：Story 5.3 代码审查周期收敛，Status `review` → `done`。**
+
 **Round 1 耗时基线台账（用户专项——主会话实测）**：单元/契约/架构 515 tests 35.81s（自身执行全亚秒 ✅；~20s/worker 为共享基建：bootstrap() 7.35s×session×worker + litellm import 1.4s + coverage 启动——D13 既有债非本 Story 引入）；集成+验收 23 tests 167.86s→（F9 后）~140s（scenario_4 真实 LLM 102-124s 网络主导 + 采样 8s + setup 20s）；无 LLM 环境同面 ~55s→~30s。
 
 ### 下一步 Next Steps
@@ -1086,7 +1094,9 @@ tests（追加/同步 4）：
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
 | 2026-10-20 | v1.3.1 → 实施 | dev-story 全链实施：Task 0-9 依序完成（每 Task 独立红→绿→变异→重构循环）；src 新建 12 + 扩展 9 + tests 新建 16 + 追加 6 + 文档同步 4；验收 18 场景全绿、集成 3 绿 2 skip（LLM/PG 动态门控）、单元/契约/架构全套绿、全仓 ruff+mypy 零告警、四条红线自查零输出；5-2 移交风险 #1（装配契约）/#2（agent_id 双轨）核销，R1-DF3（真实发布链路验证）/R3-DF1（L1 失败语义）处置交付 |
-| 2026-10-21 | 代码审查 R1 | Round 1（四视角调研 + 双评审员 C3 门禁）：**零 P0**；P1×3（终局合成缺反思素材+验收锚空心化 / AC-3.2 恒真断言 / noqa 红线）+ P2×6（引擎 agent_id 守卫+cleanup / File List 补录 6 文件 / conftest 版本守卫 / 444 agent_id 锚 / prompt-Schema 矛盾）+ P3 批 12 + 耗时优化 2 落地 1 裁掉（延迟 0.2→0.05s + 调用数锁——采样批 30s→8s 判别力反升；xdist_group 收窄改判不落码）；已知风险区补登 3 项（380 穿透/谓词键预设/checkpointer） |
+| 2026-10-21 | 代码审查 R1 | Round 1（四视角调研 + 双评审员 C3 门禁）：**零 P0**；P1×3（终局合成缺反思素材+验收锚空心化 / AC-3.2 恒真断言 / noqa 红线）+ P2×5（引擎 agent_id 守卫+cleanup / File List 补录 6 文件 / conftest 版本守卫 / 444 agent_id 锚 / prompt-Schema 矛盾——R5 勘误：原记 ×6 系笔误）+ P3 批 12 + 耗时优化 2 落地 1 裁掉（延迟 0.2→0.05s + 调用数锁——采样批 30s→8s 判别力反升；xdist_group 收窄改判不落码）；已知风险区补登 3 项（380 穿透/谓词键预设/checkpointer） |
+| 2026-10-21 | 代码审查 R2/R3（R5 终审补记） | R2 回归核查：12 项 R1 修复全 PASS（零 P0-P2）+ 2 P3 勘误清偿（5-11 残留/docstring 时态）+ 全量回归 12685 passed（19 failed 环境类预存三轮甄别）；R3 深度推演：六时间线零冲突 + 6 P3（5 清偿 1 登记 R3-DF1）——含 tool_execution_engine doc rot 勘误/扁平 Schema 单测补位/litellm 运维注记 |
+| 2026-10-21 | 代码审查 R4/R5（收敛） | R4 纯验证零发现零提交：全量 12686 passed（19 failed 与 R2 同族预存）+ 本 Story 三面终验全绿（377 单测/契约/架构 + 23 集成验收 + ruff/mypy）；R5 独立终审六节全 PASS + 4 P3 特权发现随收敛清偿（P2 计数勘误/Change Log 补行/File List 计数/checkpointer 入 deferred）——**周期收敛，Status review → done** |
 
 ---
 

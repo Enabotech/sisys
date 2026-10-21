@@ -189,3 +189,4 @@
 - 【R1-DF3·P3】ChainOfThoughtSchema.input_summary 必填与「系统覆写」语义冗余 — R1-F8 采用文案修正（最小面），Schema 给 default（回声面字段值不被消费）为更根治形态 — 核销触发：下次 Schema 演进（联动既有 5 测试面）
 - 【R1-DF4·P3】测试基建耗时债：session autouse bootstrap() 7.35s×worker（D13 既有登记的 pytest 形态）— 纯 domain/SAP 单测 worker 被强制付组合根全量注册成本；本 Story 测试自身执行全亚秒（D 视角实证），耗时大头为共享基建 — 核销触发：组合根瘦身（D13 架构级决策）或 conftest 按需 bootstrap 分层（影响全仓测试，需专项评估）
 - 【R3-DF1·P3】终局合成多轮反思素材截断 — package 阶段终局 prompt 的 reflection 素材仅取 state["reflection"]（末次 reflect 产物），两轮重试时间线中第 1 轮的 error_analysis/revised_plan 不进终局 prompt（「历经 N 次重试」描述与单轮素材不完全对应——素材真实无虚构，属总结素材不完整的简化面）；完整化需 reflection 历史聚合设计（state 键扩展或服务侧聚合） — 核销触发：反思轮信息流扩展时（与 R1-DF1 工具选择韧性同 Story 评估）
+- 【R1-DF5·P3】SingleAgentWorkflow 新图 compile 无 checkpointer（R5 终审补录——Story 风险区 #8 此前未入台账） — 图工厂裸 compile 与 BasicAgent `compile(checkpointer=...)` 编译策略分叉，thread_id 被静默忽略（langgraph 1.2.9 实测无害）；DC-1 选型理由之一的 checkpoint 中断恢复需 checkpointer 注入基础 — 核销触发：5-10 checkpoint 系列立项（图工厂接受可选 checkpointer 参数由引擎传入，与 BasicAgent 对齐）
