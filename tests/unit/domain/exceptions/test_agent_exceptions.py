@@ -304,3 +304,150 @@ class TestHttpMappingStory52:
         error = AgentNotFoundError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
         assert isinstance(error, BusinessException)
         assert _get_http_status(error) == 404  # 若无精确注册，isinstance 扫描会得到 400
+
+
+# ===================================================================
+# Story 5-3 追加：AgentWorkflowError(444) / ChainOfThoughtValidationError(445)
+# ===================================================================
+
+
+class TestAgentWorkflowErrorConstruction:
+    """AgentWorkflowError 构造契约（工作流阶段执行失败，继承 SystemException）。"""
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import AgentWorkflowError
+
+        error = AgentWorkflowError(
+            agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            phase="verify",
+            reason="LLM 阶段调用失败",
+        )
+        assert error.code == "EXCEPTION_444"
+        assert error.message, "默认消息不能为空"
+
+    def test_context_carries_phase_anchor(self) -> None:
+        """同码多因区分锚点：phase ∈ {perceive,plan,execute,verify,reflect,package}。"""
+        from src.domain.exceptions import AgentWorkflowError
+
+        for phase in ("perceive", "plan", "execute", "verify", "reflect", "package"):
+            error = AgentWorkflowError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", phase=phase, reason="失败")
+            assert error.context["phase"] == phase
+            assert error.context["agent_id"] == "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+            assert error.context["reason"] == "失败"
+
+    def test_inherits_system_exception(self) -> None:
+        """444 属系统执行失败语义（LLM 调用失败/图执行异常收敛）。"""
+        from src.domain.exceptions import AgentWorkflowError, SystemException
+
+        error = AgentWorkflowError(agent_id="a", phase="plan", reason="r")
+        assert isinstance(error, SystemException)
+        assert isinstance(error, DomainError)
+
+    def test_to_dict_serialization(self) -> None:
+        from src.domain.exceptions import AgentWorkflowError
+
+        error = AgentWorkflowError(agent_id="0f1e2d3c", phase="reflect", reason="反思阶段 LLM 超时")
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_444"
+        assert data["context"]["phase"] == "reflect"
+
+
+class TestChainOfThoughtValidationErrorConstruction:
+    """ChainOfThoughtValidationError 构造契约（思维链完整性校验失败，继承 SystemException）。"""
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import ChainOfThoughtValidationError
+
+        error = ChainOfThoughtValidationError(
+            agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            missing_fields=("reflection", "final_answer"),
+        )
+        assert error.code == "EXCEPTION_445"
+        assert error.message, "默认消息不能为空"
+
+    def test_context_carries_missing_fields(self) -> None:
+        """同码多因区分锚点：missing_fields 列表（五字段缺一/空值/结构非法）。"""
+        from src.domain.exceptions import ChainOfThoughtValidationError
+
+        error = ChainOfThoughtValidationError(agent_id="0f1e2d3c", missing_fields=("tools_used",))
+        assert error.context["missing_fields"] == ["tools_used"]
+        assert error.context["agent_id"] == "0f1e2d3c"
+
+    def test_inherits_system_exception(self) -> None:
+        from src.domain.exceptions import ChainOfThoughtValidationError, SystemException
+
+        error = ChainOfThoughtValidationError(agent_id="a", missing_fields=())
+        assert isinstance(error, SystemException)
+
+    def test_to_dict_serialization(self) -> None:
+        from src.domain.exceptions import ChainOfThoughtValidationError
+
+        error = ChainOfThoughtValidationError(agent_id="0f1e2d3c", missing_fields=("input_summary",))
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_445"
+        assert data["context"]["missing_fields"] == ["input_summary"]
+
+
+class TestHttpMappingStory53:
+    """经 _get_http_status 反向验证 444/445 精确注册。"""
+
+    def test_workflow_error_maps_500(self) -> None:
+        """444 → 500（系统执行失败语义）。"""
+        from src.domain.exceptions import AgentWorkflowError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = AgentWorkflowError(agent_id="a", phase="plan", reason="r")
+        assert _get_http_status(error) == 500
+
+    def test_chain_validation_error_maps_500(self) -> None:
+        """445 → 500（组装后完整性校验失败属系统侧缺陷）。"""
+        from src.domain.exceptions import ChainOfThoughtValidationError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = ChainOfThoughtValidationError(agent_id="a", missing_fields=("reflection",))
+        assert _get_http_status(error) == 500
+
+    def test_workflow_error_no_isinstance_fallback_to_500_ambiguity(self) -> None:
+        """反向验证：444 精确注册（SystemException 基类同为 500，精确注册防回退歧义）。"""
+        from src.domain.exceptions import AgentWorkflowError
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert AgentWorkflowError in EXCEPTION_HTTP_MAP
+        assert EXCEPTION_HTTP_MAP[AgentWorkflowError] == 500
+
+
+class TestSubdomainRegistrationStory53:
+    """444/445 子域登记（agent 段 440-449 预留段核销）。"""
+
+    def test_classes_registered_in_agent_subdomain(self) -> None:
+        assert _CLASS_TO_SUBDOMAIN["AgentWorkflowError"] == "agent"
+        assert _CLASS_TO_SUBDOMAIN["ChainOfThoughtValidationError"] == "agent"
+
+    def test_codes_within_agent_range(self) -> None:
+        """码值落在 agent 段 (440, 449) 内。"""
+        from src.domain.exceptions import AgentWorkflowError, ChainOfThoughtValidationError
+
+        low, high = CODE_RANGES["agent"]
+        assert low <= int(AgentWorkflowError.code.removeprefix("EXCEPTION_")) <= high
+        assert low <= int(ChainOfThoughtValidationError.code.removeprefix("EXCEPTION_")) <= high
+
+    def test_codes_unique_across_agent_subdomain(self) -> None:
+        """444/445 与既有 440-443 码值互异（同码即冲突）。"""
+        from src.domain.exceptions import (
+            AgentConfigError,
+            AgentNotFoundError,
+            AgentProfileError,
+            AgentRoleNotSupportedError,
+            AgentWorkflowError,
+            ChainOfThoughtValidationError,
+        )
+
+        codes = {
+            AgentConfigError.code,
+            AgentRoleNotSupportedError.code,
+            AgentProfileError.code,
+            AgentNotFoundError.code,
+            AgentWorkflowError.code,
+            ChainOfThoughtValidationError.code,
+        }
+        assert len(codes) == 6, f"agent 子域六码应互异: {codes}"

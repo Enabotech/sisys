@@ -419,6 +419,31 @@ class LitellmLLMClient(LLMClientPort):
             model=config.model,
         )
 
+    def _extract_structured_tool_arguments(self, response: Any) -> str | None:
+        """提取结构化输出通道的 tool_use arguments（Story 5-3 补）。
+
+        anthropic tools 通道（tool_choice 强制）下，模型经 tool_use 返回
+        Schema JSON——litellm 将其转为 openai 形态的 message.tool_calls，
+        arguments 即 Schema JSON 字符串。无 tool_calls（非 anthropic 通道或
+        模型偶发文本直出）返回 None（调用方回退 content 文本解析）。
+
+        Args:
+            response: LiteLLM acompletion() 返回值
+
+        Returns:
+            tool_calls[0].function.arguments 字符串；无有效 tool_calls 时 None
+        """
+        try:
+            message = response.choices[0].message
+            tool_calls = getattr(message, "tool_calls", None)
+            if tool_calls:
+                arguments = tool_calls[0].function.arguments
+                if isinstance(arguments, str) and arguments.strip():
+                    return arguments
+        except (AttributeError, IndexError, TypeError):
+            return None
+        return None
+
     def _parse_llm_response(self, response: Any, config: LLMConfig) -> LLMResponse:
         """解析 LiteLLM 响应为 LLMResponse
 
@@ -601,18 +626,40 @@ class LitellmLLMClient(LLMClientPort):
         kwargs = self._build_acompletion_kwargs(prompt, cfg, system_prompt=system_prompt)
         # 将 Pydantic Schema 转换为 JSON Schema dict（litellm 原生支持）
         # 领域层不依赖 pydantic，此处仅在基础设施层访问 model_json_schema()
-        response_format = None
+        # 结构化输出通道按 api_type 分派（Story 5-3 补——anthropic 通道绕过
+        # litellm response_format 转换缺陷）：openai 协议 response_format
+        # 原生直传（json_schema）；anthropic 协议改用标准 tools 传法 +
+        # tool_choice 强制（litellm 1.83 对 anthropic 的 response_format=
+        # json_schema 转换生成病态请求——嵌套 Schema 实测触发 GLM-5.3 端点
+        # 服务端 500 StackOverflowError，标准 tool 格式两通道均实证可靠）
+        schema_name = getattr(response_schema, "__name__", "response")
         if hasattr(response_schema, "model_json_schema"):
-            response_format = {
+            schema_dict: dict[str, Any] = response_schema.model_json_schema()
+        else:
+            schema_dict = {"type": "object"}
+
+        if cfg.api_type == "anthropic":
+            kwargs["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": schema_name,
+                        "description": f"按 {schema_name} JSON Schema 结构输出结果",
+                        "parameters": schema_dict,
+                    },
+                }
+            ]
+            kwargs["tool_choice"] = {"type": "function", "function": {"name": schema_name}}
+        elif hasattr(response_schema, "model_json_schema"):
+            kwargs["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": getattr(response_schema, "__name__", "response"),
-                    "schema": response_schema.model_json_schema(),
+                    "name": schema_name,
+                    "schema": schema_dict,
                 },
             }
         else:
-            response_format = {"type": "json_object"}
-        kwargs["response_format"] = response_format
+            kwargs["response_format"] = {"type": "json_object"}
 
         # 第 3 步：指数退避重试
         try:
@@ -648,6 +695,19 @@ class LitellmLLMClient(LLMClientPort):
                 model=cfg.model,
                 response_summary=str(response)[:200],
             ) from e
+
+        # anthropic tools 通道：tool_use 响应（litellm 转 openai 形态的
+        # message.tool_calls）优先作为结构化解析源——content 为空或为思考
+        # 文本时 tool_calls[0].function.arguments 承载 Schema JSON；
+        # 无 tool_calls（模型偶发文本直出）回退 content 文本解析
+        tool_json = self._extract_structured_tool_arguments(response)
+        if tool_json is not None:
+            llm_response = LLMResponse(
+                content=tool_json,
+                finish_reason=llm_response.finish_reason,
+                usage=llm_response.usage,
+                model=llm_response.model,
+            )
 
         # API 响应解析成功 → 通知熔断器（与 generate() 第 466 行一致）
         # Schema 转换失败是独立的业务逻辑错误，不应回滚 API 调用的成功记录

@@ -197,9 +197,107 @@ class AgentNotFoundError(BusinessException):
         super().__init__(message=message, cause=cause, context=context)
 
 
+class AgentWorkflowError(SystemException):
+    """单 Agent 工作流阶段执行失败（Story 5-3 — 单 Agent 标准工作流）
+
+    触发场景：六阶段任一阶段的 LLM 调用失败包装（LLM 族异常 330-332 收敛）
+    或图执行异常收敛。工作流执行属系统侧行为（非调用方输入错误），与 440/442
+    系统资源语义同层，继承 SystemException。
+
+    LLM 族异常传播策略（4-5 辩论纪律先例）：阶段内包装为 444 携带 phase；
+    LLMConfigError（332，配置错误透传不包装）与 CancelledError（协程取消
+    透传）例外。
+
+    端到端可达前提：引擎 submit_graph 的 DomainError 透传改造（现引擎对
+    ainvoke 任意异常包 RuntimeError from e，444 会被改写致 CLI stderr 无
+    [EXCEPTION_444]——Task 5 改造项）。
+
+    Attributes:
+        code: EXCEPTION_444
+        message: 默认消息（静态文案，不含动态内部细节）
+        context: 领域上下文（agent_id/phase/reason——phase 为同码多因区分
+            锚点，取值 perceive/plan/execute/verify/reflect/package）
+    """
+
+    code = "EXCEPTION_444"
+    message = "Agent 工作流阶段执行失败"
+
+    def __init__(
+        self,
+        agent_id: str = "",
+        phase: str = "",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化工作流阶段执行异常
+
+        Args:
+            agent_id: 工作流归属的 Agent 标识（字符串形态）
+            phase: 失败阶段名（perceive/plan/execute/verify/reflect/package 之一）
+            reason: 面向调用方可理解的失败原因摘要
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链）
+        """
+        context: dict[str, str] = {
+            "agent_id": agent_id,
+            "phase": phase,
+            "reason": reason,
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class ChainOfThoughtValidationError(SystemException):
+    """思维链完整性校验失败（Story 5-3 — 单 Agent 标准工作流）
+
+    触发场景：终局组装后的服务端完整性校验失败——五字段缺一/空值/结构
+    非法。组装产物缺陷属系统侧问题（LLM 产出或组装链缺陷，非调用方输入
+    错误），继承 SystemException。
+
+    三层校验次序定稿（DC-2）：
+    ① LLM 输出 Schema 校验失败已被 structured_generate 内建拦截→
+       LLMResponseError(331)→服务包 444；
+    ② VO __post_init__ 校验失败抛 EntityValidationError(242)——package
+       阶段捕获 242 改写 445（context.missing_fields）；
+    ③ 服务自检缺失直接 445。444 严格限于 LLM 调用失败与图执行异常。
+
+    Attributes:
+        code: EXCEPTION_445
+        message: 默认消息（静态文案）
+        context: 领域上下文（agent_id/missing_fields——缺失字段名清单为
+            同码多因区分锚点）
+    """
+
+    code = "EXCEPTION_445"
+    message = "Agent 思维链完整性校验失败"
+
+    def __init__(
+        self,
+        agent_id: str = "",
+        missing_fields: tuple[str, ...] | list[str] = (),
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化思维链完整性校验异常
+
+        Args:
+            agent_id: 工作流归属的 Agent 标识（字符串形态）
+            missing_fields: 缺失/非法的字段名清单（五字段子集）
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链——如 242 改写场景携带原异常）
+        """
+        context: dict[str, Any] = {
+            "agent_id": agent_id,
+            "missing_fields": list(missing_fields),
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
 __all__ = [
     "AgentConfigError",
     "AgentNotFoundError",
     "AgentProfileError",
     "AgentRoleNotSupportedError",
+    "AgentWorkflowError",
+    "ChainOfThoughtValidationError",
 ]

@@ -25,6 +25,7 @@ from src.domain.exceptions import (
     AgentNotFoundError,
     AgentProfileError,
     AgentRoleNotSupportedError,
+    AgentWorkflowError,
     ArchiveConflictError,
     ArchiveNotFoundError,
     ArchiveStorageError,
@@ -36,6 +37,7 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
+    ChainOfThoughtValidationError,
     ChunkingError,
     ComplianceLockError,
     ConfigurationError,
@@ -336,6 +338,8 @@ class TestExceptionHttpMap:
             AgentRoleNotSupportedError,  # 441 — Story 5.1 MVP 未开放角色
             AgentProfileError,  # 442 — Story 5.2 Agent 档案资产无效
             AgentNotFoundError,  # 443 — Story 5.2 Agent 不存在（404）
+            AgentWorkflowError,  # 444 — Story 5.3 工作流阶段执行失败（500）
+            ChainOfThoughtValidationError,  # 445 — Story 5.3 思维链完整性校验失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

@@ -2903,6 +2903,13 @@ buckets/
 - **SAP 通信协议：** 内部 Agent 间标准消息格式（MessageType/Priority/EIP 隔离信息）
 - **Agent 评估：** 开源可观测性方案（Phoenix/Arize 等，详见基础设施层 `infrastructure/monitoring/` 子设计文档）+ CUSUM 漂移检测
 
+> **MVP 实现状态注记（Story 5-3，2026-10-20）：** 单 Agent 标准工作流已落地六阶段形态
+> （感知→规划→执行→验证→反思→证据打包——LangGraph SingleAgentWorkflow 图承载，DC-1）；
+> 九步中的初始化内化为用例前置（档案加载+装配），深度思考（9-8 域）与演化（V1）可选步未实现；
+> 状态模型裁剪为 executed_phases 轨迹形态。思维链（ChainOfThought 五字段 VO + to_display
+> 五段展示）与任务级证据包（TaskEvidencePackage 九字段）随工作流交付；SAP 消息 Schema
+> （src/interfaces/sap/——15 字段契约）已定义，bus/传输实现归 Story 5.11。
+
 > 详见 [sisys-core-domain-design.md §17.3](sisys-core-domain-design.md#173-agent-架构设计)
 
 ### 17.5 战略规划架构

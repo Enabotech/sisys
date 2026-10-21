@@ -424,3 +424,186 @@ class TestLoadProfileMain:
         assert exit_code == 1
         assert "EXCEPTION_201" in capsys.readouterr().err
         assert stub.calls == [], "UUID 守卫先于用例调用"
+
+
+# ===================================================================
+# Story 5-3 — run-task 子命令（六阶段工作流 CLI 全链）
+# ===================================================================
+
+
+class _StubWorkflowResult:
+    """工作流用例结果替身（结构对齐 AgentWorkflowResult 五字段）。"""
+
+    def __init__(self, status: str = "completed") -> None:
+        import hashlib
+
+        from src.domain.value_objects.chain_of_thought import ChainOfThought
+        from src.domain.value_objects.task_evidence import TaskEvidencePackage
+
+        self.workflow_status = status
+        self.retry_count = 0 if status == "completed" else 2
+        self.executed_phases = ("perceive", "plan", "execute", "verify", "package")
+        self.evidence = TaskEvidencePackage(
+            input_hash=hashlib.sha256("任务".encode()).hexdigest(),
+            task_breakdown=("执行分析",),
+            tool_trace=(),
+            artifacts_snapshot=(),
+            confidence=0.85,
+            confidence_rationale="结构化检查通过",
+            citations=(),
+            status=status,
+            failure_reason="" if status == "completed" else "第 3 次验证未通过",
+        )
+        self.chain = ChainOfThought(
+            input_summary="任务摘要：战略分析",
+            reflection="一次通过" if status == "completed" else "历经修正",
+            tools_used=(),
+            constraints_check="约束符合",
+            final_answer='{"answer": "三层次建议"}',
+        )
+
+
+class _StubWorkflowUseCase:
+    """工作流用例替身：记录调用并可编程抛异常。"""
+
+    def __init__(self, error: Exception | None = None, status: str = "completed") -> None:
+        self.calls: list[tuple[uuid.UUID, str]] = []
+        self._error = error
+        self._status = status
+
+    async def execute(self, agent_id: uuid.UUID, task: str) -> _StubWorkflowResult:
+        self.calls.append((agent_id, task))
+        if self._error is not None:
+            raise self._error
+        return _StubWorkflowResult(status=self._status)
+
+
+def _patch_run_task_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubWorkflowUseCase) -> None:
+    """monkeypatch agent_cli 模块级属性（run-task 链路注入——同 _patch_entry 形态）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: use_case)
+    monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+
+
+class TestRunTaskParser:
+    """run-task 参数契约。"""
+
+    def test_run_task_requires_agent_id_and_task(self) -> None:
+        """--agent-id/-a 与 --task/-t 双必填（缺任一退出码 2）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["run-task", "--agent-id", str(uuid.uuid4()), "--task", "任务"])
+        assert args.command == "run-task"
+        args_short = parser.parse_args(["run-task", "-a", str(uuid.uuid4()), "-t", "任务"])
+        assert args_short.command == "run-task"
+
+    def test_run_task_missing_args_exit_two(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """缺 --task 时 argparse 用法错误退出码 2。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["run-task", "--agent-id", str(uuid.uuid4())])
+        assert exc_info.value.code == 2
+
+
+class TestRunTaskExecution:
+    """run-task 执行契约（成功/失败完成态/守卫路径）。"""
+
+    def test_success_outputs_summary_exit_zero(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功路径：exit 0 + 六阶段状态行 + 思维链预览 + 置信度 + 证据引用。"""
+        use_case = _StubWorkflowUseCase(status="completed")
+        _patch_run_task_entry(monkeypatch, use_case)
+        agent_id = uuid.uuid4()
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", str(agent_id), "--task", "分析任务"])
+
+        assert exit_code == 0
+        assert use_case.calls == [(agent_id, "分析任务")]
+        output = capsys.readouterr().out
+        assert "perceive" in output and "package" in output, "六阶段状态行缺失"
+        assert "<Reflection>" in output, "思维链五段预览缺失"
+        assert "0.85" in output, "置信度输出缺失"
+
+    def test_failed_completion_exit_zero_with_summary(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """失败完成态：exit 0（工作流正常走完语义）+ status=failed 摘要。"""
+        use_case = _StubWorkflowUseCase(status="failed")
+        _patch_run_task_entry(monkeypatch, use_case)
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", str(uuid.uuid4()), "--task", "任务"])
+
+        assert exit_code == 0, "失败完成态是正常走完——与系统错误 exit 1 区分"
+        output = capsys.readouterr().out
+        assert "failed" in output, "失败状态摘要缺失"
+
+    def test_agent_not_found_exit_one_with_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """443 守卫路径：exit 1 + stderr [EXCEPTION_443]。"""
+        from src.domain.exceptions import AgentNotFoundError
+
+        use_case = _StubWorkflowUseCase(error=AgentNotFoundError(agent_id=str(uuid.uuid4())))
+        _patch_run_task_entry(monkeypatch, use_case)
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", str(uuid.uuid4()), "--task", "任务"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "EXCEPTION_443" in captured.err
+
+    def test_role_not_supported_exit_one_with_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """441 守卫路径（R1-F12 补位——Story Task 6 钦定 443/441/444 三守卫）：
+        exit 1 + stderr [EXCEPTION_441]。"""
+        from src.domain.exceptions import AgentRoleNotSupportedError
+
+        use_case = _StubWorkflowUseCase(error=AgentRoleNotSupportedError(role="CFO"))
+        _patch_run_task_entry(monkeypatch, use_case)
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", str(uuid.uuid4()), "--task", "任务"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "EXCEPTION_441" in captured.err
+
+    def test_workflow_error_exit_one_with_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """444 路径：exit 1 + stderr [EXCEPTION_444]（引擎 DomainError 透传链路）。"""
+        from src.domain.exceptions.agent_exceptions import AgentWorkflowError
+
+        use_case = _StubWorkflowUseCase(error=AgentWorkflowError(agent_id="a", phase="verify", reason="LLM 失败"))
+        _patch_run_task_entry(monkeypatch, use_case)
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", str(uuid.uuid4()), "--task", "任务"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "EXCEPTION_444" in captured.err
+
+    def test_invalid_uuid_guard_exit_one(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """UUID 守卫：非法 agent-id → 201 退出码 1（先于 bootstrap）。"""
+        use_case = _StubWorkflowUseCase()
+        _patch_run_task_entry(monkeypatch, use_case)
+
+        exit_code = agent_cli.main(["run-task", "--agent-id", "not-a-uuid", "--task", "任务"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "EXCEPTION_201" in captured.err
+        assert use_case.calls == [], "守卫失败不得触达用例"
+
+    def test_bootstrap_idempotent_guard(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """bootstrap 幂等守卫：registry 关键端口已存在即跳过重放（DC-12 ③前提）。"""
+        bootstrap_calls = {"count": 0}
+        original_bootstrap = agent_cli.bootstrap
+
+        def _counting_bootstrap() -> None:
+            bootstrap_calls["count"] += 1
+            original_bootstrap()
+
+        monkeypatch.setattr(agent_cli, "bootstrap", _counting_bootstrap)
+        # conftest 已 bootstrap——本调用应被幂等守卫短路（count 不增）
+        agent_cli._ensure_bootstrapped()
+        assert bootstrap_calls["count"] == 0, "幂等守卫未生效（二次 bootstrap 必抛 ConflictError）"

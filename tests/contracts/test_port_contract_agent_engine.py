@@ -89,7 +89,7 @@ class TestAgentEnginePortContract:
         assert params == ["self", "graph_run_id"]
 
     def test_compliant_implementation(self) -> None:
-        """验证合规实现可通过 isinstance 检查"""
+        """验证合规实现可通过 isinstance 检查（含 Story 5-3 get_graph_result）"""
 
         class MockEngine:
             async def submit_graph(self, graph_name: str, parameters: dict[str, Any]) -> str:
@@ -99,6 +99,9 @@ class TestAgentEnginePortContract:
                 from src.domain.value_objects.flow_status import FlowStatus
 
                 return FlowStatus.COMPLETED
+
+            async def get_graph_result(self, graph_run_id: str) -> dict[str, Any] | None:
+                return None
 
         engine = MockEngine()
         assert isinstance(engine, AgentEnginePort)
@@ -155,6 +158,21 @@ class TestAgentEnginePortContract:
 
         engine = BadEngine()
         assert not isinstance(engine, AgentEnginePort)
+
+    def test_get_graph_result_method_exists(self) -> None:
+        """Story 5-3（DC-11）：端口声明 get_graph_result 方法。"""
+        assert hasattr(AgentEnginePort, "get_graph_result")
+        assert callable(AgentEnginePort.get_graph_result)
+
+    def test_get_graph_result_is_async(self) -> None:
+        """get_graph_result 为异步方法。"""
+        assert inspect.iscoroutinefunction(AgentEnginePort.get_graph_result)
+
+    def test_get_graph_result_signature(self) -> None:
+        """get_graph_result 签名（self + graph_run_id）。"""
+        sig = inspect.signature(AgentEnginePort.get_graph_result)
+        params = list(sig.parameters.keys())
+        assert params == ["self", "graph_run_id"]
 
 
 __all__ = ["TestAgentEnginePortContract"]

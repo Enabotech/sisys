@@ -127,7 +127,7 @@
 - unified_storage + L0/memory 子系统 12 端口休眠 — 触发=Epic 6
 - semantic_cache_middleware/cache_metrics/semantic_cache 休眠 — Story 3-9 缓存整体未运行；触发=检索性能需求
 - orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5
-- session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）
+- session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）。**5-3 Task 0 处置（2026-10-20）：续期**——触发移至 5-4+/多轮会话需求 Story（5-3 DC-9：MVP 单次 CLI 调用内会话闭合，无跨调用状态需求；九步可选步「持久化沙箱内存变量」同批续期见 5-3 D-6）
 - uow_factory/saga_repository 零 resolve — 事务子系统待首个真实事务用例
 - compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线
 
@@ -162,9 +162,9 @@
 
 - 【D11·P3·范围收窄至①】outbox 毒消息终态机制 — 2026-10-14 清偿轮清偿②④⑤⑥；**2026-10-15 D11-a 微 Story 清偿③+巡检面**：③DLQ dequeue 毒隔离（队头畸形 payload 标 error 终态+action_taken 记毒因+继续取下一条——修「先行改标+from_dict 裸调致毒条目每轮重炸队头」）+ `count_by_status()` 按状态分组巡检方法（pending 滞留/failed 存量/archived 终态一查可见）。**剩余①归 D11-b 专项**：超限行 archived 终态迁移 + requeue 入口 + archived→pending 状态机迁移评审——设计方案见 proposals/proposal-d11-outbox-dead-letter.md（PG 环境前置：本地 5433 认证修复）——**已立项 Story 91-2**（2026-10-15，91-2-outbox-dead-letter-termination）——**已核销于 Story 91-2（2026-10-15 实施完成）**
 - 【D12·P2】wheel 形态 configs/ 分发缺口 — pyproject packages=[{include="src"}] 不含 configs/（非 Python 包），wheel/pip 安装形态 agent CLI 必现 440；源码树/Docker/k8s 三形态自洽，CI 零 wheel 构建环节无消费方 — 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态限定）
-- 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前
+- 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前。**5-3 Task 0 处置（2026-10-20）：知悉不处置**——run-task 单次调用阻塞语义下无批量消费面（非阻断）；组合根瘦身属架构级决策，登记保持
 - 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
-- 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数。**5-2 R1 追记（2026-10-19，编号锚 R1-DF2）**：AgentProfileLoaded（5-2 交付，reliable 单通道同族）同形态累积；且发布失败（outbox 写失败/raise）在 CLI 路径仅 stderr 日志 + exit 0，无程序化可观测信号（exit 码/输出标记均无）——观测面增强（发布失败退码化/结果对象标记/指标计数）与 poller 宿主同归 — 核销触发：5.3 首个事件消费 Story 立项时一并定夺
+- 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数。**5-2 R1 追记（2026-10-19，编号锚 R1-DF2）**：AgentProfileLoaded（5-2 交付，reliable 单通道同族）同形态累积；且发布失败（outbox 写失败/raise）在 CLI 路径仅 stderr 日志 + exit 0，无程序化可观测信号（exit 码/输出标记均无）——观测面增强（发布失败退码化/结果对象标记/指标计数）与 poller 宿主同归 — 核销触发：5.3 首个事件消费 Story 立项时一并定夺。**5-3 Task 0 处置（2026-10-20）：登记保持**——5-3 是 AgentDecided 的生产方（confidence 真实化写入）而非任何事件的消费方，无事件订阅面，锚位顺延至 5.7 Phoenix 追踪立项
 
 ## Deferred from: Story 5-2 Task 0 链路普查 (2026-10-19)
 
@@ -177,5 +177,14 @@
 > 审查台账见 Story 5-2「Review Findings」节（4 并行视角调研 + C3 双评审员评审，零 P0/P1，4 P2 + 10 P3；8 项落码修复 + 2 项 P2 改判 + 1 项 P3 登记 deferred + 3 项维持——改判裁定见该节）。本段为改判/登记留项分流。
 
 - 【R1-DF1·P2】InMemorySkillLoader L1 缓存表头幽灵条目（4-1a 遗留，非 5-2 引入）— `src/application/skills/loader.py` `_init_metadata_cache`（L126-141 附近）的行跳过条件只拦 `#`/`---`/空行，TOOLS.md 表头行 `| slug | tool_name | ... |` 被 `_TABLE_ROW_PATTERN` 解析为数据条目——实测 L1 缓存 24 条（manifest 23 + ghost `slug='slug'`，ghost status='active'）；`match_by_tag`/`match_by_capability` 等直接遍历缓存的接口会命中幽灵（当前生产消费方为零——grep 实证仅契约测试/单测引用）。5-2 的 SkillSelector 经 `get_all_slugs()` 静态清单枚举天然免疫（tools_l1==23 不受影响）。修复形态：`_init_metadata_cache` 增表头行过滤（如 `cells[0] == 'slug'` 跳过）——属 4-1a 交付资产域（回归面含 4-1a 套件），审查周期不动他 Story 文件 — 核销触发：下次 Skills 资产演进（SKILL.md 增删/TOOLS.md 改版）或 5.9 漂移检测立项（ACTIVE 基线数消费该面）
-- 【R1-DF3·P3】AC-5 性能门禁计时口径不含生产发布链路 — 集成/验收 P95<500ms 计时注入 `InMemoryEventBus`（内存发布），生产 CLI 路径发布经 DualChannelEventBus→PG outbox 写入（网络 RTT + 失败重试面），口径差余量约 25 倍（实测 P95 ~10ms 级）大概率覆盖但无证据背书 — 核销触发：5.3 批量消费前补含真实发布链路的计时（或明示口径差）
-- 【R3-DF1·P3】L1 组装失败语义契约沉默（387 路径根因不可观测）— `src/application/skills/loader.py` L111-124 对 TOOLS.md 缺失/读取 OSError 仅记日志后**降级回退空 L1 索引**；skill_manifest（23 slug 静态清单）与空索引漂移时 `load_metadata` 抛 SkillNotFoundError(387) 穿透 SkillSelector/use_case 到 CLI `[EXCEPTION_387]` exit 1——运维只见 "Skill not found" 无 TOOLS.md 根因指向（4-1a 的吞错降级行为因 5-2 首次接线成为承载面）。R3-F2 已补 use_case docstring Raises 契约（传播语义显式化），根因可观测性（387 context 携带 TOOLS.md 状态/加载器 fail-loud 化）待消费方定义 — 核销触发：5.3 上下文装配契约订立时定义 L1 失败语义（与 R1-DF2 同锚 5.3）
+- 【R1-DF3·P3】AC-5 性能门禁计时口径不含生产发布链路 — 集成/验收 P95<500ms 计时注入 `InMemoryEventBus`（内存发布），生产 CLI 路径发布经 DualChannelEventBus→PG outbox 写入（网络 RTT + 失败重试面），口径差余量约 25 倍（实测 P95 ~10ms 级）大概率覆盖但无证据背书 — 核销触发：5.3 批量消费前补含真实发布链路的计时（或明示口径差）。**5-3 Task 0 处置（2026-10-20）：本 Story 处置**——Task 7 集成场景⑤真实发布链路单次时序验证（resolve 真实 event_publisher/DualChannelEventBus + PG event_outbox 落行断言，PG 门控动态 skip）+ P95 主口径的发布面口径差声明随测试 docstring 落盘（场景①②为内存/替身发布面）；完整生产口径计时（真实 LLM+真实发布 P95 采样）续期至部署验证
+- 【R3-DF1·P3】L1 组装失败语义契约沉默（387 路径根因不可观测）— `src/application/skills/loader.py` L111-124 对 TOOLS.md 缺失/读取 OSError 仅记日志后**降级回退空 L1 索引**；skill_manifest（23 slug 静态清单）与空索引漂移时 `load_metadata` 抛 SkillNotFoundError(387) 穿透 SkillSelector/use_case 到 CLI `[EXCEPTION_387]` exit 1——运维只见 "Skill not found" 无 TOOLS.md 根因指向（4-1a 的吞错降级行为因 5-2 首次接线成为承载面）。R3-F2 已补 use_case docstring Raises 契约（传播语义显式化），根因可观测性（387 context 携带 TOOLS.md 状态/加载器 fail-loud 化）待消费方定义 — 核销触发：5.3 上下文装配契约订立时定义 L1 失败语义（与 R1-DF2 同锚 5.3）。**5-3 Task 0 处置（2026-10-20）：本 Story 处置**——Task 3 循环 B 交付 L1 失败语义测试（TOOLS.md 缺失/降级空 L1 时装配行为：387 传播或显式降级注记）+ 装配契约 DC-3 定稿核销
+
+## Deferred from: code review of 5-3-single-agent-workflow Round 1 (2026-10-21)
+
+> 审查台账见 Story 5-3「Review Findings」节（四视角并行调研 + 双评审员 C3 门禁，零 P0；P1×3 + P2×6 + P3 批 12 + 耗时优化 2 落地 1 改判）。本段为登记留项分流（详尽机理见 Story 已知下游风险区 #6-#8）。
+
+- 【R1-DF1·P2】幻觉工具名 380 穿透反思-重试闭环 — plan 阶段 LLM 自主选名（DC-10）幻觉未命中 registry 时 ToolNotFoundError(380) 直接穿透整链（execute 服务 L226 已声明决策），verify→reflect 重试只覆盖验证失败不覆盖工具解析失败；LLM 名字幻觉是结构化输出高频失败模式 — 核销触发：工具选择韧性 Story（步级捕获 380 记入 step_summaries 继续，或作为 reflect 闭环触发信号）
+- 【R1-DF2·P2】谓词键可经 parameters 预设（外部可控内部控制流初值）— 引擎 ainvoke 将 parameters 原样作初始 state，外部可预设 retry_count/executed_phases 初值（用例链路只传 agent_id/task/context 三键不触发；orchestration_service API 面直通）— 核销触发：7-2 REST 入口立项时初始 state 键白名单过滤
+- 【R1-DF3·P3】ChainOfThoughtSchema.input_summary 必填与「系统覆写」语义冗余 — R1-F8 采用文案修正（最小面），Schema 给 default（回声面字段值不被消费）为更根治形态 — 核销触发：下次 Schema 演进（联动既有 5 测试面）
+- 【R1-DF4·P3】测试基建耗时债：session autouse bootstrap() 7.35s×worker（D13 既有登记的 pytest 形态）— 纯 domain/SAP 单测 worker 被强制付组合根全量注册成本；本 Story 测试自身执行全亚秒（D 视角实证），耗时大头为共享基建 — 核销触发：组合根瘦身（D13 架构级决策）或 conftest 按需 bootstrap 分层（影响全仓测试，需专项评估）

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import BaseModel, Field
 
 from src.domain.exceptions import (
     LLMAPIError,
@@ -720,3 +721,146 @@ class TestExtractFirstJsonObject:
         content = '[1, 2, {"a": 3}]'
         result = _extract_first_json_object(content)
         assert result == content
+
+
+# ===================================================================
+# anthropic 通道结构化输出（Story 5-3 补——litellm response_format 转换缺陷绕过）
+# ===================================================================
+
+
+class _NestedStep(BaseModel):
+    """嵌套 Schema 步结构（模块级定义——精确类型注解使 isinstance 收窄生效）。"""
+
+    description: str = Field(min_length=1)
+    tool_name: str = ""
+
+
+class _NestedPlan(BaseModel):
+    """嵌套 Schema（list[Step] 形态——生产 PlanSchema 同构）。
+
+    复现 GLM-5.3 anthropic 端点 500 的 Schema 形态（嵌套 object list）。
+    """
+
+    steps: list[_NestedStep] = Field(min_length=1)
+
+
+def _make_nested_pydantic_schema() -> type[_NestedPlan]:
+    """构造嵌套 Schema（list[Step] 形态——生产 PlanSchema 同构）。"""
+    return _NestedPlan
+
+
+def _make_anthropic_config() -> LLMConfig:
+    """anthropic 协议配置（生产 UDMR_CLOUD GLM-5.3 同款形态）。"""
+    return LLMConfig(
+        api_type="anthropic",
+        model="glm-5.3-flash",
+        endpoint="https://open.bigmodel.cn/api/anthropic",
+        api_key="test-key",  # pragma: allowlist secret
+        temperature=0.3,
+        max_tokens=1024,
+        timeout=30.0,
+    )
+
+
+def _make_tool_call_response(arguments_json: str) -> MagicMock:
+    """构建带 tool_calls 的 LiteLLM 响应（anthropic tool_use 经 litellm 转换形态）。"""
+    mock_response = _make_mock_litellm_response(content="")
+    tool_call = MagicMock()
+    tool_call.function.arguments = arguments_json
+    tool_call.function.name = "Plan"
+    mock_response.choices[0].message.tool_calls = [tool_call]
+    return mock_response
+
+
+class TestStructuredGenerateAnthropicChannel:
+    """anthropic api_type 的结构化输出通道（tools 传法替代 response_format）。
+
+    根因（2026-10-20 实测定谳）：litellm 1.83 对 anthropic 协议的
+    response_format=json_schema 转换生成病态请求（嵌套 Schema 触发服务端
+    500 StackOverflowError）；标准 anthropic tool 格式两通道（原始 httpx 与
+    litellm tools 直传）均实证可靠——本通道按 api_type 分派请求构造与解析。
+    """
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_anthropic_uses_tools_channel_not_response_format(
+        self, mock_acompletion: MagicMock, client: LitellmLLMClient
+    ) -> None:
+        """anthropic 通道请求形态：标准 tools + tool_choice 强制；无 response_format。"""
+        plan = _make_nested_pydantic_schema()
+        mock_acompletion.return_value = _make_tool_call_response(
+            json.dumps({"steps": [{"description": "第一步分析", "tool_name": ""}]})
+        )
+        anthropic_cfg = _make_anthropic_config()
+
+        await client.structured_generate("规划任务", response_schema=plan, config=anthropic_cfg)
+
+        kwargs = mock_acompletion.call_args.kwargs
+        assert "response_format" not in kwargs, "anthropic 通道禁用 response_format（litellm 转换缺陷面）"
+        assert "tools" in kwargs, "anthropic 通道应以标准 tools 传法承载 Schema"
+        tool = kwargs["tools"][0]
+        assert tool["type"] == "function"
+        assert tool["function"]["name"] == _NestedPlan.__name__, "tool 名应为 Schema 类名（同源派生防改名破断言）"
+        # parameters 应为 Schema 原生 JSON Schema
+        assert tool["function"]["parameters"] == plan.model_json_schema()
+        assert kwargs["tool_choice"] == {"type": "function", "function": {"name": _NestedPlan.__name__}}, (
+            "强制调用该 tool（结构化确定性）"
+        )
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_openai_keeps_response_format_channel(self, mock_acompletion: MagicMock, client: LitellmLLMClient) -> None:
+        """openai 通道零回归：保持 response_format=json_schema 传法（原生直传无缺陷）。"""
+        plan = _make_nested_pydantic_schema()
+        mock_acompletion.return_value = _make_mock_litellm_response(
+            content=json.dumps({"steps": [{"description": "第一步", "tool_name": ""}]})
+        )
+
+        await client.structured_generate("规划任务", response_schema=plan)  # fixture 为 openai config
+
+        kwargs = mock_acompletion.call_args.kwargs
+        assert "tools" not in kwargs, "openai 通道不应注入 tools"
+        assert kwargs["response_format"]["type"] == "json_schema"
+        assert kwargs["response_format"]["json_schema"]["schema"] == plan.model_json_schema()
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_tool_call_arguments_parsed_to_schema(self, mock_acompletion: MagicMock, client: LitellmLLMClient) -> None:
+        """anthropic tool_use 响应解析：tool_calls[0].function.arguments → Schema 实例。"""
+        plan = _make_nested_pydantic_schema()
+        mock_acompletion.return_value = _make_tool_call_response(
+            json.dumps(
+                {
+                    "steps": [
+                        {"description": "行业宏观分析", "tool_name": "PESTEL 分析"},
+                        {"description": "综合建议", "tool_name": ""},
+                    ]
+                }
+            )
+        )
+
+        result = await client.structured_generate("规划任务", response_schema=plan, config=_make_anthropic_config())
+
+        assert isinstance(result, plan)
+        assert len(result.steps) == 2
+        assert result.steps[0].tool_name == "PESTEL 分析"
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_content_fallback_when_no_tool_calls(self, mock_acompletion: MagicMock, client: LitellmLLMClient) -> None:
+        """无 tool_calls 时回退 content 文本解析（模型偶发不调 tool 的容错面）。"""
+        plan = _make_nested_pydantic_schema()
+        mock_acompletion.return_value = _make_mock_litellm_response(
+            content='```json\n{"steps": [{"description": "回退解析", "tool_name": ""}]}\n```'
+        )
+
+        result = await client.structured_generate("规划任务", response_schema=plan, config=_make_anthropic_config())
+
+        assert isinstance(result, plan)
+        assert result.steps[0].description == "回退解析"
+
+    @patch("src.infrastructure.external_services.llm.litellm_llm_client.litellm.acompletion")
+    async def test_tool_call_invalid_json_raises_331(self, mock_acompletion: MagicMock, client: LitellmLLMClient) -> None:
+        """tool_use arguments 非法 JSON → LLMResponseError(331)（统一解析契约）。"""
+        plan = _make_nested_pydantic_schema()
+        mock_acompletion.return_value = _make_tool_call_response("not-valid-json")
+
+        with pytest.raises(LLMResponseError) as exc_info:
+            await client.structured_generate("规划任务", response_schema=plan, config=_make_anthropic_config())
+        assert exc_info.value.code == "EXCEPTION_331"

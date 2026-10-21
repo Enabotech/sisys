@@ -1,12 +1,13 @@
-"""Agent 命令行接口（Story 5-1 实例化 + Story 5-2 档案加载）
+"""Agent 命令行接口（Story 5-1 实例化 + Story 5-2 档案加载 + Story 5-3 工作流执行）
 
-提供 Agent 实例化与档案加载命令行工具。使用 argparse 标准库（零额外依赖），
-通过 pyproject.toml 注册为 sisys-agent 入口点。
+提供 Agent 实例化、档案加载与单 Agent 工作流执行命令行工具。使用 argparse
+标准库（零额外依赖），通过 pyproject.toml 注册为 sisys-agent 入口点。
 
 架构约束：
 - 位于 entrypoints 组装层（进程入口，D1 方案 A 上移自 interfaces/cli）
 - 通过 composition_root 的 bootstrap() + resolve("agent_instantiation_use_case" /
-  "agent_profile_use_case") 获取应用层用例（与 ocr_cli 同款接线模式）
+  "agent_profile_use_case" / "agent_workflow_use_case") 获取应用层用例（与
+  ocr_cli 同款接线模式）
 - 角色字符串 → 枚举转换必须守卫（禁止裸 AgentRole(value)——Enum 原生抛
   ValueError 逃逸统一异常体系，统一映射 AgentRoleNotSupportedError）
 - agent_id 字符串 → UUID 转换必须守卫（禁止裸 uuid.UUID(value)——ValueError
@@ -21,17 +22,28 @@
   （事件经 RELIABLE 通道落 PG outbox 表——进程外副作用，见 _close_connection_pools
   docstring）；发布事件是副作用（重复调用会重复发布 AgentProfileLoaded，
   事件带 event_id 消费方可按其幂等去重）。
+- run-task 单次执行语义——六阶段工作流阻塞执行到终态（成功/失败完成态均
+  正常走完 exit 0；443/441/444/445 等业务异常 exit 1）。
+
+bootstrap 幂等守卫（Story 5-3——DC-12 ③ 前提）：
+- _ensure_bootstrapped 检查 registry 关键端口已存在即跳过重放——防同进程
+  二次 bootstrap 因 lambda 工厂 spec 不幂等抛 ConflictError（测试进程内
+  main() 调用的前置条件）。
 
 运行方式：
     sisys-agent instantiate --role ceo
     sisys-agent load-profile --agent-id <uuid>
-    poetry run sisys-agent load-profile --agent-id <uuid>
+    sisys-agent run-task --agent-id <uuid> --task "<任务描述>"
+    poetry run sisys-agent run-task --agent-id <uuid> --task "<任务描述>"
 
 输出：
     instantiate 成功路径 stdout 为纯 UUID 单行（agent_id）；
     load-profile 成功路径 stdout 为多行人类可读摘要（六档案逐项 OK +
     活跃技能数 + 启动上下文 token 计量）；日志与错误走 stderr；
-    退出码 0=成功 / 1=业务异常（统一异常体系编码） / 2=用法错误（argparse）。
+    run-task 成功/失败完成态 stdout 为多行摘要（六阶段状态行 + 思维链
+    五段预览 + 证据引用 + 置信度 + 状态标记）；
+    退出码 0=成功或工作流正常走完（含失败完成态） / 1=业务异常（统一异常
+    体系编码） / 2=用法错误（argparse）。
 """
 
 from __future__ import annotations
@@ -48,6 +60,20 @@ from src.domain.exceptions import AgentRoleNotSupportedError, DomainError, Valid
 from src.domain.ports.resolver import get_resolver, resolve
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_bootstrapped() -> None:
+    """bootstrap 幂等守卫：registry 关键端口已存在即跳过重放（DC-12 ③前提）。
+
+    同进程二次 bootstrap 会因 lambda 工厂 spec 不幂等必抛 ConflictError
+    （PortRegistry.register 同名异 spec 冲突）——测试进程内 main() 调用
+    （conftest _bootstrap_once 已引导）依赖本守卫短路重放。
+    """
+    from src.domain.ports.registry import _global_registry
+
+    if _global_registry.get("agent_workflow_use_case") is not None:
+        return
+    bootstrap()
 
 
 def _parse_role(role_str: str) -> AgentRole:
@@ -157,6 +183,27 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="AGENT_ID",
         help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
     )
+
+    run_task = subparsers.add_parser(
+        "run-task",
+        help="执行单 Agent 六阶段工作流（感知→规划→执行→验证→反思→证据打包——阻塞执行）",
+    )
+    run_task.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=True,
+        metavar="AGENT_ID",
+        help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
+    )
+    run_task.add_argument(
+        "-t",
+        "--task",
+        type=str,
+        required=True,
+        metavar="TASK",
+        help='任务描述原文（如 "分析新能源汽车行业进入战略"）',
+    )
     return parser
 
 
@@ -245,7 +292,7 @@ def _run_load_profile_cli(agent_id_raw: str) -> int:
         return 1
 
     try:
-        bootstrap()
+        _ensure_bootstrapped()
         result = asyncio.run(_load_profile(agent_id))
         _print_profile_summary(result)
         logger.info(
@@ -260,6 +307,76 @@ def _run_load_profile_cli(agent_id_raw: str) -> int:
         return 1
     except Exception as error:
         logger.error("Agent 档案加载异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _run_task(agent_id: uuid_module.UUID, task: str) -> object:
+    """执行单 Agent 工作流并清理已打开的连接池（守卫触 Redis + outbox 触达 PG）。"""
+    use_case = resolve("agent_workflow_use_case")
+    try:
+        return await use_case.execute(agent_id=agent_id, task=task)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_workflow_summary(result: object) -> None:
+    """输出工作流执行多行人类可读摘要（stdout）。
+
+    六阶段状态行（executed_phases 轨迹）+ 思维链五段预览（to_display）+
+    证据引用 + 置信度 + 状态标记（completed/failed——CLI 契约定稿：失败
+    完成态 exit 0 语义下的状态可观测锚点）。
+
+    Args:
+        result: AgentWorkflowResult（属性访问避免 import 依赖）
+    """
+    status = getattr(result, "workflow_status")
+    phases = getattr(result, "executed_phases")
+    print(f"工作流状态: {status}（重试 {getattr(result, 'retry_count')} 次）")
+    print(f"阶段轨迹: {' → '.join(phases)}")
+    print(getattr(getattr(result, "chain"), "to_display")())
+    evidence = getattr(result, "evidence")
+    print(f"证据引用: {getattr(evidence, 'input_hash')}")
+    print(f"置信度: {getattr(evidence, 'confidence')}")
+    if status == "failed":
+        print(f"失败原因: {getattr(evidence, 'failure_reason')}")
+
+
+def _run_task_cli(agent_id_raw: str, task: str) -> int:
+    """run-task 子命令执行（守卫 → bootstrap → 执行 → 摘要输出）。
+
+    退出码契约（CLI 契约定稿）：成功与失败完成态均 exit 0（工作流正常走完
+    语义——status 可观测锚点在摘要输出）；443/441/444/445 等业务异常 exit 1。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+        task: --task 原始字符串
+
+    Returns:
+        退出码（0=工作流正常走完（含失败完成态），1=业务异常）
+    """
+    # UUID 守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    try:
+        agent_id = _parse_agent_uuid(agent_id_raw)
+    except ValidationError as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_task(agent_id, task))
+        _print_workflow_summary(result)
+        logger.info(
+            "Agent 工作流执行完成: status=%s",
+            getattr(result, "workflow_status"),
+        )
+        return 0
+    except DomainError as error:
+        logger.error("Agent 工作流执行失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Agent 工作流执行异常: %s", error, exc_info=True)
         return 1
 
 
@@ -316,6 +433,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "load-profile":
         return _run_load_profile_cli(args.agent_id)
+    if args.command == "run-task":
+        return _run_task_cli(args.agent_id, args.task)
     return _run_instantiate_cli(args.role)
 
 

@@ -1543,9 +1543,13 @@ def bootstrap() -> None:
         name="agent_engine",
         version="v1.0.0",
         interface=AgentEnginePort,
+        # Story 5-3：lambda 注入 workflow_service（六阶段图真跑的硬前置——
+        # 不注入则 SingleAgentWorkflow 分派抛 ValidationError；惰性 resolve
+        # 不要求注册顺序）
         impl=lambda resolver: LangGraphEngine(
             LangGraphConfig.from_env(),
             resolver.resolve("event_publisher"),
+            workflow_service=resolver.resolve("agent_workflow_service"),
         ),
         module="src.infrastructure.agent_orch.langgraph_engine",
         lifetime=Lifetime.SINGLETON,
@@ -2790,6 +2794,58 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("agent",),
+    )
+    # Story 5-3 — 单 Agent 六阶段工作流服务（R2 组合端口四依赖：
+    # LLM 客户端 + 工具执行服务（唯一调用通道）+ 技能加载 + 工具注册；
+    # base_config 注入生产 LLM 配置——温度分档基于基底派生完整配置，
+    # 防裸 LLMConfig() 丢 endpoint/api_key 连接字段——4-5 辩论纪律）
+    register_port(
+        name="agent_workflow_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_workflow",
+            fromlist=["AgentWorkflowServicePort"],
+        ).AgentWorkflowServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.agent_workflow_service",
+            fromlist=["AgentWorkflowService"],
+        ).AgentWorkflowService(
+            llm_client=resolver.resolve("llm_client"),
+            tool_execution_service=resolver.resolve("tool_execution_service"),
+            skill_loader=resolver.resolve("skill_loader"),
+            tool_registry_service=resolver.resolve("tool_registry_service"),
+            base_config=__import__(
+                "src.infrastructure.config.llm",
+                fromlist=["build_default_llm_config"],
+            ).build_default_llm_config(),
+        ),
+        module="src.application.services.agent_workflow_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "workflow"),
+    )
+    # Story 5-3 — 单 Agent 工作流执行用例（run-task 全链编排：守卫→档案加载→
+    # 装配→图执行→结果组装；R2 组合端口四依赖）
+    register_port(
+        name="agent_workflow_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.run_agent_workflow",
+            fromlist=["RunAgentWorkflowUseCase"],
+        ).RunAgentWorkflowUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.run_agent_workflow",
+            fromlist=["RunAgentWorkflowUseCase"],
+        ).RunAgentWorkflowUseCase(
+            agent_repository=resolver.resolve("agent_repository"),
+            agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
+            agent_engine=resolver.resolve("agent_engine"),
+            agent_workflow_service=resolver.resolve("agent_workflow_service"),
+        ),
+        module="src.application.use_cases.run_agent_workflow",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "workflow"),
     )
 
     # === 事件处理器注册（register_handlers）===

@@ -1556,7 +1556,14 @@ class MessagePriority(str, Enum):
     URGENT = "urgent"
 
 class SAPMessage(BaseModel):
-    """Agent 间通信消息（SAP 协议）"""
+    """Agent 间通信消息（SAP 协议）
+
+    .. note:: 勘误注记（Story 5-3 D-7，2026-10-20）：下方 ``correlation_id: UUID = None``
+        为 pydantic v2 非法默认（不可空类型配 None 默认）——实现修正为
+        ``correlation_id: UUID | None = None``（联合类型）；``isolation_level``
+        实现复用 domain ``IsolationLevel`` 枚举（SSOT，替代裸 str）。已落地
+        ``src/interfaces/sap/message.py``（15 字段，bus/传输归 5-11）。
+    """
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID  # 会话 ID，关联同一对话的消息
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

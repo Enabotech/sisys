@@ -19,6 +19,7 @@ from src.domain.exceptions import (
     AgentNotFoundError,
     AgentProfileError,
     AgentRoleNotSupportedError,
+    AgentWorkflowError,
     ArchiveConflictError,
     ArchiveNotFoundError,
     ArchiveStorageError,
@@ -29,6 +30,7 @@ from src.domain.exceptions import (
     BusinessRuleViolationError,
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
+    ChainOfThoughtValidationError,
     ChunkingError,
     ComplianceLockError,
     ConfigurationError,
@@ -267,6 +269,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     AgentRoleNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 441 — MVP 未开放角色（精确注册，避免回退 400）
     AgentProfileError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 442 — 档案资产无效（系统资源缺陷，与 440 同族）
     AgentNotFoundError: status.HTTP_404_NOT_FOUND,  # 443 — 请求的 Agent 实例不存在（精确注册，避免回退 400）
+    AgentWorkflowError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 444 — 工作流阶段执行失败（系统执行语义，精确注册防回退歧义）
+    ChainOfThoughtValidationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 445 — 思维链完整性校验失败（系统组装缺陷语义）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

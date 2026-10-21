@@ -53,7 +53,7 @@ class TestAgentEnginePortProtocol:
         assert hints["return"] is FlowStatus
 
     def test_structural_subtyping(self) -> None:
-        """满足签名的类应通过 isinstance 检查"""
+        """满足签名的类应通过 isinstance 检查（含 Story 5-3 get_graph_result）"""
 
         class FakeEngine:
             async def submit_graph(self, graph_name: str, parameters: dict[str, Any]) -> str:
@@ -61,6 +61,9 @@ class TestAgentEnginePortProtocol:
 
             async def get_graph_status(self, graph_run_id: str) -> FlowStatus:
                 return FlowStatus.COMPLETED
+
+            async def get_graph_result(self, graph_run_id: str) -> dict[str, Any] | None:
+                return None
 
         from src.domain.ports.agent_engine import AgentEnginePort
 

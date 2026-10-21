@@ -999,6 +999,15 @@ class SkillSelector:
 
 ### 5.6 Agent 上下文加载流程
 
+> **装配契约落地注记（Story 5-3，2026-10-20）：** Step 1 的 AGENT.md 未实施（无 FR 认领）——
+> 其「项目上下文+约束」语义由六阶段工作流的核心约束文本常量承载
+> （`agent_workflow_prompts.CORE_CONSTRAINTS_TEXT`，5-3 D-2 裁决）。已落地的装配形态（DC-3 定稿）：
+> system_prompt 五分节定序 IDENTITY→SOUL→CODE→核心约束→TOOLS L1 视图 + USER/MEMORY 尾节；
+> HEARTBEAT 档案不注入（调度心跳配置非推理上下文）；task_description 进 user prompt；
+> 计量为 CJK 感知估算（中文 1.5 字/token 其他 4 字/token——`assembled_context_tokens`
+> 落位 WorkflowContext，弃 chars//4 口径）。TOOLS.md 缺失/降级空 L1 时装配显式
+> 「无可用工具」注记（5-3 R3-DF1 核销）。
+
 ```
 Agent 启动
     │
@@ -1298,6 +1307,12 @@ class CEOSkill:
 | **V2+** | ✅ 完整实现 | EIP 协作态 + 隔离切换 + mTLS | 企业级多 Agent 协作必需 |
 
 ### 7.4 消息格式定义
+
+> **Schema 已定义注记（Story 5-3，2026-10-20）：** SAPMessage 15 字段契约已落地
+> `src/interfaces/sap/`（types.py 枚举 + message.py Pydantic 模型——FR-IF-03
+> Schema-only 交付）；correlation_id 修正为 `UUID | None = None` 联合类型
+> （pydantic v2 非法默认修正，5-3 D-7）；isolation_level 复用 domain
+> IsolationLevel 枚举（SSOT）。bus/传输/序列化/黑板交互归 Story 5.11。
 
 ```python
 class MessageType(str, Enum):

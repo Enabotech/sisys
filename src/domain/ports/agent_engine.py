@@ -40,3 +40,18 @@ class AgentEnginePort(Protocol):
             当前状态图执行状态
         """
         ...
+
+    async def get_graph_result(self, graph_run_id: str) -> dict[str, Any] | None:
+        """取回状态图终态 state（Story 5-3 — DC-11 既有端口追加方法）
+
+        用例/CLI 的结果组装数据源（ainvoke 终态 state 在端口面的取回通道
+        ——不改既有 submit_graph/get_graph_status 签名，BasicAgent 向后兼容）。
+
+        Args:
+            graph_run_id: 状态图运行标识符
+
+        Returns:
+            终态 state dict；未知/过期 id 或失败路径（无终态）返回 None
+            ——与 get_graph_status 的 FAILED 默认语义区分
+        """
+        ...

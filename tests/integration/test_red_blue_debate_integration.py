@@ -400,6 +400,14 @@ class TestRealLLMDebate:
                 service.run_debate(topic=topic, context=ExecutionContext(tenant_id=topic.tenant_id)),
                 timeout=180.0,  # 防挂死上限（慢端点 3 次调用 + tenacity 重试余量）
             )
+        except asyncio.TimeoutError:
+            # 防挂死上限击穿（2026-10-20 GLM-5.3 thinking 实测踩中：单次结构化
+            # 调用 30s+ × 三视角 + 重试余量超 180s）——语义与 elapsed ≥ 30s 分支
+            # 同归「端点性能不满足 30s 目标前提」（极端形态），环境性能非实现缺陷
+            pytest.skip(
+                "端点性能不满足 30s 目标前提（180s 防挂死上限击穿——慢端点三视角"
+                "累计超时）；目标验收移交达标环境/Story 5.7 批量基准"
+            )
         except (DebateGenerationError, DebateSynthesisError) as exc:
             # cause 分类分流（R2-D1 清偿）：环境类异常（服务端 5xx/超时/过载/模型输出
             # 不合约束——与服务的包装 except 面对齐）→ 动态跳过与"端点不可达"同置；

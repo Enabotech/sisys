@@ -109,14 +109,17 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 遵循 data_source 410-419 / debate 420-429 独立段先例）
     # EXCEPTION_434-439 暂不分配，保持空段预留
     "tool_version": (430, 439),
-    # Agent 子域（440-449）—— Story 5.1 注册 2 个 + Story 5.2 追加 2 个异常:
+    # Agent 子域（440-449）—— Story 5.1 注册 2 个 + Story 5.2 追加 2 个 + Story 5.3 追加 2 个异常:
     # EXCEPTION_440 AgentConfigError (Story 5.1, 配置文件缺失/YAML 解析失败/必填字段无效/role 不匹配/state_ttl 越界)
     # EXCEPTION_441 AgentRoleNotSupportedError (Story 5.1, MVP 未开放角色实例化请求)
     # EXCEPTION_442 AgentProfileError (Story 5.2, 档案目录缺失/文件缺失/不可读/编码非法/内容空白/超 64KB 上限/VO 字段类型非法)
     # EXCEPTION_443 AgentNotFoundError (Story 5.2, get_by_id 返回 None——键不存在或 TTL 过期后重放旧 agent_id)
-    # 440/442 语义归属 system（SystemException 子类——配置/档案资产属系统资源）、441/443 语义归属
-    # business（BusinessException 子类——阶段性能力范围限制/请求资源不存在），物理段独立（遵循独立段先例）
-    # EXCEPTION_444-449 预留（5.4-5.5 EIP 隔离 / 5.3 工作流异常）
+    # EXCEPTION_444 AgentWorkflowError (Story 5.3, 工作流阶段执行失败——LLM 调用失败包装/图执行异常收敛，phase 区分锚点)
+    # EXCEPTION_445 ChainOfThoughtValidationError (Story 5.3, 思维链完整性校验失败——终局组装后五字段缺一/空值/结构非法)
+    # 445 的 missing_fields 上下文为同码多因区分锚点（异常契约三层校验次序②的改写目标）
+    # 440/442/444/445 语义归属 system（SystemException 子类——配置/档案资产/工作流执行属系统资源）、
+    # 441/443 语义归属 business（BusinessException 子类——阶段性能力范围限制/请求资源不存在），物理段独立（遵循独立段先例）
+    # EXCEPTION_446-449 预留（5.4-5.5 EIP 隔离）
     "agent": (440, 449),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -270,11 +273,13 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolVersionAlreadyExistsError": "tool_version",
     "ToolVersionTrafficWeightError": "tool_version",
     "ToolVersionRollbackError": "tool_version",
-    # agent_exceptions.py (Story 5.1 新增 2 个异常, Story 5.2 追加 2 个)
+    # agent_exceptions.py (Story 5.1 新增 2 个异常, Story 5.2 追加 2 个, Story 5.3 追加 2 个)
     "AgentConfigError": "agent",
     "AgentRoleNotSupportedError": "agent",
     "AgentProfileError": "agent",
     "AgentNotFoundError": "agent",
+    "AgentWorkflowError": "agent",
+    "ChainOfThoughtValidationError": "agent",
 }
 
 

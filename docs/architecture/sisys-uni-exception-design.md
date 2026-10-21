@@ -733,7 +733,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_441 | AgentRoleNotSupportedError | BusinessException | 422 |（Story 5.1，MVP 未开放角色实例化请求——阶段性业务能力范围限制，精确注册避免回退 400）|
 | EXCEPTION_442 | AgentProfileError | SystemException | 500 |（Story 5.2，档案目录缺失/档案文件缺失/文件不可读（OSError 家族）/编码非法（非 UTF-8）/内容纯空白/单文件超 64KB 上限/VO 字段类型非法（六档案非 str）——档案资产属系统资源（部署缺陷非调用方输入错误），同 440 继承链语义分码监控）|
 | EXCEPTION_443 | AgentNotFoundError | BusinessException | 404 |（Story 5.2，get_by_id(agent_id) 返回 None——键不存在或 TTL 过期后重放旧 agent_id，请求资源不存在语义，精确注册避免回退 400）|
-| EXCEPTION_444~449 | （预留 agent 子域）| — | — |（5.4-5.5 EIP 隔离 / 5.3 工作流异常）|
+| EXCEPTION_444 | AgentWorkflowError | SystemException | 500 |（Story 5.3，单 Agent 工作流阶段执行失败——六阶段 LLM 调用失败包装/图执行异常收敛，context.phase ∈ perceive/plan/execute/verify/reflect/package 为同码多因区分锚点；LLMConfigError 与 CancelledError 透传不包装——4-5 辩论纪律先例）|
+| EXCEPTION_445 | ChainOfThoughtValidationError | SystemException | 500 |（Story 5.3，思维链终局组装后完整性校验失败——五字段缺一/空值/结构非法，context.missing_fields 区分锚点；三层校验次序：LLM Schema 失败→331→444、VO 242 改写 445、服务自检直接 445）|
+| EXCEPTION_446~449 | （预留 agent 子域）| — | — |（5.4-5.5 EIP 隔离）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
