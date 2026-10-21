@@ -45,7 +45,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | Story 5.3 | `AgentWorkflowService`/`RunAgentWorkflowUseCase`（本 Story 不修改）+ 事件 kw_only 必填纪律（agent_events.py L70-100 AgentProfileLoaded 先例）+ `_RecordingEventPublisher` 手工装配先例 + SCOPED 捕获留项移交（风险 #4「其 SCOPED 归属同评估」） | 事件纪律收紧基准；D7 评估义务 | ✅ done |
 | Story 1.2 | `IsolationLevel` 枚举（`src/domain/events/enums.py` L39-45：L4_HARD/L3_SOFT/L2_COLLAB/L1_FUSED，str,Enum）——**SSOT 唯一定义点，直接复用禁止新建** | 等级枚举 | ✅ done |
 | Story 1.x 骨架 | `IsolationLevelSwitched` 事件预置（`src/domain/events/isolation_events.py` L16-43，**旧风格 default_factory——本 Story 纪律收紧**）+ yaml/channel_router 双登记已就绪（configs/event_channels.yaml L197-201 + src/infrastructure/messaging/channel_router.py L255-260，RELIABLE 单通道）+ `AutoTriggerHandler._registered_event_types` 字符串清单已含该事件（auto_trigger_handler.py L68） | 事件复用（零新建零登记，仅收紧纪律） | ✅ done |
-| 事件总线 | `EventPublisher.publish(event) -> PublishResult`（domain/ports/event_publisher.py L26）+ `DualChannelEventBus`（infrastructure/messaging/dual_channel_event_bus.py L20-65）+ `InMemoryEventBus`（真实类——inmemory_event_bus.py L19；子类捕获先例是 5-1/5-2 单测 `_TracingEventBus`，5-3 验收/集成的 `_RecordingEventPublisher`/`_RecordingEventBus` 为手写 duck-typing 类，非子类——R1-F14 校准） | 切换事件发布 | ✅ done |
+| 事件总线 | `EventPublisher.publish(event) -> PublishResult`（domain/ports/event_publisher.py L26）+ `DualChannelEventBus`（infrastructure/messaging/dual_channel_event_bus.py L20-65）+ `InMemoryEventBus`（真实类——inmemory_event_bus.py L18；子类捕获先例是 5-1/5-2 单测 `_TracingEventBus`，5-3 验收/集成的 `_RecordingEventPublisher`/`_RecordingEventBus` 为手写 duck-typing 类，非子类——R1-F14 校准） | 切换事件发布 | ✅ done |
 | 异常体系 | agent 子域段 446-449 **显式预留「5.4-5.5 EIP 隔离」**（`src/domain/exceptions/_code_ranges.py` L122） | 新异常 446/447 码位 | ✅ 就绪 |
 
 **移交给本 Story 的留项（必须处置）**：
@@ -124,7 +124,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 - [ ] 隔离键与 Agent 键并存（两键各自独立存在，隔离键不写入 Agent 键空间）
 - [ ] TTL 断言用 `redis.ttl(key)` 校验区间（禁真实等待过期——redis_cache_layer 先例）
 - [ ] 持久化往返：save → get_by_agent_id 重建的 `IsolationState` 字段逐项相等（UUID/IsolationLevel/datetime 显式重建——RedisAgentRepository 同款纪律）
-- [ ] 初始化等级非法（配置 L1 或非 MVP 等级）→ 446 拒绝（**验收禁 mock 下的合规驱动（R1-F35）**：临时 yaml 配置文件（default_isolation_level: L1）+ 真实 config_loader 加载 + 真实服务链——禁 mock config 注入）
+- [ ] 初始化等级非法（配置 L1——合法枚举越 MVP 白名单，loader 放行后由实体 initialize 446 拒绝；**非法枚举串如 "L9" 在 loader 层即 440 属循环 E 单测面，不进本验收断言**——R2-组合-3 输入通道分层收口）→ 446 拒绝（**验收禁 mock 下的合规驱动（R1-F35）**：临时 yaml 配置文件（default_isolation_level: L1）+ 真实 config_loader 加载 + 真实服务链——禁 mock config 注入）
 - [ ] 仓储 TTL 越界（<60 或 >2592000）→ 440（防御校验复用语义）
 
 ### AC-3: 隔离状态查询（隔离检查入口）
@@ -163,10 +163,10 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 **Then** 隔离检查延迟 P95<100ms（epics L1612）；隔离状态持久化成功率 100%；并发隔离 Agent≥10（epics L1614 / NFR-PERF-04 MVP 档）
 
 **验证标准/Validation Criteria:**
-- [ ] P95：`get_isolation_state` 服务全链真实 Redis 计时（R1-F02：443 存在性守卫 + 隔离态读两次读——DC-11 口径），warmup 剔除 1 次 + 20 采样 + `statistics.quantiles(n=20)[18] < 0.1s`（`perf_counter` 计时——profile_loading 先例；计时含协议解析与 VO 重建全链）。**验收 AC-5×3 场景委托集成模块计时 helper**（模块级采样缓存共享同批结果 + 验收与集成同名 xdist_group("agent-isolation-perf") 同 worker 串行缓存命中——禁 20 采样双跑拖慢套件，5-3 先例；R1-F23）
+- [ ] P95：`get_isolation_state` 服务全链真实 Redis 计时（R1-F02：443 存在性守卫 + 隔离态读——**共两次真实 Redis 读**（R2-回归-10 措辞校准），DC-11 口径），warmup 剔除 1 次 + 20 采样 + `statistics.quantiles(n=20)[18] < 0.1s`（`perf_counter` 计时——profile_loading 先例；计时含协议解析与 VO 重建全链）。**验收 AC-5×3 场景委托集成模块计时 helper**（模块级采样缓存共享同批结果 + 验收与集成同名 xdist_group("agent-isolation-perf") 同 worker 串行缓存命中——禁 20 采样双跑拖慢套件，5-3 先例；R1-F23）
 - [ ] 持久化成功率：20 次连续 save+读回验证全成功（分母 20 分子 20）
 - [ ] 并发 10：10 个 agent_id 并发 initialize+switch+get（`asyncio.gather`）全部成功且状态互不串扰（单进程并发先例）
-- [ ] 计时场景 xdist_group 串行（`agent-isolation-perf`）+ benchmark 场景级标记（**验收侧不打文件级**——5-3 验收 R1-F8 先例；集成侧 Task 6 按集成先例（profile_loading L46-51）文件级 pytestmark 含 benchmark+xdist_group——两层各自对齐本层先例，R1-F16 口径注记）
+- [ ] 计时场景 xdist_group 串行（`agent-isolation-perf`）+ benchmark 场景级标记（**验收侧不打文件级**——5-2 R1-F8 先例（R2-回归-6 归属勘误：原写「5-3 验收 R1-F8」，该先例属 5-2，5-3 L281 是转引）；集成侧 Task 6 按集成先例（profile_loading L46-51）文件级 pytestmark 含 benchmark+xdist_group——两层各自对齐本层先例，R1-F16 口径注记）
 
 ### AC-6: 端口接线、架构合规与 CLI 全链
 
@@ -179,7 +179,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 - [ ] `InstantiateAgentUseCase` resolve 可达且注入链完整（实例化→隔离键真实出现——端到端锚）
 - [ ] CLI 全链：instantiate 产出 agent_id（手动组装实例化——不经 main()，R1-F06）→ isolation-status 输出 L4（main() exit 0）→ set-isolation L3 输出切换摘要（main() exit 0）→ isolation-status 输出 L3；守卫路径 443/446/447/201 退出码 1 + stderr 编码断言 `\[EXCEPTION_(?:201|4[0-9]{2})\]`（R1-F15——正则须同时匹配 201 与 4xx 两族）
 - [ ] 架构验证器：domain 零外部依赖（isolation_policy.py/isolation_state.py/isolation_events.py/agent_exceptions.py AST 扫描禁 pydantic/redis）+ 组合根外零实例化 + 端口方向（application 服务依赖 domain 端口合法）
-- [ ] CLI 成功路径验收 = 进程内 `main()` 调用（5-3 DC-12 测试序四件套同款：**`clear_singleton()` + `clear_scoped()` 双清**（R1-F06——SCOPED agent_repository 实例钉死在上一命令 asyncio.run 循环，只清 singleton 不够）→ conftest 已 bootstrap → 按需覆写 → main()；**每次 main() 调用前重执行双清**。**instantiate 步骤不经 main()**——手动组装实例化产出 agent_id（5-3 AC-6.3 同款先例：`_run_instantiate_cli` 直调 `bootstrap()` 与 conftest session 级 bootstrap 二重注册必抛 ConflictError——registry 同名异 spec 守卫）。本 Story 无 LLM 依赖，仅需关注 resolve 链与 Redis 门控）
+- [ ] CLI 成功路径验收 = 进程内 `main()` 调用（**扩展 5-3 DC-12 测试序四件套（R2-回归-7 归称校准）**：`clear_singleton()` 同款 + **新增 `clear_scoped()`**——本 Story 连续多次 main() 需清 SCOPED agent_repository 跨循环死实例（5-3 原四件套仅单清）→ conftest 已 bootstrap → 按需覆写 → main()；**每次 main() 调用前重执行双清**。**instantiate 步骤不经 main()**——手动组装实例化产出 agent_id（5-3 AC-6.3 同款先例：`_run_instantiate_cli` 直调 `bootstrap()` 与 conftest session 级 bootstrap 二重注册必抛 ConflictError——registry 同名异 spec 守卫）。本 Story 无 LLM 依赖，仅需关注 resolve 链与 Redis 门控）
 
 ---
 
@@ -310,7 +310,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | TDD 契约测试 | isolation_management_service | 11 维度 + DummyResolver | `tests/contracts/test_port_contract_isolation_management_service.py` | Task 3 |
 | TDD 单元测试 | InstantiateAgentUseCase 注入改造 | 第四依赖调用断言/初始化失败 fail-fast/既有守卫零回归 | `tests/unit/application/use_cases/test_agent_instantiation.py`（追加+同步） | Task 4 |
 | TDD 单元测试 | CLI 子命令 | 参数解析/`_parse_isolation_level` 两道守卫/退出码/no-op 输出 | `tests/unit/interfaces/cli/test_agent_cli.py`（追加） | Task 5 |
-| TDD 验收测试 | Gherkin + BDD | 18 场景（Task 0 编写，各 Task 转绿——AC-1 随 Task 1、AC-2 随 Task 2/4、AC-3/AC-4 随 Task 3/5、AC-5×3 随 Task 6、AC-6 随 Task 4/5/7、收尾场景 Task 8——R1-F43 补 AC-6 归属） | `test_acceptance_agent_isolation.feature/.py` | Task 0-8 |
+| TDD 验收测试 | Gherkin + BDD | 17 场景 Task 0 编写 + 收尾场景 Task 8 追加（全量 18；各 Task 转绿——AC-1 随 Task 1、AC-2 随 Task 2/4、AC-3/AC-4 随 Task 3/5、AC-5×3 随 Task 6、AC-6 随 Task 4/5/7、收尾场景 Task 8——R1-F43 补 AC-6 归属 + R2-组合-7 口径收口：原「18 场景（Task 0 编写」把收尾错归 Task 0，与 L386/L610 冲突） | `test_acceptance_agent_isolation.feature/.py` | Task 0-8 |
 | SDD 架构验证 | 六边形约束 | domain 零外部依赖/组合根外零实例化/端口方向/lifetime 决策落地 | `tests/unit/architecture/test_arch_agent_isolation.py` | Task 7 |
 | 集成测试 | 全链（真实 Redis） | 实例化→隔离→切换→事件/性能三指标/并发 10 | `tests/integration/test_integration_agent_isolation.py` | Task 6 |
 
@@ -432,7 +432,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | 某字段默认值回退 → TypeError 断言红 → 还原 |
 | 🔄 重构 | 事件全套测试绿（test_event_architecture 导出断言复验 + `tests/acceptance/test_acceptance_domain_event_definition.py` 构造形态同步——回归面四文件全绿） |
 
-#### TDD 循环 E：AgentConfig D6 残余回填
+#### TDD 循环 E：AgentConfig D6 残余回填（DC-12 回填边界定稿）
 
 | 阶段 | 动作 |
 |------|------|
@@ -484,7 +484,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_isolation_management_service.py`（`AsyncMock(spec=IsolationRepository)` + `AsyncMock(spec=AgentRepository)` + `AsyncMock(spec=EventPublisher)` + `AsyncMock(spec=AgentConfigLoader)` 四替身——单测 Mock 端口合规；config stub 携带 state_ttl。initialize：构建状态→repo.save(state, ttl) 调用断言（参数含 TTL）/返回 IsolationState/非法等级由实体工厂 446 拦截（服务不重复校验——向上透传）。get **守卫序同 switch 前置（R1-F02）**：agent_repository.get_by_id None → 443/isolation repo.get 返回状态→透传/repo.get 返回 None → 抛 447（context agent_id）/repo 异常透传。switch **守卫序 calls 断言**（5-2 先例）：agent_repository.get_by_id None → 443（isolation repo 未被调——calls 顺序断言）/状态 None → 447/实体 switch_to 返回 False → switched=False + event=None + **repo.save 零调用 + publisher 零调用**（no-op 零副作用——calls 计数断言）/返回 True → repo.save 恰一次且 **ttl 参数 == config stub 的 state_ttl（R1-F01 TTL 真源断言——config_loader.load(agent.role) 恰一次）** + publisher.publish 恰一次（事件六字段断言：previous==旧等级/target==新等级/trigger_reason/approval_chain==传入链/aggregate_id==agent_id）/publish 抛异常 → 记日志不回滚（结果正常返回——publish 失败容错，DC-10；logger 断言或 caplog） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_isolation_management_service.py`（`AsyncMock(spec=IsolationRepository)` + `AsyncMock(spec=AgentRepository)` + `AsyncMock(spec=EventPublisher)` + `AsyncMock(spec=AgentConfigLoader)` 四替身——单测 Mock 端口合规；config stub 携带 state_ttl。initialize：构建状态→repo.save(state, ttl) 调用断言（参数含 TTL）/返回 IsolationState/非法等级由实体工厂 446 拦截（服务不重复校验——向上透传）。get **守卫序同 switch 前置（R1-F02——含同款 calls 顺序断言，R2-组合-2 显式化）**：agent_repository.get_by_id None → 443 且 isolation_repository 未被调（calls 顺序断言——变异可红前提）/isolation repo.get 返回状态→透传/repo.get 返回 None → 抛 447（context agent_id）/repo 异常透传。switch **守卫序 calls 断言**（5-2 先例）：agent_repository.get_by_id None → 443（isolation repo 未被调——calls 顺序断言）/状态 None → 447/实体 switch_to 返回 False → switched=False + event=None + **repo.save 零调用 + publisher 零调用**（no-op 零副作用——calls 计数断言）/返回 True → repo.save 恰一次且 **ttl 参数 == config stub 的 state_ttl（R1-F01 TTL 真源断言——config_loader.load(agent.role) 恰一次）** + publisher.publish 恰一次（事件六字段断言：previous==旧等级/target==新等级/trigger_reason/approval_chain==传入链/aggregate_id==agent_id）/publish 抛异常 → 记日志不回滚（结果正常返回——publish 失败容错，DC-10；logger 断言或 caplog）/**publish 返回 is_success=False 失败结果 → 结果正常返回（switched=True）+ repo.save 恰一次保持 + logger.warning 断言**（R2-组合-5：真实总线失败不抛异常——先例 test_agent_instantiation.py test_publish_is_success_false_path_returns_result 同款独立命名用例，两分支各配独立用例） |
 | 🟢 绿 | 实现 `src/application/ports/isolation_management.py`（Protocol + IsolationSwitchResult）+ `src/application/services/isolation_management_service.py`（构造注入 isolation_repository/agent_repository/event_publisher/agent_config_loader——R2 组合四依赖；switch 内 TTL 取值 `config = await self._config_loader.load(agent.role)`（agent 复用 443 守卫已取实例——R1-F01）+ `datetime.now(UTC)` 单次取值传实体（initialized/updated 一致性）；发布失败容错双分支对齐 InstantiateAgentUseCase 先例：`try/except Exception` 记日志 **+ `publish_result.is_success == False` 分支记日志**——真实总线发布失败不抛异常而返回失败结果，单分支 except 在真实链路不可达） |
 | 🟡 变异 | 守卫顺序交换（447 先于 443）→ calls 断言红 → 还原；no-op 分支误调 save → 计数断言红 → 还原 |
 | 🔄 重构 | ruff + mypy |
@@ -524,7 +524,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🔴 红 | `tests/contracts/test_port_contract_agent_instantiation_use_case.py` impl 维度同步（工厂签名四依赖）；组合根注册测试（如有）同步 |
 | 🟢 绿 | 组合根 lambda 四依赖完整；`resolve("agent_instantiation_use_case")` 冒烟（链路接线断言清单 L2——**端到端锚**：真实 Redis 下 instantiate → 隔离键真实出现，归验收 AC-2.1 场景） |
 | 🟡 变异 | lambda 漏注入 isolation 依赖 → resolve 构造失败红 → 还原 |
-| 🔄 重构 | **回归面清单全量跑**（适配器契约变更回归规则——R1-F05 补全：`InstantiateAgentUseCase(` 全仓 9 处构造点 + 3 处联动测试）。**手动构造点 7 处（第四依赖必填，全部需同步补依赖）**：①单测 `tests/unit/application/use_cases/test_agent_instantiation.py:121`（_make_use_case 工厂）；②验收 `test_acceptance_agent_instantiation.py:214`；③验收 `test_acceptance_agent_profile_loading.py:228`；④验收 `test_acceptance_agent_workflow.py:564`（5-3 AC-6.3 场景手动组装）；⑤集成 `test_integration_agent_workflow.py:227`（`_instantiate_agent` helper——**手动组装非 resolve 链**，场景①②③⑤共用）；⑥集成 `test_integration_agent_profile_loading.py:64`（assembled fixture）；⑦集成 `test_integration_agent_instantiation.py:68`。**联动测试 3 处**：test_agent_cli（instantiate 部分）/test_port_contract_agent_instantiation_use_case（_DummyResolver 按名提供依赖分支 L27-51 同步）/test_yaml_agent_config_loader/test_agent_config。验收/集成手动组装处补第四依赖：真实 `IsolationManagementService`（真实隔离链）或 `AsyncMock(spec=IsolationManagementServicePort)`（既有验收 mock 形态——5-1 验收先例 L214 同款） |
+| 🔄 重构 | **回归面清单全量跑**（适配器契约变更回归规则——R1-F05 补全：`InstantiateAgentUseCase(` 全仓 8 处构造点 + 3 处联动测试——R2-回归-5 计数勘误：7 手动构造 + 组合根 lambda，契约测试经 spec.impl 反射构造不入 grep 面）。**手动构造点 7 处（第四依赖必填，全部需同步补依赖）**：①单测 `tests/unit/application/use_cases/test_agent_instantiation.py:121`（_make_use_case 工厂）；②验收 `test_acceptance_agent_instantiation.py:214`；③验收 `test_acceptance_agent_profile_loading.py:228`；④验收 `test_acceptance_agent_workflow.py:564`（5-3 AC-6.3 场景手动组装）；⑤集成 `test_integration_agent_workflow.py:227`（`_instantiate_agent` helper——**手动组装非 resolve 链**，场景①②③⑤共用）；⑥集成 `test_integration_agent_profile_loading.py:64`（assembled fixture）；⑦集成 `test_integration_agent_instantiation.py:68`。**联动测试 3 处**：test_agent_cli（instantiate 部分）/test_port_contract_agent_instantiation_use_case（_DummyResolver 按名提供依赖分支 L27-51 同步）/test_yaml_agent_config_loader/test_agent_config。**第四依赖分派（R2-回归-2 + R2-组合-1 定稿）**：既有三验收文件（②③④）与三集成文件（⑤⑥⑦）回归同步用 `AsyncMock(spec=IsolationManagementServicePort)`（保既有场景聚焦——隔离面不在其被测范围；集成 Mock 工厂子模式合规。注：5-1 验收 L214 是全真实组装先例非 mock——mock 分支为本 Story 新增回归形态决策，无既有验收组装先例）；本 Story 新验收场景（AC-2.1/AC-4×4/AC-6.2）与集成场景①用**真实 IsolationManagementService 完整四依赖手动组装**（隔离键必须真实写入——其四依赖：isolation_repository/agent_repository 场景级客户端、event_publisher=_RecordingEventPublisher、agent_config_loader 经 resolve("agent_config_loader") 取——无状态零连接 resolve 安全，5-3 集成 `_instantiate_agent` L227 同款） |
 
 - [ ] Subtask 4.1-4.2: 两循环红绿变异重构
 - [ ] Subtask 4.3: 回归面清单全绿确认
@@ -541,8 +541,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | `tests/unit/interfaces/cli/test_agent_cli.py` 追加（`_parse_isolation_level` 两道守卫——**顺序对齐 `_parse_role` 先例（R1-F07）**：第一道 `try IsolationLevel(raw) except ValueError` 映射 446 `from None`（唯一拦截非法字符串的活路径）/第二道 `SUPPORTED_ISOLATION_LEVELS` 预检（唯一拦截「合法枚举但未开放」即 L1 的活路径）；context 携带原始输入与支持列表/isolation-status：参数必填 --agent-id/成功输出等级+三维度策略+时间（stdout 断言）/443/447/201 → exit 1 + stderr 编码断言 `\[EXCEPTION_(?:201|4[0-9]{2})\]` 精确匹配（R1-F15：201 是 ValidationError 族须同匹配）/set-isolation：--agent-id/--level/--reason 三参数必填/成功输出切换摘要（previous→target）/no-op 输出提示且 exit 0/443/446/447/201 → exit 1/`--level L1` 字符串 → 446（统一异常出口，argparse 不做 choices 静默拒绝） |
-| 🟢 绿 | `src/entrypoints/agent_cli.py` 追加两子命令（骨架模板照抄 **load-profile/run-task 的 `_ensure_bootstrapped()` 幂等形态**——R1-F06：禁照抄 instantiate 直调 `bootstrap()`，conftest 已 bootstrap 的进程内二次调用必抛 ConflictError；守卫先于 bootstrap/退出码/`_close_connection_pools`；main() 分发分支插在既有 fallback `_run_instantiate_cli` 之前；resolve `isolation_management_service`；`SUPPORTED_ISOLATION_LEVELS` 模块常量 = 显式元组字面量 `("L4", "L3", "L2")`——**禁从 frozenset 迭代派生**（迭代序不稳定致帮助文本漂移，R1-F34），测试断言 `set(SUPPORTED_ISOLATION_LEVELS) == {l.value for l in MVP_ALLOWED_LEVELS}` 双锁防 V2 开放 L1 时漏改） |
+| 🔴 红 | `tests/unit/interfaces/cli/test_agent_cli.py` 追加（`_parse_isolation_level` 两道守卫——**顺序对齐 `_parse_role` 先例（R1-F07）**：第一道 `try IsolationLevel(raw) except ValueError` 映射 446 `from None`（唯一拦截非法字符串的活路径）/第二道 `SUPPORTED_ISOLATION_LEVELS` 预检（唯一拦截「合法枚举但未开放」即 L1 的活路径）；context 携带原始输入与支持列表/isolation-status：参数必填 --agent-id/成功输出等级+三维度策略+时间（stdout 断言）/443/447/201 → exit 1 + stderr 编码断言 `\[EXCEPTION_(?:201\|4[0-9]{2})\]` 精确匹配（R1-F15：201 是 ValidationError 族须同匹配；R2-回归-4 表格内转义修正）/set-isolation：--agent-id/--level/--reason 三参数必填/成功输出切换摘要（previous→target）/no-op 输出提示且 exit 0/443/446/447/201 → exit 1/`--level L1` 字符串 → 446（统一异常出口，argparse 不做 choices 静默拒绝） |
+| 🟢 绿 | `src/entrypoints/agent_cli.py` 追加两子命令（骨架模板照抄 **load-profile/run-task 的 `_ensure_bootstrapped()` 幂等形态**——R1-F06：禁照抄 instantiate 直调 `bootstrap()`，conftest 已 bootstrap 的进程内二次调用必抛 ConflictError；**禁照抄 `_parse_role` 的 `.lower()` 归一**——R2-组合-4：AgentRole 枚举值全小写而 IsolationLevel 枚举值全大写，lower 化将拒绝全部合法输入（"L4"→"l4"→ValueError→446）；--level 大小写敏感（契约 `<L4|L3|L2>`）；守卫先于 bootstrap/退出码/`_close_connection_pools`；main() 分发分支插在既有 fallback `_run_instantiate_cli` 之前；resolve `isolation_management_service`；`SUPPORTED_ISOLATION_LEVELS` 模块常量 = 显式元组字面量 `("L4", "L3", "L2")`——**禁从 frozenset 迭代派生**（迭代序不稳定致帮助文本漂移，R1-F34），测试断言 `set(SUPPORTED_ISOLATION_LEVELS) == {l.value for l in MVP_ALLOWED_LEVELS}` 双锁防 V2 开放 L1 时漏改） |
 | 🟡 变异 | 删第一道 except 分支 → "L9" 非法字符串用例红（ValueError 逃逸被断言捕获——5-1 Task 5 变异同款）→ 还原；删第二道预检 → `--level L1` 用例红 → 还原 |
 | 🔄 重构 | ruff + mypy |
 
@@ -562,7 +562,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_agent_isolation.py`（真实 Redis 6380 门控 ping 失败 skip + 手动组装全链 + `pytestmark = [pytest.mark.integration, pytest.mark.redis, pytest.mark.benchmark, pytest.mark.xdist_group("agent-isolation-perf")]`。场景①全链：真实 `InstantiateAgentUseCase`（手动组装：config_loader/repository/isolation_service[真实服务+真实隔离仓储]/InMemoryEventBus 或 recording）→ instantiate → 隔离键 L4 断言 → set-isolation 等价服务调用切 L3 → 键 L3 + recording 恰一次事件 → 双键 teardown + exists 复核。场景②P95：`get_isolation_state` warmup 1 + 20 采样 `quantiles(n=20)[18] < 0.1`（perf_counter；计时含 VO 重建全链；同源派生阈值常量）。场景③持久化成功率：20 次连续 initialize+读回全成功（分母分子断言 20/20）。场景④并发 10：10 agent_id `asyncio.gather` 并发 init+switch+get 全成功且各自状态独立（互不串扰断言——agent_i 状态==各自目标等级；**目标等级互异设计（R1-F42）**：奇数 agent 切 L3、偶数切 L2，使串扰在主断言即可红而非仅靠变异兜底）。场景⑤事件真实发布链路（5-3 场景⑤先例）：resolve 真实 `event_publisher`（DualChannelEventBus）+ 真实服务 switch 一次 → PG `event_outbox` 落行断言（`event_type=="IsolationLevelSwitched" and aggregate_id==str(agent_id)` 精确查询禁全表计数；outbox 追加语义无清理面；PG 门控动态 skip——构造 try/except 形态对齐 5-3 先例；**RabbitMQ 缺席不影响本场景（R1-F31）**：reliable 通道 publish 链路只写 PG outbox，实际投递归 AsyncOutboxPoller 异步侧，无需 rabbitmq 门控）。发布面口径差声明随 docstring（场景①recording 替身 vs 场景⑤生产 outbox） |
+| 🔴 红 | 编写 `tests/integration/test_integration_agent_isolation.py`（真实 Redis 6380 门控 ping 失败 skip + 手动组装全链 + `pytestmark = [pytest.mark.integration, pytest.mark.redis, pytest.mark.benchmark, pytest.mark.xdist_group("agent-isolation-perf")]`。场景①全链：真实 `InstantiateAgentUseCase`（手动组装：config_loader/repository/isolation_service[真实服务+真实隔离仓储]/InMemoryEventBus 或 recording）→ instantiate → 隔离键 L4 断言 → set-isolation 等价服务调用切 L3 → 键 L3 + recording 恰一次事件 → 双键 teardown + exists 复核。场景②P95：`get_isolation_state` warmup 1 + 20 采样 `quantiles(n=20)[18] < 0.1`（perf_counter；计时含 VO 重建全链；同源派生阈值常量；**交付形态（R2-回归-8）**：模块级采样缓存计时 helper（`_PERF_CACHE` 单槽缓存——供验收 AC-5×3 委托共享，同 xdist_group 同 worker 缓存命中，5-3 集成 test_integration_agent_workflow.py L71/L300 先例；helper 内 sample_keys **双键登记**——每轮 initialize 产生 agent+isolation 双键即时清理，5-3 单键形态的双键扩展——R2-组合-9）。场景③持久化成功率：20 次连续 initialize+读回全成功（分母分子断言 20/20）。场景④并发 10：10 agent_id `asyncio.gather` 并发 init+switch+get 全成功且各自状态独立（互不串扰断言——agent_i 状态==各自目标等级；**目标等级互异设计（R1-F42）**：奇数 agent 切 L3、偶数切 L2，使串扰在主断言即可红而非仅靠变异兜底）。场景⑤事件真实发布链路（5-3 场景⑤先例）：resolve 真实 `event_publisher`（DualChannelEventBus）+ 真实服务 switch 一次 → PG `event_outbox` 落行断言（`event_type=="IsolationLevelSwitched" and aggregate_id==str(agent_id)` 精确查询禁全表计数；outbox 追加语义无清理面；PG 门控动态 skip——构造 try/except 形态对齐 5-3 先例；**RabbitMQ 缺席不影响本场景（R1-F31）**：reliable 通道 publish 链路只写 PG outbox，实际投递归 AsyncOutboxPoller 异步侧，无需 rabbitmq 门控）。发布面口径差声明随 docstring（场景①recording 替身 vs 场景⑤生产 outbox） |
 | 🟢 绿 | 全场景转绿（验证型——被测链路已由 Task 1-5 交付） |
 | 🟡 变异 | P95 阈值突变（0.1→0.0001）→ 红 → 还原；并发断言弱化为聚合无个体 → 串扰用例红设计验算（构造两 agent 切不同等级断言互不影响——仓储键隔离的判别力实证）→ 还原 |
 | 🔄 重构 | xdist_group + benchmark 场景级标记收敛 |
@@ -637,7 +637,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | DC-9 | TTL 策略 | **隔离键 TTL=AgentConfig.state_ttl 同源**（初始化时与 Agent 键同值写入；switch 重置时经服务第四依赖 agent_config_loader 重取真源——R1-F01）；**切换 save 重置 TTL**（RedisAgentRepository save 语义同款。R1-F10 论证修正：Agent 键全仓唯一 save 点=实例化（agent_instantiation.py L126），无续期方——原「活跃 Agent 续期」前提不成立；切换重置的真实语义是隔离键生命周期独立延长，Agent 键先亡态由 443 前置守卫拦截（无害），孤儿隔离键由自身 TTL 回收——良性单向漂移，风险 #6 已补双向注记）；TTL 越界防御校验抛 440（真源是配置——配置语义异常） | a) 隔离键独立 TTL 配置项（弃用：YAGNI——无独立过期需求）；b) 切换不重置 TTL（弃用：与仓储 save 重置语义分叉需签名 `ttl: int \| None`，隔离协议 MVP 保持与 AgentRepository 同款 save 语义更一致）；c) 服务侧硬编码默认 TTL（弃用：第二真源违 SSOT） | AgentConfig.state_ttl 唯一真源；RedisAgentRepository save 重置语义 |
 | DC-10 | 切换事件发布失败语义 | **记日志不回滚**：switch 内 repo.save 成功后 publish 失败 → logger.warning + 正常返回结果（状态已切换是事实、事件是通知——与仓储写不一致的补偿归 5.6 审计链与 outbox 死信专项）；reliable 通道下 publish 即 outbox 写入，失败罕见 | a) 发布失败回滚等级（弃用：Redis 无事务回滚已写状态；为通知回滚事实是本末倒置）；b) 发布失败抛出（弃用：切换本身成功，抛出让 CLI 误报系统错误） | 5-1 AgentInstantiated 发布容错先例；outbox 可靠通道设计 |
 | DC-11 | 性能验收口径 | **P95 = `get_isolation_state` 服务全链真实 Redis 计时**（R1-F02 修订：443 存在性守卫 + 隔离态读**两次读**，含协议解析+VO 重建；warmup 1 + 20 采样 quantiles[18] < 0.1s——本地 Redis RTT ~1ms，两次读预算仍 50 倍宽裕，断言真实下界=计时含 fakeredis 替身不可——集成必须真实 Redis）；**持久化成功率 = 20 次连续 initialize+读回全成功**；**并发 10 = 10 agent 并发 init+switch+get gather 全成功 + 状态互不串扰**（个体等级断言非聚合断言 + 目标等级互异——键隔离判别力） | a) P95 测纯 Redis GET（弃用：不含 VO 重建的口径低估实际检查成本）；b) 并发只断言全成功（弃用：聚合断言对键串扰不敏感——变异不可红） | epics L1612-1614；profile_loading P95 先例；epics「并发隔离 Agent≥10」语义=隔离互不干扰 |
-| DC-12 | AgentConfig D6 回填边界 | **全量回填 D6 残余四项**（isolation 枚举化 + 标量类型守卫 + 空白归一 + strip）：5-4 是 D6 最后触发（5.3/5.4），不回填则永久悬空；字段类型 `str→IsolationLevel` 是 SSOT 收紧（yaml loader str→enum 转换守卫映射 440——"L4"→L4_HARD，非法值 reason="isolation_level_invalid"）；ceo_agent.yaml 值 "L4" 合法零改动 | a) 仅回填 isolation 项（弃用：D6 其余三项是同一留项的组成部分，拆半核销台账不闭合）；b) 保留 str 类型+值域校验（弃用：枚举类型才是 SSOT——裸 str 是 5-1 遗留形态，AgentConfig docstring 已注明 5.4 消费） | 5-1 D6 残余清单；AgentConfig L46/L57 docstring；events/enums.py SSOT |
+| DC-12 | AgentConfig D6 回填边界 | **回填两项 + 钉子两项**（R2-回归-1 口径收口，对齐 R1-F03/F04 定稿）：回填 = isolation 枚举化 + 标量类型守卫（统一 440 分码对齐 `_fail` 文件先例）；钉子 = 空白串与 strip 现状（拦截语义已存在——钉子测试锁定即核销，存储值不做 strip 归一）。5-4 是 D6 最后触发（5.3/5.4），不回填则永久悬空；字段类型 `str→IsolationLevel` 是 SSOT 收紧（yaml loader str→enum 转换守卫映射 440——"L4"→L4_HARD，非法值 reason 中文自然语言弃 snake_case——R1-F04）；ceo_agent.yaml 值 "L4" 合法零改动 | a) 仅回填 isolation 项（弃用：D6 其余三项是同一留项的组成部分，拆半核销台账不闭合）；b) 保留 str 类型+值域校验（弃用：枚举类型才是 SSOT——裸 str 是 5-1 遗留形态，AgentConfig docstring 已注明 5.4 消费） | 5-1 D6 残余清单；AgentConfig L46/L57 docstring；events/enums.py SSOT |
 
 ### 已知下游风险（本 Story 不处置，消费方 Story 决策）
 
@@ -931,7 +931,7 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
 > **编号规则（R1 起）**：R<轮>-F<序号>——轮次与修复序号双段；R<轮> 勘误类用 R<轮>-FM<序号>。
 
-#### Round 1（2026-10-21，四视角调研 + 三视角审查：科学性/一致性/可行性，P0×1 + P1×7 + P2×14 + P3×20 去重后修复 32 项）
+#### Round 1（2026-10-21，四视角调研 + 三视角审查：科学性/一致性/可行性，P0×1 + P1×8 + P2×20 + P3×19 去重后修复 48 表行——R2-回归-3 计数对账勘误：原「P1×7 + P2×14 + P3×20 修复 32 项」分布与总数三数字互斥，逐行实点为本口径（F08/F27 为 P1 按 P2 实质、F36 为 P2 升格））
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -939,7 +939,7 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 | R1-F02 | get_isolation_state 的 443 守卫三方矛盾：AC-3 要求随机 UUID→443，但 Task 3 红的 get 无 agent 守卫、DC-11 称「单次读」 | P1 | 定稿 get 含 443 守卫（语义正确——隔离检查入口先验 Agent 合法性，5.5 消费方受益）；Task 3 红阶段补守卫序断言；DC-11/AC-5 计时口径改「服务全链两次读」（预算仍裕量 50 倍） |
 | R1-F03 | Task 1 循环 E 将 AgentConfig 守卫定向 242：与文件先例（全部 440）及钉死测试（空白 name→440）冲突，照文执行断言不可满足；242/440 分界原则缺失 | P1 | AgentConfig 全部新守卫统一 440（`_fail` 家族）；「空白串未归一」核实为「拦截已存在」钉子测试锁定即核销；异常契约节补分界原则（配置资产 VO→440 / 非配置实体不变量→242） |
 | R1-F04 | loader 同步未声明「空串/缺失回落 L4」既有语义保留——dev 照文会把回落改 440 静默破坏 1.x 定稿语义；loader 用例后置到重构行违禁先码后测 | P1 | 绿阶段明确「仅拦非法枚举值字符串（"L9"）→440；非字符串沿用既有守卫；空串/缺失回落语义原样保留」+「loader 不做 MVP 白名单（"L1" 放行→实体 446——AC-2 路径）」；loader 用例并入红阶段同批先行；reason 改中文自然语言风格弃 snake_case |
-| R1-F05 | Task 4 回归面清单漏 4 处构造点（验收 profile_loading:228/workflow:564 + 集成 profile_loading:64/instantiation:68），且「5-3 集成场景① resolve 链自动携带」表述错误（实为手动组装 helper）——第四依赖必填则 5 处必红 | P1 | 回归面清单全量重写：9 处构造点显式列出（7 手动构造 + 组合根 + 分类），5-3 集成 helper 表述改正（手动组装非 resolve） |
+| R1-F05 | Task 4 回归面清单漏 4 处构造点（验收 profile_loading:228/workflow:564 + 集成 profile_loading:64/instantiation:68），且「5-3 集成场景① resolve 链自动携带」表述错误（实为手动组装 helper）——第四依赖必填则 5 处必红 | P1 | 回归面清单全量重写：8 处构造点显式列出（7 手动构造 + 组合根——R2-回归-5 计数勘误：原写 9 处，契约测试反射构造不入 grep 面），5-3 集成 helper 表述改正（手动组装非 resolve） |
 | R1-F06 | CLI 验收三连坑：instantiate 经进程内 main() 必 ConflictError（直调 bootstrap() 与 conftest 二重注册）；新子命令形态未指明（照抄 instantiate 直调 bootstrap 会炸）；多次 main() 间只 clear_singleton 不清 SCOPED agent_repository（跨循环死实例） | P1 | AC-6.3 改双清（clear_singleton+clear_scoped）+「instantiate 不经 main()（手动组装产出 agent_id——5-3 先例）」+「每次 main() 前重执行双清」；Task 5 绿阶段明确照抄 load-profile/run-task 的 `_ensure_bootstrapped()` 幂等形态 |
 | R1-F07 | `_parse_isolation_level` 拟稿守卫顺序与 `_parse_role` 先例相反（先例 except 转换在前、SUPPORTED 预检在后）——拟稿顺序下 except 成死代码，预设变异「删 except→红」不可红 | P1 | 骨架对齐先例顺序（第一道 try/except ValueError→446 from None 拦非法串；第二道 MVP 预检拦 L1）；变异行改双变异（删第一道→"L9" 红；删第二道→L1 红） |
 | R1-F08 | Subtask 0.3「HTTP 映射 400/404」与四处 446→422 权威口径矛盾 | P1（按 P2 实质） | 改「422/404」+ 勘误注记 |
@@ -948,9 +948,9 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 | R1-F11 | exception_handlers.py 行号引用偏差：441→422 实为 L269、443→404 实为 L271（原引 L268/L270） | P2 | 两处行号勘误（DC-8 依据列 + 446 异常契约行） |
 | R1-F12 | agent_events.py 纪律注释实为 L87-88（原引 L77-79 是 docstring 区）；事件收紧未点名保留 `__post_init__` 的 aggregate_id←agent_id 派生（AC-4 断言依赖） | P2 | 行号勘误；DC-6 依据列与 Task 0 事件契约补「保留 __post_init__ 派生」 |
 | R1-F13 | epics 集成覆盖率 ≥75% 实为 L1618（原引 L1617 是应用层覆盖率行） | P2 | 行号勘误 |
-| R1-F14 | `_RecordingEventPublisher`「InMemoryEventBus 真实类子类」三处失实（全仓 4 处均为手写 duck-typing 类；子类先例实为 `_TracingEventBus`） | P2 | 三处表述修正（L48/L80/L336）——手写类 + `_TracingEventBus` 子类先例双注 |
+| R1-F14 | `_RecordingEventPublisher`「InMemoryEventBus 真实类子类」三处失实（全仓 4 处均为手写 duck-typing 类；子类先例实为 `_TracingEventBus`） | P2 | 三处表述修正（L48/L80/L339——R2-回归-9 台账自报行号勘误）——手写类 + `_TracingEventBus` 子类先例双注 |
 | R1-F15 | CLI stderr 断言正则 `\[EXCEPTION_4[0-9][0-9]\]` 不匹配 201（ValidationError 族是隔离 CLI 合法退出码路径之一） | P2 | 正则改 `\[EXCEPTION_(?:201\|4[0-9]{2})\]`（AC-6.2 + Task 5 红两处） |
-| R1-F16 | 集成 pytestmark 文件级 benchmark 与验收「场景级不打文件级」表述歧义（两层先例各自成立但未注记分界） | P2 | AC-5 注记两层各自对齐本层先例（验收场景级 5-3 R1-F8 / 集成文件级 profile_loading） |
+| R1-F16 | 集成 pytestmark 文件级 benchmark 与验收「场景级不打文件级」表述歧义（两层先例各自成立但未注记分界） | P2 | AC-5 注记两层各自对齐本层先例（验收场景级 5-2 R1-F8——R2-回归-6 归属勘误 / 集成文件级 profile_loading） |
 | R1-F17 | 测试分类表缺两行（yaml loader 追加 + acceptance domain_event_definition 同步）——六面交叉破口 | P2 | 补两行 |
 | R1-F18 | AC-3「返回…及三重隔离策略」与端口签名 `-> IsolationState` 不一致（策略联查实为消费方派生） | P2 | AC-3 Then 措辞校准 |
 | R1-F19 | Task 7.4 验证器 C 白名单缺 `src.application.ports`——服务实现 application 端口、用例注入它均必然 import，按原白名单合法代码被判红 | P2 | 白名单补 application.ports + 扫描对象含 services 与 use_cases |
@@ -986,7 +986,31 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 
 > R1 证伪留痕（审查员推演不成立的疑点，与问题同价值）：no-op/查询不刷新 TTL 不会致隔离键先过期（两键同刻同值写入、Agent 键无续期方）；`quantiles(n=20)[18]` 数学正确即 P95；AC-1 策略表与 architecture.md §5.1 六格逐行一致；kw_only 对 frozen dataclass 收紧正确；R1/R2/R3/R4 分层矩阵整体正确；aggregate_id 无需显式传（__post_init__ 自动派生——但派生本身需保留，见 R1-F12）。
 
-#### Round 2（待回归核查轮填充）
+#### Round 2（2026-10-21，回归核查 + 组合交互面双审查：P2×5 + P3×12 修复 17 表行）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-F01 | DC-12 决策行残留 R1 前旧口径（「空白归一 + strip」回填 + snake_case reason）——与 R1-F03/F04 定稿三处互相矛盾，dev 读决策表会与循环 E 断言冲突 | P2 | DC-12 改「回填两项 + 钉子两项」口径对齐 R1-F03/F04 |
+| R2-F02 | L527「AsyncMock（既有验收 mock 形态——5-1 验收先例 L214 同款）」引证失实（L214 实为全真实组装，验收目录用例组装 AsyncMock 零先例）；第四依赖「真实/mock」分派在 8 处构造点未定稿 | P2 | 分派定稿：既有六文件回归同步用 AsyncMock（集成 Mock 工厂子模式合规——本 Story 新增回归形态决策，如实注明无验收组装先例）；本 Story 新验收场景与集成场景①用真实服务四依赖手动组装（隔离键真实性硬依赖——四依赖逐一列出，config_loader 经 resolve 取） |
+| R2-F03 | R1 计数对账三数字互斥（标题「32 项」/日志「48 表行」/分布合计 42）——逐行实点为 P0×1 + P1×8 + P2×20 + P3×19 = 48 | P2 | R1 标题计数勘误 + 勘误注记 |
+| R2-F04 | AC-2「非 MVP 等级→446」与 R1-F03/F04 输入通道分层冲突——照字面在验收写 "L9" yaml 断 446 必红（"L9" 在 loader 层 440） | P2 | AC-2 表述收口（L1 越白名单→446 进验收；"L9"→440 归循环 E 单测面） |
+| R2-F05 | R1-F36 双分支容错只落骨架与绿阶段，Task 3 红阶段缺 is_success=False 独立用例（先例两分支各有独立命名用例——红先性破口） | P2 | Task 3 红阶段补独立用例断言 |
+| R2-F06 | R1-F15 在 Task 5 红行写入裸管道正则（表格内未转义——GFM 按裸 \| 切单元格，表格断 5 列错位） | P3 | `(?:201\|4[0-9]{2})` 转义修正 |
+| R2-F07 | 「全仓 9 处构造点」计数错账（R1-F05 自引入；实为 8 处——契约测试经 spec.impl 反射构造不入 grep 面）且传播进变更日志 | P3 | 两处 9→8 勘误 |
+| R2-F08 | 「验收侧不打文件级」先例归属张冠李戴（属 5-2 R1-F8；5-3 自己的 R1-F8 是 LLM 冒烟恒真项，5-3 L281 是转引） | P3 | 两处归属勘误（AC-5 注记 + R1-F16 台账行） |
+| R2-F09 | 「5-3 DC-12 四件套同款」归称失实——双清是本 Story 扩展（5-3 原四件套仅 clear_singleton 单清，实码 L549 佐证） | P3 | 改「扩展 5-3 DC-12 四件套：单清同款 + 新增 clear_scoped」 |
+| R2-F10 | AC-5 委托集成计时 helper 口径单侧悬挂（委托方有要求、Task 6 被委托方无交付物——5-3 先例写在集成 Task 红阶段内） | P3 | Task 6 场景②补交付形态（模块级 _PERF_CACHE helper） |
+| R2-F11 | get 守卫序 calls 断言以引用式传递（「同 switch 前置」），变异「守卫顺序交换」在 get 方法不可红 | P3 | calls 断言显式化（443 时 isolation_repository 未被调） |
+| R2-F12 | 「照抄 _parse_role」未警示 .lower() 归一不可照抄（AgentRole 全小写 vs IsolationLevel 全大写——照抄则全部合法输入误拒）；--level 大小写敏感性未声明 | P3 | 绿阶段补禁抄警示 + 大小写敏感契约 |
+| R2-F13 | DC-12 是 12 项决策中唯一无正文锚的（且与 L182「5-3 DC-12」编号碰撞致 grep 假阳性） | P3 | 循环 E 标题补「DC-12 回填边界定稿」 |
+| R2-F14 | 测试分类表「18 场景（Task 0 编写」与三处「Task 0 编写 17、Task 8 追加」口径冲突 | P3 | 改「17 场景 Task 0 编写 + 收尾 Task 8 追加（全量 18）」 |
+| R2-F15 | 委托计时 helper 采样键清理未注记双键扩展（照抄 5-3 单键形态漏删隔离键——helper 内轮次不经场景 teardown） | P3 | 场景②补 sample_keys 双键登记说明 |
+| R2-F16 | R1-F14 台账自报行号漂移（第三处实落 L339 非 L336）；L48 InMemoryEventBus 行号 off-by-one（类定义 L18） | P3 | 两处行号勘误 |
+| R2-F17 | AC-5「隔离态读两次读」措辞粘连病句 | P3 | 改「443 存在性守卫 + 隔离态读——共两次真实 Redis 读」 |
+
+> R2 证伪留痕（推演不成立，与发现同价值）：①「两次读」口径在 get 路径准确（config_loader 仅 switch 路径，yaml 文件读不在 get 计时面——YamlAgentConfigLoader 无缓存每次真实读文件）；②多命令连接生命周期闭合（双清后 re-resolve 全链新实例新循环，_close_connection_pools 不清 registry 缓存、双清补位——R1-F06×R1-F36×R1-F31 正交互补成立；set-isolation 在 PG/RabbitMQ 缺席时由双分支容错兜底 exit 0）；③L1 双断言守卫序正确（两道均传 raw 原文，446 context 语义无影响）；④委托计时缓存共享疑点不成立（_PERF_CACHE 单槽固定 key 无 agent_id 维度，验收/集成 agent_id 不同不妨碍共享）；⑤DC-1~DC-11 正文锚齐全（唯 DC-12 缺——R2-F13）；⑥四依赖 11 处表述全一致。
+
+#### Round 3（待深度推演轮填充）
 
 ---
 
@@ -1023,13 +1047,15 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
 | 2026-10-21 | v1.0.0 | 创建故事文件（四视角并行调研：Agent 实体与工作流链路 / 端口注册与组合根规范 / 验收与集成测试模板 / 异常体系与事件通道；12 项关键架构决策 DC-1~DC-12 + 6 项偏离声明 D-1~D-6；5-1 D6/D7 留项核销 + session_storage 再续期 + 工具熔断挂点评估；IsolationLevelSwitched 复用收紧 + 446/447 预留段核销 + AgentConfig D6 回填；范围边界表与 5.5/5.6/V1 精确切分） |
-| 2026-10-21 | v1.1.0 | 文档审查周期 Round 1（四视角调研 + 三视角审查——科学性/一致性/可行性）：P0×1 + P1×7 + P2×14 + P3×20 去重后修复 48 表行。核心修复：R1-F01 TTL 链闭合（服务第四依赖 agent_config_loader——Task 0 钉死契约与 Task 3 骨架矛盾消解）；R1-F02 get 加 443 守卫（三方矛盾定稿）；R1-F03 AgentConfig 守卫统一 440 分码（242 破坏钉死测试风险消除）+ 242/440 分界原则入契约；R1-F05 回归面补全 9 处构造点；R1-F06 CLI 验收双清+instantiate 不经 main()；R1-F07 _parse_isolation_level 顺序对齐先例（变异可红）；R1-F27 D6/D7 核销落点校正（5-1 台账）；DC-3/DC-9/DC-7 论证修正与补登记；行号勘误五处；_RecordingEventPublisher 定性校正三处 |
+| 2026-10-21 | v1.1.0 | 文档审查周期 Round 1（四视角调研 + 三视角审查——科学性/一致性/可行性）：P0×1 + P1×8 + P2×20 + P3×19 去重后修复 48 表行。核心修复：R1-F01 TTL 链闭合（服务第四依赖 agent_config_loader——Task 0 钉死契约与 Task 3 骨架矛盾消解）；R1-F02 get 加 443 守卫（三方矛盾定稿）；R1-F03 AgentConfig 守卫统一 440 分码（242 破坏钉死测试风险消除）+ 242/440 分界原则入契约；R1-F05 回归面补全 8 处构造点；R1-F06 CLI 验收双清+instantiate 不经 main()；R1-F07 _parse_isolation_level 顺序对齐先例（变异可红）；R1-F27 D6/D7 核销落点校正（5-1 台账）；DC-3/DC-9/DC-7 论证修正与补登记；行号勘误五处；_RecordingEventPublisher 定性校正三处 |
+| 2026-10-21 | v1.2.0 | 文档审查周期 Round 2（回归核查 + 组合交互面双审查）：P2×5 + P3×12 修复 17 表行。核心：R2-F02 第四依赖分派定稿（既有六文件 AsyncMock 回归同步 / 新验收场景真实四依赖组装——L214 引证失实校正）；R2-F01 DC-12 旧口径残留收口；R2-F04 AC-2 输入通道分层收口（"L9"→440 归单测面）；R2-F05 is_success=False 独立用例补红阶段；R2-F10 计时 helper 交付形态落 Task 6；.lower() 照抄警示；计数与归属勘误五项；R1 修复自引入破口清偿（表格转义/9→8 计数/先例归属） |
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-10-21
 **最后更新/Last Updated:** 2026-10-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查周期 Round 1（48 表行修复——详见 Docs Review Fixes R1 表）
+- v1.2.0: 文档审查周期 Round 2（17 表行修复——详见 Docs Review Fixes R2 表）
