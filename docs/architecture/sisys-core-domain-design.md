@@ -1562,7 +1562,7 @@ class SAPMessage(BaseModel):
         为 pydantic v2 非法默认（不可空类型配 None 默认）——实现修正为
         ``correlation_id: UUID | None = None``（联合类型）；``isolation_level``
         实现复用 domain ``IsolationLevel`` 枚举（SSOT，替代裸 str）。已落地
-        ``src/interfaces/sap/message.py``（15 字段，bus/传输归 5-11）。
+        ``src/interfaces/sap/message.py``（15 字段，bus/传输归 Story 5.11）。
     """
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID  # 会话 ID，关联同一对话的消息

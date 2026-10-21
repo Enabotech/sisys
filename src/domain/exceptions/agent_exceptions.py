@@ -208,9 +208,10 @@ class AgentWorkflowError(SystemException):
     LLMConfigError（332，配置错误透传不包装）与 CancelledError（协程取消
     透传）例外。
 
-    端到端可达前提：引擎 submit_graph 的 DomainError 透传改造（现引擎对
-    ainvoke 任意异常包 RuntimeError from e，444 会被改写致 CLI stderr 无
-    [EXCEPTION_444]——Task 5 改造项）。
+    端到端可达前提：引擎 submit_graph 的 DomainError 透传（原引擎对 ainvoke
+    任意异常包 RuntimeError from e 会改写 444 致 CLI stderr 无
+    [EXCEPTION_444]——Task 5 已改造为 DomainError 原样透传、仅非 DomainError
+    包 RuntimeError，端到端链路已闭合）。
 
     Attributes:
         code: EXCEPTION_444

@@ -1048,6 +1048,15 @@ tests（追加/同步 4）：
 
 **Round 1 证伪留痕（审过判定不修/排除）**：组合根接线/异常 4 项 checklist/SAP 15 字段/CLI 退出码/DC-12 四件套/隔离纪律/BDD 18/18 绑定/分派键独立性全部实证通过（四视角通过面）；retry off-by-one 无偏差（四路径推演+测试双向）；`_runs` 异常记录为孤儿不可查询（状态自洽）；langgraph 节点异常原样传播（透传成立）；谓词键预设（parameters 可注入 retry_count 初值——用例链路只传三键不触发，登记 API 面加固项）；新图无 checkpointer（与 BasicAgent 编译策略分叉——登记后续注记）；幻觉工具名 380 穿透（实现已声明决策+契约未要求——deferred 登记）。
 
+**Round 2（2026-10-21）：回归核查轮——12 项 R1 修复全 PASS（零 P0/P1/P2），2 P3 勘误清偿**
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R2-F1 | P3 | 传播漏网：core-domain-design.md L1565「bus/传输归 5-11」——R1 的「5-11→5.11」修复同 commit 新增行自带旧写法（修复自身引入的破口，历史规律应验） | 改「Story 5.11」；docs/ 主目录 grep 清零（archive 归档不动） |
+| R2-F2 | P3 | AgentWorkflowError docstring「现引擎对 ainvoke 任意异常包 RuntimeError」失实——描述的是 Task 5 改造前状态（透传已落地） | 改过去时态 + 已闭合注记 |
+
+**Round 2 核查结论（核查①+ 主会话全量）**：12 项 R1 修复 + 10 处 mypy 修复逐项 PASS（4 项 note：验收/集成 Fake 的 error_analysis 文本前缀差——判别力不受影响；场景③ delay_sec 硬编码微瑕；F4 测试第二断言对 fresh engine 冗余——判别力由主断言承载；台账「3 新单测」口径实为 2+1 锚重写）；传播完备性差集仅 R2-F1 一处；组合交互面（F1×F8×既有断言/F4×存量/F9×场景断言/F12 spec×挂载）全 PASS。**全量回归（-n 8，28:53）：12685 passed + 37 skipped + 19 failed（环境性能类预存——三轮甄别：可见失败全为 ocr benchmark/qdrant 延迟/hybrid/docker sandbox 族与本 Story 改动面零交集；本 Story 三文件隔离复跑 70 passed 全绿；qdrant 失败项隔离复跑 1 passed 抖动实锤）**。
+
 **Round 1 耗时基线台账（用户专项——主会话实测）**：单元/契约/架构 515 tests 35.81s（自身执行全亚秒 ✅；~20s/worker 为共享基建：bootstrap() 7.35s×session×worker + litellm import 1.4s + coverage 启动——D13 既有债非本 Story 引入）；集成+验收 23 tests 167.86s→（F9 后）~140s（scenario_4 真实 LLM 102-124s 网络主导 + 采样 8s + setup 20s）；无 LLM 环境同面 ~55s→~30s。
 
 ### 下一步 Next Steps
