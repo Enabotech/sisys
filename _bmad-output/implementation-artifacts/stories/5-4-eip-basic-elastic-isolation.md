@@ -1,6 +1,6 @@
 # Story 5.4: EIP 弹性隔离协议基础
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1172,6 +1172,27 @@ tests 修改 12:
 > R3 证伪留痕（7 疑点推演+实测不成立）：①xdist import 序不一致——load_dotenv 默认 override=False（litellm/__init__.py:20 实证）+ 双向守卫，两种序均收敛；②CLI 池关闭不完备（含 rabbitmq 腿）——三路径零缺口、RELIABLE 发布无带内 AMQP；③双清与关池序错用已关池——清在 main 前关在 main 内 finally；④TTL 双向漂移——agent 键全仓唯一 save 点=实例化，漂移严格单向良性（风险 #6 结论在实现终态成立）；⑤kw_only+aggregate_id 交互破坏——7 处构造全 UUID、from_dict 类型还原完备；⑥固定模式下 config/environ 分裂格——8 关键格全一致（分裂仅进程内模式翻转，R3-F01）；⑦事件双注册缺失——yaml+DEFAULT_MAPPINGS 双位点齐备。附注：Layer 2 MinIO 填充分支硬编码 :9000 忽略 .env（90-1 遗留，Layer 3 自愈，仅记录）。
 > R3 实测：特殊字符/emoji/超长 reason 4 形态往返保真 PASS；9 格异码矩阵与文档契约逐格一致（L1 直构造 SUCCESS 是有意 V2 前向兼容形态）；TTL 单调性/upsert 重置/纯 get 不重置 PASS；验收+集成 22+1skip、unit 9374 passed、ruff/mypy 干净。
 
+#### Round 4（2026-10-22，纯验证轮：锚点存续 + 计数对账 + 门禁实跑 + 结构连续性——**零规范级发现，不造提交**）
+
+| 验证项 | 结果 |
+|--------|------|
+| 三轮修复锚点存续（helper/门控/派生/单钟/partial/11 键/锚定/CI 用例） | 全部 ✅（R4 Agent 中断前 + 主会话接续完成） |
+| 计数对账 | R1-F 表行 62 = 文档审查 48 + 代码审查 14；R2-F 22 = 17+5；R3-F 13 = 10+3；DF 2——全吻合 |
+| 门禁实跑 | unit 全量 **9374 passed 零 warning**（R3-F04 消除的最终态）；验收集成 22+1skip；ruff/mypy 干净；红线零新增（3 处 ValueError 均预存非 5-4 面）；CI 形态 5 passed |
+| 结构连续性 | 八轮 Round 标题齐全（文档审查 R1-R5 + 代码审查 R1-R3）无 Edit 吞噬 |
+
+#### Round 5（2026-10-22，独立终审五节取证——不轻信 Story 自报，全部实地核验）
+
+| 节 | 取证项 | 结果 |
+|----|--------|------|
+| 1 | 周期闭合 | ✓ 三提交序列精确（R1=f9da030e/R2=109b0c0c/R3=d5a3d99d）+ R4 零提交；文件面与台账三轮描述交叉核对无游离提交、无第三方文件混入 |
+| 2 | 关键修复双向取证（8 项抽验） | ✓ 全部双向一致：R1-F02 门控/R2-F02 MinIO 两键/R2-F01 锚定+6390 用例/R1-F05 真派生/R1-F09+R3-F03 服务事件三字段/R1-F01+R3-F04 pipeline 测试/R1-F13 try-finally+key 登记/R3-F01 11 键 |
+| 3 | 全量实跑 | ✓ agent 域相关面 1364 passed + 1 failed（唯一失败 = 5-3 outbox 场景既有门控缺口——R1-F02 修复后从「假打 dev 5432 绿」转为「正确探测 5433 不可达红」的诚实暴露，5-3 资产面非本周期回归，已登记 R5-DF1）；unit 9374 零 warning；contracts 绿；CI 形态 5 passed |
+| 4 | 留项台账完整性 | ✓ R1-DF1/DF2 镜像一致 + 触发条件在案；R3-OBS 维持注记在 Story；R5 特权发现 R5-DF1 补登记（5-3 门控缺口台账化——照抄 R1-F07 形态的触发器在案）；版本链 v2.1.0/v2.2.0/v2.3.0 + 底部字段一致 |
+| 5 | 红线终扫 + 状态流转 | ✓ 红线计数 HEAD 与基线 8af9a17a 逐文件完全一致（零新增）；提交信息零 AI 署名；状态流转判定：**review → done**（对照 5-2 [3e067395]/5-3 [3b0b6e1a] 先例——代码审查 R5 收敛提交随附流转） |
+
+> **代码审查周期收敛声明（R5 终审）**：Story 5.4 代码审查周期经 R1（四视角调研 + 双评审 + 主会话事实裁决——P1×2 + P2×5 + P3×7 落码 14 项）、R2（回归核查 + 组合交互面——P0×1 + P2×1 + P3×4 落码 6 项，其中 P0 为 R1 修复自引入的 CI 门禁击穿）、R3（单深度推演——16 格环境矩阵/CLI 三路径/八路径事件矩阵/9 格异码矩阵全闭合，P3×3 落码）、R4（纯验证——零规范级发现，9374 passed 零 warning）、R5（独立终审五节取证全过）——共 23 项落码修复 + 3 项 deferred 登记（R1-DF1/DF2/R5-DF1）+ 9 项维持（证伪留痕在案）。核心修复：SISYS_USE_TEST_PORTS 端口隔离击穿闭合（双向修复链经 R1→R2→R3 三轮深化收敛——Layer 3 守卫/sync 强覆写/MinIO 腿/CI 门禁/恢复键集）、pipeline 原子性等六类判别力锁定、446 真派生与单钟纪律兑现。全部证据与仓库现实一致，零 P0/P1/P2 残留。**代码审查周期正式收敛，Story 5.4 状态 review → done。**
+
 **登记（deferred-work.md 镜像）**：
 
 | # | 项 | 处置 |
@@ -1200,7 +1221,7 @@ tests 修改 12:
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施（从 Task 0 开始）
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `code-review` 进行代码审查（五轮收敛 v2.3.1——2026-10-22）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
@@ -1218,10 +1239,11 @@ tests 修改 12:
 | 2026-10-22 | v2.1.0 | **代码审查周期 Round 1**（四视角调研 + 双评审 + 主会话事实裁决）：P1×2 + P2×5 + P3×7 落码 14 项 + 登记 DF×2 + 维持 8 项（证伪留痕）。核心：R1-F02 SISYS_USE_TEST_PORTS 端口隔离被 conftest 模块级 litellm import 的 load_dotenv 副作用静默击穿（测试实读写 dev 6379/5432——environments.py 双向修复：Layer 3 端口守卫 + sync 强覆写 + MinIO endpoint 洞 + 4 用例锁定）；R1-F01 pipeline 原子性契约判别力锁定（5-1 先例移植）；R1-F05 446 supported_levels 真派生兑现 docstring 承诺；R1-F10 环方向 docstring 主会话副本实验定谳（value_objects-first 经 archive_events 断环——三方交叉验证，调研与评审员乙的两版链路均为误报）；R1-F13 集成异常路径清理闭合（key 即时登记模式）；双评审 4 条修正全吸收（甲 P0 级 split-brain 联动面最高价值） |
 | 2026-10-22 | v2.2.0 | **代码审查周期 Round 2**（回归核查 + 组合交互面双审查 + 单评审快评）：P0×1 + P2×1 + P3×4 落码 6 项。核心：R2-F01 R1-F02 锁定用例击穿 CI 门禁（SISYS_TEST_ENV=ci 下 3/4 用例必红——实测复现；修复=显式锚定 local[delenv 被 CI 容器双重兜底击穿——评审实证] + CI 形态反向锁定用例[6390 差异化防恒真]）；R2-F02 MinIO 生产路径 split-brain 闭合（from_env 读 HOST/API_PORT 非 ENDPOINT——sync 补两键覆写）；R2-F05 判定式 helper 单一化；R2-OBS monkeypatch 真源性行为锁；R1 修复回归核查 13/14 干净 + 台账一致性全过 + 6380 MONITOR 实证 |
 | 2026-10-22 | v2.3.0 | **代码审查周期 Round 3**（单深度推演）：零 P0/P1，P3×3 落码。R3-F01 锁定测试恢复键集缺口闭合（注入集扩至 sync 写集全量 11 键——进程内单向污染与 NEO4J 腿分裂触发条件消除）；R3-F03 trigger_reason 双投影统一（事件传 state.last_trigger_reason 单源）；R3-F04 R1 引入的 pipeline stub lambda 协程丢弃缺陷修复（partial 绑定真 async——全 unit 面唯一 RuntimeWarning 消除）；16 格环境矩阵/CLI 三路径/八路径事件/9 格异码矩阵全推演闭合 + 7 疑点证伪留痕 |
+| 2026-10-22 | v2.3.1 | **代码审查周期 R4 纯验证 + R5 独立终审判收敛**：R4 零规范级发现（锚点全存续/计数全对账/unit 9374 passed 零 warning）；R5 五节取证全过（周期闭合/8 项关键修复双向一致/agent 域 1364 passed[唯一失败为 5-3 既有门控缺口→R5-DF1 台账化]/台账完整/红线零新增）——**收敛声明入 Story，状态 review → done**；R5 特权发现 R5-DF1（5-3 outbox 场景同型门控缺口）随收敛提交登记 |
 
 ---
 
-**故事版本/Story Version:** v2.3.0
+**故事版本/Story Version:** v2.3.1
 **创建日期/Created:** 2026-10-21
 **最后更新/Last Updated:** 2026-10-22
 **更新说明/Description:**
@@ -1234,3 +1256,4 @@ tests 修改 12:
 - v2.1.0: 代码审查周期 Round 1（14 落码 + 2 登记 + 8 维持——详见 Review Findings R1 表）
 - v2.2.0: 代码审查周期 Round 2（P0×1 + P2×1 + P3×4 落码——详见 Review Findings R2 表）
 - v2.3.0: 代码审查周期 Round 3（零 P0/P1，P3×3 落码 + P3×1 维持——详见 Review Findings R3 表）
+- v2.3.1: R4 纯验证 + R5 独立终审判收敛（收敛声明入 Story + 状态 review → done + R5-DF1 登记）

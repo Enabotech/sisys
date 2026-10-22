@@ -198,3 +198,7 @@
 
 - 【R1-DF1·P3】clear_scoped 接线纪律约束（captive dependency 缓解前提）— DC-7 的「无实害」论证依赖「clear_scoped 生产未接线（SCOPED≡SINGLETON 进程级共享）」环境前提（组合根 isolation_management_service 注册注释自认；retry_helpers.py:66 同款注释）；未来接线请求作用域清理时若只调 clear_scoped 不调 clear_singleton，SINGLETON isolation_management_service 将持有绑已关闭事件循环的死亡 RedisAgentRepository（"Event loop is closed"——测试环境验收 _run_cli 双清正是此形态的规避）— 核销触发：请求作用域接线立项（接线时 clear_scoped 必须连同 clear_singleton，或评估 agent_repository 翻 SINGLETON）
 - 【R1-DF2·P3】StorageError(103) 同码双语义分化 — ①构造纪律分化：redis_snapshot_store.py:133/183 `raise StorageError(...) from e` 不带 cause= 构造参数，与 agent/isolation 仓储 cause=exc 形态（5-1 Task 3 教训）同码两种构造纪律（snapshot 域归他 Story 资产不动）；②语义分化：数据损坏与连接故障同码 103，监控维度不可区分（可观测性分化形态=except 内分支 context 标记 data_corrupt 或专用码）— 核销触发：存储层异常码专项或 5.5（与 agent_repository 先例统一行动，单仓先例不孤立改）
+
+## Deferred from: code review of 5-4-eip-basic-elastic-isolation R5 终审特权发现 (2026-10-22)
+
+- 【R5-DF1·P3】5-3 集成场景⑤ outbox PG 连接级门控缺口（5-4 R1-F07 同型）— `tests/integration/test_integration_agent_workflow.py::test_scenario_5_real_publish_outbox_row` 的 PG 门控仅拦 import 失败不拦连接失败（5-3 资产面）；5-4 R1-F02 端口隔离修复后该测试从「假打 dev 5432 绿」转为「正确探测 5433 不可达红」——诚实暴露但违 DoD「PG 缺席 skip」形态 — 核销触发：5-3 资产维护或测试基建门控专项（修复形态照抄 5-4 R1-F07：SELECT 1 预检 + dispose + skip）
