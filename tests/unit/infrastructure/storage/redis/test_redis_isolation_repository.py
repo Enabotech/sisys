@@ -22,6 +22,7 @@ import json
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -266,7 +267,14 @@ class _PipelineStub:
 
     def __init__(self, apply: Callable[[_PipelineOps], Awaitable[list[Any]]]) -> None:
         self.operations: _PipelineOps = []
-        self.execute = AsyncMock(side_effect=lambda: apply(self.operations))
+        # partial 绑定 async 方法（对齐 5-1 先例——iscoroutinefunction 解包 partial
+        # 判 True 使 AsyncMock await side_effect 返回值；lambda 形态返回裸协程被
+        # 丢弃：RuntimeWarning "coroutine never awaited" + apply 副作用空洞）
+        self.execute = AsyncMock(side_effect=partial(self._apply_operations, apply))
+
+    async def _apply_operations(self, apply: Callable[[_PipelineOps], Awaitable[list[Any]]]) -> list[Any]:
+        """execute 提交：按入队顺序逐条应用并返回结果清单（真 async——partial 绑定位）。"""
+        return await apply(self.operations)
 
     def hset(self, key: str, field: str, value: str) -> None:
         """入队 HSET（同步调用——对齐 redis-py pipeline 命令排队语义）。"""

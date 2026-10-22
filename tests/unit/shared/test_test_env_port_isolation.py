@@ -21,7 +21,10 @@ import pytest
 
 from tests.environments import get_test_env
 
-# litellm load_dotenv 注入形态的 dev 端口污染集（.env 同款键值）
+# litellm load_dotenv 注入形态的 dev 端口污染集（.env 同款键值）。
+# 注入集 = _sync_config_to_environ 测试端口模式强覆写写集全量（11 键）——
+# monkeypatch teardown 恢复全部被覆写键，防进程内单向污染（R3-F01：写集 ⊋
+# 恢复集时后续 ambient 解析被静默漂到测试端口、NEO4J 两键 config/environ 分裂）
 _DEV_PORT_POLLUTION = {
     "REDIS_PORT": "6379",
     "POSTGRES_PORT": "5432",
@@ -29,6 +32,11 @@ _DEV_PORT_POLLUTION = {
     "QDRANT_GRPC_PORT": "6334",
     "RABBITMQ_PORT": "5672",
     "RABBITMQ_MGMT_PORT": "15672",
+    "NEO4J_HTTP_PORT": "7474",
+    "NEO4J_BOLT_PORT": "7687",
+    "MINIO_ENDPOINT": "localhost:9000",
+    "MINIO_HOST": "localhost",
+    "MINIO_API_PORT": "9000",
 }
 
 # TEST_CONFIG 对应的期望测试端口（config 侧与 os.environ 侧同值）

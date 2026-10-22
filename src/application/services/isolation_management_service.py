@@ -149,7 +149,7 @@ class IsolationManagementService(IsolationManagementServicePort):
             agent_id=agent_id,
             previous_level=previous_level,
             target_level=target_level,
-            trigger_reason=trigger_reason,
+            trigger_reason=state.last_trigger_reason,  # strip 后文本（与持久化态单源——事件/状态双投影一致，R3-F03）
             approval_chain=list(approval_chain),  # kw_only 必填形态（DC-6）+ 显式转发
             switch_timestamp=state.updated_at,  # 单钟纪律: 事件时刻=状态变更时刻（对齐 initialize 单 now 双用叙事）
         )

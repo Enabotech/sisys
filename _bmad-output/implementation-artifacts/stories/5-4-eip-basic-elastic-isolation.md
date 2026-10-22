@@ -1160,6 +1160,18 @@ tests 修改 12:
 > R2 证伪留痕（维持注记）：NEO4J_HTTP_PORT 被 sync 但 .env.example 无此键且生产不读（近死键，维持）；场景⑤「短超时」注释无显式 connect timeout 背书（OS refused 即时，维持）；显式端口+开关 on 被覆写（6399→6380 有意权衡，注释在案）；Layer 2 host 填充在测试端口模式未门控（host 类不在 F02 声明范围，.env 全 localhost 无实害，注记）。
 > R2 评审过程记录：单评审快评给两处实质修正（R2-F01 delenv→setenv[CI 容器双重兜底实证]/CI 用例端口 6379→6390 差异化防恒真）+ R2-OBS 枚举成员硬约束——全部吸收后落码。
 
+#### Round 3（2026-10-22，单深度推演：16 格环境矩阵 + CLI 三路径时间线 + 八路径事件矩阵 + 9 格实体异码矩阵 + fakeredis 边界实测——零 P0/P1，P3×3 落码 + P3×1 维持 + 7 疑点证伪留痕）
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R3-F01 | P3 | 锁定测试 monkeypatch 恢复键集 ⊋ 缺口——sync 强覆写写集 11 键而注入集仅 8 键：测试后 NEO4J_HTTP/BOLT 等 3 键无人恢复（进程内单向污染——后续 ambient 解析被静默漂到测试端口；NEO4J 两键 sync 写但 Layer 3 不读——翻转后 config/environ 真分裂）；当前爆炸半径 ≈0（该文件是收集序最后文件），触发条件=shared 目录加排序在后文件/显式 argv 顺序 | `_inject_dev_port_pollution` 注入集扩至 sync 写集全量 11 键（monkeypatch teardown 恢复全部被覆写键——恢复面=覆写面闭合） |
+| R3-F03 | P3 | trigger_reason 双投影分歧——事件携带原文 reason、state 存 `.strip()` 后文本（带空白包裹的 reason 使审计事件与持久化状态两份记录不一致） | 服务事件构造改传 `state.last_trigger_reason`（strip 后文本——与持久化态单源） |
+| R3-F04 | P3 | R1 新增 pipeline 测试 stub 的 lambda 形态产生未 await 协程（`AsyncMock(side_effect=lambda: apply(...))`——iscoroutinefunction(lambda)=False 使返回的裸协程被丢弃：RuntimeWarning "coroutine never awaited"[全 unit 面唯一 warning] + apply 副作用空洞；5-1 先例 partial(async) 形态被正确 await——实测对照定谳） | `_PipelineStub.execute` 改 partial 绑定真 async 方法（对齐 5-1 先例）——复跑 24 passed 零 warning |
+| R3-OBS | P3 | instantiate 路径 bootstrap 幂等守卫缺失（五命令唯一不对称——裸 `bootstrap()` vs 其余四命令 `_ensure_bootstrapped()`；进程内二次 instantiate 必 ConflictError，验收被迫手动组装绕过 main()——instantiate 的 CLI 主入口无 main() 级验收覆盖） | **维持注记**：5-1 交付面资产（agent_cli.py instantiate 段），非本 Story 引入；行为修复（改幂等形态）涉 5-1 语义变更，归 5-1 资产维护或 CLI 专项评估 |
+
+> R3 证伪留痕（7 疑点推演+实测不成立）：①xdist import 序不一致——load_dotenv 默认 override=False（litellm/__init__.py:20 实证）+ 双向守卫，两种序均收敛；②CLI 池关闭不完备（含 rabbitmq 腿）——三路径零缺口、RELIABLE 发布无带内 AMQP；③双清与关池序错用已关池——清在 main 前关在 main 内 finally；④TTL 双向漂移——agent 键全仓唯一 save 点=实例化，漂移严格单向良性（风险 #6 结论在实现终态成立）；⑤kw_only+aggregate_id 交互破坏——7 处构造全 UUID、from_dict 类型还原完备；⑥固定模式下 config/environ 分裂格——8 关键格全一致（分裂仅进程内模式翻转，R3-F01）；⑦事件双注册缺失——yaml+DEFAULT_MAPPINGS 双位点齐备。附注：Layer 2 MinIO 填充分支硬编码 :9000 忽略 .env（90-1 遗留，Layer 3 自愈，仅记录）。
+> R3 实测：特殊字符/emoji/超长 reason 4 形态往返保真 PASS；9 格异码矩阵与文档契约逐格一致（L1 直构造 SUCCESS 是有意 V2 前向兼容形态）；TTL 单调性/upsert 重置/纯 get 不重置 PASS；验收+集成 22+1skip、unit 9374 passed、ruff/mypy 干净。
+
 **登记（deferred-work.md 镜像）**：
 
 | # | 项 | 处置 |
@@ -1205,10 +1217,11 @@ tests 修改 12:
 | 2026-10-22 | v2.0.0 | **dev-story 实施完成（Task 0-8 全勾选）**: src 新建 6 + 修改 12、tests 新建 10 + 修改 15、文档 4；验收 18/18 场景全绿（含 Task 8 收尾）、集成 5/5 绿、契约 24 断言绿、架构验证器 A-D 15 断言绿；每 Task 完整红绿变异循环（变异实证 13 项全部先红后还原）；D6/D7 留项核销落盘（5-1 台账勾选 + deferred-work 索引）；R6 改造——验收测试组织结构对齐 PG 模板（用户裁定）；实施期两发现: BDD 参数化步骤须 parsers.parse 显式声明 / isolation_state 对 isolation_policy 依赖经方法内延迟 import 打破包初始化环 |
 | 2026-10-22 | v2.1.0 | **代码审查周期 Round 1**（四视角调研 + 双评审 + 主会话事实裁决）：P1×2 + P2×5 + P3×7 落码 14 项 + 登记 DF×2 + 维持 8 项（证伪留痕）。核心：R1-F02 SISYS_USE_TEST_PORTS 端口隔离被 conftest 模块级 litellm import 的 load_dotenv 副作用静默击穿（测试实读写 dev 6379/5432——environments.py 双向修复：Layer 3 端口守卫 + sync 强覆写 + MinIO endpoint 洞 + 4 用例锁定）；R1-F01 pipeline 原子性契约判别力锁定（5-1 先例移植）；R1-F05 446 supported_levels 真派生兑现 docstring 承诺；R1-F10 环方向 docstring 主会话副本实验定谳（value_objects-first 经 archive_events 断环——三方交叉验证，调研与评审员乙的两版链路均为误报）；R1-F13 集成异常路径清理闭合（key 即时登记模式）；双评审 4 条修正全吸收（甲 P0 级 split-brain 联动面最高价值） |
 | 2026-10-22 | v2.2.0 | **代码审查周期 Round 2**（回归核查 + 组合交互面双审查 + 单评审快评）：P0×1 + P2×1 + P3×4 落码 6 项。核心：R2-F01 R1-F02 锁定用例击穿 CI 门禁（SISYS_TEST_ENV=ci 下 3/4 用例必红——实测复现；修复=显式锚定 local[delenv 被 CI 容器双重兜底击穿——评审实证] + CI 形态反向锁定用例[6390 差异化防恒真]）；R2-F02 MinIO 生产路径 split-brain 闭合（from_env 读 HOST/API_PORT 非 ENDPOINT——sync 补两键覆写）；R2-F05 判定式 helper 单一化；R2-OBS monkeypatch 真源性行为锁；R1 修复回归核查 13/14 干净 + 台账一致性全过 + 6380 MONITOR 实证 |
+| 2026-10-22 | v2.3.0 | **代码审查周期 Round 3**（单深度推演）：零 P0/P1，P3×3 落码。R3-F01 锁定测试恢复键集缺口闭合（注入集扩至 sync 写集全量 11 键——进程内单向污染与 NEO4J 腿分裂触发条件消除）；R3-F03 trigger_reason 双投影统一（事件传 state.last_trigger_reason 单源）；R3-F04 R1 引入的 pipeline stub lambda 协程丢弃缺陷修复（partial 绑定真 async——全 unit 面唯一 RuntimeWarning 消除）；16 格环境矩阵/CLI 三路径/八路径事件/9 格异码矩阵全推演闭合 + 7 疑点证伪留痕 |
 
 ---
 
-**故事版本/Story Version:** v2.2.0
+**故事版本/Story Version:** v2.3.0
 **创建日期/Created:** 2026-10-21
 **最后更新/Last Updated:** 2026-10-22
 **更新说明/Description:**
@@ -1220,3 +1233,4 @@ tests 修改 12:
 - v2.0.0: dev-story 实施完成（Task 0-8 全交付）
 - v2.1.0: 代码审查周期 Round 1（14 落码 + 2 登记 + 8 维持——详见 Review Findings R1 表）
 - v2.2.0: 代码审查周期 Round 2（P0×1 + P2×1 + P3×4 落码——详见 Review Findings R2 表）
+- v2.3.0: 代码审查周期 Round 3（零 P0/P1，P3×3 落码 + P3×1 维持——详见 Review Findings R3 表）
