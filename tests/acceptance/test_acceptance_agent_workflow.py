@@ -1,9 +1,10 @@
 """Story 5-3 — 单 Agent 标准工作流验收测试（BDD 场景步骤实现）。
 
-结构范本：test_acceptance_agent_profile_loading.py（5-2 最新形态——FEATURE 常量 +
-@scenario 显式绑定 + context dict + 场景级独立 Redis 客户端 + _run_async 同循环调度）；
-AST 静态扫描写法参照 test_acceptance_postgresql_relational_layer.py（架构约束归
-tests/unit/architecture/test_arch_agent_workflow.py）。
+模板基准: test_acceptance_postgresql_relational_layer.py（PG 模板——
+多行 @scenario 字面量路径 + 场景绑定与步骤实现交替排列 + AC 横幅分组）；
+R6 改造（用户裁定 2026-10-22）: 组织结构对齐 PG 模板，保留真实断言
+（禁 then-pass 占位——PG 模板历史缺陷）、AC 前缀场景名、Redis 步骤化
+门控、benchmark 场级标记与 DC-12 场景序约束。
 
 18 场景三属性分档表（Task 0 Subtask 0.6 定稿——层级/LLM 依赖/Redis 依赖）：
 
@@ -29,8 +30,8 @@ tests/unit/architecture/test_arch_agent_workflow.py）。
 | 18 | AC-6.4   | 静态完成清单（Task 9）   | 无       | 无     |
 
 场景序约束（DC-12）：AC-6.3 CLI 覆写场景先于 AC-6.1 接线场景执行（接线场景
-resolve 即缓存全真实链，后行 CLI 覆写失效）——绑定函数定义序 AC-6.3 在前，
-feature 文本序保持 AC 编号序。
+resolve 即缓存全真实链，后行 CLI 覆写失效）——绑定函数定义序 AC-6.3 在前
+（AC-6 组内先定义），feature 文本序保持 AC 编号序。
 
 新模块延迟 import 纪律：本 Story 交付的模块（agent_workflow 端口 / 六阶段服务 /
 schemas / prompts / context 装配器 / 图工厂 / 引擎扩展 / use_case / 444-445 异常 /
@@ -44,12 +45,13 @@ Run with:
     - 端口级场景不触 Redis（档案加载走本地静态文件 loader；图执行手工装配
       LangGraphEngine + InMemoryEventBus 子类 recording publisher——R3-F4 注入位）
     - 仅 AC-6.3 需要真实 Redis（instantiate 落 Agent 实体 + run-task 守卫 get_by_id）
-    - teardown 逐键精确删除本场景记录的 agent_id 键（禁 delete_pattern/flush）
+    - teardown 逐键精确删除本场景记录的 agent_id 键（agent/isolation 双 namespace
+      ——Story 5-4 后实例化即写隔离键；禁 delete_pattern/flush）
     - 场景级独立 Redis 客户端 + 同循环关闭（跨循环 "Event loop is closed" 存档教训）
     - BDD 步骤禁 @pytest.mark.asyncio（context 数据丢失），统一 _run_async 调度
     - 验收禁调用 bootstrap()（session 级 _bootstrap_once 已引导，二次调用因
       lambda 工厂 spec 不幂等必抛 ConflictError）
-    - Fake LLM 端口替身是外部 SaaS 豁免面（分派键 = response_schema 身份，断言锚
+    - Fake LLM 端口替身是外部 SaaS 豁免面（分档键 = response_schema 身份，断言锚
       与分派键独立——4-5 纪律）；工具链 generate 面按 prompt 前缀分派
     - AC-5.1/5.2 共享计时 helper（模块级采样缓存——禁 20 采样双跑拖慢套件）
 """
@@ -70,8 +72,6 @@ from pytest_bdd import given, scenario, then, when
 from src.domain.entities.agent import AgentRole
 from src.infrastructure.storage.redis.key_builder import build_key
 
-FEATURE = "test_acceptance_agent_workflow.feature"
-
 # 仓库根锚定（完成清单断言用，不依赖 cwd）
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -87,106 +87,6 @@ pytestmark = [
 
 # AC-5.1/5.2 共享计时采样缓存（xdist_group 保证同 worker 串行——AC-5.1 先行产出）
 _PERF_SAMPLES: dict[str, Any] = {}
-
-
-# ===================================================================
-# 场景绑定（17 个，场景名从 .feature 复制粘贴——ASCII 连字符 + 两侧空格）
-# 注意：AC-6.3 先于 AC-6.1/AC-6.2 定义（DC-12 场景序约束）
-# ===================================================================
-
-
-@scenario(FEATURE, "AC-1.1 - 六阶段标准工作流顺序执行")
-def test_ac_1_1_six_phase_sequential_execution(context: dict[str, Any]) -> None:
-    """AC-1.1: executed_phases 轨迹六阶段完备 + 每阶段产物入 state。"""
-
-
-@scenario(FEATURE, "AC-1.2 - 验证失败进入反思且修正后重试与不可修正早退")
-def test_ac_1_2_reflect_retry_and_early_exit(context: dict[str, Any]) -> None:
-    """AC-1.2: fail→reflect→revised→plan 重试成功 + revised=False 早退两路径。"""
-
-
-@scenario(FEATURE, "AC-1.3 - 重试上限耗尽带失败标记完成")
-def test_ac_1_3_retry_exhausted_failed_completion(context: dict[str, Any]) -> None:
-    """AC-1.3: plan 总执行 ≤3 次 + status=failed 完成态。"""
-
-
-@scenario(FEATURE, "AC-1.4 - agent_id 全链贯通无新铸")
-def test_ac_1_4_agent_id_threading(context: dict[str, Any]) -> None:
-    """AC-1.4: AgentDecided.agent_id == parameters 传入值（5-2 风险 #2 核销）。"""
-
-
-@scenario(FEATURE, "AC-2.1 - 思维链五字段完备且工具轨迹一致")
-def test_ac_2_1_chain_five_fields_and_tool_trace(context: dict[str, Any]) -> None:
-    """AC-2.1: 五字段非空 + tools_used 与真实工具轨迹一致（覆写制）。"""
-
-
-@scenario(FEATURE, "AC-2.2 - 思维链展示形态含 XML 标签与 JSON 尾段")
-def test_ac_2_2_chain_display_form(context: dict[str, Any]) -> None:
-    """AC-2.2: to_display 五段形态 + 三个 XML 标签段 + JSON 尾段。"""
-
-
-@scenario(FEATURE, "AC-3.1 - 证据包六类字段齐备")
-def test_ac_3_1_evidence_six_field_classes(context: dict[str, Any]) -> None:
-    """AC-3.1: 六类字段齐备 + input_hash sha256 64 位 hex + 置信度溯源。"""
-
-
-@scenario(FEATURE, "AC-3.2 - 失败终态产出全量轨迹证据包")
-def test_ac_3_2_failed_terminal_full_trace(context: dict[str, Any]) -> None:
-    """AC-3.2: 跨重试轮全部工具轨迹 + 末次验证失败摘要。"""
-
-
-@scenario(FEATURE, "AC-4.1 - SAP 消息十五字段定义完整")
-def test_ac_4_1_sap_fifteen_fields(context: dict[str, Any]) -> None:
-    """AC-4.1: 15 字段存在性与类型 + 10 必需字段逐一点名（验收 tripwire）。"""
-
-
-@scenario(FEATURE, "AC-4.2 - SAP 枚举值与默认值契约")
-def test_ac_4_2_sap_enums_and_defaults(context: dict[str, Any]) -> None:
-    """AC-4.2: 5 类型/4 优先级 + 四默认值（NORMAL/L4_HARD/False/300）。"""
-
-
-@scenario(FEATURE, "AC-4.3 - SAP 必填约束与非法值拒绝")
-def test_ac_4_3_sap_required_and_rejection(context: dict[str, Any]) -> None:
-    """AC-4.3: conversation_id 必填 + correlation_id 可空 + 非法枚举拒绝 + UTC。"""
-
-
-@pytest.mark.benchmark  # 性能场景级标记（R1-F8——不打文件级以防非计时场景误挂语义）
-@scenario(FEATURE, "AC-5.1 - 工作流执行延迟 P95 小于 10 秒")
-def test_ac_5_1_p95_under_10s(context: dict[str, Any]) -> None:
-    """AC-5.1: warmup 1 + 20 采样 quantiles(n=20)[18] < 10s（Fake 延迟注入）。"""
-
-
-@scenario(FEATURE, "AC-5.2 - 思维链输出完整率不低于 98%")
-def test_ac_5_2_chain_completeness_rate(context: dict[str, Any]) -> None:
-    """AC-5.2: 复用 AC-5.1 采样统计五字段完备占比 ≥98%。"""
-
-
-@scenario(FEATURE, "AC-5.3 - 并发 10 个 Agent 会话全部成功")
-def test_ac_5_3_concurrent_ten_sessions(context: dict[str, Any]) -> None:
-    """AC-5.3: asyncio.gather 10 agent_id 并发全成功（单进程并发先例）。"""
-
-
-# --- DC-12 场景序约束：AC-6.3 CLI 覆写场景先于 AC-6.1 接线场景执行 ---
-
-
-@scenario(FEATURE, "AC-6.3 - CLI run-task 全链贯通")
-def test_ac_6_3_cli_run_task_full_chain(context: dict[str, Any]) -> None:
-    """AC-6.3: DC-12 四件套——成功 exit 0/失败完成态 exit 0/守卫 443 exit 1。"""
-
-
-@scenario(FEATURE, "AC-6.1 - 端口接线与图注册可达")
-def test_ac_6_1_port_wiring_and_graph_registration(context: dict[str, Any]) -> None:
-    """AC-6.1: 两新端口 resolve+isinstance + SingleAgentWorkflow 图名注册。"""
-
-
-@scenario(FEATURE, "AC-6.2 - AgentDecided 事件真实化发布")
-def test_ac_6_2_agent_decided_realized(context: dict[str, Any]) -> None:
-    """AC-6.2: decision_result 五键投影 + confidence 来自验证阶段（非 0.9）。"""
-
-
-@scenario(FEATURE, "AC-6.4 - 完成清单逐项确认")
-def test_ac_6_4_completion_checklist(context: dict[str, Any]) -> None:
-    """AC-6.4: src/tests 完成清单 + 链路接线断言清单终态（Task 9 收尾）。"""
 
 
 # ===================================================================
@@ -478,17 +378,16 @@ def _submit_workflow(context: dict[str, Any]) -> None:
 
 
 # ===================================================================
-# Given 步骤
+# AC-1: 六阶段标准工作流执行
 # ===================================================================
 
 
-@given("Redis 缓存服务可用")
-def given_redis_service_available(context: dict[str, Any]) -> None:
-    """验证 Redis 服务可用（不可用时场景整体动态跳过，禁止写死 skip）。"""
-    try:
-        _run_async(context["_loop"], context["_redis_client"].ping())
-    except Exception as exc:
-        pytest.skip(f"Redis not available: {exc}")
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-1.1 - 六阶段标准工作流顺序执行",
+)
+def test_ac_1_1_six_phase_sequential_execution(context: dict[str, Any]) -> None:
+    """AC-1.1: executed_phases 轨迹六阶段完备 + 每阶段产物入 state。"""
 
 
 @given("六阶段工作流组件已装配且 Fake LLM 验证恒通过")
@@ -497,10 +396,105 @@ def given_workflow_assembled_always_pass(context: dict[str, Any]) -> None:
     _assemble_workflow(context, verify_mode="always_pass")
 
 
+@when("以指定 agent_id 执行单 Agent 工作流任务")
+def when_execute_workflow_task(context: dict[str, Any]) -> None:
+    """提交 SingleAgentWorkflow（阻塞语义）+ 取终态 state（get_graph_result）。"""
+    _submit_workflow(context)
+
+
+@then("executed_phases 轨迹按六阶段顺序完备且末段为 package")
+def then_executed_phases_complete(context: dict[str, Any]) -> None:
+    """六阶段轨迹断言（成功路径：perceive→plan→execute→verify→package）。"""
+    state = context["final_state"]
+    phases = state["executed_phases"]
+    assert phases == ["perceive", "plan", "execute", "verify", "package"], f"轨迹异常: {phases}"
+    assert phases[-1] == "package", "末元素钉死 package（对齐 444 phase 枚举）"
+
+
+@then("每阶段产物已写入工作流状态")
+def then_phase_artifacts_in_state(context: dict[str, Any]) -> None:
+    """各阶段产物键非空断言（perception/plan 产物/execution/verification/evidence/chain）。"""
+    state = context["final_state"]
+    assert state.get("perception") is not None
+    assert state.get("plan") is not None
+    assert state.get("execution") is not None
+    assert state.get("verification") is not None
+    assert state.get("evidence") is not None
+    assert state.get("chain") is not None
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-1.2 - 验证失败进入反思且修正后重试与不可修正早退",
+)
+def test_ac_1_2_reflect_retry_and_early_exit(context: dict[str, Any]) -> None:
+    """AC-1.2: fail→reflect→revised→plan 重试成功 + revised=False 早退两路径。"""
+
+
 @given("六阶段工作流组件已装配且 Fake LLM 验证先失败后通过")
 def given_workflow_assembled_fail_once(context: dict[str, Any]) -> None:
     """装配六阶段全链（序列 Fake：verify 第 1 次 fail、第 2 次 pass——反思重试闭环）。"""
     _assemble_workflow(context, verify_mode="fail_once", plan_tool_names=("PESTEL 分析",))
+
+
+@then("轨迹含验证反思规划重试环且终态成功")
+def then_reflect_retry_loop_success(context: dict[str, Any]) -> None:
+    """fail_once 路径轨迹：...verify→reflect→plan→execute→verify→package。"""
+    state = context["final_state"]
+    phases = state["executed_phases"]
+    expected_prefix = ["perceive", "plan", "execute", "verify", "reflect", "plan", "execute", "verify", "package"]
+    assert phases == expected_prefix, f"反思重试轨迹异常: {phases}"
+    assert state["evidence"].status == "completed"
+
+
+@then("重试轮规划提示词包含修正计划与错误分析")
+def then_retry_plan_prompt_contains_revision(context: dict[str, Any]) -> None:
+    """R2-F4：重试轮 plan prompt 注入 revised_plan + error_analysis 断言。
+
+    R1 修复：选调锚改 PlanSchema 身份（原「规划 in system_prompt」对全部调用
+    恒真——system_prompt 六阶段共用；终局合成模板自带「修正」二字使 OR 兜底
+    恒绿，R2-F4 断裂时本断言不红——空心化）。断言锚 = Fake 产物精确串，与
+    分派键（Schema 身份）独立。
+    """
+    from src.application.services.agent_workflow_schemas import PlanSchema
+
+    fake_llm = context["fake_llm"]
+    plan_calls = [
+        call.kwargs.get("prompt", "") or call.args[0]
+        for call in fake_llm.structured_generate.call_args_list
+        if call.kwargs.get("response_schema") is PlanSchema
+    ]
+    assert len(plan_calls) >= 2, f"fail_once 路径应存在两次 plan 调用，实际 {len(plan_calls)} 次"
+    # 第二次 plan 调用（重试轮）须含反思产物注入（Fake 反思产物的精确串——
+    # 不用「修正」类模板兜底词，防终局合成 prompt 的静态文本污染）
+    retry_prompt = plan_calls[1]
+    assert "补充约束参数" in retry_prompt, f"重试轮 plan prompt 未注入修正计划: {retry_prompt[:200]}"
+    assert "工具输出缺少关键约束字段" in retry_prompt, f"重试轮 plan prompt 未注入错误分析: {retry_prompt[:200]}"
+
+
+@given("六阶段工作流组件已装配且 Fake LLM 反思判定不可修正")
+def given_workflow_assembled_not_revisable(context: dict[str, Any]) -> None:
+    """装配六阶段全链（reflect revised=False——第四路径不可修正早退）。"""
+    _assemble_workflow(context, verify_mode="always_fail", reflect_revised=False, plan_tool_names=("PESTEL 分析",))
+
+
+@then("未耗尽重试即直接打包失败证据")
+def then_not_revisable_early_exit(context: dict[str, Any]) -> None:
+    """第四路径：reflect 判定不可修正（revised=False 且未耗尽）→ 直接 package(failed)。"""
+    state = context["final_state"]
+    phases = state["executed_phases"]
+    expected = ["perceive", "plan", "execute", "verify", "reflect", "package"]
+    assert phases == expected, f"不可修正早退轨迹异常: {phases}"
+    assert state["evidence"].status == "failed"
+    assert state["retry_count"] == 1, "reflect 执行一次即消耗一次重试（未耗尽）"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-1.3 - 重试上限耗尽带失败标记完成",
+)
+def test_ac_1_3_retry_exhausted_failed_completion(context: dict[str, Any]) -> None:
+    """AC-1.3: plan 总执行 ≤3 次 + status=failed 完成态。"""
 
 
 @given("六阶段工作流组件已装配且 Fake LLM 验证恒失败且反思恒可修正")
@@ -509,10 +503,81 @@ def given_workflow_assembled_always_fail(context: dict[str, Any]) -> None:
     _assemble_workflow(context, verify_mode="always_fail", reflect_revised=True, plan_tool_names=("PESTEL 分析",))
 
 
-@given("六阶段工作流组件已装配且 Fake LLM 反思判定不可修正")
-def given_workflow_assembled_not_revisable(context: dict[str, Any]) -> None:
-    """装配六阶段全链（reflect revised=False——第四路径不可修正早退）。"""
-    _assemble_workflow(context, verify_mode="always_fail", reflect_revised=False, plan_tool_names=("PESTEL 分析",))
+@then("规划阶段总执行次数不超过 3 次")
+def then_plan_execution_bounded(context: dict[str, Any]) -> None:
+    """重试语义：初始 1 + 重试 2 = plan 总执行 ≤3（reflect 递增 + <= 谓词）。"""
+    state = context["final_state"]
+    phases = state["executed_phases"]
+    plan_count = phases.count("plan")
+    assert plan_count == 3, f"恒失败+恒可修正应触发满 3 次 plan: {phases}"
+    assert state["retry_count"] == 3, "retry_count 终值=reflect 总执行数（第三次 reflect 判定耗尽）"
+
+
+@then("终态证据携带失败标记与失败原因")
+def then_failed_evidence_marker(context: dict[str, Any]) -> None:
+    """失败终态：status=failed + failure_reason 非空（末次验证失败摘要）。"""
+    evidence = context["final_state"]["evidence"]
+    assert evidence.status == "failed"
+    assert evidence.failure_reason.strip(), "失败终态 failure_reason 必须非空"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-1.4 - agent_id 全链贯通无新铸",
+)
+def test_ac_1_4_agent_id_threading(context: dict[str, Any]) -> None:
+    """AC-1.4: AgentDecided.agent_id == parameters 传入值（5-2 风险 #2 核销）。"""
+
+
+@then("发布的 AgentDecided 事件 agent_id 与入参完全一致")
+def then_agent_decided_agent_id_matches(context: dict[str, Any]) -> None:
+    """agent_id 贯通：事件 agent_id == parameters 传入实体 id（5-2 风险 #2 核销）。"""
+    decided_events = [e for e in context["recorder"].published_events if type(e).__name__ == "AgentDecided"]
+    assert decided_events, "应发布 AgentDecided 事件"
+    assert decided_events[0].agent_id == context["agent_id"], (
+        f"事件 agent_id {decided_events[0].agent_id} != 入参 {context['agent_id']}"
+    )
+
+
+# ===================================================================
+# AC-2: JSON 思维链输出
+# ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-2.1 - 思维链五字段完备且工具轨迹一致",
+)
+def test_ac_2_1_chain_five_fields_and_tool_trace(context: dict[str, Any]) -> None:
+    """AC-2.1: 五字段非空 + tools_used 与真实工具轨迹一致（覆写制）。"""
+
+
+@then("思维链五字段完备且非空")
+def then_chain_five_fields_complete(context: dict[str, Any]) -> None:
+    """五字段完备：四 str 字段非空 + tools_used 元组形态（空元组合法）。"""
+    chain = context["final_state"]["chain"]
+    for name in ("input_summary", "reflection", "constraints_check", "final_answer"):
+        value = getattr(chain, name)
+        assert isinstance(value, str) and value.strip(), f"字段 {name} 应为非空 str"
+    assert isinstance(chain.tools_used, tuple), "tools_used 应为 tuple 形态"
+
+
+@then("tools_used 与真实工具调用轨迹一致")
+def then_tools_used_matches_real_trace(context: dict[str, Any]) -> None:
+    """覆写制断言：chain.tools_used == 真实执行轨迹（Fake 终局回声值相异——判别力）。"""
+    chain = context["final_state"]["chain"]
+    execution = context["final_state"]["execution"]
+    real_trace = execution.tool_trace if hasattr(execution, "tool_trace") else ()
+    assert chain.tools_used == real_trace, f"tools_used {chain.tools_used} != 真实轨迹 {real_trace}（覆写制失效）"
+    assert "fake-echo" not in "".join(chain.tools_used), "Fake 回声值泄漏（未覆写）"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-2.2 - 思维链展示形态含 XML 标签与 JSON 尾段",
+)
+def test_ac_2_2_chain_display_form(context: dict[str, Any]) -> None:
+    """AC-2.2: to_display 五段形态 + 三个 XML 标签段 + JSON 尾段。"""
 
 
 @given("已构造含工具轨迹的思维链值对象")
@@ -527,6 +592,465 @@ def given_chain_of_thought_vo(context: dict[str, Any]) -> None:
         constraints_check="约束检查：符合 MVP 范围与安全红线",
         final_answer=json.dumps({"answer": "建议采用三层次进入策略"}, ensure_ascii=False),
     )
+
+
+@then("to_display 生成五段展示形态")
+def then_to_display_five_segments(context: dict[str, Any]) -> None:
+    """展示形态：Input → Reflection → Tools_Used → Constraints_Check → JSON。"""
+    display = context["chain_vo"].to_display()
+    assert "Input" in display
+    assert display.index("Input") < display.index("<Reflection>"), "分段顺序: Input 在 Reflection 前"
+
+
+@then("输出含三个 XML 标签段与 JSON 尾段")
+def then_display_xml_tags_and_json_tail(context: dict[str, Any]) -> None:
+    """三 XML 标签段 + JSON 尾段（or.md §五.5 展示契约）。"""
+    display = context["chain_vo"].to_display()
+    assert "<Reflection>" in display and "</Reflection>" in display
+    assert "<Tools_Used>" in display and "</Tools_Used>" in display
+    assert "<Constraints_Check>" in display and "</Constraints_Check>" in display
+    json_tail = display.rsplit("→", 1)[-1].strip()
+    json.loads(json_tail)  # 尾段必须是合法 JSON
+
+
+# ===================================================================
+# AC-3: 证据打包
+# ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-3.1 - 证据包六类字段齐备",
+)
+def test_ac_3_1_evidence_six_field_classes(context: dict[str, Any]) -> None:
+    """AC-3.1: 六类字段齐备 + input_hash sha256 64 位 hex + 置信度溯源。"""
+
+
+@then("证据包六类字段齐备且输入哈希为 SHA256 六十四位十六进制")
+def then_evidence_six_classes_and_hash(context: dict[str, Any]) -> None:
+    """六类字段（输入哈希/分解图/轨迹/快照/置信度依据/引用源）+ sha256 口径。"""
+    evidence = context["final_state"]["evidence"]
+    for name in (
+        "input_hash",
+        "task_breakdown",
+        "tool_trace",
+        "artifacts_snapshot",
+        "confidence",
+        "confidence_rationale",
+        "citations",
+    ):
+        assert hasattr(evidence, name), f"证据字段缺失: {name}"
+    task = context["task"]
+    assert evidence.input_hash == hashlib.sha256(task.encode()).hexdigest(), "input_hash 口径: sha256(task_description)"
+    assert len(evidence.input_hash) == 64 and all(c in "0123456789abcdef" for c in evidence.input_hash)
+
+
+@then("置信度与依据来源于验证阶段产物")
+def then_confidence_from_verification(context: dict[str, Any]) -> None:
+    """置信度同源验证阶段（Fake verify pass 时 confidence=0.85——非硬编码 0.9）。"""
+    evidence = context["final_state"]["evidence"]
+    verification = context["final_state"]["verification"]
+    assert evidence.confidence == verification.confidence, "置信度应同源验证阶段"
+    assert evidence.confidence == 0.85, "Fake 验证通过档位 0.85（区别于硬编码 0.9）"
+    assert evidence.confidence_rationale.strip()
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-3.2 - 失败终态产出全量轨迹证据包",
+)
+def test_ac_3_2_failed_terminal_full_trace(context: dict[str, Any]) -> None:
+    """AC-3.2: 跨重试轮全部工具轨迹 + 末次验证失败摘要。"""
+
+
+@then("失败终态证据包含跨重试轮全部工具轨迹")
+def then_failed_evidence_full_trace(context: dict[str, Any]) -> None:
+    """历史聚合断言：恒失败 3 轮 plan → 工具轨迹跨轮累积（键覆盖丢前轮即红）。"""
+    state = context["final_state"]
+    evidence = state["evidence"]
+    plan_count = state["executed_phases"].count("plan")
+    trace = evidence.tool_trace
+    assert plan_count >= 2, "前置：应至少两个执行轮"
+    # 形态 + 精确下界（同源派生：given 每轮 plan 含 1 工具步 → 轨迹数 >= plan 轮数；
+    # execute 聚合改键覆盖丢前轮时 len < plan_count 必红——恒真形态已修）
+    assert isinstance(trace, tuple), "轨迹应为元组形态（frozen VO 不可变纪律）"
+    assert len(trace) >= plan_count, "跨轮轨迹应累积至计划轮数下界（键覆盖丢前轮即红）"
+    execution = state["execution"]
+    assert execution is not None and len(execution.tool_trace) == len(trace), (
+        "execution 与 evidence 轨迹应同长（聚合语义——覆盖丢前轮轨迹即红）"
+    )
+
+
+@then("失败原因携带末次验证失败摘要")
+def then_failure_reason_last_verification(context: dict[str, Any]) -> None:
+    """failure_reason = 末次验证失败摘要（Fake rationale 含轮次锚）。"""
+    evidence = context["final_state"]["evidence"]
+    verification = context["final_state"]["verification"]
+    assert evidence.failure_reason == verification.rationale, "失败原因应为末次验证摘要"
+
+
+# ===================================================================
+# AC-4: SAP 消息 Schema 定义（FR-IF-03）
+# ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-4.1 - SAP 消息十五字段定义完整",
+)
+def test_ac_4_1_sap_fifteen_fields(context: dict[str, Any]) -> None:
+    """AC-4.1: 15 字段存在性与类型 + 10 必需字段逐一点名（验收 tripwire）。"""
+
+
+@then("SAPMessage 模型包含十五个字段且类型正确")
+def then_sap_message_fifteen_fields(context: dict[str, Any]) -> None:
+    """15 字段存在性与类型（验收 tripwire——AC-4×3 与 Task 2 单测断言面重复，
+    保留为静态绊线先例）。"""
+    import datetime
+    import uuid as uuid_module
+
+    from src.interfaces.sap.message import SAPMessage
+
+    field_names = set(SAPMessage.model_fields)
+    assert len(field_names) == 15, f"字段总数应为 15: {field_names}"
+
+    message = SAPMessage(
+        message_id=uuid_module.uuid4(),
+        conversation_id=uuid_module.uuid4(),
+        sender_id="agent-ceo",
+        receiver_id="agent-cfo",
+        message_type="request",
+        content="请提供财务视角评估",
+    )
+    assert isinstance(message.message_id, uuid_module.UUID)
+    assert isinstance(message.timestamp, datetime.datetime)
+    assert isinstance(message.context, dict)
+
+
+@then("十个必需字段逐一点名存在")
+def then_sap_ten_required_fields_named(context: dict[str, Any]) -> None:
+    """epics 验收点名的 10 必需字段逐一点名（tripwire 第二断言面）。"""
+    from src.interfaces.sap.message import SAPMessage
+
+    required_ten = (
+        "message_id",
+        "conversation_id",
+        "sender_id",
+        "receiver_id",
+        "message_type",
+        "priority",
+        "content",
+        "correlation_id",
+        "isolation_level",
+        "blackboard_visible",
+    )
+    field_names = set(SAPMessage.model_fields)
+    for name in required_ten:
+        assert name in field_names, f"必需字段缺失: {name}"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-4.2 - SAP 枚举值与默认值契约",
+)
+def test_ac_4_2_sap_enums_and_defaults(context: dict[str, Any]) -> None:
+    """AC-4.2: 5 类型/4 优先级 + 四默认值（NORMAL/L4_HARD/False/300）。"""
+
+
+@then("MessageType 含五种类型且 MessagePriority 含四级优先级")
+def then_sap_enum_values(context: dict[str, Any]) -> None:
+    """枚举值集合：request/response/notification/broadcast/debate + low/normal/high/urgent。"""
+    from src.interfaces.sap.types import MessagePriority, MessageType
+
+    assert {item.value for item in MessageType} == {"request", "response", "notification", "broadcast", "debate"}
+    assert {item.value for item in MessagePriority} == {"low", "normal", "high", "urgent"}
+
+
+@then("默认值为普通优先级硬隔离不公开黑板且超时 300 秒")
+def then_sap_defaults(context: dict[str, Any]) -> None:
+    """四默认值：priority=NORMAL / isolation_level=L4_HARD / blackboard_visible=False / timeout=300。"""
+    import uuid as uuid_module
+
+    from src.domain.events.enums import IsolationLevel
+    from src.interfaces.sap.message import SAPMessage
+    from src.interfaces.sap.types import MessagePriority
+
+    message = SAPMessage(
+        message_id=uuid_module.uuid4(),
+        conversation_id=uuid_module.uuid4(),
+        sender_id="agent-ceo",
+        receiver_id="broadcast",
+        message_type="broadcast",
+        content="广播消息",
+    )
+    assert message.priority is MessagePriority.NORMAL
+    assert message.isolation_level is IsolationLevel.L4_HARD
+    assert message.blackboard_visible is False
+    assert message.timeout_seconds == 300
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-4.3 - SAP 必填约束与非法值拒绝",
+)
+def test_ac_4_3_sap_required_and_rejection(context: dict[str, Any]) -> None:
+    """AC-4.3: conversation_id 必填 + correlation_id 可空 + 非法枚举拒绝 + UTC。"""
+
+
+@then("conversation_id 必填且 correlation_id 默认可空")
+def then_sap_required_and_nullable(context: dict[str, Any]) -> None:
+    """conversation_id 无默认（缺失构造 ValidationError）+ correlation_id: UUID | None = None。"""
+    import uuid as uuid_module
+
+    import pydantic
+
+    from src.interfaces.sap.message import SAPMessage
+
+    # model_validate(dict) 承载「必填缺失」负向构造（裸 SAPMessage(...) 缺参
+    # 形态对 mypy 是 call-arg 静态错误——model_validate 等价运行时语义）
+    with pytest.raises(pydantic.ValidationError):
+        SAPMessage.model_validate(
+            {
+                "message_id": uuid_module.uuid4(),
+                "sender_id": "agent-ceo",
+                "receiver_id": "agent-cfo",
+                "message_type": "request",
+                "content": "缺少 conversation_id",
+            }
+        )
+
+    message = SAPMessage(
+        message_id=uuid_module.uuid4(),
+        conversation_id=uuid_module.uuid4(),
+        sender_id="agent-ceo",
+        receiver_id="agent-cfo",
+        message_type="request",
+        content="correlation_id 可空",
+    )
+    assert message.correlation_id is None
+
+
+@then("非法枚举值构造被拒绝且时间戳为 UTC 感知")
+def then_sap_invalid_rejected_and_utc(context: dict[str, Any]) -> None:
+    """非法 message_type 构造 ValidationError + timestamp tz-aware（禁裸 utcnow）。"""
+    import uuid as uuid_module
+
+    import pydantic
+
+    from src.interfaces.sap.message import SAPMessage
+
+    with pytest.raises(pydantic.ValidationError):
+        SAPMessage(
+            message_id=uuid_module.uuid4(),
+            conversation_id=uuid_module.uuid4(),
+            sender_id="agent-ceo",
+            receiver_id="agent-cfo",
+            message_type="invalid-type",
+            content="非法枚举",
+        )
+
+    message = SAPMessage(
+        message_id=uuid_module.uuid4(),
+        conversation_id=uuid_module.uuid4(),
+        sender_id="agent-ceo",
+        receiver_id="agent-cfo",
+        message_type="request",
+        content="UTC 感知",
+    )
+    assert message.timestamp.tzinfo is not None, "timestamp 必须为 tz-aware（architecture v8.4.0 红线）"
+
+
+# ===================================================================
+# AC-5: 性能指标
+# ===================================================================
+
+
+@pytest.mark.benchmark  # 性能场景级标记（R1-F8——不打文件级以防非计时场景误挂语义）
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-5.1 - 工作流执行延迟 P95 小于 10 秒",
+)
+def test_ac_5_1_p95_under_10s(context: dict[str, Any]) -> None:
+    """AC-5.1: warmup 1 + 20 采样 quantiles(n=20)[18] < 10s（Fake 延迟注入）。"""
+
+
+@given("Redis 缓存服务可用")
+def given_redis_service_available(context: dict[str, Any]) -> None:
+    """验证 Redis 服务可用（不可用时场景整体动态跳过，禁止写死 skip）。"""
+    try:
+        _run_async(context["_loop"], context["_redis_client"].ping())
+    except Exception as exc:
+        pytest.skip(f"Redis not available: {exc}")
+
+
+@when("采样执行工作流全链 1 次 warmup 与 20 次计时")
+def when_sample_workflow_latency(context: dict[str, Any]) -> None:
+    """P95 采样：warmup 1 次 + 计时 20 次（statistics.quantiles(n=20)[18]——5-2 先例）。
+
+    共享计时 helper（Task 7 交付）：委托集成测试模块的 sample_workflow_latency
+    ——模块级采样缓存使集成场景②与验收 AC-5.1/5.2 共享同批结果（禁 20 采样
+    双跑拖慢套件）；同 xdist_group("agent-workflow-perf") 同 worker 串行保证
+    缓存命中。
+    """
+    # 采样链 instantiate 需真实 Redis（键落库）——门控复用 given 步骤的 ping 形态
+    try:
+        _run_async(context["_loop"], context["_redis_client"].ping())
+    except Exception as exc:
+        pytest.skip(f"Redis not available（采样链 instantiate 前置）: {exc}")
+
+    # 计时链完全由集成 helper 自建（逐轮 Fake 装配 + 延迟注入）——验收侧
+    # 不再做本地装配（原装配产物零消费且不进计时窗——R1 耗时优化 F11）
+    from tests.integration.test_integration_agent_workflow import sample_workflow_latency
+
+    result = _run_async(context["_loop"], sample_workflow_latency(context["_redis_client"]))
+    context["perf_samples"] = result["samples"]
+    context["perf_chains"] = result["chains"]
+    _PERF_SAMPLES["latencies"] = result["samples"]
+    _PERF_SAMPLES["chains"] = result["chains"]
+    context["p95"] = result["p95"]
+
+
+@then("工作流执行延迟 P95 小于 10 秒且计时含六阶段全链")
+def then_p95_under_10s(context: dict[str, Any]) -> None:
+    """P95 断言（NFR-PERF-04 MVP 档）+ 计时下界锚（同源派生——R1 耗时优化）。"""
+    from tests.integration.test_integration_agent_workflow import FAKE_LLM_DELAY_SEC
+
+    assert len(context["perf_samples"]) == 20, "采样数 20（warmup 已剔除）"
+    assert context["p95"] < 10.0, f"P95 {context['p95']:.2f}s >= 10s"
+    # 计时下界（同源派生——与集成 helper 的 FAKE_LLM_DELAY_SEC 单源防漂移）：
+    # 工作流级 4 次调用（perceive/plan/verify/终局）× 延迟档（调用数判别力
+    # 由 scenario_2 的逐轮调用数锁承载）
+    assert context["p95"] >= 4 * FAKE_LLM_DELAY_SEC, f"P95 {context['p95']:.2f}s 低于 Fake 延迟下界（计时未含全链）"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-5.2 - 思维链输出完整率不低于 98%",
+)
+def test_ac_5_2_chain_completeness_rate(context: dict[str, Any]) -> None:
+    """AC-5.2: 复用 AC-5.1 采样统计五字段完备占比 ≥98%。"""
+
+
+@when("复用性能采样结果统计思维链完整率")
+def when_compute_chain_completeness(context: dict[str, Any]) -> None:
+    """从共享采样缓存统计五字段完备占比（AC-5.2——与 AC-5.1 同批结果）。"""
+    if "chains" not in _PERF_SAMPLES:
+        pytest.skip("AC-5.1 采样未执行（Redis 缺席级联跳过——完整率无分母）")
+    chains = _PERF_SAMPLES["chains"]
+    total = len(chains)
+
+    def _complete(chain: Any) -> bool:
+        if chain is None:
+            return False
+        non_str_fields = ("input_summary", "reflection", "constraints_check", "final_answer")
+        for name in non_str_fields:
+            value = getattr(chain, name, "")
+            if not isinstance(value, str) or not value.strip():
+                return False
+        tools = getattr(chain, "tools_used", None)
+        return isinstance(tools, tuple)
+
+    context["completeness_total"] = total
+    context["completeness_complete"] = sum(1 for chain in chains if _complete(chain))
+
+
+@then("五字段完备的思维链占比不低于 98%")
+def then_completeness_rate(context: dict[str, Any]) -> None:
+    """完整率 ≥98%（Fake 确定性产出下 100%——20/20）。"""
+    total = context["completeness_total"]
+    complete = context["completeness_complete"]
+    assert total == 20, f"分母应为 20: {total}"
+    assert complete / total >= 0.98, f"完整率 {complete}/{total} < 98%"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-5.3 - 并发 10 个 Agent 会话全部成功",
+)
+def test_ac_5_3_concurrent_ten_sessions(context: dict[str, Any]) -> None:
+    """AC-5.3: asyncio.gather 10 个 agent_id 并发全成功（单进程并发先例）。"""
+
+
+@when("以 10 个不同 agent_id 并发执行工作流任务")
+def when_concurrent_ten_sessions(context: dict[str, Any]) -> None:
+    """asyncio.gather 10 个 agent_id 并发全链（单进程并发先例）。"""
+
+    async def _run_session(agent_id: uuid.UUID) -> dict[str, Any]:
+        from src.domain.ports.resolver import resolve
+
+        profile_loader = resolve("agent_profile_loader")
+        profile = await profile_loader.load(role=AgentRole.CEO, agent_id=agent_id)
+        skill_selector = resolve("skill_selector")
+        tools_l1 = await skill_selector.list_active_skills()
+
+        from src.application.use_cases.agent_profile_loading import AgentProfileLoadResult
+
+        profile_result = AgentProfileLoadResult(
+            agent_id=agent_id,
+            role=AgentRole.CEO,
+            profile=profile,
+            tools_l1=tools_l1,
+            startup_context_tokens=0,
+        )
+
+        fake_llm = _make_fake_llm(verify_mode="always_pass")
+        tool_execution_service = _build_tool_execution_service(fake_llm)
+
+        from src.application.services.agent_workflow_service import AgentWorkflowService
+
+        service = AgentWorkflowService(
+            llm_client=fake_llm,
+            tool_execution_service=tool_execution_service,
+            skill_loader=resolve("skill_loader"),
+            tool_registry_service=_make_registry(),
+        )
+        recorder = _RecordingEventBus()
+        from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
+        from src.infrastructure.config.langgraph import LangGraphConfig
+
+        engine = LangGraphEngine(config=LangGraphConfig.from_env(), event_publisher=recorder, workflow_service=service)
+        workflow_context = service.build_context(profile_result, context["task"])
+        parameters = {"agent_id": str(agent_id), "task": context["task"], "context": workflow_context}
+        run_id = await engine.submit_graph("SingleAgentWorkflow", parameters=parameters)
+        state = await engine.get_graph_result(run_id)
+        return {"agent_id": agent_id, "state": state}
+
+    async def _gather_all() -> list[dict[str, Any]]:
+        import asyncio as aio
+
+        agent_ids = [uuid.uuid4() for _ in range(10)]
+        return list(await aio.gather(*(_run_session(aid) for aid in agent_ids)))
+
+    context["concurrent_results"] = _run_async(context["_loop"], _gather_all())
+
+
+@then("全部会话成功完成且产出完整思维链与证据包")
+def then_concurrent_all_success(context: dict[str, Any]) -> None:
+    """并发 10 会话全成功 + 每会话 chain/evidence 完备。"""
+    results = context["concurrent_results"]
+    assert len(results) == 10
+    for item in results:
+        state = item["state"]
+        assert state is not None, f"会话 {item['agent_id']} 终态缺失"
+        assert state["evidence"].status == "completed"
+        assert state["chain"] is not None
+        assert state["executed_phases"][-1] == "package"
+
+
+# ===================================================================
+# AC-6: 端口接线、架构合规与 CLI 全链
+# 注意（DC-12 场景序约束）: AC-6.3 CLI 覆写场景先于 AC-6.1/AC-6.2 定义——
+# 接线场景 resolve 即缓存全真实链，后行 CLI 覆写失效；feature 文本序保持
+# AC 编号序（AC-6.1 在前），执行序以绑定函数定义序为准。
+# ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-6.3 - CLI run-task 全链贯通",
+)
+def test_ac_6_3_cli_run_task_full_chain(context: dict[str, Any]) -> None:
+    """AC-6.3: DC-12 四件套——成功 exit 0/失败完成态 exit 0/守卫 443 exit 1。"""
 
 
 @given("已实例化 CEO Agent 且 CLI 已覆写 Fake LLM 端口")
@@ -615,120 +1139,6 @@ def given_cli_env_with_fake_llm_overridden(context: dict[str, Any]) -> None:
     context["_restorers"].append(_restore_llm_port)
 
 
-# ===================================================================
-# When 步骤
-# ===================================================================
-
-
-@when("以指定 agent_id 执行单 Agent 工作流任务")
-def when_execute_workflow_task(context: dict[str, Any]) -> None:
-    """提交 SingleAgentWorkflow（阻塞语义）+ 取终态 state（get_graph_result）。"""
-    _submit_workflow(context)
-
-
-@when("采样执行工作流全链 1 次 warmup 与 20 次计时")
-def when_sample_workflow_latency(context: dict[str, Any]) -> None:
-    """P95 采样：warmup 1 次 + 计时 20 次（statistics.quantiles(n=20)[18]——5-2 先例）。
-
-    共享计时 helper（Task 7 交付）：委托集成测试模块的 sample_workflow_latency
-    ——模块级采样缓存使集成场景②与验收 AC-5.1/5.2 共享同批结果（禁 20 采样
-    双跑拖慢套件）；同 xdist_group("agent-workflow-perf") 同 worker 串行保证
-    缓存命中。
-    """
-    # 采样链 instantiate 需真实 Redis（键落库）——门控复用 given 步骤的 ping 形态
-    try:
-        _run_async(context["_loop"], context["_redis_client"].ping())
-    except Exception as exc:
-        pytest.skip(f"Redis not available（采样链 instantiate 前置）: {exc}")
-
-    # 计时链完全由集成 helper 自建（逐轮 Fake 装配 + 延迟注入）——验收侧
-    # 不再做本地装配（原装配产物零消费且不进计时窗——R1 耗时优化 F11）
-    from tests.integration.test_integration_agent_workflow import sample_workflow_latency
-
-    result = _run_async(context["_loop"], sample_workflow_latency(context["_redis_client"]))
-    context["perf_samples"] = result["samples"]
-    context["perf_chains"] = result["chains"]
-    _PERF_SAMPLES["latencies"] = result["samples"]
-    _PERF_SAMPLES["chains"] = result["chains"]
-    context["p95"] = result["p95"]
-
-
-@when("复用性能采样结果统计思维链完整率")
-def when_compute_chain_completeness(context: dict[str, Any]) -> None:
-    """从共享采样缓存统计五字段完备占比（AC-5.2——与 AC-5.1 同批结果）。"""
-    if "chains" not in _PERF_SAMPLES:
-        pytest.skip("AC-5.1 采样未执行（Redis 缺席级联跳过——完整率无分母）")
-    chains = _PERF_SAMPLES["chains"]
-    total = len(chains)
-
-    def _complete(chain: Any) -> bool:
-        if chain is None:
-            return False
-        non_str_fields = ("input_summary", "reflection", "constraints_check", "final_answer")
-        for name in non_str_fields:
-            value = getattr(chain, name, "")
-            if not isinstance(value, str) or not value.strip():
-                return False
-        tools = getattr(chain, "tools_used", None)
-        return isinstance(tools, tuple)
-
-    context["completeness_total"] = total
-    context["completeness_complete"] = sum(1 for chain in chains if _complete(chain))
-
-
-@when("以 10 个不同 agent_id 并发执行工作流任务")
-def when_concurrent_ten_sessions(context: dict[str, Any]) -> None:
-    """asyncio.gather 10 个 agent_id 并发全链（单进程并发先例）。"""
-
-    async def _run_session(agent_id: uuid.UUID) -> dict[str, Any]:
-        from src.domain.ports.resolver import resolve
-
-        profile_loader = resolve("agent_profile_loader")
-        profile = await profile_loader.load(role=AgentRole.CEO, agent_id=agent_id)
-        skill_selector = resolve("skill_selector")
-        tools_l1 = await skill_selector.list_active_skills()
-
-        from src.application.use_cases.agent_profile_loading import AgentProfileLoadResult
-
-        profile_result = AgentProfileLoadResult(
-            agent_id=agent_id,
-            role=AgentRole.CEO,
-            profile=profile,
-            tools_l1=tools_l1,
-            startup_context_tokens=0,
-        )
-
-        fake_llm = _make_fake_llm(verify_mode="always_pass")
-        tool_execution_service = _build_tool_execution_service(fake_llm)
-
-        from src.application.services.agent_workflow_service import AgentWorkflowService
-
-        service = AgentWorkflowService(
-            llm_client=fake_llm,
-            tool_execution_service=tool_execution_service,
-            skill_loader=resolve("skill_loader"),
-            tool_registry_service=_make_registry(),
-        )
-        recorder = _RecordingEventBus()
-        from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
-        from src.infrastructure.config.langgraph import LangGraphConfig
-
-        engine = LangGraphEngine(config=LangGraphConfig.from_env(), event_publisher=recorder, workflow_service=service)
-        workflow_context = service.build_context(profile_result, context["task"])
-        parameters = {"agent_id": str(agent_id), "task": context["task"], "context": workflow_context}
-        run_id = await engine.submit_graph("SingleAgentWorkflow", parameters=parameters)
-        state = await engine.get_graph_result(run_id)
-        return {"agent_id": agent_id, "state": state}
-
-    async def _gather_all() -> list[dict[str, Any]]:
-        import asyncio as aio
-
-        agent_ids = [uuid.uuid4() for _ in range(10)]
-        return list(await aio.gather(*(_run_session(aid) for aid in agent_ids)))
-
-    context["concurrent_results"] = _run_async(context["_loop"], _gather_all())
-
-
 @when("执行 CLI run-task 成功路径")
 def when_cli_run_task_success(context: dict[str, Any], capsys: pytest.CaptureFixture[str]) -> None:
     """进程内 main(["run-task"]) 成功路径（DC-12 四件套第③步）。
@@ -748,6 +1158,16 @@ def when_cli_run_task_success(context: dict[str, Any], capsys: pytest.CaptureFix
         ]
     )
     context["cli_captured"] = capsys.readouterr()
+
+
+@then("退出码为 0 且输出六阶段状态行与思维链预览与置信度")
+def then_cli_success_exit_zero(context: dict[str, Any]) -> None:
+    """CLI 成功路径：exit 0 + 六阶段状态行 + 思维链预览 + 证据引用 + 置信度。"""
+    assert context["cli_exit_code"] == 0
+    output = context["cli_captured"].out
+    assert "perceive" in output and "package" in output, "六阶段状态行缺失"
+    assert "<Reflection>" in output, "思维链五段预览缺失"
+    assert "0.85" in output, "置信度输出缺失"
 
 
 @when("执行 CLI run-task 验证恒失败路径")
@@ -789,6 +1209,14 @@ def when_cli_run_task_failed_completion(context: dict[str, Any], capsys: pytest.
     context["cli_captured"] = capsys.readouterr()
 
 
+@then("退出码为 0 且输出失败状态摘要")
+def then_cli_failed_completion_exit_zero(context: dict[str, Any]) -> None:
+    """失败完成态：exit 0（工作流正常走完）+ status=failed 摘要（与系统错误 exit 1 区分）。"""
+    assert context["cli_exit_code"] == 0, "失败完成态是正常走完语义——exit 0"
+    output = context["cli_captured"].out
+    assert "failed" in output, "失败状态摘要缺失"
+
+
 @when("以不存在的 agent_id 执行 CLI run-task")
 def when_cli_run_task_agent_not_found(context: dict[str, Any], capsys: pytest.CaptureFixture[str]) -> None:
     """守卫路径：随机 agent_id → 443 退出码 1 + stderr 编码断言。
@@ -817,375 +1245,20 @@ def when_cli_run_task_agent_not_found(context: dict[str, Any], capsys: pytest.Ca
     context["cli_captured"] = capsys.readouterr()
 
 
-# ===================================================================
-# Then 步骤
-# ===================================================================
-
-
-@then("executed_phases 轨迹按六阶段顺序完备且末段为 package")
-def then_executed_phases_complete(context: dict[str, Any]) -> None:
-    """六阶段轨迹断言（成功路径：perceive→plan→execute→verify→package）。"""
-    state = context["final_state"]
-    phases = state["executed_phases"]
-    assert phases == ["perceive", "plan", "execute", "verify", "package"], f"轨迹异常: {phases}"
-    assert phases[-1] == "package", "末元素钉死 package（对齐 444 phase 枚举）"
-
-
-@then("每阶段产物已写入工作流状态")
-def then_phase_artifacts_in_state(context: dict[str, Any]) -> None:
-    """各阶段产物键非空断言（perception/plan 产物/execution/verification/evidence/chain）。"""
-    state = context["final_state"]
-    assert state.get("perception") is not None
-    assert state.get("plan") is not None
-    assert state.get("execution") is not None
-    assert state.get("verification") is not None
-    assert state.get("evidence") is not None
-    assert state.get("chain") is not None
-
-
-@then("轨迹含验证反思规划重试环且终态成功")
-def then_reflect_retry_loop_success(context: dict[str, Any]) -> None:
-    """fail_once 路径轨迹：...verify→reflect→plan→execute→verify→package。"""
-    state = context["final_state"]
-    phases = state["executed_phases"]
-    expected_prefix = ["perceive", "plan", "execute", "verify", "reflect", "plan", "execute", "verify", "package"]
-    assert phases == expected_prefix, f"反思重试轨迹异常: {phases}"
-    assert state["evidence"].status == "completed"
-
-
-@then("重试轮规划提示词包含修正计划与错误分析")
-def then_retry_plan_prompt_contains_revision(context: dict[str, Any]) -> None:
-    """R2-F4：重试轮 plan prompt 注入 revised_plan + error_analysis 断言。
-
-    R1 修复：选调锚改 PlanSchema 身份（原「规划 in system_prompt」对全部调用
-    恒真——system_prompt 六阶段共用；终局合成模板自带「修正」二字使 OR 兜底
-    恒绿，R2-F4 断裂时本断言不红——空心化）。断言锚 = Fake 产物精确串，与
-    分派键（Schema 身份）独立。
-    """
-    from src.application.services.agent_workflow_schemas import PlanSchema
-
-    fake_llm = context["fake_llm"]
-    plan_calls = [
-        call.kwargs.get("prompt", "") or call.args[0]
-        for call in fake_llm.structured_generate.call_args_list
-        if call.kwargs.get("response_schema") is PlanSchema
-    ]
-    assert len(plan_calls) >= 2, f"fail_once 路径应存在两次 plan 调用，实际 {len(plan_calls)} 次"
-    # 第二次 plan 调用（重试轮）须含反思产物注入（Fake 反思产物的精确串——
-    # 不用「修正」类模板兜底词，防终局合成 prompt 的静态文本污染）
-    retry_prompt = plan_calls[1]
-    assert "补充约束参数" in retry_prompt, f"重试轮 plan prompt 未注入修正计划: {retry_prompt[:200]}"
-    assert "工具输出缺少关键约束字段" in retry_prompt, f"重试轮 plan prompt 未注入错误分析: {retry_prompt[:200]}"
-
-
-@then("未耗尽重试即直接打包失败证据")
-def then_not_revisable_early_exit(context: dict[str, Any]) -> None:
-    """第四路径：reflect 判定不可修正（revised=False 且未耗尽）→ 直接 package(failed)。"""
-    state = context["final_state"]
-    phases = state["executed_phases"]
-    expected = ["perceive", "plan", "execute", "verify", "reflect", "package"]
-    assert phases == expected, f"不可修正早退轨迹异常: {phases}"
-    assert state["evidence"].status == "failed"
-    assert state["retry_count"] == 1, "reflect 执行一次即消耗一次重试（未耗尽）"
-
-
-@then("规划阶段总执行次数不超过 3 次")
-def then_plan_execution_bounded(context: dict[str, Any]) -> None:
-    """重试语义：初始 1 + 重试 2 = plan 总执行 ≤3（reflect 递增 + <= 谓词）。"""
-    state = context["final_state"]
-    phases = state["executed_phases"]
-    plan_count = phases.count("plan")
-    assert plan_count == 3, f"恒失败+恒可修正应触发满 3 次 plan: {phases}"
-    assert state["retry_count"] == 3, "retry_count 终值=reflect 总执行数（第三次 reflect 判定耗尽）"
-
-
-@then("终态证据携带失败标记与失败原因")
-def then_failed_evidence_marker(context: dict[str, Any]) -> None:
-    """失败终态：status=failed + failure_reason 非空（末次验证失败摘要）。"""
-    evidence = context["final_state"]["evidence"]
-    assert evidence.status == "failed"
-    assert evidence.failure_reason.strip(), "失败终态 failure_reason 必须非空"
-
-
-@then("发布的 AgentDecided 事件 agent_id 与入参完全一致")
-def then_agent_decided_agent_id_matches(context: dict[str, Any]) -> None:
-    """agent_id 贯通：事件 agent_id == parameters 传入实体 id（5-2 风险 #2 核销）。"""
-    decided_events = [e for e in context["recorder"].published_events if type(e).__name__ == "AgentDecided"]
-    assert decided_events, "应发布 AgentDecided 事件"
-    assert decided_events[0].agent_id == context["agent_id"], (
-        f"事件 agent_id {decided_events[0].agent_id} != 入参 {context['agent_id']}"
-    )
-
-
-@then("思维链五字段完备且非空")
-def then_chain_five_fields_complete(context: dict[str, Any]) -> None:
-    """五字段完备：四 str 字段非空 + tools_used 元组形态（空元组合法）。"""
-    chain = context["final_state"]["chain"]
-    for name in ("input_summary", "reflection", "constraints_check", "final_answer"):
-        value = getattr(chain, name)
-        assert isinstance(value, str) and value.strip(), f"字段 {name} 应为非空 str"
-    assert isinstance(chain.tools_used, tuple), "tools_used 应为 tuple 形态"
-
-
-@then("tools_used 与真实工具调用轨迹一致")
-def then_tools_used_matches_real_trace(context: dict[str, Any]) -> None:
-    """覆写制断言：chain.tools_used == 真实执行轨迹（Fake 终局回声值相异——判别力）。"""
-    chain = context["final_state"]["chain"]
-    execution = context["final_state"]["execution"]
-    real_trace = execution.tool_trace if hasattr(execution, "tool_trace") else ()
-    assert chain.tools_used == real_trace, f"tools_used {chain.tools_used} != 真实轨迹 {real_trace}（覆写制失效）"
-    assert "fake-echo" not in "".join(chain.tools_used), "Fake 回声值泄漏（未覆写）"
-
-
-@then("to_display 生成五段展示形态")
-def then_to_display_five_segments(context: dict[str, Any]) -> None:
-    """展示形态：Input → Reflection → Tools_Used → Constraints_Check → JSON。"""
-    display = context["chain_vo"].to_display()
-    assert "Input" in display
-    assert display.index("Input") < display.index("<Reflection>"), "分段顺序: Input 在 Reflection 前"
-
-
-@then("输出含三个 XML 标签段与 JSON 尾段")
-def then_display_xml_tags_and_json_tail(context: dict[str, Any]) -> None:
-    """三 XML 标签段 + JSON 尾段（or.md §五.5 展示契约）。"""
-    display = context["chain_vo"].to_display()
-    assert "<Reflection>" in display and "</Reflection>" in display
-    assert "<Tools_Used>" in display and "</Tools_Used>" in display
-    assert "<Constraints_Check>" in display and "</Constraints_Check>" in display
-    json_tail = display.rsplit("→", 1)[-1].strip()
-    json.loads(json_tail)  # 尾段必须是合法 JSON
-
-
-@then("证据包六类字段齐备且输入哈希为 SHA256 六十四位十六进制")
-def then_evidence_six_classes_and_hash(context: dict[str, Any]) -> None:
-    """六类字段（输入哈希/分解图/轨迹/快照/置信度依据/引用源）+ sha256 口径。"""
-    evidence = context["final_state"]["evidence"]
-    for name in (
-        "input_hash",
-        "task_breakdown",
-        "tool_trace",
-        "artifacts_snapshot",
-        "confidence",
-        "confidence_rationale",
-        "citations",
-    ):
-        assert hasattr(evidence, name), f"证据字段缺失: {name}"
-    task = context["task"]
-    assert evidence.input_hash == hashlib.sha256(task.encode()).hexdigest(), "input_hash 口径: sha256(task_description)"
-    assert len(evidence.input_hash) == 64 and all(c in "0123456789abcdef" for c in evidence.input_hash)
-
-
-@then("置信度与依据来源于验证阶段产物")
-def then_confidence_from_verification(context: dict[str, Any]) -> None:
-    """置信度同源验证阶段（Fake verify pass 时 confidence=0.85——非硬编码 0.9）。"""
-    evidence = context["final_state"]["evidence"]
-    verification = context["final_state"]["verification"]
-    assert evidence.confidence == verification.confidence, "置信度应同源验证阶段"
-    assert evidence.confidence == 0.85, "Fake 验证通过档位 0.85（区别于硬编码 0.9）"
-    assert evidence.confidence_rationale.strip()
-
-
-@then("失败终态证据包含跨重试轮全部工具轨迹")
-def then_failed_evidence_full_trace(context: dict[str, Any]) -> None:
-    """历史聚合断言：恒失败 3 轮 plan → 工具轨迹跨轮累积（键覆盖丢前轮即红）。"""
-    state = context["final_state"]
-    evidence = state["evidence"]
-    plan_count = state["executed_phases"].count("plan")
-    trace = evidence.tool_trace
-    assert plan_count >= 2, "前置：应至少两个执行轮"
-    # 形态 + 精确下界（同源派生：given 每轮 plan 含 1 工具步 → 轨迹数 >= plan 轮数；
-    # execute 聚合改键覆盖丢前轮时 len < plan_count 必红——恒真形态已修）
-    assert isinstance(trace, tuple), "轨迹应为元组形态（frozen VO 不可变纪律）"
-    assert len(trace) >= plan_count, "跨轮轨迹应累积至计划轮数下界（键覆盖丢前轮即红）"
-    execution = state["execution"]
-    assert execution is not None and len(execution.tool_trace) == len(trace), (
-        "execution 与 evidence 轨迹应同长（聚合语义——覆盖丢前轮轨迹即红）"
-    )
-
-
-@then("失败原因携带末次验证失败摘要")
-def then_failure_reason_last_verification(context: dict[str, Any]) -> None:
-    """failure_reason = 末次验证失败摘要（Fake rationale 含轮次锚）。"""
-    evidence = context["final_state"]["evidence"]
-    verification = context["final_state"]["verification"]
-    assert evidence.failure_reason == verification.rationale, "失败原因应为末次验证摘要"
-
-
-@then("SAPMessage 模型包含十五个字段且类型正确")
-def then_sap_message_fifteen_fields(context: dict[str, Any]) -> None:
-    """15 字段存在性与类型（验收 tripwire——AC-4×3 与 Task 2 单测断言面重复，
-    保留为静态绊线先例）。"""
-    import datetime
-    import uuid as uuid_module
-
-    from src.interfaces.sap.message import SAPMessage
-
-    field_names = set(SAPMessage.model_fields)
-    assert len(field_names) == 15, f"字段总数应为 15: {field_names}"
-
-    message = SAPMessage(
-        message_id=uuid_module.uuid4(),
-        conversation_id=uuid_module.uuid4(),
-        sender_id="agent-ceo",
-        receiver_id="agent-cfo",
-        message_type="request",
-        content="请提供财务视角评估",
-    )
-    assert isinstance(message.message_id, uuid_module.UUID)
-    assert isinstance(message.timestamp, datetime.datetime)
-    assert isinstance(message.context, dict)
-
-
-@then("十个必需字段逐一点名存在")
-def then_sap_ten_required_fields_named(context: dict[str, Any]) -> None:
-    """epics 验收点名的 10 必需字段逐一点名（tripwire 第二断言面）。"""
-    from src.interfaces.sap.message import SAPMessage
-
-    required_ten = (
-        "message_id",
-        "conversation_id",
-        "sender_id",
-        "receiver_id",
-        "message_type",
-        "priority",
-        "content",
-        "correlation_id",
-        "isolation_level",
-        "blackboard_visible",
-    )
-    field_names = set(SAPMessage.model_fields)
-    for name in required_ten:
-        assert name in field_names, f"必需字段缺失: {name}"
-
-
-@then("MessageType 含五种类型且 MessagePriority 含四级优先级")
-def then_sap_enum_values(context: dict[str, Any]) -> None:
-    """枚举值集合：request/response/notification/broadcast/debate + low/normal/high/urgent。"""
-    from src.interfaces.sap.types import MessagePriority, MessageType
-
-    assert {item.value for item in MessageType} == {"request", "response", "notification", "broadcast", "debate"}
-    assert {item.value for item in MessagePriority} == {"low", "normal", "high", "urgent"}
-
-
-@then("默认值为普通优先级硬隔离不公开黑板且超时 300 秒")
-def then_sap_defaults(context: dict[str, Any]) -> None:
-    """四默认值：priority=NORMAL / isolation_level=L4_HARD / blackboard_visible=False / timeout=300。"""
-    import uuid as uuid_module
-
-    from src.domain.events.enums import IsolationLevel
-    from src.interfaces.sap.message import SAPMessage
-    from src.interfaces.sap.types import MessagePriority
-
-    message = SAPMessage(
-        message_id=uuid_module.uuid4(),
-        conversation_id=uuid_module.uuid4(),
-        sender_id="agent-ceo",
-        receiver_id="broadcast",
-        message_type="broadcast",
-        content="广播消息",
-    )
-    assert message.priority is MessagePriority.NORMAL
-    assert message.isolation_level is IsolationLevel.L4_HARD
-    assert message.blackboard_visible is False
-    assert message.timeout_seconds == 300
-
-
-@then("conversation_id 必填且 correlation_id 默认可空")
-def then_sap_required_and_nullable(context: dict[str, Any]) -> None:
-    """conversation_id 无默认（缺失构造 ValidationError）+ correlation_id: UUID | None = None。"""
-    import uuid as uuid_module
-
-    import pydantic
-
-    from src.interfaces.sap.message import SAPMessage
-
-    # model_validate(dict) 承载「必填缺失」负向构造（裸 SAPMessage(...) 缺参
-    # 形态对 mypy 是 call-arg 静态错误——model_validate 等价运行时语义）
-    with pytest.raises(pydantic.ValidationError):
-        SAPMessage.model_validate(
-            {
-                "message_id": uuid_module.uuid4(),
-                "sender_id": "agent-ceo",
-                "receiver_id": "agent-cfo",
-                "message_type": "request",
-                "content": "缺少 conversation_id",
-            }
-        )
-
-    message = SAPMessage(
-        message_id=uuid_module.uuid4(),
-        conversation_id=uuid_module.uuid4(),
-        sender_id="agent-ceo",
-        receiver_id="agent-cfo",
-        message_type="request",
-        content="correlation_id 可空",
-    )
-    assert message.correlation_id is None
-
-
-@then("非法枚举值构造被拒绝且时间戳为 UTC 感知")
-def then_sap_invalid_rejected_and_utc(context: dict[str, Any]) -> None:
-    """非法 message_type 构造 ValidationError + timestamp tz-aware（禁裸 utcnow）。"""
-    import uuid as uuid_module
-
-    import pydantic
-
-    from src.interfaces.sap.message import SAPMessage
-
-    with pytest.raises(pydantic.ValidationError):
-        SAPMessage(
-            message_id=uuid_module.uuid4(),
-            conversation_id=uuid_module.uuid4(),
-            sender_id="agent-ceo",
-            receiver_id="agent-cfo",
-            message_type="invalid-type",
-            content="非法枚举",
-        )
-
-    message = SAPMessage(
-        message_id=uuid_module.uuid4(),
-        conversation_id=uuid_module.uuid4(),
-        sender_id="agent-ceo",
-        receiver_id="agent-cfo",
-        message_type="request",
-        content="UTC 感知",
-    )
-    assert message.timestamp.tzinfo is not None, "timestamp 必须为 tz-aware（architecture v8.4.0 红线）"
-
-
-@then("工作流执行延迟 P95 小于 10 秒且计时含六阶段全链")
-def then_p95_under_10s(context: dict[str, Any]) -> None:
-    """P95 断言（NFR-PERF-04 MVP 档）+ 计时下界锚（同源派生——R1 耗时优化）。"""
-    from tests.integration.test_integration_agent_workflow import FAKE_LLM_DELAY_SEC
-
-    assert len(context["perf_samples"]) == 20, "采样数 20（warmup 已剔除）"
-    assert context["p95"] < 10.0, f"P95 {context['p95']:.2f}s >= 10s"
-    # 计时下界（同源派生——与集成 helper 的 FAKE_LLM_DELAY_SEC 单源防漂移）：
-    # 工作流级 4 次调用（perceive/plan/verify/终局）× 延迟档（调用数判别力
-    # 由 scenario_2 的逐轮调用数锁承载）
-    assert context["p95"] >= 4 * FAKE_LLM_DELAY_SEC, f"P95 {context['p95']:.2f}s 低于 Fake 延迟下界（计时未含全链）"
-
-
-@then("五字段完备的思维链占比不低于 98%")
-def then_completeness_rate(context: dict[str, Any]) -> None:
-    """完整率 ≥98%（Fake 确定性产出下 100%——20/20）。"""
-    total = context["completeness_total"]
-    complete = context["completeness_complete"]
-    assert total == 20, f"分母应为 20: {total}"
-    assert complete / total >= 0.98, f"完整率 {complete}/{total} < 98%"
-
-
-@then("全部会话成功完成且产出完整思维链与证据包")
-def then_concurrent_all_success(context: dict[str, Any]) -> None:
-    """并发 10 会话全成功 + 每会话 chain/evidence 完备。"""
-    results = context["concurrent_results"]
-    assert len(results) == 10
-    for item in results:
-        state = item["state"]
-        assert state is not None, f"会话 {item['agent_id']} 终态缺失"
-        assert state["evidence"].status == "completed"
-        assert state["chain"] is not None
-        assert state["executed_phases"][-1] == "package"
+@then("退出码为 1 且 stderr 携带 EXCEPTION_443 编码")
+def then_cli_guard_exit_one(context: dict[str, Any]) -> None:
+    """守卫路径：443 退出码 1 + stderr [EXCEPTION_443] 编码。"""
+    assert context["cli_exit_code"] == 1
+    captured = context["cli_captured"]
+    assert "EXCEPTION_443" in captured.err, f"stderr 缺 443 编码: {captured.err!r}"
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-6.1 - 端口接线与图注册可达",
+)
+def test_ac_6_1_port_wiring_and_graph_registration(context: dict[str, Any]) -> None:
+    """AC-6.1: 两新端口 resolve+isinstance + SingleAgentWorkflow 图名注册。"""
 
 
 @then("agent_workflow_service 与 agent_workflow_use_case 经组合根注册可解析")
@@ -1222,6 +1295,14 @@ def then_graph_registered(context: dict[str, Any]) -> None:
     assert "SingleAgentWorkflow" in engine._SUPPORTED_GRAPHS, "图名未注册"
 
 
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-6.2 - AgentDecided 事件真实化发布",
+)
+def test_ac_6_2_agent_decided_realized(context: dict[str, Any]) -> None:
+    """AC-6.2: decision_result 五键投影 + confidence 来自验证阶段（非 0.9）。"""
+
+
 @then("AgentDecided 事件决策结果含工作流状态与重试计数")
 def then_decision_result_projection(context: dict[str, Any]) -> None:
     """decision_result 五键纯标量投影（workflow_status/task_summary/chain_summary/evidence_ref/retry_count）。"""
@@ -1243,35 +1324,17 @@ def then_confidence_not_hardcoded(context: dict[str, Any]) -> None:
     assert event.confidence == 0.85, f"confidence {event.confidence} 非 Fake 验证档位（硬编码泄漏？）"
 
 
-@then("退出码为 0 且输出六阶段状态行与思维链预览与置信度")
-def then_cli_success_exit_zero(context: dict[str, Any]) -> None:
-    """CLI 成功路径：exit 0 + 六阶段状态行 + 思维链预览 + 证据引用 + 置信度。"""
-    assert context["cli_exit_code"] == 0
-    output = context["cli_captured"].out
-    assert "perceive" in output and "package" in output, "六阶段状态行缺失"
-    assert "<Reflection>" in output, "思维链五段预览缺失"
-    assert "0.85" in output, "置信度输出缺失"
-
-
-@then("退出码为 0 且输出失败状态摘要")
-def then_cli_failed_completion_exit_zero(context: dict[str, Any]) -> None:
-    """失败完成态：exit 0（工作流正常走完）+ status=failed 摘要（与系统错误 exit 1 区分）。"""
-    assert context["cli_exit_code"] == 0, "失败完成态是正常走完语义——exit 0"
-    output = context["cli_captured"].out
-    assert "failed" in output, "失败状态摘要缺失"
-
-
-@then("退出码为 1 且 stderr 携带 EXCEPTION_443 编码")
-def then_cli_guard_exit_one(context: dict[str, Any]) -> None:
-    """守卫路径：443 退出码 1 + stderr [EXCEPTION_443] 编码。"""
-    assert context["cli_exit_code"] == 1
-    captured = context["cli_captured"]
-    assert "EXCEPTION_443" in captured.err, f"stderr 缺 443 编码: {captured.err!r}"
-
-
 # ===================================================================
-# Task 9 收尾：完成清单场景（AC-6.4——AC-6.3 形态同款静态断言）
+# AC-6.4 完成清单收尾（Task 9 追加——静态断言形态）
 # ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_workflow.feature",
+    "AC-6.4 - 完成清单逐项确认",
+)
+def test_ac_6_4_completion_checklist(context: dict[str, Any]) -> None:
+    """AC-6.4: src/tests 完成清单 + 链路接线断言清单终态（Task 9 收尾）。"""
 
 
 @then("src 与 tests 完成清单逐项存在")
