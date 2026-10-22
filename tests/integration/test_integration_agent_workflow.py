@@ -598,10 +598,29 @@ async def test_scenario_5_real_publish_outbox_row(real_redis: Any) -> None:
     except Exception as exc:  # PG 配置缺失
         pytest.skip(f"PostgreSQL 不可用: {exc}")
 
+    # 连接级 + schema 级双预检（R5-DF1 核销——5-4 R7-F01 同款：manager 构造
+    # 零 IO 拦不住「服务缺席/空 schema」，任一形态下发布 INSERT 被 DC-10 容错
+    # 吞 warning 后查询裸红；预检直探目标表存在性统一 skip）
+    from sqlalchemy import text as _sa_text
+    from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+
+    try:
+        async with _AsyncSession(manager.get_async_engine()) as probe_session:
+            await probe_session.execute(_sa_text("SELECT event_id FROM event_outbox LIMIT 1"))
+    except Exception as exc:
+        await manager.get_async_engine().dispose()
+        pytest.skip(f"PostgreSQL 不可达或 event_outbox 表未初始化: {exc}")
+
     instantiation = await _instantiate_agent(real_redis)
     agent_id = instantiation.agent_id
     try:
         # 真实发布面：引擎构造注入生产 DualChannelEventBus（resolve 真实端口）
+        # SINGLETON publisher 跨测试 loop 死连接防线（R7-F02 同款——组合跑中
+        # 先行场景的 resolve 实例持旧 loop 连接，本测试发布必失败；resolve 前
+        # 清 SINGLETON 取新建实例绑定当前测试 loop，构造零 IO 重建安全）
+        from src.domain.ports.resolver import get_resolver
+
+        get_resolver().clear_singleton()
         real_publisher = _resolve("event_publisher")
         from src.application.services.agent_workflow_service import AgentWorkflowService
         from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase

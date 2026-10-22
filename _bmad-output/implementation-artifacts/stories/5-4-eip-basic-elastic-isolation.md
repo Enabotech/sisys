@@ -1201,6 +1201,15 @@ tests 修改 12:
 
 > R6 同批甄别（用户 10 failed 全量定谳）：①8 个 DNS/resolve 失败 = R6-F01 回归（已修复——dev 模式复跑 66 passed）；②1 个 Redis 6380 ConnectionRefused = test-ports 模式 6380 容器缺失的诚实红（修复前假绿打 dev 6379；已重起 6380 容器，storage 测试 23 passed）+ 该测试无 ping 门控属既有缺口族；③1 个 LLM smoke = 环境波动（单独跑 passed 209s 真实调用——全量并发下 LLM 端点慢，非回归）。
 
+#### Round 7（2026-10-22，收敛后用户全量反馈第二轮紧急修复：R1-F07 预检粒度不足 + 组合跑跨 loop 连接——P1×1 + P2×1 落码 + R5-DF1 核销）
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R7-F01 | P1 | R1-F07 预检粒度不足——`SELECT 1` 只拦「服务缺席」，拦不住「服务在但 schema 未初始化」：空库 PG 上 event_outbox 表不存在 → 发布 INSERT 被容错吞 warning（DC-10）+ 查询断言裸红 `UndefinedTableError`（用户实测） | 预检升级为**连接级 + schema 级双预检**（直接探 `SELECT event_id FROM event_outbox LIMIT 1`——两形态统一 skip）；同款升级 5-3 场景⑤（原完全无连接预检——**R5-DF1 核销**，触发条件被用户实测踩中且成本趋零） |
+| R7-F02 | P2 | 组合跑顺序暴露场景⑤「resolve 生产 publisher」的跨 loop 脆弱——pytest 每测试函数新 event loop，SINGLETON 缓存的 DualChannelEventBus 持上一测试 loop 的 PG 引擎连接：先行场景⑤跑后，后跑场景⑤复用旧实例发布必失败（被容错吞后断言「真实发布链路断裂」红——两顺序组合实测一方必红） | 两场景⑤ resolve 前清 `get_resolver().clear_singleton()`（取新建实例绑定当前测试 loop——构造零 IO 重建安全，R3 证伪留痕①）；两顺序组合复跑 2 passed |
+
+> R7 验证：双顺序组合 2 passed；空库 5433 形态（临时容器实测）1 skipped 正确；test-ports 模式终态 26 passed + 2 skipped（两场景⑤ 5433 缺席正确 skip）；dev 模式两场景真实落行绿；环境注记：6380 测试容器会被 dev 栈 compose 重启（--remove-orphans 孤儿清理）清除——重起命令 `docker run -d --name sisys-redis-test-6380 -p 6380:6379 harbor.sisys.local/sisys/tools/redis/redis:7.2.5`。
+
 **登记（deferred-work.md 镜像）**：
 
 | # | 项 | 处置 |

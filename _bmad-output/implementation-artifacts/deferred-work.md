@@ -201,4 +201,4 @@
 
 ## Deferred from: code review of 5-4-eip-basic-elastic-isolation R5 终审特权发现 (2026-10-22)
 
-- 【R5-DF1·P3】5-3 集成场景⑤ outbox PG 连接级门控缺口（5-4 R1-F07 同型）— `tests/integration/test_integration_agent_workflow.py::test_scenario_5_real_publish_outbox_row` 的 PG 门控仅拦 import 失败不拦连接失败（5-3 资产面）；5-4 R1-F02 端口隔离修复后该测试从「假打 dev 5432 绿」转为「正确探测 5433 不可达红」——诚实暴露但违 DoD「PG 缺席 skip」形态 — 核销触发：5-3 资产维护或测试基建门控专项（修复形态照抄 5-4 R1-F07：SELECT 1 预检 + dispose + skip）
+- 【R5-DF1·P3·已核销】5-3 集成场景⑤ outbox PG 连接级门控缺口（5-4 R1-F07 同型）— `tests/integration/test_integration_agent_workflow.py::test_scenario_5_real_publish_outbox_row` 的 PG 门控仅拦 import 失败不拦连接失败（5-3 资产面）；5-4 R1-F02 端口隔离修复后该测试从「假打 dev 5432 绿」转为「正确探测 5433 不可达红」——诚实暴露但违 DoD「PG 缺席 skip」形态 — 核销触发：5-3 资产维护或测试基建门控专项（修复形态照抄 5-4 R1-F07）。**已核销于 5-4 R7（2026-10-22）**：用户实测踩中触发条件（PG 可达但 event_outbox 表缺失形态——比原登记更进一层的缺席），同款升级为连接+表存在双预检 + R7-F02 跨 loop SINGLETON publisher 清理防线（详见 5-4 story R7 表）

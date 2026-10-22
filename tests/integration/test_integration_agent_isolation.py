@@ -311,8 +311,14 @@ class TestRealEventPublishingOutbox:
         RabbitMQ 缺席不影响本场景（reliable 通道 publish 只写 PG outbox，实际
         投递归 AsyncOutboxPoller 异步侧——R1-F31 注记）；PG 缺席动态 skip。
         """
-        from src.domain.ports.resolver import resolve
+        from src.domain.ports.resolver import get_resolver, resolve
 
+        # SINGLETON publisher 跨测试 loop 死连接防线（R7-F02）：pytest 每测试函数
+        # 新 event loop，SINGLETON 缓存的 DualChannelEventBus 持上一测试 loop 的
+        # PG 引擎连接——本测试复用旧实例发布必失败（被 DC-10 吞 warning 后落行
+        # 断言裸红，组合跑实测）。resolve 前清 SINGLETON 使本测试取新建实例
+        # （构造零 IO——R3 证伪留痕①），连接绑定当前测试 loop
+        get_resolver().clear_singleton()
         real_publisher = resolve("event_publisher")  # 生产 DualChannelEventBus
         chain = _assemble_real_chain(real_redis, publisher=real_publisher)
         instantiation = await chain["use_case"].execute(role=AgentRole.CEO)
@@ -346,14 +352,16 @@ class TestRealEventPublishingOutbox:
             from sqlalchemy import text
             from sqlalchemy.ext.asyncio import AsyncSession
 
-            # 连接级预检（PG 基建已装但服务未运行 → skip 而非红——对齐 Redis 侧
-            # ping 门控形态；短超时防拖慢 PG 在位的常规运行，dispose 防绑循环引擎泄漏）
+            # 连接级 + schema 级双预检（R7-F01：SELECT 1 只拦「服务缺席」，拦不住
+            # 「服务在但 schema 未初始化」——空库 PG 上 event_outbox 表不存在会使
+            # 发布 INSERT 被容错吞 warning + 查询断言裸红；预检直接探目标表存在性，
+            # 两形态统一 skip。dispose 防绑循环引擎泄漏）
             try:
                 async with AsyncSession(manager.get_async_engine()) as probe_session:
-                    await probe_session.execute(text("SELECT 1"))
+                    await probe_session.execute(text("SELECT event_id FROM event_outbox LIMIT 1"))
             except Exception as exc:
                 await manager.get_async_engine().dispose()
-                pytest.skip(f"PostgreSQL 连接不可达: {exc}")
+                pytest.skip(f"PostgreSQL 不可达或 event_outbox 表未初始化: {exc}")
 
             async with AsyncSession(manager.get_async_engine(), expire_on_commit=False) as session:
                 query = text(
