@@ -75,6 +75,13 @@ def _patch_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubUseCase) -> Non
 class TestBuildParser:
     """parser 结构契约。"""
 
+    def test_help_text_lists_all_registered_subcommands(self) -> None:
+        """帮助文本漂移锁：五子命令名均出现于帮助输出（R2-F03——两代子命令
+        加入未更新 description/epilog 的缺陷形态防复发）。"""
+        help_text = agent_cli.build_parser().format_help()
+        for subcommand in ("instantiate", "load-profile", "run-task", "isolation-status", "set-isolation"):
+            assert subcommand in help_text, f"帮助文本缺少子命令 {subcommand}（description/epilog 漂移）"
+
     def test_instantiate_with_role_ceo(self) -> None:
         args = agent_cli.build_parser().parse_args(["instantiate", "--role", "ceo"])
         assert args.command == "instantiate"

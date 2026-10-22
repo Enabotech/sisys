@@ -80,6 +80,28 @@ class TestInitializeFactory:
         assert exc_info.value.context["level"] == "L1"
         assert exc_info.value.context["supported_levels"] == ["L4", "L3", "L2"]
 
+    def test_supported_level_values_derives_from_mvp_constant(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """supported_levels 真派生行为锁：MVP_ALLOWED_LEVELS 扩容后 context 随动。
+
+        monkeypatch 须用枚举成员（str,Enum hash 语义下裸 "L1" 无法命中 frozenset
+        成员——isolation_policy L146 同款注记）；延迟 from-import 每次调用读
+        sys.modules 属性，monkeypatch 即时生效（R2-OBS——同值字面量替换对
+        现值断言零判别力，本用例以行为差锁定派生真源性）。
+        """
+        import src.domain.value_objects.isolation_policy as isolation_policy_module
+
+        monkeypatch.setattr(
+            isolation_policy_module,
+            "MVP_ALLOWED_LEVELS",
+            frozenset({IsolationLevel.L4_HARD, IsolationLevel.L3_SOFT, IsolationLevel.L2_COLLAB, IsolationLevel.L1_FUSED}),
+        )
+        raw_level: Any = "L9"  # Any 注解承载故意非法类型（mypy arg-type 面——先例 bad_ttl 同款）
+        with pytest.raises(IsolationLevelNotSupportedError) as exc_info:
+            IsolationState.initialize(uuid.uuid4(), raw_level)  # 非枚举实例触发 446（双条件守卫第一支）
+        assert exc_info.value.context["supported_levels"] == ["L4", "L3", "L2", "L1"], (
+            "supported_levels 须从 MVP_ALLOWED_LEVELS 真派生（含新扩 L1）——硬编码形态在本用例红"
+        )
+
     @pytest.mark.parametrize(
         "raw",
         ["L3", "L9"],

@@ -323,6 +323,22 @@ def resolve_env() -> TestEnvironment:
     return TestEnvironment.LOCAL
 
 
+def _use_test_ports_active(config: TestEnvConfig | None = None) -> bool:
+    """测试端口开关生效判定（单一真源——三调用位共享防判定式漂移）。
+
+    判定式若在多处复制漂移（真值集/合取条件不一致），Layer 1 选择与
+    Layer 3/sync 门控会层间分叉（选了 TEST_CONFIG 却不跳过端口覆盖）——
+    统一收敛到本函数（R2-F05）。
+
+    Args:
+        config: 已选配置（None 时仅判开关——get_test_env Layer 1 选择位
+            处于 LOCAL 分支内，env 已知为 LOCAL）
+    """
+    if config is not None and config.env != TestEnvironment.LOCAL:
+        return False
+    return os.getenv("SISYS_USE_TEST_PORTS", "").lower() in ("1", "true", "yes")
+
+
 def get_test_env() -> TestEnvConfig:
     """获取测试环境配置（单例）
 
@@ -357,7 +373,7 @@ def get_test_env() -> TestEnvConfig:
             config = copy.deepcopy(K8S_CONFIG)
         elif env == TestEnvironment.LOCAL:
             # 端口切换内嵌在 LOCAL 分支中
-            if os.getenv("SISYS_USE_TEST_PORTS", "").lower() in ("1", "true", "yes"):
+            if _use_test_ports_active():
                 config = copy.deepcopy(TEST_CONFIG)
             else:
                 config = copy.deepcopy(LOCAL_CONFIG)
@@ -490,11 +506,7 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     # 跳过：测试端口开关是显式意图，权威高于 os.environ——第三方库 import 副作用
     # （conftest 模块级 litellm import 触发 load_dotenv 将 .env 的 dev 端口注入
     # os.environ）不得击穿测试端口隔离（测试静默读写 dev 6379/5432 实例）。
-    _use_test_ports = config.env == TestEnvironment.LOCAL and os.getenv("SISYS_USE_TEST_PORTS", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    _use_test_ports = _use_test_ports_active(config)
 
     # Redis
     if redis_host := os.getenv("REDIS_HOST"):
@@ -618,11 +630,7 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # 测试端口模式下端口类变量强制覆写（理由见 docstring——与 _override_config_from_env
     # 的端口守卫配对，双向闭合测试端口隔离）
-    _use_test_ports = config.env == TestEnvironment.LOCAL and os.getenv("SISYS_USE_TEST_PORTS", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    _use_test_ports = _use_test_ports_active(config)
 
     def _set_port_env(key: str, value: str) -> None:
         """设置端口类环境变量（测试端口模式强制覆写，否则 setdefault 尊重显式值）"""
@@ -671,9 +679,16 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
     os.environ.setdefault("RABBITMQ_USERNAME", config.rabbitmq.username)
     os.environ.setdefault("RABBITMQ_PASSWORD", config.rabbitmq.password)
 
-    # MinIO - endpoint 是 "host:port" 格式，host 部分同样可能被污染
+    # MinIO - endpoint 是 "host:port" 格式，host 部分同样可能被污染。
+    # 生产 MinIOConfig.from_env 读 MINIO_HOST+MINIO_API_PORT（非 endpoint）——
+    # 测试端口模式下两键一并强覆写（endpoint 解析回填），防 MinIO 腿 split-brain
+    # （R2-F02：.env 注入的 MINIO_API_PORT=9000 会使 from_env 得 9000 ≠ 测试 9010）
     if _use_test_ports:
         os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
+        _endpoint_parts = config.minio.endpoint.rsplit(":", 1)
+        if len(_endpoint_parts) == 2:  # 守卫：endpoint 恒含端口（四预设均含；异常形态跳过覆写不炸）
+            os.environ["MINIO_HOST"] = _endpoint_parts[0]
+            os.environ["MINIO_API_PORT"] = _endpoint_parts[1]
     elif _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
         os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
     else:

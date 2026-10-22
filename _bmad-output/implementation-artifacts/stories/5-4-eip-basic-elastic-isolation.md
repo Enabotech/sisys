@@ -1146,6 +1146,20 @@ tests 修改 12:
 | R1-F13 | P3 | 集成场景① execute 段与场景④ gather 在 try 之外——中途异常时 finally 不执行/已完成写键不在清理面（违自包含纪律异常路径；朴素移入有 finally UnboundLocalError 机械坑——评审员甲注记） | 场景①预绑定 agent_id/isolation_key=None + finally 守卫 + 成功路径收窄断言；场景④ key 即时登记模式（_one_agent 内写键即入册——gather 部分失败时已完成 agent 双键仍清理） |
 | R1-F14 | P3 | CLI 帮助文本漂移——description「实例化与身份档案加载」+ epilog 仅两命令示例，未含 run-task/isolation 两代子命令（5-3 起陈旧） | description/epilog 更新含五子命令 |
 
+#### Round 2（2026-10-22，回归核查 + 组合交互面双审查：P0×1 + P2×1 + P3×4 落码 6 项 + 3 注记维持——R1 修复的回归核查 13/14 干净、台账一致性全过、组合 1/4/5/6 自洽、6380 MONITOR 实证端口隔离生效、变异 a 判别力实证）
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R2-F01 | **P0** | R1-F02 锁定用例击穿 CI 门禁——4 用例未处理 `SISYS_TEST_ENV`（CI 下 resolve_env 最高优先级走 CI 分支，TEST_CONFIG 永不被选中，3/4 用例断言 6380 得 6379——组合交互 Agent 以 CI 精确 env 实测复现；ci.yaml push-main 单测门 + cr.yaml 每日回归均中招）| 评审修正两处：①delenv 不够（CI 容器 GITHUB_ACTIONS 注入 + /.dockerenv 双重兜底仍判 CI——评审实证）→ 全部用例 `setenv("SISYS_TEST_ENV", "local")` 显式锚定；②新增 CI 形态反向锁定用例（注入端口 6390 差异化防恒真 + host 断言锁死 CI_CONFIG 选择——门控误扩 CI 时红）。CI 形态复跑 5 passed（P0 闭合实证） |
+| R2-F02 | P2 | MinIO environ 腿不完备——生产 `MinIOConfig.from_env` 读 `MINIO_HOST`+`MINIO_API_PORT`（.env:67 有 9000），sync 只强覆写 `MINIO_ENDPOINT`（src 零消费方死键）→ MinIO 生产路径 split-brain 未闭合（双 Agent 一致发现；评审实证 split-brain 形态与修复推演） | `_sync_config_to_environ` 测试端口模式下补 MINIO_HOST/MINIO_API_PORT 强覆写（endpoint rsplit 解析回填 + len 守卫）；锁定测试断言面扩展两键；CI/远程分支不动（动会改 CI 现行为——遗留缺口注记：CI 形态 MINIO_HOST 从不同步，归存储测试基建专项） |
+| R2-F03 | P3 | CLI 帮助文本无漂移锁——R1-F14 只改文本未加锁，两代子命令漂移成因原样敞开 | test_agent_cli 补 test_help_text_lists_all_registered_subcommands（五子命令名均现于 format_help()——usage choices 与 epilog 双通道） |
+| R2-F04 | P3 | 446 异常 docstring「勿硬编码/仅改一处」写在两路径共享的异常类上未按位点区分（CLI 位点合法违反——R1-F34 在案；「仅改一处」对 CLI 路径不实） | agent_exceptions.py 两处 docstring 补位点区分注记（实体/服务侧真派生；CLI 侧字面量双锁形态） |
+| R2-F05 | P3 | `_use_test_ports` 判定式三处复制（get_test_env L376/_override/_sync）——真值集/合取漂移即层间分叉 | 提 `_use_test_ports_active(config)` 单一真源 helper（config=None 时仅判开关——Layer 1 选择位语义）；三调用位替换 |
+| R2-OBS | P3 | R1-F05 派生的同值字面量替换零判别力（变异 b 实证 57 测全绿——回归核查 Agent 定性为固有形态非双锁恒真） | test_isolation_state 补 monkeypatch 真源性行为锁（MVP_ALLOWED_LEVELS 扩 L1[枚举成员形态——str,Enum hash 语义硬约束] → 446 context 随动含 "L1"——硬编码形态红） |
+
+> R2 证伪留痕（维持注记）：NEO4J_HTTP_PORT 被 sync 但 .env.example 无此键且生产不读（近死键，维持）；场景⑤「短超时」注释无显式 connect timeout 背书（OS refused 即时，维持）；显式端口+开关 on 被覆写（6399→6380 有意权衡，注释在案）；Layer 2 host 填充在测试端口模式未门控（host 类不在 F02 声明范围，.env 全 localhost 无实害，注记）。
+> R2 评审过程记录：单评审快评给两处实质修正（R2-F01 delenv→setenv[CI 容器双重兜底实证]/CI 用例端口 6379→6390 差异化防恒真）+ R2-OBS 枚举成员硬约束——全部吸收后落码。
+
 **登记（deferred-work.md 镜像）**：
 
 | # | 项 | 处置 |
@@ -1190,10 +1204,11 @@ tests 修改 12:
 | 2026-10-21 | v1.3.1 | 文档审查周期 R4 纯验证 + R5 独立终审判收敛：R4 零规范级修复（96 锚点 98.9% 精确/红线零违规/交叉计数全过——5 项台账级 P3/P4 留项）；R5 五节取证全过（周期闭合/六项关键修复双向一致/五高风险锚全中/红线零命中/R4 留项清偿行号复核无误）——零 P0/P1/P2 残留，**收敛声明入 Story，进入 dev-story 实施**；R4 五项留项随本收敛提交清偿 |
 | 2026-10-22 | v2.0.0 | **dev-story 实施完成（Task 0-8 全勾选）**: src 新建 6 + 修改 12、tests 新建 10 + 修改 15、文档 4；验收 18/18 场景全绿（含 Task 8 收尾）、集成 5/5 绿、契约 24 断言绿、架构验证器 A-D 15 断言绿；每 Task 完整红绿变异循环（变异实证 13 项全部先红后还原）；D6/D7 留项核销落盘（5-1 台账勾选 + deferred-work 索引）；R6 改造——验收测试组织结构对齐 PG 模板（用户裁定）；实施期两发现: BDD 参数化步骤须 parsers.parse 显式声明 / isolation_state 对 isolation_policy 依赖经方法内延迟 import 打破包初始化环 |
 | 2026-10-22 | v2.1.0 | **代码审查周期 Round 1**（四视角调研 + 双评审 + 主会话事实裁决）：P1×2 + P2×5 + P3×7 落码 14 项 + 登记 DF×2 + 维持 8 项（证伪留痕）。核心：R1-F02 SISYS_USE_TEST_PORTS 端口隔离被 conftest 模块级 litellm import 的 load_dotenv 副作用静默击穿（测试实读写 dev 6379/5432——environments.py 双向修复：Layer 3 端口守卫 + sync 强覆写 + MinIO endpoint 洞 + 4 用例锁定）；R1-F01 pipeline 原子性契约判别力锁定（5-1 先例移植）；R1-F05 446 supported_levels 真派生兑现 docstring 承诺；R1-F10 环方向 docstring 主会话副本实验定谳（value_objects-first 经 archive_events 断环——三方交叉验证，调研与评审员乙的两版链路均为误报）；R1-F13 集成异常路径清理闭合（key 即时登记模式）；双评审 4 条修正全吸收（甲 P0 级 split-brain 联动面最高价值） |
+| 2026-10-22 | v2.2.0 | **代码审查周期 Round 2**（回归核查 + 组合交互面双审查 + 单评审快评）：P0×1 + P2×1 + P3×4 落码 6 项。核心：R2-F01 R1-F02 锁定用例击穿 CI 门禁（SISYS_TEST_ENV=ci 下 3/4 用例必红——实测复现；修复=显式锚定 local[delenv 被 CI 容器双重兜底击穿——评审实证] + CI 形态反向锁定用例[6390 差异化防恒真]）；R2-F02 MinIO 生产路径 split-brain 闭合（from_env 读 HOST/API_PORT 非 ENDPOINT——sync 补两键覆写）；R2-F05 判定式 helper 单一化；R2-OBS monkeypatch 真源性行为锁；R1 修复回归核查 13/14 干净 + 台账一致性全过 + 6380 MONITOR 实证 |
 
 ---
 
-**故事版本/Story Version:** v2.1.0
+**故事版本/Story Version:** v2.2.0
 **创建日期/Created:** 2026-10-21
 **最后更新/Last Updated:** 2026-10-22
 **更新说明/Description:**
@@ -1204,3 +1219,4 @@ tests 修改 12:
 - v1.3.1: R4 纯验证 + R5 独立终审判收敛（收敛声明入 Story + R4 五项留项清偿）
 - v2.0.0: dev-story 实施完成（Task 0-8 全交付）
 - v2.1.0: 代码审查周期 Round 1（14 落码 + 2 登记 + 8 维持——详见 Review Findings R1 表）
+- v2.2.0: 代码审查周期 Round 2（P0×1 + P2×1 + P3×4 落码——详见 Review Findings R2 表）

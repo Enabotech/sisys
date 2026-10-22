@@ -308,7 +308,10 @@ class IsolationLevelNotSupportedError(BusinessException):
         code: EXCEPTION_446
         message: 默认消息
         context: 领域上下文（level 原始输入 + supported_levels 当前开放等级清单
-            ——从 MVP_ALLOWED_LEVELS 派生，勿硬编码字面量列表）
+            ——按位点区分：实体/服务侧从 MVP_ALLOWED_LEVELS 真派生
+            [isolation_state._supported_level_values——V2 仅改常量一处]；CLI 侧
+            SUPPORTED_ISOLATION_LEVELS 显式字面量 + 集合相等双锁形态
+            [R1-F34——帮助文本稳定性；双锁红即 V2 同步提醒]）
     """
 
     code = "EXCEPTION_446"
@@ -325,8 +328,8 @@ class IsolationLevelNotSupportedError(BusinessException):
 
         Args:
             level: 请求的等级原始输入（字符串形态——非枚举实例经 str 化后传入）
-            supported_levels: 当前开放等级清单（从 MVP_ALLOWED_LEVELS 派生——
-                V2 开放 L1 时仅改常量一处）
+            supported_levels: 当前开放等级清单（实体/服务侧从 MVP_ALLOWED_LEVELS
+                真派生；CLI 侧字面量双锁——见类 docstring 位点注记）
             message: 覆盖默认消息（可选）
             cause: 原始异常（可选，用于异常链）
         """
