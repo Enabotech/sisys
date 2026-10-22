@@ -190,7 +190,18 @@ class TestCiEnvKeepsPortOverrideSemantics:
         host.docker.internal 全套）若残留，后续 get_test_env 的 Layer 3 会以
         残留值覆盖 TEST_CONFIG 的 localhost、生产 from_env 直读同中招——
         全量跑 Qdrant DNS/Neo4j resolve 失败族的根因形态。
+
+        环境条件化（R8-F01）：本用例锁定的是**本地形态**污染（基线环境不含
+        host.docker.internal 键——R6-F01 爆发环境）；CI job 容器自带全套
+        host.docker.internal 预设键（合法基线，CI_CONFIG 本就指向宿主网络）
+        ——该形态下「值不变」是环境基线而非污染，动态 skip。
         """
+        if any(
+            os.environ.get(key) == "host.docker.internal"
+            for key in ("QDRANT_HOST", "POSTGRES_HOST", "NEO4J_HOST", "RABBITMQ_HOST")
+        ):
+            pytest.skip("CI 环境自带 host.docker.internal 全套预设键（合法基线）——本地形态污染锁不适用")
+
         _anchor_local_env(monkeypatch)
         monkeypatch.setenv("SISYS_USE_TEST_PORTS", "1")
 
