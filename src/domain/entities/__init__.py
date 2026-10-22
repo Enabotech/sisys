@@ -9,6 +9,7 @@ from .cross_border_transfer import CrossBorderTransferRequest
 from .data_residency_policy import DataResidencyPolicy
 from .document import Document
 from .external_api_whitelist import ExternalAPIWhitelist
+from .isolation_state import IsolationState
 from .memory_change_history import MemoryChangeHistory
 from .memory_metadata import MemoryMetadata
 from .permission import Permission
@@ -28,6 +29,7 @@ __all__ = [
     "DataResidencyPolicy",
     "Document",
     "ExternalAPIWhitelist",
+    "IsolationState",
     "MemoryChangeHistory",
     "MemoryMetadata",
     "Permission",

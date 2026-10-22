@@ -15,7 +15,7 @@
 
 **路线图触发型**：
 - langgraph retry/timeout 字段 → **触发 = Story 5.10（CheckpointWithEvaluation）或 6.6（Checkpoint 摘要查看）实施**（epics :2016 规划在案、story 文件未创建——两处是 checkpoint_table/编排引擎行为的规划消费方，届时字段语义定稿）
-- 工具熔断 → **触发 = Epic 5 sprint planning 重估归属**（epics 无直接对应 Story——FR-CP-07 是 Epic 11.3 成本熔断非工具执行域；建议 5.4/5.5 EIP 弹性隔离实施时评估挂点或独立小 Story）
+- 工具熔断 → **触发 = Epic 5 sprint planning 重估归属**（epics 无直接对应 Story——FR-CP-07 是 Epic 11.3 成本熔断非工具执行域；建议 5.4/5.5 EIP 弹性隔离实施时评估挂点或独立小 Story）。**5-4 Task 0 评估（2026-10-22）：挂点不成立**——工具熔断（连续校验失败熔断）属 tool_execution 域装饰链语义，与 EIP 隔离等级无协议耦合；维持 deferred 归 Epic 5 sprint planning 重估/独立小 Story
 
 **数据触发型**（共同链：Epic 5-8 交付 → V1 上线 → 真实失败流量 → 案例库积累；**上线前可提前部署观测脚本**——判据全可由 `EvolutionLogQuery.list_by_tool` + `get_by_natural_key` 量化）：
 - fast-fail 尝试缩减 → 就绪判据：每签名 ≥30 次观测且 NEGATIVE_CASE_GUIDED 组样本充足（按 fix_strategy 分组恢复率对照——R8-32）｜上线后 +2~4 周
@@ -127,7 +127,7 @@
 - unified_storage + L0/memory 子系统 12 端口休眠 — 触发=Epic 6
 - semantic_cache_middleware/cache_metrics/semantic_cache 休眠 — Story 3-9 缓存整体未运行；触发=检索性能需求
 - orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5
-- session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）。**5-3 Task 0 处置（2026-10-20）：续期**——触发移至 5-4+/多轮会话需求 Story（5-3 DC-9：MVP 单次 CLI 调用内会话闭合，无跨调用状态需求；九步可选步「持久化沙箱内存变量」同批续期见 5-3 D-6）
+- session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）。**5-3 Task 0 处置（2026-10-20）：续期**——触发移至 5-4+/多轮会话需求 Story（5-3 DC-9：MVP 单次 CLI 调用内会话闭合，无跨调用状态需求；九步可选步「持久化沙箱内存变量」同批续期见 5-3 D-6）。**5-4 Task 0 处置（2026-10-22）：再续期**——5-4 隔离状态（IsolationState）是 EIP 协议状态非会话状态（5-4 DC-1：独立聚合 + 独立键空间 sisys:isolation:*，不经 session_storage）；触发移至真正的多轮会话需求 Story
 - uow_factory/saga_repository 零 resolve — 事务子系统待首个真实事务用例
 - compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线
 
@@ -164,6 +164,8 @@
 - 【D12·P2】wheel 形态 configs/ 分发缺口 — pyproject packages=[{include="src"}] 不含 configs/（非 Python 包），wheel/pip 安装形态 agent CLI 必现 440；源码树/Docker/k8s 三形态自洽，CI 零 wheel 构建环节无消费方 — 核销触发：发布/打包专项立项 或 首个 wheel 消费方出现（README 已声明部署形态限定）
 - 【D13·P2】CLI 全量 bootstrap 启动开销 — 单次调用墙钟 10.4s（bootstrap 7.7s≈157 端口注册 + litellm import 出网拉取价目表 + BGE tokenizer 加载；实际用例 ~2.5ms；2026-10-14 本机实测）——agent_cli 是首个全量付费的 Redis CLI，组合根瘦身/lazy 化属架构级决策；短期缓解已落地（2026-10-14）：.env.example 增 LITELLM_LOCAL_MODEL_COST_MAP=1 样例项 — 核销触发：5.3 批量实例化消费前。**5-3 Task 0 处置（2026-10-20）：知悉不处置**——run-task 单次调用阻塞语义下无批量消费面（非阻断）；组合根瘦身属架构级决策，登记保持
 - 【D11 补强】超限毒行恢复唯一路径=运维 SQL 重置（mark_pending >=max 硬抛 + 无终态迁移）；SELECT 过滤后超限行零日志为监控盲区（专项需提供 pending 滞留巡检面）；另 `_mark_failed_entity`/`AuditOutboxModel.mark_failed` 两处 error_message VARCHAR(1000) 未截断潜伏面同批收敛
+- 【D6·P3·已核销·索引行】AgentConfig 直构造守卫残余（主登记位 = 5-1 story 留项台账 D6 条）→ **核销于 Story 5.4（2026-10-22）Task 1 循环 E**：default_isolation_level 枚举化 + 标量类型守卫统一 440 分码；空白串拦截语义核实已存在钉子锁定（详见 5-4 story D6 处置行）
+- 【D7·P3·已核销·索引行】SINGLETON 用例捕获 SCOPED 仓储 captive dependency 评估（主登记位 = 5-1 story 留项台账 D7 条）→ **核销于 Story 5.4（2026-10-22）Task 0 评估 + DC-7**：isolation_repository SINGLETON 新增面从源头避免 + 存量维持注记 + 验证器 D lifetime 架构锚（详见 5-4 story D7 处置行）
 - 【部署面注记补充】outbox 无 poller 宿主叠加 CLI 路径：sisys-agent 产出的 AgentInstantiated RELIABLE 事件在 event_outbox 持续 pending 累积（sisys-api 服务缺失既有登记）——短期 ops 可用 SQL 巡检 pending 数。**5-2 R1 追记（2026-10-19，编号锚 R1-DF2）**：AgentProfileLoaded（5-2 交付，reliable 单通道同族）同形态累积；且发布失败（outbox 写失败/raise）在 CLI 路径仅 stderr 日志 + exit 0，无程序化可观测信号（exit 码/输出标记均无）——观测面增强（发布失败退码化/结果对象标记/指标计数）与 poller 宿主同归 — 核销触发：5.3 首个事件消费 Story 立项时一并定夺。**5-3 Task 0 处置（2026-10-20）：登记保持**——5-3 是 AgentDecided 的生产方（confidence 真实化写入）而非任何事件的消费方，无事件订阅面，锚位顺延至 5.7 Phoenix 追踪立项
 
 ## Deferred from: Story 5-2 Task 0 链路普查 (2026-10-19)

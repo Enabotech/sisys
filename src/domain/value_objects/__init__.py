@@ -52,6 +52,13 @@ from src.domain.value_objects.intrusion_detection_result import (
     AttackDetectionResult,
     IntrusionStats,
 )
+from src.domain.value_objects.isolation_policy import (
+    ISOLATION_POLICIES,
+    MVP_ALLOWED_LEVELS,
+    DataIsolationMode,
+    IsolationPolicy,
+    get_isolation_policy,
+)
 from src.domain.value_objects.parsed_document import (
     BoundingBox,
     BoundingBoxResult,
@@ -116,6 +123,7 @@ __all__ = [
     "FlowStatus",
     "InjectionDetectionResult",
     "IntegrityResult",
+    "ISOLATION_POLICIES",
     "ConsensusArea",
     "DebatePerspective",
     "DebateQuality",
@@ -126,6 +134,10 @@ __all__ = [
     "RiskView",
     "IntrusionStats",
     "IsolationVerificationResult",
+    "MVP_ALLOWED_LEVELS",
+    "DataIsolationMode",
+    "IsolationPolicy",
+    "get_isolation_policy",
     "MAX_ARCHIVE_EXTRACTED_SIZE",
     "MAX_BATCH_COUNT",
     "MAX_BATCH_SIZE",

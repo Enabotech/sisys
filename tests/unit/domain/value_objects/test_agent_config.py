@@ -18,6 +18,7 @@ import dataclasses
 import pytest
 
 from src.domain.entities.agent import AgentRole
+from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import AgentConfigError
 from src.domain.value_objects.agent_config import AgentConfig
 
@@ -60,7 +61,7 @@ class TestAgentConfigCreation:
 
     def test_default_isolation_level_l4(self) -> None:
         config = _make_config()
-        assert config.default_isolation_level == "L4"
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
 
     def test_frozen_immutable(self) -> None:
         config = _make_config()
@@ -191,4 +192,81 @@ class TestRoleValidation:
     def test_non_enum_role_raises_440(self) -> None:
         with pytest.raises(AgentConfigError) as exc_info:
             _make_config(role="ceo")  # 工厂 **overrides 未注解参数按 Any 透传（VO 校验是测试意图）
+        assert exc_info.value.code == "EXCEPTION_440"
+
+
+# ===================================================================
+# Story 5-4 D6 残余回填：default_isolation_level 枚举化 + 标量类型守卫
+# ===================================================================
+
+
+class TestIsolationLevelFieldValidation:
+    """default_isolation_level 枚举收紧（D6 isolation 项核销——SSOT 枚举绑定）。
+
+    配置资产类 VO 校验失败统一 440（AgentConfigError 家族——242/440 分界原则）。
+    """
+
+    def test_enum_instance_accepted(self) -> None:
+        """枚举实例合法构造（SSOT 类型——IsolationLevel 枚举绑定）。"""
+        config = _make_config(default_isolation_level=IsolationLevel.L4_HARD)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+
+    def test_other_valid_level_accepted(self) -> None:
+        """其他合法枚举值构造（L3——loader 层不做 MVP 白名单，VO 只认枚举类型）。"""
+        config = _make_config(default_isolation_level=IsolationLevel.L3_SOFT)
+        assert config.default_isolation_level is IsolationLevel.L3_SOFT
+
+    def test_bare_string_raises_440(self) -> None:
+        """裸字符串 "L4" → 440（reason 含 isolation 语义——枚举类型才是 SSOT）。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(default_isolation_level="L4")  # 工厂 **overrides 未注解参数按 Any 透传
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "isolation" in exc_info.value.context.get("reason", "")
+
+    def test_non_string_non_enum_raises_440(self) -> None:
+        """异构值（整数/None）→ 440。"""
+        for raw in (4, None, ["L4"]):
+            with pytest.raises(AgentConfigError):
+                _make_config(default_isolation_level=raw)
+
+    def test_default_value_is_enum_instance(self) -> None:
+        """字段默认值本身是枚举实例（str = "L4" 裸形态核销）。"""
+        config = AgentConfig(
+            role=AgentRole.CEO,
+            name="CEO Agent",
+            description="首席执行官 Agent",
+            version="1.0.0",
+            responsibilities=("战略方向",),
+            domain_knowledge=("宏观趋势",),
+            preferred_model=None,
+        )
+        assert isinstance(config.default_isolation_level, IsolationLevel)
+
+
+class TestScalarFieldTypeGuards:
+    """标量字段类型守卫（D6 残余核销锚——原 name=123 裸 AttributeError 逃逸）。
+
+    AgentConfig 全部标量字段（name/description/version）isinstance str 守卫，
+    统一 440 分码（配置资产语义——原裸 AttributeError 逃逸是 D6 残余核销锚）。
+    """
+
+    @pytest.mark.parametrize("field_name", ["name", "description", "version"])
+    def test_int_scalar_raises_440(self, field_name: str) -> None:
+        """整数值 → 440（reason 中文自然语言——非 snake_case）。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(**{field_name: 123})
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert field_name in exc_info.value.context.get("reason", "")
+
+    @pytest.mark.parametrize("field_name", ["name", "description", "version"])
+    def test_list_scalar_raises_440(self, field_name: str) -> None:
+        """列表值 → 440（防 falsy 判空越过后的下游静默损坏）。"""
+        with pytest.raises(AgentConfigError):
+            _make_config(**{field_name: ["not", "a", "string"]})
+
+    def test_whitespace_name_still_raises_440_nail(self) -> None:
+        """空白串现状钉子（D6「空白串未归一」子项核实为「拦截语义已存在」——
+        钉子测试锁定即核销，存储值不做 strip 归一）。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(name="   ")
         assert exc_info.value.code == "EXCEPTION_440"

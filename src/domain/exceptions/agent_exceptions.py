@@ -294,6 +294,89 @@ class ChainOfThoughtValidationError(SystemException):
         super().__init__(message=message, cause=cause, context=context)
 
 
+class IsolationLevelNotSupportedError(BusinessException):
+    """请求的 EIP 隔离等级不合法（Story 5.4 — EIP 弹性隔离协议基础）
+
+    触发场景（双路径——同码多因区分锚在 context.level）:
+    ① CLI/调用方传入非法枚举值字符串（如 "L9"——_parse_isolation_level
+       第一道转换守卫拦截，禁止裸 IsolationLevel(value) 的 ValueError 逃逸）；
+    ② 合法枚举但不在 MVP_ALLOWED_LEVELS（L1 融合态——SYS 监督/紧急态/强制
+       审计设施均 V2，MVP 禁用；实体 initialize/switch_to 双条件守卫拦截）。
+    与 441「MVP 未开放角色」同语义族（阶段性能力范围限制），HTTP 422。
+
+    Attributes:
+        code: EXCEPTION_446
+        message: 默认消息
+        context: 领域上下文（level 原始输入 + supported_levels 当前开放等级清单
+            ——从 MVP_ALLOWED_LEVELS 派生，勿硬编码字面量列表）
+    """
+
+    code = "EXCEPTION_446"
+    message = "隔离等级在当前阶段不支持"
+
+    def __init__(
+        self,
+        level: str,
+        supported_levels: tuple[str, ...] | list[str] = (),
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化隔离等级不支持异常
+
+        Args:
+            level: 请求的等级原始输入（字符串形态——非枚举实例经 str 化后传入）
+            supported_levels: 当前开放等级清单（从 MVP_ALLOWED_LEVELS 派生——
+                V2 开放 L1 时仅改常量一处）
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链）
+        """
+        context: dict[str, Any] = {
+            "level": level,
+            "supported_levels": list(supported_levels),
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class IsolationStateNotInitializedError(BusinessException):
+    """Agent 的 EIP 隔离状态缺失（Story 5.4 — EIP 弹性隔离协议基础）
+
+    触发场景（三种成因——同码多因，context.agent_id 为区分锚）:
+    ① 存量 Agent 无隔离键（5.4 部署前实例化的 agent 被查询——隔离键从未写入；
+       「TTL 漂移致隔离键先过期」经写序推演不可构造，见 Story 5.4 风险 #6）；
+    ② 未初始化查询（get_isolation_state 在隔离键缺失时抛出——443 守卫通过后）；
+    ③ 实例化 fail-fast 后键残留（agent 键存活 → 443 守卫通过 → 隔离键缺失；
+       服务级以同 id 重新 initialize 可自愈，用例/CLI 通道靠 TTL 自然回收）。
+    Agent 存在与隔离状态缺失是两个聚合两个语义（443 vs 447 精确诊断），
+    HTTP 404 对齐 443 NotFound 族。
+
+    Attributes:
+        code: EXCEPTION_447
+        message: 默认消息
+        context: 领域上下文（agent_id——raise 侧传 str(agent_id) 字符串形态）
+    """
+
+    code = "EXCEPTION_447"
+    message = "Agent 隔离状态未初始化"
+
+    def __init__(
+        self,
+        agent_id: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化隔离状态未初始化异常
+
+        Args:
+            agent_id: 隔离状态缺失的 Agent 标识（字符串形态）
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链）
+        """
+        context: dict[str, str] = {
+            "agent_id": agent_id,
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
 __all__ = [
     "AgentConfigError",
     "AgentNotFoundError",
@@ -301,4 +384,6 @@ __all__ = [
     "AgentRoleNotSupportedError",
     "AgentWorkflowError",
     "ChainOfThoughtValidationError",
+    "IsolationLevelNotSupportedError",
+    "IsolationStateNotInitializedError",
 ]

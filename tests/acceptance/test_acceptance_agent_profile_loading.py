@@ -177,7 +177,8 @@ def context(
 
     # teardown: 逐键精确删除本场景创建的 Agent 状态键 + 同循环关闭客户端
     for agent_id in ctx["_agent_ids"]:
-        _run_async(event_loop, redis_client.delete(build_key("agent", str(agent_id))))
+        for namespace in ("agent", "isolation"):
+            _run_async(event_loop, redis_client.delete(build_key(namespace, str(agent_id))))
     _run_async(event_loop, redis_client.close())
 
 
@@ -216,19 +217,30 @@ def given_ceo_agent_instantiated(context: dict[str, Any]) -> None:
       （均本地静态文件只读、无连接构造，跨循环安全）+ 同一手动仓储 + 新 InMemoryEventBus
       （事件捕获锚点）+ LoadAgentProfileUseCase 手动实例化
     """
+    # Story 5-4 第四依赖: 真实 IsolationManagementService 手动组装（验收禁 mock
+    # ——R3-F04 分派；隔离键真实写入，teardown 已双键化清理）
+    from src.application.services.isolation_management_service import IsolationManagementService
     from src.application.use_cases.agent_instantiation import InstantiateAgentUseCase
     from src.domain.ports.resolver import resolve
     from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
     from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
     from src.infrastructure.storage.redis.redis_agent_repository import RedisAgentRepository
+    from src.infrastructure.storage.redis.redis_isolation_repository import RedisIsolationRepository
 
     repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=context["_redis_client"]))
     context["repository"] = repository
 
+    isolation_service = IsolationManagementService(
+        isolation_repository=RedisIsolationRepository(adapter=RedisAdapter(redis_client=context["_redis_client"])),
+        agent_repository=repository,
+        event_publisher=InMemoryEventBus(),
+        agent_config_loader=resolve("agent_config_loader"),
+    )
     instantiate_use_case = InstantiateAgentUseCase(
         config_loader=resolve("agent_config_loader"),
         repository=repository,
         event_publisher=InMemoryEventBus(),
+        isolation_service=isolation_service,
     )
     instantiation = _run_async(context["_loop"], instantiate_use_case.execute(role=AgentRole.CEO))
     context["_agent_ids"].append(instantiation.agent_id)

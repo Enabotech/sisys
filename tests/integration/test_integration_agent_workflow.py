@@ -222,12 +222,21 @@ def _build_tool_execution_service(fake_llm: Any) -> Any:
 
 
 async def _instantiate_agent(redis_client: Any) -> Any:
-    """真实实例化 CEO Agent（Redis Agent 实体——run-task 守卫数据源）。"""
+    """真实实例化 CEO Agent（Redis Agent 实体——run-task 守卫数据源）。
+
+    第四依赖 isolation_service 用 AsyncMock(spec=IsolationManagementServicePort)
+    ——集成 Mock 工厂子模式（隔离初始化非本 Story 5-3 场景断言面，归 5-4 集成）。
+    """
+    from unittest.mock import AsyncMock
+
+    from src.application.ports.isolation_management import IsolationManagementServicePort
+
     repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=redis_client))
     instantiate_use_case = InstantiateAgentUseCase(
         config_loader=_resolve("agent_config_loader"),
         repository=repository,
         event_publisher=InMemoryEventBus(),
+        isolation_service=AsyncMock(spec=IsolationManagementServicePort),
     )
     return await instantiate_use_case.execute(role=AgentRole.CEO)
 

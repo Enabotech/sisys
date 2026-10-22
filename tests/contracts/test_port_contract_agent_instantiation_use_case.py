@@ -27,9 +27,10 @@ from src.domain.ports.registry import Lifetime
 class _DummyResolver:
     """测试用最小 Resolver 占位符。
 
-    agent_instantiation_use_case 工厂注入三依赖：agent_config_loader /
-    agent_repository / event_publisher——全部以零 IO 替身提供（契约维度仅
-    验证实例化与方法面，不触真实连接）。
+    agent_instantiation_use_case 工厂注入四依赖（Story 5-4 追加
+    isolation_management_service）：agent_config_loader / agent_repository /
+    event_publisher / isolation_management_service——全部以零 IO 替身提供
+    （契约维度仅验证实例化与方法面，不触真实连接）。
     """
 
     def resolve(self, name: str) -> Any:
@@ -48,6 +49,20 @@ class _DummyResolver:
             from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 
             return InMemoryEventBus()
+        if name == "isolation_management_service":
+            import fakeredis.aioredis
+
+            from src.application.services.isolation_management_service import IsolationManagementService
+            from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+            from src.infrastructure.storage.redis.redis_isolation_repository import RedisIsolationRepository
+
+            fake_adapter = RedisAdapter(redis_client=fakeredis.aioredis.FakeRedis(decode_responses=True))
+            return IsolationManagementService(
+                isolation_repository=RedisIsolationRepository(adapter=fake_adapter),
+                agent_repository=self.resolve("agent_repository"),
+                event_publisher=self.resolve("event_publisher"),
+                agent_config_loader=self.resolve("agent_config_loader"),
+            )
         raise KeyError(f"未注册的端口: {name}")
 
 

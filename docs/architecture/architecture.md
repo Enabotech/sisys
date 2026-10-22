@@ -642,6 +642,16 @@ UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本�
 
 ## 5. 弹性视角隔离协议 EIP
 
+> **MVP 实现状态注记（Story 5.4 — EIP 弹性隔离协议基础）**：四级隔离等级模型已交付——
+> `ISOLATION_POLICIES` 四级策略表 + `MVP_ALLOWED_LEVELS={L4,L3,L2}`（L1 融合态 V2 开放）
+> + `IsolationState` 独立聚合（Redis 键空间 `sisys:isolation:{agent_id}`，与 Agent 键并存
+> ——Agent 实体 isolation_level 字段规划归 V1 评估，见偏离声明 D-1）+ 实例化即 L4 硬隔离
+> 默认 + 用户显式请求切换通道（CLI `set-isolation`）+ `IsolationLevelSwitched` 事件发布。
+> 触发条件 MVP 仅「用户请求」通道（SYS 命令/关键词频率/任务依赖归 V1——FR-AC-09）；
+> 自动恢复（§5.3）归 V1；三重隔离的运行时强制拦截归 Story 5.5；`IsolationSwitchLog`
+> 切换日志归 Story 5.6。异常契约: 446 `IsolationLevelNotSupportedError`（422）/
+> 447 `IsolationStateNotInitializedError`（404）。
+
 ### 5.1 四级隔离等级
 
 | 等级 | 名称 | Prompt 隔离 | 工具隔离 | 数据隔离 | 适用场景 |
@@ -1746,7 +1756,7 @@ src/domain/
 │   ├── agent_service.py                                   # Agent 协作服务接口
 │   ├── planning_service.py                                # 规划服务接口（BLM/BEM）
 │   ├── routing_service.py                                 # UDMR 路由服务接口 ⭐
-│   ├── isolation_service.py                               # EIP 隔离服务接口 ⭐
+│   ├── isolation_service.py                               # EIP 隔离服务接口 ⭐（MVP 落位注记 Story 5.4: 实际落位 application/ports/isolation_management.py——隔离管理需编排仓储读写与事件发布属应用编排关注点，纯策略表已留 domain/value_objects/isolation_policy.py——偏离声明 D-2）
 │   ├── evaluation_service.py                              # 评估服务接口
 │   └── visualization_service.py                           # 可视化服务接口
 │
@@ -1758,7 +1768,8 @@ src/domain/
 │   ├── plan_repository.py                                 # 规划仓储接口
 │   ├── checkpoint_repository.py                           # Checkpoint 仓储接口
 │   ├── routing_log_repository.py                          # 路由日志仓储接口 ⭐
-│   ├── isolation_log_repository.py                        # 隔离日志仓储接口 ⭐
+│   ├── isolation_log_repository.py                        # 隔离日志仓储接口 ⭐（归 Story 5.6）
+│   ├── isolation_repository.py                           # EIP 隔离状态仓储接口 ⭐（Story 5.4 交付——键空间 sisys:isolation:{agent_id}）
 │   └── archive_repository.py                              # 档案仓储接口
 │
 ├── events/                                                # 领域事件定义

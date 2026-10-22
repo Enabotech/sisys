@@ -1,15 +1,19 @@
-"""Agent 命令行接口（Story 5-1 实例化 + Story 5-2 档案加载 + Story 5-3 工作流执行）
+"""Agent 命令行接口（Story 5-1 实例化 + Story 5-2 档案加载 + Story 5-3 工作流执行 + Story 5-4 隔离管理）
 
-提供 Agent 实例化、档案加载与单 Agent 工作流执行命令行工具。使用 argparse
-标准库（零额外依赖），通过 pyproject.toml 注册为 sisys-agent 入口点。
+提供 Agent 实例化、档案加载、单 Agent 工作流执行与 EIP 隔离管理命令行工具。
+使用 argparse 标准库（零额外依赖），通过 pyproject.toml 注册为 sisys-agent 入口点。
 
 架构约束：
 - 位于 entrypoints 组装层（进程入口，D1 方案 A 上移自 interfaces/cli）
 - 通过 composition_root 的 bootstrap() + resolve("agent_instantiation_use_case" /
-  "agent_profile_use_case" / "agent_workflow_use_case") 获取应用层用例（与
-  ocr_cli 同款接线模式）
+  "agent_profile_use_case" / "agent_workflow_use_case" /
+  "isolation_management_service") 获取应用层用例/服务（与 ocr_cli 同款接线模式）
 - 角色字符串 → 枚举转换必须守卫（禁止裸 AgentRole(value)——Enum 原生抛
   ValueError 逃逸统一异常体系，统一映射 AgentRoleNotSupportedError）
+- 隔离等级字符串 → 枚举转换必须守卫（Story 5-4——禁止裸 IsolationLevel(value)，
+  统一映射 IsolationLevelNotSupportedError(446)；禁 .lower() 归一——
+  AgentRole 枚举值全小写而 IsolationLevel 全大写，lower 化将拒绝全部合法输入；
+  --level 大小写敏感）
 - agent_id 字符串 → UUID 转换必须守卫（禁止裸 uuid.UUID(value)——ValueError
   逃逸统一异常体系，统一映射 ValidationError(201)；argparse 的 type= 参数
   不得用 uuid.UUID——argparse 会把 ValueError 转 usage error exit 2 绕过
@@ -24,6 +28,8 @@
   事件带 event_id 消费方可按其幂等去重）。
 - run-task 单次执行语义——六阶段工作流阻塞执行到终态（成功/失败完成态均
   正常走完 exit 0；443/441/444/445 等业务异常 exit 1）。
+- set-isolation 同等级 no-op 是正常态（exit 0 + 未变更提示——幂等重试语义；
+  Story 5-4）。
 
 bootstrap 幂等守卫（Story 5-3——DC-12 ③ 前提）：
 - _ensure_bootstrapped 检查 registry 关键端口已存在即跳过重放——防同进程
@@ -34,6 +40,8 @@ bootstrap 幂等守卫（Story 5-3——DC-12 ③ 前提）：
     sisys-agent instantiate --role ceo
     sisys-agent load-profile --agent-id <uuid>
     sisys-agent run-task --agent-id <uuid> --task "<任务描述>"
+    sisys-agent isolation-status --agent-id <uuid>
+    sisys-agent set-isolation --agent-id <uuid> --level <L4|L3|L2> --reason "<原因>"
     poetry run sisys-agent run-task --agent-id <uuid> --task "<任务描述>"
 
 输出：
@@ -42,7 +50,11 @@ bootstrap 幂等守卫（Story 5-3——DC-12 ③ 前提）：
     活跃技能数 + 启动上下文 token 计量）；日志与错误走 stderr；
     run-task 成功/失败完成态 stdout 为多行摘要（六阶段状态行 + 思维链
     五段预览 + 证据引用 + 置信度 + 状态标记）；
-    退出码 0=成功或工作流正常走完（含失败完成态） / 1=业务异常（统一异常
+    isolation-status 成功路径 stdout 为多行摘要（等级+名称 / 三维度策略 /
+    isoformat 时间 / 最近触发原因——Story 5-4）；
+    set-isolation 成功路径 stdout 为切换摘要（previous -> target）或
+    no-op 提示（exit 0 含 no-op——幂等语义）；
+    退出码 0=成功或工作流正常走完（含失败完成态/no-op） / 1=业务异常（统一异常
     体系编码） / 2=用法错误（argparse）。
 """
 
@@ -54,12 +66,28 @@ import logging
 import sys
 import uuid as uuid_module
 
+from src.application.ports.isolation_management import (
+    IsolationManagementServicePort,
+    IsolationSwitchResult,
+)
 from src.composition_root import bootstrap
 from src.domain.entities.agent import AgentRole
-from src.domain.exceptions import AgentRoleNotSupportedError, DomainError, ValidationError
+from src.domain.entities.isolation_state import IsolationState
+from src.domain.events.enums import IsolationLevel
+from src.domain.exceptions import (
+    AgentRoleNotSupportedError,
+    DomainError,
+    IsolationLevelNotSupportedError,
+    ValidationError,
+)
 from src.domain.ports.resolver import get_resolver, resolve
 
 logger = logging.getLogger(__name__)
+
+# CLI 支持的隔离等级清单（显式元组字面量——禁从 frozenset 迭代派生：迭代序
+# 不稳定致帮助文本漂移；与 domain MVP_ALLOWED_LEVELS 集合相等由测试双锁
+# （V2 开放 L1 时仅改 domain 常量，测试红提醒同步本清单）——Story 5-4）
+SUPPORTED_ISOLATION_LEVELS: tuple[str, ...] = ("L4", "L3", "L2")
 
 
 def _ensure_bootstrapped() -> None:
@@ -140,6 +168,45 @@ def _parse_agent_uuid(value: str) -> uuid_module.UUID:
         ) from None
 
 
+def _parse_isolation_level(raw: str) -> IsolationLevel:
+    """隔离等级字符串 → IsolationLevel 枚举（守卫转换——Story 5-4）
+
+    两道守卫（顺序对齐 _parse_role 先例——第一道转换在前是唯一拦截非法
+    字符串的活路径，第二道预检拦「合法枚举但未开放」即 L1 融合态）:
+    ① 禁止裸 IsolationLevel(raw)——Enum 原生 ValueError 逃逸统一异常体系，
+      统一映射 IsolationLevelNotSupportedError(446)；
+    ② MVP_ALLOWED_LEVELS 预检——L1 是合法枚举值，字符串转换拦不住它。
+    大小写敏感（契约 <L4|L3|L2>——枚举值全大写，禁 .lower() 归一——
+    AgentRole 先例的归一化在此不适用）。
+
+    Args:
+        raw: 命令行原始输入（如 "L4"；"l4"/"L9" 均为非法输入）
+
+    Returns:
+        IsolationLevel 枚举实例
+
+    Raises:
+        IsolationLevelNotSupportedError: 非法或未开放等级字符串（EXCEPTION_446
+            ——context 携带原始输入与支持列表）
+    """
+    from src.domain.value_objects.isolation_policy import MVP_ALLOWED_LEVELS
+
+    level: IsolationLevel
+    try:
+        level = IsolationLevel(raw.strip())
+    except ValueError:
+        raise IsolationLevelNotSupportedError(
+            level=raw,
+            supported_levels=SUPPORTED_ISOLATION_LEVELS,
+        ) from None
+    if level not in MVP_ALLOWED_LEVELS:
+        raise IsolationLevelNotSupportedError(
+            level=raw,
+            supported_levels=SUPPORTED_ISOLATION_LEVELS,
+        )
+    return level
+
+
 def build_parser() -> argparse.ArgumentParser:
     """构建命令行参数解析器
 
@@ -203,6 +270,48 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="TASK",
         help='任务描述原文（如 "分析新能源汽车行业进入战略"）',
+    )
+
+    isolation_status = subparsers.add_parser(
+        "isolation-status",
+        help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
+    )
+    isolation_status.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=True,
+        metavar="AGENT_ID",
+        help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
+    )
+
+    set_isolation = subparsers.add_parser(
+        "set-isolation",
+        help="切换 Agent EIP 隔离等级（MVP 唯一触发通道——用户显式请求；同等级 no-op 幂等）",
+    )
+    set_isolation.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=True,
+        metavar="AGENT_ID",
+        help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
+    )
+    set_isolation.add_argument(
+        "-l",
+        "--level",
+        type=str,
+        required=True,
+        metavar="LEVEL",
+        help='目标隔离等级（MVP 开放 "L4"/"L3"/"L2"——大小写敏感；L1 融合态 V2 开放）',
+    )
+    set_isolation.add_argument(
+        "-r",
+        "--reason",
+        type=str,
+        required=True,
+        metavar="REASON",
+        help='切换原因（非空——用户显式请求语义必填，如 "任务需要软隔离"）',
     )
     return parser
 
@@ -413,6 +522,131 @@ def _run_instantiate_cli(role_raw: str) -> int:
         return 1
 
 
+def _print_isolation_status_summary(state: object) -> None:
+    """输出隔离状态多行人类可读摘要（stdout——Story 5-4）。
+
+    等级+名称 / 三维度策略（消费方持 state 联查 get_isolation_policy 派生）/
+    isoformat 全格式时间 / 最近触发原因。
+
+    Args:
+        state: IsolationState（属性访问避免 import 依赖——R4 接口层适配）
+    """
+    from src.domain.value_objects.isolation_policy import get_isolation_policy
+
+    current_level = getattr(state, "current_level")
+    policy = get_isolation_policy(current_level)
+    print(f"当前隔离等级: {current_level.value}（{policy.name}）")
+    print(f"Prompt 隔离: {policy.prompt_isolation}")
+    print(f"工具隔离: {policy.tool_isolation}")
+    print(f"数据隔离: {policy.data_isolation.value}")
+    print(f"初始化时间: {getattr(state, 'initialized_at').isoformat()}")
+    print(f"更新时间: {getattr(state, 'updated_at').isoformat()}")
+    print(f"最近触发原因: {getattr(state, 'last_trigger_reason')}")
+
+
+def _run_isolation_status_cli(agent_id_raw: str) -> int:
+    """isolation-status 子命令执行（守卫 → bootstrap → 执行 → 摘要输出）。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+
+    Returns:
+        退出码（0=成功，1=业务异常——443/447/201）
+    """
+    # UUID 守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    try:
+        agent_id = _parse_agent_uuid(agent_id_raw)
+    except ValidationError as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        service = resolve("isolation_management_service")
+        state = asyncio.run(_get_isolation_state(service, agent_id))
+        _print_isolation_status_summary(state)
+        logger.info("隔离状态查询成功: agent_id=%s", agent_id)
+        return 0
+    except DomainError as error:
+        logger.error("隔离状态查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("隔离状态查询异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _get_isolation_state(service: IsolationManagementServicePort, agent_id: uuid_module.UUID) -> IsolationState:
+    """查询隔离状态并清理已打开的连接池（守卫触 Redis + outbox 触达 PG）。"""
+    try:
+        return await service.get_isolation_state(agent_id)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_switch_summary(result: object, target_level: IsolationLevel) -> None:
+    """输出切换摘要（成功切换 / no-op 两形态——stdout）。"""
+    switched = getattr(result, "switched")
+    if switched:
+        state = getattr(result, "state")
+        previous_value = getattr(getattr(result, "event"), "previous_level", None)
+        previous = previous_value.value if previous_value is not None else target_level.value
+        reason = getattr(state, "last_trigger_reason")
+        print(f"隔离等级已切换: {previous} -> {target_level.value}（原因: {reason}）")
+    else:
+        print(f"隔离等级未变更（同等级 {target_level.value}）: no-op")
+
+
+def _run_set_isolation_cli(agent_id_raw: str, level_raw: str, reason: str) -> int:
+    """set-isolation 子命令执行（守卫 → bootstrap → 执行 → 摘要输出）。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+        level_raw: --level 原始字符串（L9/L1 → 446 统一异常出口）
+        reason: --reason 原始字符串
+
+    Returns:
+        退出码（0=成功（含 no-op），1=业务异常——443/446/447/201）
+    """
+    # 双守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    try:
+        agent_id = _parse_agent_uuid(agent_id_raw)
+        level = _parse_isolation_level(level_raw)
+    except (ValidationError, IsolationLevelNotSupportedError) as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        service = resolve("isolation_management_service")
+        result = asyncio.run(_switch_isolation_level(service, agent_id, level, reason))
+        _print_switch_summary(result, level)
+        logger.info("隔离等级切换命令完成: agent_id=%s level=%s", agent_id, level.value)
+        return 0
+    except DomainError as error:
+        logger.error("隔离等级切换失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("隔离等级切换异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _switch_isolation_level(
+    service: IsolationManagementServicePort,
+    agent_id: uuid_module.UUID,
+    level: IsolationLevel,
+    reason: str,
+) -> IsolationSwitchResult:
+    """执行隔离等级切换并清理已打开的连接池。"""
+    try:
+        return await service.switch_isolation_level(agent_id, level, reason)
+    finally:
+        await _close_connection_pools()
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 主入口
 
@@ -435,6 +669,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_load_profile_cli(args.agent_id)
     if args.command == "run-task":
         return _run_task_cli(args.agent_id, args.task)
+    if args.command == "isolation-status":
+        return _run_isolation_status_cli(args.agent_id)
+    if args.command == "set-isolation":
+        return _run_set_isolation_cli(args.agent_id, args.level, args.reason)
     return _run_instantiate_cli(args.role)
 
 

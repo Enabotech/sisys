@@ -24,6 +24,7 @@ import yaml
 
 from src.application.ports.agent_config_loader import AgentConfigLoader
 from src.domain.entities.agent import AgentRole
+from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import AgentConfigError
 from src.domain.value_objects.agent_config import AgentConfig
 
@@ -120,12 +121,19 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         eip_raw = data.get("eip_config")
         if eip_raw is not None and not isinstance(eip_raw, dict):
             _fail("eip_config 段必须为映射结构")
-        # eip_config.default_isolation_level：缺失默认 L4（本 Story 仅承载，5.4 消费）；非字符串显式 440
+        # eip_config.default_isolation_level：缺失/空串/null 回落 L4（Story 5-4 枚举化——
+        # 语义原样保留）；非字符串显式 440；字符串→IsolationLevel 转换守卫（禁裸
+        # IsolationLevel(value) 的 ValueError 逃逸——对齐 identity.role 先例）；
+        # 不做 MVP 白名单（"L1" 合法枚举放行 → 实体 initialize 446 拒绝——输入通道分层）
         eip_config = eip_raw or {}
         isolation_raw = eip_config.get("default_isolation_level") if isinstance(eip_config, dict) else None
         if isolation_raw is not None and not isinstance(isolation_raw, str):
             _fail("eip_config.default_isolation_level 必须为字符串")
-        default_isolation_level = isolation_raw if isinstance(isolation_raw, str) and isolation_raw else "L4"
+        isolation_str = isolation_raw if isinstance(isolation_raw, str) and isolation_raw else "L4"
+        try:
+            default_isolation_level = IsolationLevel(isolation_str)
+        except ValueError:
+            _fail(f"eip_config.default_isolation_level 非法隔离等级值: {isolation_str}")
 
         memory_raw = data.get("memory_config")
         if memory_raw is not None and not isinstance(memory_raw, dict):

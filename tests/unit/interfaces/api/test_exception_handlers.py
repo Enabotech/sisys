@@ -67,6 +67,8 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    IsolationLevelNotSupportedError,
+    IsolationStateNotInitializedError,
     LayeredRetrievalError,
     LevelTransitionError,
     LLMAPIError,
@@ -340,6 +342,8 @@ class TestExceptionHttpMap:
             AgentNotFoundError,  # 443 — Story 5.2 Agent 不存在（404）
             AgentWorkflowError,  # 444 — Story 5.3 工作流阶段执行失败（500）
             ChainOfThoughtValidationError,  # 445 — Story 5.3 思维链完整性校验失败（500）
+            IsolationLevelNotSupportedError,  # 446 — Story 5.4 隔离等级不支持（422）
+            IsolationStateNotInitializedError,  # 447 — Story 5.4 隔离状态未初始化（404）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

@@ -735,7 +735,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_443 | AgentNotFoundError | BusinessException | 404 |（Story 5.2，get_by_id(agent_id) 返回 None——键不存在或 TTL 过期后重放旧 agent_id，请求资源不存在语义，精确注册避免回退 400）|
 | EXCEPTION_444 | AgentWorkflowError | SystemException | 500 |（Story 5.3，单 Agent 工作流阶段执行失败——六阶段 LLM 调用失败包装/图执行异常收敛，context.phase ∈ perceive/plan/execute/verify/reflect/package 为同码多因区分锚点；LLMConfigError 与 CancelledError 透传不包装——4-5 辩论纪律先例）|
 | EXCEPTION_445 | ChainOfThoughtValidationError | SystemException | 500 |（Story 5.3，思维链终局组装后完整性校验失败——五字段缺一/空值/结构非法，context.missing_fields 区分锚点；三层校验次序：LLM Schema 失败→331→444、VO 242 改写 445、服务自检直接 445）|
-| EXCEPTION_446~449 | （预留 agent 子域）| — | — |（5.4-5.5 EIP 隔离）|
+| EXCEPTION_446 | IsolationLevelNotSupportedError | BusinessException | 422 |（Story 5.4，EIP 隔离等级不合法——双触发路径：①非法枚举值字符串（CLI `_parse_isolation_level` 第一道转换守卫，禁裸 IsolationLevel(value) 的 ValueError 逃逸）②合法枚举但越 MVP_ALLOWED_LEVELS 即 L1 融合态（实体 initialize/switch_to 双条件 isinstance 守卫）；构造器对齐 441 形态，context={level, supported_levels}；HTTP 422 对齐 441「不支持的取值」族精确注册先例）|
+| EXCEPTION_447 | IsolationStateNotInitializedError | BusinessException | 404 |（Story 5.4，Agent EIP 隔离状态缺失——三成因：存量 Agent 无隔离键（5.4 部署前实例化）/未初始化查询/实例化 fail-fast 后键残留（服务级同 id 重 initialize 可自愈，用例/CLI 通道靠 TTL 回收）；与 443「Agent 不存在」是两聚合两语义的精确诊断分离，context={agent_id}；HTTP 404 对齐 443 NotFound 族）|
+| EXCEPTION_448~449 | （预留 agent 子域）| — | — |（Story 5.5 三重硬隔离强制执行）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——

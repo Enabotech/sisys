@@ -1,4 +1,4 @@
-"""应用层 Agent 实例化用例模块（Story 5-1 — CEO Agent 实例化 MVP）
+"""应用层 Agent 实例化用例模块（Story 5-1 — CEO Agent 实例化 MVP；Story 5-4 隔离初始化注入）
 
 实现 InstantiateAgentUseCase（应用层用例，R2——MVP 以应用层用例实现实例化
 编排，不新建 domain AgentService，偏离声明 D-7）。
@@ -15,7 +15,11 @@
 4. 持久化——AgentRepository.save(agent, ttl=config.state_ttl) 显式传入
    （VO 是唯一默认值真源）；失败传播且不发布事件（无持久化即无事件——
    Agent 聚合在 Redis、发件箱在 PG 跨存储无 ACID，此序保证无幽灵事件）
-5. 发布事件——AgentInstantiated（reliable 审计合规型）；发布失败记日志
+5. 隔离初始化（Story 5-4）——IsolationManagementServicePort.initialize_agent_isolation
+   （等级=config.default_isolation_level、TTL=config.state_ttl 双消费——实例化即
+   L4 硬隔离）；失败向上抛 fail-fast（安全基线优先——静默成功=安全默认破洞；
+   残留 agent 键由 TTL 自然回收，DC-3）
+6. 发布事件——AgentInstantiated（reliable 审计合规型）；发布失败记日志
    不回滚（对齐 run_tool_chain L180-185 用例先例）；真实失败面为
    PublishResult.is_success == False（raise 路径仅异常基础设施触发）
 
@@ -30,6 +34,7 @@ import uuid
 from dataclasses import dataclass
 
 from src.application.ports.agent_config_loader import AgentConfigLoader
+from src.application.ports.isolation_management import IsolationManagementServicePort
 from src.domain.entities.agent import Agent, AgentRole
 from src.domain.events.agent_events import AgentInstantiated
 from src.domain.exceptions import AgentRoleNotSupportedError
@@ -59,14 +64,15 @@ class AgentInstantiationResult:
 class InstantiateAgentUseCase:
     """Agent 实例化用例
 
-    编排：角色守卫 → 加载配置 → 构建实体 → 持久化 → 发布事件。
-    依赖经端口注入（config_loader/repository/event_publisher），不导入
-    infrastructure 具体实现。
+    编排：角色守卫 → 加载配置 → 构建实体 → 持久化 → 隔离初始化 → 发布事件。
+    依赖经端口注入（config_loader/repository/event_publisher/isolation_service
+    ——R2 同层应用端口组合注入，Story 5-4），不导入 infrastructure 具体实现。
 
     Attributes:
         _config_loader: Agent 基础配置加载端口
         _repository: Agent 聚合仓储端口
         _event_publisher: 事件发布端口
+        _isolation_service: EIP 隔离管理端口（Story 5-4 第四依赖）
     """
 
     def __init__(
@@ -74,6 +80,7 @@ class InstantiateAgentUseCase:
         config_loader: AgentConfigLoader,
         repository: AgentRepository,
         event_publisher: EventPublisher,
+        isolation_service: IsolationManagementServicePort,
     ) -> None:
         """初始化用例
 
@@ -81,10 +88,13 @@ class InstantiateAgentUseCase:
             config_loader: 配置加载端口（组合根 agent_config_loader）
             repository: Agent 仓储端口（组合根 agent_repository）
             event_publisher: 事件发布端口（组合根 event_publisher）
+            isolation_service: EIP 隔离管理端口（组合根 isolation_management_service
+                ——Story 5-4 注入，实例化即默认 L4 硬隔离）
         """
         self._config_loader = config_loader
         self._repository = repository
         self._event_publisher = event_publisher
+        self._isolation_service = isolation_service
 
     async def execute(self, role: AgentRole) -> AgentInstantiationResult:
         """执行 Agent 实例化
@@ -100,6 +110,8 @@ class InstantiateAgentUseCase:
             AgentConfigError: 配置资产无效（EXCEPTION_440，透传加载器）
             EntityValidationError: 实体不变量违反（EXCEPTION_242，透传不包装）
             StorageError: 持久化故障（EXCEPTION_103，透传仓储——不返回假成功）
+            IsolationLevelNotSupportedError: 隔离初始化等级非法（EXCEPTION_446，
+                透传隔离服务——fail-fast 不发布事件）
         """
         # 1. 角色守卫（先于加载——441 可达性前提，见模块 docstring）
         if role not in SUPPORTED_ROLES:
@@ -125,7 +137,13 @@ class InstantiateAgentUseCase:
         # 4. 持久化（ttl 显式自 config.state_ttl；失败传播且零事件——无幽灵事件）
         await self._repository.save(agent, ttl=config.state_ttl)
 
-        # 5. 发布事件（失败记日志不回滚——先持久化后发布保证「无持久化即无事件」）
+        # 5. 隔离初始化（Story 5-4：实例化即默认 L4 硬隔离——等级与 TTL 双消费
+        # config 真源；失败 fail-fast 向上抛且不发布事件——安全基线优先，DC-3）
+        await self._isolation_service.initialize_agent_isolation(
+            agent.agent_id, config.default_isolation_level, config.state_ttl
+        )
+
+        # 6. 发布事件（失败记日志不回滚——先持久化后发布保证「无持久化即无事件」）
         event = AgentInstantiated(
             agent_id=agent.agent_id,
             role=agent.role.value,

@@ -228,7 +228,8 @@ def context(
     for restore in ctx["_restorers"]:
         restore()
     for agent_id in ctx["_agent_ids"]:
-        _run_async(event_loop, redis_client.delete(build_key("agent", str(agent_id))))
+        for namespace in ("agent", "isolation"):
+            _run_async(event_loop, redis_client.delete(build_key(namespace, str(agent_id))))
     _run_async(event_loop, redis_client.close())
 
 
@@ -560,11 +561,23 @@ def given_cli_env_with_fake_llm_overridden(context: dict[str, Any]) -> None:
     get_resolver().clear_singleton()
 
     # 真实 instantiate（Redis Agent 实体——run-task 守卫 get_by_id 数据源）
+    # Story 5-4 第四依赖: 真实 IsolationManagementService 手动组装（验收禁 mock
+    # ——R3-F04 分派；隔离键真实写入，teardown 已双键化清理）
+    from src.application.services.isolation_management_service import IsolationManagementService
+    from src.infrastructure.storage.redis.redis_isolation_repository import RedisIsolationRepository
+
     repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=context["_redis_client"]))
+    isolation_service = IsolationManagementService(
+        isolation_repository=RedisIsolationRepository(adapter=RedisAdapter(redis_client=context["_redis_client"])),
+        agent_repository=repository,
+        event_publisher=InMemoryEventBus(),
+        agent_config_loader=resolve("agent_config_loader"),
+    )
     instantiate_use_case = InstantiateAgentUseCase(
         config_loader=resolve("agent_config_loader"),
         repository=repository,
         event_publisher=InMemoryEventBus(),
+        isolation_service=isolation_service,
     )
     instantiation = _run_async(loop, instantiate_use_case.execute(role=AgentRole.CEO))
     context["_agent_ids"].append(instantiation.agent_id)

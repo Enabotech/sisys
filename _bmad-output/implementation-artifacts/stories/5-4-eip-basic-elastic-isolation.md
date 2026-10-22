@@ -1,6 +1,6 @@
 # Story 5.4: EIP 弹性隔离协议基础
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -193,98 +193,98 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 #### 领域事件 Schema (Domain Events)
 
-- [ ] **不新建领域事件**——复用既有 `IsolationLevelSwitched`（`src/domain/events/isolation_events.py` L16-43；yaml L197-201 + channel_router L255-260 双登记已就绪，**零登记改动**，Task 0 仅复验）
-- [ ] **既有事件纪律收紧（DC-6，契约变更登记）**：`agent_id: uuid.UUID = field(default_factory=uuid.uuid4)` → `field(kw_only=True)`；`previous_level`/`target_level` 去掉 `= IsolationLevel.L4_HARD` 默认值改 kw_only 必填；`trigger_reason: str = ""` → kw_only 必填（切换必须有原因——空串是无意义的切换事件）；`approval_chain: list[str]`（default_factory=list）与 `switch_timestamp`（default_factory now(UTC)）保留默认（MVP 用户请求无审批链）。依据：DomainEvent 基类字段全带默认值，子类无默认值的非 kw_only 字段跟在其后类定义即抛 TypeError（AgentProfileLoaded 先例注释——agent_events.py L87-88）。**收紧时保留既有 `__post_init__` 的 aggregate_id←agent_id 派生与 aggregate_type="Agent"（isolation_events.py L38-43——AC-4 aggregate 断言依赖此派生，重写类体时禁丢失——R1-F12）**
-- [ ] **回归面清单（事件收紧全量同步，Task 1 循环 D）**：`tests/unit/domain/events/test_new_events.py` L79-108（TestIsolationLevelSwitched 构造/默认值断言形态同步）；`tests/unit/domain/events/test_event_serialization.py` L67-75/L145-146/L221-222（三处构造补必填参数）；`tests/acceptance/test_acceptance_domain_event_definition.py` L35/L150-279/L465-467（事件定义验收——构造形态同步）；`tests/unit/architecture/test_event_architecture.py` L129（导出断言——不受影响，复验）。src 侧零发布方、AutoTriggerHandler 引用是字符串（auto_trigger_handler.py L60-72）——零 src 回归
-- [ ] `src/domain/events/__init__.py` 无需改动（已导出 L31/L69）
+- [x] **不新建领域事件**——复用既有 `IsolationLevelSwitched`（`src/domain/events/isolation_events.py` L16-43；yaml L197-201 + channel_router L255-260 双登记已就绪，**零登记改动**，Task 0 仅复验）
+- [x] **既有事件纪律收紧（DC-6，契约变更登记）**：`agent_id: uuid.UUID = field(default_factory=uuid.uuid4)` → `field(kw_only=True)`；`previous_level`/`target_level` 去掉 `= IsolationLevel.L4_HARD` 默认值改 kw_only 必填；`trigger_reason: str = ""` → kw_only 必填（切换必须有原因——空串是无意义的切换事件）；`approval_chain: list[str]`（default_factory=list）与 `switch_timestamp`（default_factory now(UTC)）保留默认（MVP 用户请求无审批链）。依据：DomainEvent 基类字段全带默认值，子类无默认值的非 kw_only 字段跟在其后类定义即抛 TypeError（AgentProfileLoaded 先例注释——agent_events.py L87-88）。**收紧时保留既有 `__post_init__` 的 aggregate_id←agent_id 派生与 aggregate_type="Agent"（isolation_events.py L38-43——AC-4 aggregate 断言依赖此派生，重写类体时禁丢失——R1-F12）**
+- [x] **回归面清单（事件收紧全量同步，Task 1 循环 D）**：`tests/unit/domain/events/test_new_events.py` L79-108（TestIsolationLevelSwitched 构造/默认值断言形态同步）；`tests/unit/domain/events/test_event_serialization.py` L67-75/L145-146/L221-222（三处构造补必填参数）；`tests/acceptance/test_acceptance_domain_event_definition.py` L35/L150-279/L465-467（事件定义验收——构造形态同步）；`tests/unit/architecture/test_event_architecture.py` L129（导出断言——不受影响，复验）。src 侧零发布方、AutoTriggerHandler 引用是字符串（auto_trigger_handler.py L60-72）——零 src 回归
+- [x] `src/domain/events/__init__.py` 无需改动（已导出 L31/L69）
 
 #### 数据模型 (Data Models)
 
-- [ ] `DataIsolationMode(str, Enum)`（domain/value_objects/isolation_policy.py 内定义）：`READ_ONLY = "read_only"` / `RESTRICTED_WRITE = "restricted_write"` / `FREE_WRITE = "free_write"` / `FULL_SHARED = "full_shared"`（core-domain-design §17.3.3 L1204/1211/1217/1225 四值）
-- [ ] `IsolationPolicy` VO（frozen dataclass，同文件）：`level: IsolationLevel` / `name: str` / `prompt_isolation: bool` / `tool_isolation: bool` / `data_isolation: DataIsolationMode` / `is_default: bool = False`——`__post_init__` 校验（name 非空 strip / level 是 IsolationLevel 实例）
-- [ ] `ISOLATION_POLICIES: dict[IsolationLevel, IsolationPolicy]` 模块常量（四级逐行对齐 architecture.md §5.1：L4=硬隔离/True/True/READ_ONLY/is_default=True；L3=软隔离/True/False/RESTRICTED_WRITE；L2=协作态/True/False/FREE_WRITE；L1=融合态/False/False/FULL_SHARED）+ `get_isolation_policy(level) -> IsolationPolicy`（枚举键必命中；防御守卫：非 IsolationLevel 实例抛 `EntityValidationError` 242）
-- [ ] `MVP_ALLOWED_LEVELS: frozenset[IsolationLevel] = frozenset({L4_HARD, L3_SOFT, L2_COLLAB})`（L1 排除——SYS 监督/紧急态/强制审计设施均 V2）
-- [ ] `IsolationState` 实体（domain/entities/isolation_state.py，**非 frozen dataclass**——对齐 Agent 实体可变状态机形态，有切换生命周期）：`agent_id: uuid.UUID` / `current_level: IsolationLevel` / `initialized_at: datetime` / `updated_at: datetime` / `last_trigger_reason: str`；`__post_init__` 校验（agent_id 是 UUID / current_level 是 IsolationLevel 实例 / last_trigger_reason 非空 strip——失败抛 `EntityValidationError` 242）
-- [ ] `IsolationState.initialize(agent_id, level, *, now=None) -> IsolationState` 类方法工厂：等级守卫双条件（`not isinstance(level, IsolationLevel) or level not in MVP_ALLOWED_LEVELS` → 446——**R3-F01 实测定谳**：str,Enum 混入语义下 `hash("L3")==hash(L3_SOFT)`，合法值域裸 str 经 `in frozenset` 判定为 True，单 `not in` 守卫拦不住会放行为 242/类型污染——isinstance 先行是唯一可靠子类型防线，实测 Python 3.11.15）；`last_trigger_reason="initial_default"`；`initialized_at=updated_at=now or datetime.now(UTC)`（单 now 双用——初始化两时刻严格相等）
-- [ ] `IsolationState.switch_to(target_level, trigger_reason, *, now=None) -> bool` 实例方法：等级守卫同上（446 双条件——**switch_to 路径更关键**：dataclass 赋值不触发 `__post_init__`，裸 str 穿透单守卫后 `self.current_level = target_level` 即静默类型污染持久化，isinstance 先行封死）；`trigger_reason` 非空校验（空/空白 → `EntityValidationError` 242——原因缺失是实体不变量问题，与等级非法 446 语义区分）；`target_level == current_level` → 返回 `False`（no-op 零变更）；否则更新 `current_level`/`updated_at`/`last_trigger_reason` 返回 `True`（**领域行为内聚：等级合法性校验在实体**——DC-5）
-- [ ] `AgentConfig.default_isolation_level` 类型收紧：`str = "L4"` → `IsolationLevel = IsolationLevel.L4_HARD`（D6 isolation 项核销——SSOT 枚举绑定；`__post_init__` 增 `isinstance IsolationLevel` 守卫）
+- [x] `DataIsolationMode(str, Enum)`（domain/value_objects/isolation_policy.py 内定义）：`READ_ONLY = "read_only"` / `RESTRICTED_WRITE = "restricted_write"` / `FREE_WRITE = "free_write"` / `FULL_SHARED = "full_shared"`（core-domain-design §17.3.3 L1204/1211/1217/1225 四值）
+- [x] `IsolationPolicy` VO（frozen dataclass，同文件）：`level: IsolationLevel` / `name: str` / `prompt_isolation: bool` / `tool_isolation: bool` / `data_isolation: DataIsolationMode` / `is_default: bool = False`——`__post_init__` 校验（name 非空 strip / level 是 IsolationLevel 实例）
+- [x] `ISOLATION_POLICIES: dict[IsolationLevel, IsolationPolicy]` 模块常量（四级逐行对齐 architecture.md §5.1：L4=硬隔离/True/True/READ_ONLY/is_default=True；L3=软隔离/True/False/RESTRICTED_WRITE；L2=协作态/True/False/FREE_WRITE；L1=融合态/False/False/FULL_SHARED）+ `get_isolation_policy(level) -> IsolationPolicy`（枚举键必命中；防御守卫：非 IsolationLevel 实例抛 `EntityValidationError` 242）
+- [x] `MVP_ALLOWED_LEVELS: frozenset[IsolationLevel] = frozenset({L4_HARD, L3_SOFT, L2_COLLAB})`（L1 排除——SYS 监督/紧急态/强制审计设施均 V2）
+- [x] `IsolationState` 实体（domain/entities/isolation_state.py，**非 frozen dataclass**——对齐 Agent 实体可变状态机形态，有切换生命周期）：`agent_id: uuid.UUID` / `current_level: IsolationLevel` / `initialized_at: datetime` / `updated_at: datetime` / `last_trigger_reason: str`；`__post_init__` 校验（agent_id 是 UUID / current_level 是 IsolationLevel 实例 / last_trigger_reason 非空 strip——失败抛 `EntityValidationError` 242）
+- [x] `IsolationState.initialize(agent_id, level, *, now=None) -> IsolationState` 类方法工厂：等级守卫双条件（`not isinstance(level, IsolationLevel) or level not in MVP_ALLOWED_LEVELS` → 446——**R3-F01 实测定谳**：str,Enum 混入语义下 `hash("L3")==hash(L3_SOFT)`，合法值域裸 str 经 `in frozenset` 判定为 True，单 `not in` 守卫拦不住会放行为 242/类型污染——isinstance 先行是唯一可靠子类型防线，实测 Python 3.11.15）；`last_trigger_reason="initial_default"`；`initialized_at=updated_at=now or datetime.now(UTC)`（单 now 双用——初始化两时刻严格相等）
+- [x] `IsolationState.switch_to(target_level, trigger_reason, *, now=None) -> bool` 实例方法：等级守卫同上（446 双条件——**switch_to 路径更关键**：dataclass 赋值不触发 `__post_init__`，裸 str 穿透单守卫后 `self.current_level = target_level` 即静默类型污染持久化，isinstance 先行封死）；`trigger_reason` 非空校验（空/空白 → `EntityValidationError` 242——原因缺失是实体不变量问题，与等级非法 446 语义区分）；`target_level == current_level` → 返回 `False`（no-op 零变更）；否则更新 `current_level`/`updated_at`/`last_trigger_reason` 返回 `True`（**领域行为内聚：等级合法性校验在实体**——DC-5）
+- [x] `AgentConfig.default_isolation_level` 类型收紧：`str = "L4"` → `IsolationLevel = IsolationLevel.L4_HARD`（D6 isolation 项核销——SSOT 枚举绑定；`__post_init__` 增 `isinstance IsolationLevel` 守卫）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] `IsolationRepository`（`src/domain/ports/isolation_repository.py`，`@runtime_checkable Protocol`，docstring 注明键空间 `sisys:isolation:{agent_id}` 与异常契约——**R1 领域层基础端口**，AgentRepository/SessionStorage 同款先例）：
+- [x] `IsolationRepository`（`src/domain/ports/isolation_repository.py`，`@runtime_checkable Protocol`，docstring 注明键空间 `sisys:isolation:{agent_id}` 与异常契约——**R1 领域层基础端口**，AgentRepository/SessionStorage 同款先例）：
   - `async def save(self, state: IsolationState, ttl: int) -> None`（upsert 语义，TTL 必填——真源 `AgentConfig.state_ttl`；越界 60~2592000 抛 440）
   - `async def get_by_agent_id(self, agent_id: uuid.UUID) -> IsolationState | None`
   - `async def delete(self, agent_id: uuid.UUID) -> None`（幂等）
   - `async def exists(self, agent_id: uuid.UUID) -> bool`
-- [ ] `IsolationManagementServicePort`（`src/application/ports/isolation_management.py`，`@runtime_checkable Protocol`——**R2 应用层具体应用端口，组合注入 R1 仓储端口**）：
+- [x] `IsolationManagementServicePort`（`src/application/ports/isolation_management.py`，`@runtime_checkable Protocol`——**R2 应用层具体应用端口，组合注入 R1 仓储端口**）：
   - `async def initialize_agent_isolation(self, agent_id: UUID, default_level: IsolationLevel, ttl_seconds: int) -> IsolationState`（upsert——重复初始化覆盖；**前置条件 docstring 注明（R1-F32）**：调用方须保证 agent 已持久化——本方法无 443 前置守卫，MVP 唯一调用方 InstantiateAgentUseCase 刚 save 完 agent 满足前提；重复初始化覆盖回默认等级是安全方向设计意图——DC-3/R1-F33）
   - `async def get_isolation_state(self, agent_id: UUID) -> IsolationState`（**守卫序同 switch 前置**：Agent 不存在抛 443 → 隔离态缺失抛 447——隔离检查入口，AC-5.1 计时锚含两次真实 Redis 读）
   - `async def switch_isolation_level(self, agent_id: UUID, target_level: IsolationLevel, trigger_reason: str, approval_chain: Sequence[str] = ()) -> IsolationSwitchResult`
-- [ ] `IsolationSwitchResult` dataclass（端口文件内定义——多字段组合载体放端口文件先例）：`switched: bool` / `state: IsolationState` / `event: IsolationLevelSwitched | None`（no-op 时 event=None）
-- [ ] 端口注册中心/解析器/契约门禁纪律照旧（`src/domain/ports/registry.py` 体系）；组合根注册名与元数据：
+- [x] `IsolationSwitchResult` dataclass（端口文件内定义——多字段组合载体放端口文件先例）：`switched: bool` / `state: IsolationState` / `event: IsolationLevelSwitched | None`（no-op 时 event=None）
+- [x] 端口注册中心/解析器/契约门禁纪律照旧（`src/domain/ports/registry.py` 体系）；组合根注册名与元数据：
   - `isolation_repository`：v1.0.0 / `IsolationRepository` / `RedisIsolationRepository`（lambda 工厂注入 `resolver.resolve("redis_adapter")`）/ module=src.infrastructure.storage.redis.redis_isolation_repository / **SINGLETON**（DC-7——D7 评估落地：无状态仓储构造零 IO，被 SINGLETON 服务捕获无 captive 实害）/ owner=platform / tags=("redis", "agent", "isolation")
   - `isolation_management_service`：v1.0.0 / `IsolationManagementServicePort` / `IsolationManagementService`（lambda 注入 isolation_repository + agent_repository + event_publisher + **agent_config_loader**）/ module=src.application.services.isolation_management_service / SINGLETON / owner=platform / tags=("agent", "isolation")
-- [ ] **TTL 真源通道（R1-F01 定稿，不留 Task 3 临场决策）**：switch 重置 TTL 的取值链 = 复用 443 守卫已取的 agent → `(await agent_config_loader.load(agent.role)).state_ttl`——服务第四依赖注入同层应用端口 `AgentConfigLoader`（组合根注册名 `agent_config_loader`，`load(role) -> AgentConfig` 单方法——src/application/ports/agent_config_loader.py L23-30；InstantiateAgentUseCase 注入同款先例），零第二真源、零额外 Redis 读
-- [ ] **既有端口消费**：`agent_repository`（443 守卫与初始化前置校验）、`event_publisher`（切换事件发布）、`agent_config_loader`（switch 重置 TTL 真源）、`agent_instantiation_use_case`（**构造签名扩展**——第四依赖 `isolation_management_service`，组合根 lambda 同步；契约测试 impl 维度同步——契约变更登记）
-- [ ] 端口契约测试两份（`tests/contracts/test_port_contract_isolation_repository.py` / `test_port_contract_isolation_management_service.py`，11 维度 + DummyResolver——agent_repository 样板同款）
-- [ ] **禁止**在服务文件本地定义 Protocol / Port 抽象；**禁止**新建语义重复端口（Agent 存在性查询复用 agent_repository，事件发布复用 event_publisher）
+- [x] **TTL 真源通道（R1-F01 定稿，不留 Task 3 临场决策）**：switch 重置 TTL 的取值链 = 复用 443 守卫已取的 agent → `(await agent_config_loader.load(agent.role)).state_ttl`——服务第四依赖注入同层应用端口 `AgentConfigLoader`（组合根注册名 `agent_config_loader`，`load(role) -> AgentConfig` 单方法——src/application/ports/agent_config_loader.py L23-30；InstantiateAgentUseCase 注入同款先例），零第二真源、零额外 Redis 读
+- [x] **既有端口消费**：`agent_repository`（443 守卫与初始化前置校验）、`event_publisher`（切换事件发布）、`agent_config_loader`（switch 重置 TTL 真源）、`agent_instantiation_use_case`（**构造签名扩展**——第四依赖 `isolation_management_service`，组合根 lambda 同步；契约测试 impl 维度同步——契约变更登记）
+- [x] 端口契约测试两份（`tests/contracts/test_port_contract_isolation_repository.py` / `test_port_contract_isolation_management_service.py`，11 维度 + DummyResolver——agent_repository 样板同款）
+- [x] **禁止**在服务文件本地定义 Protocol / Port 抽象；**禁止**新建语义重复端口（Agent 存在性查询复用 agent_repository，事件发布复用 event_publisher）
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本 Story 端口清单唯一真源 = 本 Task 0 定义（`isolation_repository` + `isolation_management_service` 两新端口 + **一项既有端口消费方变更**：`agent_instantiation_use_case` 构造签名扩展注入隔离服务——契约变更登记，`tests/contracts/test_port_contract_agent_instantiation_use_case.py` impl 维度与组合根 lambda 同步）
-- [ ] 禁止新增未登记端口；禁止未同步 registry/resolver/contract test
-- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
+- [x] 本 Story 端口清单唯一真源 = 本 Task 0 定义（`isolation_repository` + `isolation_management_service` 两新端口 + **一项既有端口消费方变更**：`agent_instantiation_use_case` 构造签名扩展注入隔离服务——契约变更登记，`tests/contracts/test_port_contract_agent_instantiation_use_case.py` impl 维度与组合根 lambda 同步）
+- [x] 禁止新增未登记端口；禁止未同步 registry/resolver/contract test
+- [x] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
 
 > 原则/适用范围/禁止条款同模板基线（`sisys-uni-exception-design.md §3.12`）。本 Story 使用 agent 子域预留段 446-449（`_code_ranges.py` L122 注释显式预留「5.4-5.5 EIP 隔离」）；448-449 留给 5.5。设计决策见 DC-8。
 
-- [ ] `IsolationLevelNotSupportedError`（EXCEPTION_446，BusinessException）——隔离等级不合法（两种触发：CLI/调用方传入非法枚举值；合法枚举但不在 `MVP_ALLOWED_LEVELS`——即 L1 融合态）。构造器对齐 441 实际形态（R1-F45 校准：441 首参必填、supported 接受 tuple 或 list）：`(level: str, supported_levels: tuple[str, ...] | list[str] = (), message=None, cause=None)`——level 必填（441 `role: str` 同款无默认值），context 携带 `{level, supported_levels: list}`；HTTP 422（**对齐 441 精确注册 422 先例**——exception_handlers.py L269「MVP 未开放角色（精确注册，避免回退 400）」，「不支持的取值」族语义一致）。**CLI `_parse_isolation_level` 转换守卫的唯一出口**（禁裸 `IsolationLevel(value)`——Enum 原生 ValueError 逃逸，5-1 `_parse_role` 红线同款）
-- [ ] `IsolationStateNotInitializedError`（EXCEPTION_447，BusinessException）——隔离状态缺失，三种成因（R1-F09 + R3-F07 方向修正）：①**存量 Agent 无隔离键**（5.4 部署前实例化的 agent 被查询——注：「TTL 漂移致隔离键先过期」经写序推演不可构造，见风险 #6）；②未初始化查询；③**实例化 fail-fast 后键残留**（DC-3 残留态：agent 键存活 → 443 守卫通过 → 隔离键缺失 → 447——**服务级以同 id 重新 initialize 可自愈**（upsert 覆盖回 L4）；用例/CLI 通道每次 execute 生成新 uuid4、残留态在新 id 下不可达靠 TTL 自然回收（R3-F08）——运维见 447 时排查配置 L1 反复失败实例化，必要时服务级同 id 重初始化）。构造器：`(agent_id: str = "", message=None, cause=None)`，context 携带 `{agent_id}`；HTTP 404（对齐 443 NotFound 族语义）
-- [ ] 复用不新建：`AgentNotFoundError`（443——切换/查询前置 Agent 存在守卫）、`AgentConfigError`（440——仓储 TTL 越界 + YAML loader 非法等级字符串转换失败 + **AgentConfig D6 守卫回填**）、`EntityValidationError`（242——**新建非配置实体/VO 不变量**：IsolationPolicy/IsolationState——entities/agent.py L82-84 先例）、`StorageError`（103——Redis 连接异常包装，仓储层）
-- [ ] **242/440 分界原则（R1-F03）**：配置资产类 VO（AgentConfig——yaml 载入）校验失败固定 440（AgentConfigError 家族，HTTP 500 系统资源缺陷语义）；非配置实体/VO 不变量用 242。**非法等级字符串的口径分叉是设计意图**：CLI 交互输入非法串 → 446（422，运行时用户错误族）；yaml 部署配置非法串 → 440（500，部署资产缺陷族）——输入通道决定异常族，禁止「修平」；loader 只做字符串→枚举转换合法性（"L9"→440），**不做 MVP 白名单**（"L1" 合法枚举放行 → 实体 initialize 446 拒绝——AC-2 路径）
-- [ ] 强制 4 项 checklist：定义文件（agent_exceptions.py 追加）/ `_code_ranges.py` CODE_RANGES 注释预留改已分配 + `_CLASS_TO_SUBDOMAIN` 两映射 / `__init__.py` 暴露（import 块 agent 段 + `__all__`）/ `EXCEPTION_HTTP_MAP` 精确注册 446→422、447→404（防回退歧义）；`sisys-uni-exception-design.md` §3.3.2 编码分配表同步（446/447 两行，448-449 预留注记保留给 5.5）
-- [ ] 测试覆盖：`tests/unit/domain/exceptions/test_agent_exceptions.py` 追加（构造/context/to_dict/HTTP 映射 + 446 双触发路径参数化）+ `test_code_ranges.py` 子域校验自然覆盖（Rule 4 漏登记 `_CLASS_TO_SUBDOMAIN` 直接红）+ `test_exception_handlers.py` expected_types 同步
-- [ ] BDD 异常路径：446（非法等级/L1 拒绝）/447（状态缺失）/443（Agent 不存在）纳入 Edge Cases（AC-3/AC-4 场景）
+- [x] `IsolationLevelNotSupportedError`（EXCEPTION_446，BusinessException）——隔离等级不合法（两种触发：CLI/调用方传入非法枚举值；合法枚举但不在 `MVP_ALLOWED_LEVELS`——即 L1 融合态）。构造器对齐 441 实际形态（R1-F45 校准：441 首参必填、supported 接受 tuple 或 list）：`(level: str, supported_levels: tuple[str, ...] | list[str] = (), message=None, cause=None)`——level 必填（441 `role: str` 同款无默认值），context 携带 `{level, supported_levels: list}`；HTTP 422（**对齐 441 精确注册 422 先例**——exception_handlers.py L269「MVP 未开放角色（精确注册，避免回退 400）」，「不支持的取值」族语义一致）。**CLI `_parse_isolation_level` 转换守卫的唯一出口**（禁裸 `IsolationLevel(value)`——Enum 原生 ValueError 逃逸，5-1 `_parse_role` 红线同款）
+- [x] `IsolationStateNotInitializedError`（EXCEPTION_447，BusinessException）——隔离状态缺失，三种成因（R1-F09 + R3-F07 方向修正）：①**存量 Agent 无隔离键**（5.4 部署前实例化的 agent 被查询——注：「TTL 漂移致隔离键先过期」经写序推演不可构造，见风险 #6）；②未初始化查询；③**实例化 fail-fast 后键残留**（DC-3 残留态：agent 键存活 → 443 守卫通过 → 隔离键缺失 → 447——**服务级以同 id 重新 initialize 可自愈**（upsert 覆盖回 L4）；用例/CLI 通道每次 execute 生成新 uuid4、残留态在新 id 下不可达靠 TTL 自然回收（R3-F08）——运维见 447 时排查配置 L1 反复失败实例化，必要时服务级同 id 重初始化）。构造器：`(agent_id: str = "", message=None, cause=None)`，context 携带 `{agent_id}`；HTTP 404（对齐 443 NotFound 族语义）
+- [x] 复用不新建：`AgentNotFoundError`（443——切换/查询前置 Agent 存在守卫）、`AgentConfigError`（440——仓储 TTL 越界 + YAML loader 非法等级字符串转换失败 + **AgentConfig D6 守卫回填**）、`EntityValidationError`（242——**新建非配置实体/VO 不变量**：IsolationPolicy/IsolationState——entities/agent.py L82-84 先例）、`StorageError`（103——Redis 连接异常包装，仓储层）
+- [x] **242/440 分界原则（R1-F03）**：配置资产类 VO（AgentConfig——yaml 载入）校验失败固定 440（AgentConfigError 家族，HTTP 500 系统资源缺陷语义）；非配置实体/VO 不变量用 242。**非法等级字符串的口径分叉是设计意图**：CLI 交互输入非法串 → 446（422，运行时用户错误族）；yaml 部署配置非法串 → 440（500，部署资产缺陷族）——输入通道决定异常族，禁止「修平」；loader 只做字符串→枚举转换合法性（"L9"→440），**不做 MVP 白名单**（"L1" 合法枚举放行 → 实体 initialize 446 拒绝——AC-2 路径）
+- [x] 强制 4 项 checklist：定义文件（agent_exceptions.py 追加）/ `_code_ranges.py` CODE_RANGES 注释预留改已分配 + `_CLASS_TO_SUBDOMAIN` 两映射 / `__init__.py` 暴露（import 块 agent 段 + `__all__`）/ `EXCEPTION_HTTP_MAP` 精确注册 446→422、447→404（防回退歧义）；`sisys-uni-exception-design.md` §3.3.2 编码分配表同步（446/447 两行，448-449 预留注记保留给 5.5）
+- [x] 测试覆盖：`tests/unit/domain/exceptions/test_agent_exceptions.py` 追加（构造/context/to_dict/HTTP 映射 + 446 双触发路径参数化）+ `test_code_ranges.py` 子域校验自然覆盖（Rule 4 漏登记 `_CLASS_TO_SUBDOMAIN` 直接红）+ `test_exception_handlers.py` expected_types 同步
+- [x] BDD 异常路径：446（非法等级/L1 拒绝）/447（状态缺失）/443（Agent 不存在）纳入 Edge Cases（AC-3/AC-4 场景）
 
 #### API 契约 (API Contract)
 
-- [ ] 本 Story 无 REST API（CLI 入口；Agent 域 REST 规划位归 7-2）
-- [ ] CLI 契约：`sisys-agent isolation-status --agent-id <uuid>`（输出：等级/策略三维度/初始化与更新时间/最近触发原因；**时间输出钉 `isoformat()` 全格式（R3-F11）——stdout 断言以场景持有 state 字段的 `isoformat()` 值或 `^\d{4}-\d{2}-\d{2}T` 正则锚定，禁整行精确匹配（微秒位脆弱）**；exit 0；443/447/201 → exit 1）+ `sisys-agent set-isolation --agent-id <uuid> --level <L4|L3|L2> --reason "<文本>"`（输出：切换摘要或 no-op 提示；exit 0 含 no-op；443/446/447/201 → exit 1）。`--level` 不暴露 L1（`SUPPORTED_ISOLATION_LEVELS` 帮助文本只列 MVP 三级——但传入 L1 字符串仍走 446 路径而非 argparse choices 静默拒绝，保持统一异常出口）
-- [ ] `--approval-chain` 参数不暴露（MVP 用户直切无审批链，YAGNI——V1 SYS 命令通道立项时扩展）
+- [x] 本 Story 无 REST API（CLI 入口；Agent 域 REST 规划位归 7-2）
+- [x] CLI 契约：`sisys-agent isolation-status --agent-id <uuid>`（输出：等级/策略三维度/初始化与更新时间/最近触发原因；**时间输出钉 `isoformat()` 全格式（R3-F11）——stdout 断言以场景持有 state 字段的 `isoformat()` 值或 `^\d{4}-\d{2}-\d{2}T` 正则锚定，禁整行精确匹配（微秒位脆弱）**；exit 0；443/447/201 → exit 1）+ `sisys-agent set-isolation --agent-id <uuid> --level <L4|L3|L2> --reason "<文本>"`（输出：切换摘要或 no-op 提示；exit 0 含 no-op；443/446/447/201 → exit 1）。`--level` 不暴露 L1（`SUPPORTED_ISOLATION_LEVELS` 帮助文本只列 MVP 三级——但传入 L1 字符串仍走 446 路径而非 argparse choices 静默拒绝，保持统一异常出口）
+- [x] `--approval-chain` 参数不暴露（MVP 用户直切无审批链，YAGNI——V1 SYS 命令通道立项时扩展）
 
 #### 六边形架构约束（必须遵守）
 
 > 四层定义/零依赖原则/依赖方向矩阵同模板基线。本 Story 特别注意：
 
-- [ ] `IsolationPolicy`/`IsolationState`/`DataIsolationMode`/异常/`IsolationRepository` 端口全部 domain 层，仅标准库（dataclasses/enum/uuid/datetime）——`.importlinter` domain-no-external-dependencies 契约（禁 pydantic/redis 等）
-- [ ] `IsolationManagementService`（application）构造注入三个 domain 端口（isolation_repository/agent_repository[domain 端口]/event_publisher[domain 端口]）+ 一个同层应用端口 `AgentConfigLoader`（TTL 真源通道——R1-F01；InstantiateAgentUseCase 注入先例同款，application→application 同层合法）——application→domain 合法；**禁 import infrastructure**
-- [ ] `RedisIsolationRepository`（infrastructure）实现 domain 端口；CLI（entrypoints）resolve 应用端口——interfaces/entrypoints→application 合法
-- [ ] `InstantiateAgentUseCase`（application）注入 `IsolationManagementServicePort`（application 端口）——同层端口组合注入合法（R2）
-- [ ] 架构树偏离登记（D-2）：architecture.md L1749 规划 `domain/services/isolation_service.py`（EIP 隔离服务接口）——实际落位 `application/ports/isolation_management.py`：隔离管理需编排仓储读写与事件发布，属应用编排关注点非纯领域逻辑；纯策略表（`ISOLATION_POLICIES`）已留 domain（value_objects）
+- [x] `IsolationPolicy`/`IsolationState`/`DataIsolationMode`/异常/`IsolationRepository` 端口全部 domain 层，仅标准库（dataclasses/enum/uuid/datetime）——`.importlinter` domain-no-external-dependencies 契约（禁 pydantic/redis 等）
+- [x] `IsolationManagementService`（application）构造注入三个 domain 端口（isolation_repository/agent_repository[domain 端口]/event_publisher[domain 端口]）+ 一个同层应用端口 `AgentConfigLoader`（TTL 真源通道——R1-F01；InstantiateAgentUseCase 注入先例同款，application→application 同层合法）——application→domain 合法；**禁 import infrastructure**
+- [x] `RedisIsolationRepository`（infrastructure）实现 domain 端口；CLI（entrypoints）resolve 应用端口——interfaces/entrypoints→application 合法
+- [x] `InstantiateAgentUseCase`（application）注入 `IsolationManagementServicePort`（application 端口）——同层端口组合注入合法（R2）
+- [x] 架构树偏离登记（D-2）：architecture.md L1749 规划 `domain/services/isolation_service.py`（EIP 隔离服务接口）——实际落位 `application/ports/isolation_management.py`：隔离管理需编排仓储读写与事件发布，属应用编排关注点非纯领域逻辑；纯策略表（`ISOLATION_POLICIES`）已留 domain（value_objects）
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_agent_isolation.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_agent_isolation.py`
-- [ ] 场景组织：AC 注释横幅分组（PG 模板形态）+ 全场景逐一 @scenario 显式绑定（5-3 形态，**禁 scenarios() 批量绑定与 then-pass 占位**）；场景名带 AC 编号前缀（`AC-1.1 - <描述>`，ASCII 连字符两侧空格，feature 与 .py 逐字一致）
-- [ ] 覆盖：AC-1×2（四级策略表完备/默认 L4 与 MVP 等级集）+ AC-2×3（实例化即 L4 持久化/双键空间并存与 TTL/往返重建与初始化异常）+ AC-3×2（查询与策略联查/447 与 443 异常路径）+ AC-4×4（合法切换与事件/事件字段精确断言/no-op 幂等/446 双路径与 443）+ AC-5×3（P95/持久化成功率/并发 10）+ AC-6×3（组合根接线/CLI 全链/架构合规静态扫描）= **17 场景**（Task 8 追加收尾场景后全量 18——收尾场景按模板钦定归 Task 8）
-- [ ] BDD 步骤约束：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；本 Story **零 LLM 依赖**（隔离协议不触 LLM——分档表比 5-3 简化一档）；Redis 依赖场景前置「假如 Redis 缓存服务可用」门控步骤（ping 失败 `pytest.skip` 动态跳过，禁写死）；纯端口级场景（AC-1×2 策略表、架构扫描）脱离门控
-- [ ] **场景三属性分档表**（Task 0.6 定稿，docstring 落盘）：每场景「层级（端口级/服务级/CLI 级）+ Redis 依赖（真实/无）+ 事件断言（recording/无）」
-- [ ] 显式 `pytestmark = [pytest.mark.acceptance, pytest.mark.redis, ...]`（文件名不含 "redis" 关键词，conftest 自动 marker 不生效）+ 计时场景 `xdist_group("agent-isolation-perf")`
-- [ ] 延迟 import 纪律：本 Story 新模块一律步骤函数体内延迟 import（顶部 import 收集期炸文件，无法逐 Task 转绿）
-- [ ] teardown 逐键精确删除：context 记录 `_agent_ids`，删除 `build_key("agent", ...)` + `build_key("isolation", ...)` **双键** + `exists` 复核自产键删净（禁 delete_pattern/flush/全库 scan_iter——多 worker 共享 6380 实例）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_agent_isolation.feature`
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_agent_isolation.py`
+- [x] 场景组织：AC 注释横幅分组（PG 模板形态）+ 全场景逐一 @scenario 显式绑定（5-3 形态，**禁 scenarios() 批量绑定与 then-pass 占位**）；场景名带 AC 编号前缀（`AC-1.1 - <描述>`，ASCII 连字符两侧空格，feature 与 .py 逐字一致）
+- [x] 覆盖：AC-1×2（四级策略表完备/默认 L4 与 MVP 等级集）+ AC-2×3（实例化即 L4 持久化/双键空间并存与 TTL/往返重建与初始化异常）+ AC-3×2（查询与策略联查/447 与 443 异常路径）+ AC-4×4（合法切换与事件/事件字段精确断言/no-op 幂等/446 双路径与 443）+ AC-5×3（P95/持久化成功率/并发 10）+ AC-6×3（组合根接线/CLI 全链/架构合规静态扫描）= **17 场景**（Task 8 追加收尾场景后全量 18——收尾场景按模板钦定归 Task 8）
+- [x] BDD 步骤约束：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；本 Story **零 LLM 依赖**（隔离协议不触 LLM——分档表比 5-3 简化一档）；Redis 依赖场景前置「假如 Redis 缓存服务可用」门控步骤（ping 失败 `pytest.skip` 动态跳过，禁写死）；纯端口级场景（AC-1×2 策略表、架构扫描）脱离门控
+- [x] **场景三属性分档表**（Task 0.6 定稿，docstring 落盘）：每场景「层级（端口级/服务级/CLI 级）+ Redis 依赖（真实/无）+ 事件断言（recording/无）」
+- [x] 显式 `pytestmark = [pytest.mark.acceptance, pytest.mark.redis, ...]`（文件名不含 "redis" 关键词，conftest 自动 marker 不生效）+ 计时场景 `xdist_group("agent-isolation-perf")`
+- [x] 延迟 import 纪律：本 Story 新模块一律步骤函数体内延迟 import（顶部 import 收集期炸文件，无法逐 Task 转绿）
+- [x] teardown 逐键精确删除：context 记录 `_agent_ids`，删除 `build_key("agent", ...)` + `build_key("isolation", ...)` **双键** + `exists` 复核自产键删净（禁 delete_pattern/flush/全库 scan_iter——多 worker 共享 6380 实例）
 
 **Task 0 完成标志：**
 
-- [ ] 规范项全部定义；Gherkin 已编写且运行确认失败（红阶段验证——ModuleNotFoundError/断言红为合法红）
-- [ ] **链路接线断言清单**（Epic 4 行动项 7.1-1）：
+- [x] 规范项全部定义；Gherkin 已编写且运行确认失败（红阶段验证——ModuleNotFoundError/断言红为合法红）
+- [x] **链路接线断言清单**（Epic 4 行动项 7.1-1）：
   1. `isolation_repository`/`isolation_management_service` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec 元数据）
   2. `agent_instantiation_use_case` 组合根 lambda 注入 `isolation_management_service` 确认（**端到端锚：resolve 用例 → instantiate → Redis 隔离键真实出现**——lambda 漏注入则实例化链静默无隔离键，验收 AC-2.1 抓红）
   3. `IsolationLevelSwitched` 发布点代码位（`IsolationManagementService.switch_isolation_level` 内）+ 真实触发验证（switch → recording publisher 捕获断言六字段）+ 订阅方可达性注记（`AutoTriggerHandler._registered_event_types` 字符串清单已含——注册≠订阅；**消费方归属口径统一（R1-F39）**：5.6 切换日志是首个业务消费方，5.7 是事件订阅基建面——接线归消费方 Story 立项时决定，同 5-3 风险 #2 形态）
   4. yaml/DEFAULT_MAPPINGS 双登记复验（已就绪零改动——复验断言防漂移）
   5. CLI isolation-status/set-isolation 全链
-- [ ] **D7 评估落盘**（DC-7 决策表 + 核销登记——R1-F27 落点校准：D6/D7 留项登记于 5-1 story 留项台账 L1143/L1144（deferred-work.md 无此二条目），核销动作 = 5-1 台账勾选注记 + deferred-work.md 补登记索引行）；session_storage 再续期与工具熔断挂点评估登记（deferred-work 处置表）
+- [x] **D7 评估落盘**（DC-7 决策表 + 核销登记——R1-F27 落点校准：D6/D7 留项登记于 5-1 story 留项台账 L1143/L1144（deferred-work.md 无此二条目），核销动作 = 5-1 台账勾选注记 + deferred-work.md 补登记索引行）；session_storage 再续期与工具熔断挂点评估登记（deferred-work 处置表）
 
 ---
 
@@ -378,17 +378,17 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 **关联 AC:** 全部
 
-- [ ] Subtask 0.1: 定义数据模型规范——IsolationPolicy VO（六字段）+ DataIsolationMode 四值 + ISOLATION_POLICIES 四级表 + MVP_ALLOWED_LEVELS + IsolationState 实体（五字段 + initialize/switch_to 行为契约）字段表定稿（本文件「数据模型」节为唯一真源）
-- [ ] Subtask 0.2: 定义端口契约——IsolationRepository 四方法 + IsolationManagementServicePort 三方法 + IsolationSwitchResult + 组合根注册元数据（含 lifetime 决策 DC-7）
-- [ ] Subtask 0.3: 定义异常契约——446/447（code/parent/context/触发场景表 + HTTP 映射 422/404——R1-F08 勘误：原「400/404」笔误，权威口径 446→422 对齐 441 先例）
-- [ ] Subtask 0.4: 定义事件纪律收紧契约——IsolationLevelSwitched kw_only 必填形态 + 回归面四文件清单
-- [ ] Subtask 0.5: 定义 CLI 契约——isolation-status/set-isolation 参数与退出码表 + `_parse_isolation_level` 两道守卫
-- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_isolation.feature`（17 场景——收尾场景按模板归 Task 8 追加）+ BDD 步骤实现骨架 `test_acceptance_agent_isolation.py`（@scenario 全显式绑定 + context dict fixture + 双键清理）+ **17 场景三属性分档表**定稿（docstring）
-- [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
-- [ ] Subtask 0.8: D7 评估落盘（DC-7 决策 + isolation_repository SINGLETON 依据）+ 留项核销交叉登记四项（D7 核销/D6 核销预告/session_storage 再续期/工具熔断挂点评估结论——R1-F27：D6/D7 核销落点 = 5-1 story 台账 L1143/L1144 勾选注记 + deferred-work.md 补索引；session_storage/工具熔断落点 = deferred-work.md 原条目更新）
+- [x] Subtask 0.1: 定义数据模型规范——IsolationPolicy VO（六字段）+ DataIsolationMode 四值 + ISOLATION_POLICIES 四级表 + MVP_ALLOWED_LEVELS + IsolationState 实体（五字段 + initialize/switch_to 行为契约）字段表定稿（本文件「数据模型」节为唯一真源）
+- [x] Subtask 0.2: 定义端口契约——IsolationRepository 四方法 + IsolationManagementServicePort 三方法 + IsolationSwitchResult + 组合根注册元数据（含 lifetime 决策 DC-7）
+- [x] Subtask 0.3: 定义异常契约——446/447（code/parent/context/触发场景表 + HTTP 映射 422/404——R1-F08 勘误：原「400/404」笔误，权威口径 446→422 对齐 441 先例）
+- [x] Subtask 0.4: 定义事件纪律收紧契约——IsolationLevelSwitched kw_only 必填形态 + 回归面四文件清单
+- [x] Subtask 0.5: 定义 CLI 契约——isolation-status/set-isolation 参数与退出码表 + `_parse_isolation_level` 两道守卫
+- [x] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_isolation.feature`（17 场景——收尾场景按模板归 Task 8 追加）+ BDD 步骤实现骨架 `test_acceptance_agent_isolation.py`（@scenario 全显式绑定 + context dict fixture + 双键清理）+ **17 场景三属性分档表**定稿（docstring）
+- [x] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
+- [x] Subtask 0.8: D7 评估落盘（DC-7 决策 + isolation_repository SINGLETON 依据）+ 留项核销交叉登记四项（D7 核销/D6 核销预告/session_storage 再续期/工具熔断挂点评估结论——R1-F27：D6/D7 核销落点 = 5-1 story 台账 L1143/L1144 勾选注记 + deferred-work.md 补索引；session_storage/工具熔断落点 = deferred-work.md 原条目更新）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义；验收测试红阶段确认；链路接线断言清单 L1-L5 定义
+- [x] 规范项全部定义；验收测试红阶段确认；链路接线断言清单 L1-L5 定义
 
 ---
 
@@ -441,8 +441,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | 枚举守卫删除 → 裸 str 构造用例红 → 还原；loader 转换守卫删除 → "L9" 用例红（ValueError 逃逸）→ 还原 |
 | 🔄 重构 | 既有用例同步（"L4" 值经 loader 转换后 AgentConfig.default_isolation_level==L4_HARD；既有 loader 测试全绿——空串回落用例是既有语义锁定）全绿 |
 
-- [ ] Subtask 1.1-1.5: 五循环各红绿变异重构
-- [ ] Subtask 1.6: 领域层覆盖率 ≥90% 维持确认
+- [x] Subtask 1.1-1.5: 五循环各红绿变异重构
+- [x] Subtask 1.6: 领域层覆盖率 ≥90% 维持确认
 
 **完成标准/Definition of Done:** 协议模型/实体/事件/异常/配置全绿；domain 覆盖率 ≥90%；D6 残余全核销
 
@@ -470,7 +470,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | impl 路径突变 → resolve 失败红 → 还原；lifetime 突变 SCOPED → 契约维度红 → 还原 |
 | 🔄 重构 | 契约 11 项绿 |
 
-- [ ] Subtask 2.1-2.2: 两循环红绿变异重构
+- [x] Subtask 2.1-2.2: 两循环红绿变异重构
 
 **完成标准/Definition of Done:** 仓储 fakeredis 全绿 + 契约绿；infrastructure 覆盖率 ≥75% 维持
 
@@ -498,7 +498,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | 注册名突变 → resolve 红 → 还原 |
 | 🔄 重构 | 契约绿 |
 
-- [ ] Subtask 3.1-3.2: 两循环红绿变异重构
+- [x] Subtask 3.1-3.2: 两循环红绿变异重构
 
 **完成标准/Definition of Done:** 服务三方法全绿（守卫序/no-op/事件/容错四类断言活）；契约绿；application 覆盖率 ≥85%
 
@@ -526,8 +526,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | lambda 漏注入 isolation 依赖 → resolve 构造失败红 → 还原 |
 | 🔄 重构 | **回归面清单全量跑**（适配器契约变更回归规则——R1-F05 补全：`InstantiateAgentUseCase(` 全仓 8 处构造点 + 3 处联动测试——R2-回归-5 计数勘误：7 手动构造 + 组合根 lambda，契约测试经 spec.impl 反射构造不入 grep 面）。**手动构造点 7 处（第四依赖必填，全部需同步补依赖）**：①单测 `tests/unit/application/use_cases/test_agent_instantiation.py:121`（_make_use_case 工厂）；②验收 `test_acceptance_agent_instantiation.py:214`；③验收 `test_acceptance_agent_profile_loading.py:228`；④验收 `test_acceptance_agent_workflow.py:564`（5-3 AC-6.3 场景手动组装）；⑤集成 `test_integration_agent_workflow.py:227`（`_instantiate_agent` helper——**手动组装非 resolve 链**，场景①②③⑤共用）；⑥集成 `test_integration_agent_profile_loading.py:64`（assembled fixture）；⑦集成 `test_integration_agent_instantiation.py:68`。**联动测试 3 处**：test_agent_cli（instantiate 部分）/test_port_contract_agent_instantiation_use_case（_DummyResolver 按名提供依赖分支 L27-51 同步）/test_yaml_agent_config_loader/test_agent_config。**第四依赖分派（R2-回归-2 + R2-组合-1 + R3-F04 定稿）**：既有**三验收文件（②③④）回归同步用真实 `IsolationManagementService` 手动组装**（isolation_repository/agent_repository 场景级客户端 + `_RecordingEventPublisher` + agent_config_loader 经 resolve——5-1 验收 L214 全真实组装先例同款；**CLAUDE.md「验收禁 mock」硬约束**——R2-F02 原分派的验收侧 AsyncMock 违反该约束，R3-F04 改判；实例化步骤是场景 Given 前置非断言面，真实组装成本仅 4 行依赖装配）；**三集成文件（⑤⑥⑦）维持 `AsyncMock(spec=IsolationManagementServicePort)`**（集成 Mock 工厂子模式合规——验收与集成分界清晰）；本 Story 新验收场景（AC-2.1/AC-4×4/AC-6.2）与集成场景①同样用**真实 IsolationManagementService 完整四依赖手动组装**（隔离键必须真实写入——其四依赖：isolation_repository/agent_repository 场景级客户端、event_publisher=_RecordingEventPublisher、agent_config_loader 经 resolve("agent_config_loader") 取——无状态零连接 resolve 安全，5-3 集成 `_instantiate_agent` L227 同款） |
 
-- [ ] Subtask 4.1-4.2: 两循环红绿变异重构
-- [ ] Subtask 4.3: 回归面清单全绿确认
+- [x] Subtask 4.1-4.2: 两循环红绿变异重构
+- [x] Subtask 4.3: 回归面清单全绿确认
 
 **完成标准/Definition of Done:** 注入链完整；回归面全绿；隔离初始化端到端可达
 
@@ -546,9 +546,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | 删第一道 except 分支 → "L9" 非法字符串用例红（ValueError 逃逸被断言捕获——5-1 Task 5 变异同款）→ 还原；删第二道预检 → `--level L1` 用例红 → 还原 |
 | 🔄 重构 | ruff + mypy |
 
-- [ ] Subtask 5.1: 🔴 红 — CLI 测试
-- [ ] Subtask 5.2: 🟢 绿 — 子命令实现
-- [ ] Subtask 5.3: 🟡 变异 + 🔄 重构
+- [x] Subtask 5.1: 🔴 红 — CLI 测试
+- [x] Subtask 5.2: 🟢 绿 — 子命令实现
+- [x] Subtask 5.3: 🟡 变异 + 🔄 重构
 
 **完成标准/Definition of Done:** CLI 全退出码路径绿
 
@@ -567,9 +567,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟡 变异 | P95 阈值突变（0.1→0.0001）→ 红 → 还原；并发断言弱化为聚合无个体 → 串扰用例红设计验算（构造两 agent 切不同等级断言互不影响——仓储键隔离的判别力实证）→ 还原 |
 | 🔄 重构 | xdist_group + benchmark 场景级标记收敛 |
 
-- [ ] Subtask 6.1: 🔴 红 — 五场景编写（含场景⑤真实发布链路）
-- [ ] Subtask 6.2: 🟢 绿 — 转绿 + 计时校准
-- [ ] Subtask 6.3: 🟡 变异 + 🔄 重构（双键清理纪律 + Redis 门控封装）
+- [x] Subtask 6.1: 🔴 红 — 五场景编写（含场景⑤真实发布链路）
+- [x] Subtask 6.2: 🟢 绿 — 转绿 + 计时校准
+- [x] Subtask 6.3: 🟡 变异 + 🔄 重构（双键清理纪律 + Redis 门控封装）
 
 **完成标准/Definition of Done:** 集成 5 场景绿（PG 缺席时 4 绿 + 1 skip）；性能三指标断言活
 
@@ -581,12 +581,12 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 
 #### 架构验证测试实现（验证器 A-D）
 
-- [ ] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_isolation.py`
-- [ ] Subtask 7.2: 验证器 A——domain 零外部依赖（isolation_policy.py/isolation_state.py/isolation_events.py/agent_exceptions.py/isolation_repository.py AST 扫描禁 pydantic/redis/langgraph import）
-- [ ] Subtask 7.3: 验证器 B——组合根外零实例化（RedisIsolationRepository/IsolationManagementService 全仓 AST 扫描禁业务代码直接实例化；tests 白名单前缀）
-- [ ] Subtask 7.4: 验证器 C——端口方向（application 服务与 use_cases import 白名单：domain.ports/domain.entities/domain.value_objects/domain.events/**application.ports**（R1-F19 补——IsolationManagementService 实现 application 端口、InstantiateAgentUseCase 注入它均必然 import src.application.ports，白名单缺它则合法代码被误判红）合法 / src.infrastructure 非法；CLI entrypoints→application 合法）
-- [ ] Subtask 7.5: 验证器 D——lifetime 决策落地（两行式收窄——R1-F29：`spec = _global_registry.get("isolation_repository")` → `assert spec is not None` → `assert spec.lifetime == Lifetime.SINGLETON`——registry.get 返回 `PortSpec | None`，一行式链式取属性会被 pre-commit mypy（覆盖 tests/）打 None 访问红；test_arch_data_source.py L159 先例形态；DC-7 D7 核销的架构锚，防回退 SCOPED 无声复发）
-- [ ] Subtask 7.6: 循环依赖检测用 ruff/isort（不引入 pylint）+ 全套报告
+- [x] Subtask 7.1: 创建 `tests/unit/architecture/test_arch_agent_isolation.py`
+- [x] Subtask 7.2: 验证器 A——domain 零外部依赖（isolation_policy.py/isolation_state.py/isolation_events.py/agent_exceptions.py/isolation_repository.py AST 扫描禁 pydantic/redis/langgraph import）
+- [x] Subtask 7.3: 验证器 B——组合根外零实例化（RedisIsolationRepository/IsolationManagementService 全仓 AST 扫描禁业务代码直接实例化；tests 白名单前缀）
+- [x] Subtask 7.4: 验证器 C——端口方向（application 服务与 use_cases import 白名单：domain.ports/domain.entities/domain.value_objects/domain.events/**application.ports**（R1-F19 补——IsolationManagementService 实现 application 端口、InstantiateAgentUseCase 注入它均必然 import src.application.ports，白名单缺它则合法代码被误判红）合法 / src.infrastructure 非法；CLI entrypoints→application 合法）
+- [x] Subtask 7.5: 验证器 D——lifetime 决策落地（两行式收窄——R1-F29：`spec = _global_registry.get("isolation_repository")` → `assert spec is not None` → `assert spec.lifetime == Lifetime.SINGLETON`——registry.get 返回 `PortSpec | None`，一行式链式取属性会被 pre-commit mypy（覆盖 tests/）打 None 访问红；test_arch_data_source.py L159 先例形态；DC-7 D7 核销的架构锚，防回退 SCOPED 无声复发）
+- [x] Subtask 7.6: 循环依赖检测用 ruff/isort（不引入 pylint）+ 全套报告
 
 **完成标准/Definition of Done:** 验证器 A-D 全绿；违规即红
 
@@ -602,12 +602,12 @@ Epic 5「单 Agent 战略规划能力」价值组的安全基座环：5-1/5-2/5-
 | 🟢 绿 | BDD 步骤实现（文件存在性 + 关键符号 grep 断言——5-2/5-3 AC-6.3 同款） |
 | 🔄 重构 | 场景命名收敛 |
 
-- [ ] Subtask 8.1: 收尾场景红绿
-- [ ] Subtask 8.2: 全量回归（`pytest tests/ -n 8` + 连续 5 次稳定）+ ruff/mypy 收尾校验 + 三条红线自查
-- [ ] Subtask 8.3: 文档同步（architecture.md §5 EIP 实现状态注记 + §13 目录树 isolation_* 落位注记 + sisys-uni-exception-design.md §3.3.2 已随 Task 1 同步复验）+ 留项终态更新（D6/D7 核销 = 5-1 story 台账 L1143/L1144 勾选注记 + deferred-work.md 补索引行；session_storage 续期/工具熔断评估结论 = deferred-work.md 原条目更新）
+- [x] Subtask 8.1: 收尾场景红绿
+- [x] Subtask 8.2: 全量回归（`pytest tests/ -n 8` + 连续 5 次稳定）+ ruff/mypy 收尾校验 + 三条红线自查
+- [x] Subtask 8.3: 文档同步（architecture.md §5 EIP 实现状态注记 + §13 目录树 isolation_* 落位注记 + sisys-uni-exception-design.md §3.3.2 已随 Task 1 同步复验）+ 留项终态更新（D6/D7 核销 = 5-1 story 台账 L1143/L1144 勾选注记 + deferred-work.md 补索引行；session_storage 续期/工具熔断评估结论 = deferred-work.md 原条目更新）
 
 **完成标准/Definition of Done:**
-- [ ] 全量 18 场景（17 + 收尾 1）全绿；Story 可进入 review
+- [x] 全量 18 场景（17 + 收尾 1）全绿；Story 可进入 review
 
 ---
 
@@ -888,22 +888,86 @@ tests/
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 
+**dev-story 实施完成清单（2026-10-22）:**
+
+- [x] Task 0: SDD 规范复验 + Gherkin 17 场景 + BDD 骨架（红确认）+ D7 评估落盘 + 留项核销四项（5-1 台账 D6/D7 勾选 + deferred-work 索引行/session_storage 再续期/工具熔断挂点不成立结论）
+- [x] Task 1: 五循环 A-E 全红绿变异重构（执行序调换 C→B——实体 import 446 硬依赖，每循环仍完整 TDD）：
+  IsolationPolicy VO（97% 覆盖）/ IsolationState 实体（100%——`_mvp_allowed_levels()`
+  方法内延迟 import 打破 entities→value_objects→events→entities 包初始化环）/
+  异常 446/447 四件套（含 EXCEPTION_HTTP_MAP 422/404 + expected_types 双锁 + 设计文档 §3.3.2）/
+  IsolationLevelSwitched kw_only 收紧（回归面四文件全绿）/ AgentConfig D6 全量回填
+  （枚举化 + 标量 isinstance 守卫统一 440 + loader str→enum 转换守卫——空白串/回落语义原样保留钉子锁定）
+- [x] Task 2: RedisIsolationRepository（15 用例 fakeredis——TTL/键空间/往返/StorageError cause 构造传递）+ 契约 11 维度 + 组合根 SINGLETON 注册
+- [x] Task 3: IsolationManagementService（17 用例——守卫序 calls 断言/no-op 零副作用/TTL 真源 config.state_ttl/事件六字段/publish 双分支容错）+ 契约 11 维度 + 组合根四依赖注册
+- [x] Task 4: InstantiateAgentUseCase 第四依赖 + fail-fast 编排骨位（save→iso.init→publish）+ 组合根 lambda + 回归面 8 处构造点全量同步（三验收真实组装 + 三集成 AsyncMock + 契约 DummyResolver + 存量 teardown 双键化）+ resolve 冒烟
+- [x] Task 5: CLI isolation-status/set-isolation + _parse_isolation_level 两道守卫（62 用例全退出码路径）+ SUPPORTED_ISOLATION_LEVELS 双锁
+- [x] Task 6: 集成 5 场景（全链/P95 0.1s 同源常量/成功率 20/20/并发 10 互异/PG outbox 真实落行——_PERF_CACHE 委托 helper + 双键登记清理）
+- [x] Task 7: 架构验证器 A-D（15 断言——含 isolation_state 延迟 import 实现锚与 lambda 注入静态锚；pydantic 注入变异实证红）
+- [x] Task 8: 收尾场景（18/18 全绿）+ 全量回归 + ruff/mypy 零告警 + 三条红线自查（本次变更零违规——存量 4 处命中均为非本 Story 文件）+ 文档同步（architecture.md §5 MVP 状态注记[DC-1/D-3] + §13 目录树 D-2 落位注记 + isolation_repository 新行）
+- [x] R6 改造（用户裁定 2026-10-22）: 验收测试组织结构对齐 PG 模板（多行 @scenario 字面量路径 + 场景绑定与步骤交替排列），保留真实断言/AC 前缀/步骤化门控（弃 FEATURE 常量形态）
+- [x] 实施期新发现修复: BDD 参数化步骤须显式 `parsers.parse`（pytest-bdd 默认 re parser——{level} 为字面量，对齐 data_source_expansion 先例）
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-4-eip-basic-elastic-isolation.md`（本文件）
 
-**待创建的文件/To Be Created (Dev Story 实施):**
+**dev-story 实施交付（2026-10-22）:**
 
-src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8」与实际列举不符）：
-- `src/domain/entities/isolation_state.py` - IsolationState 聚合
-- `src/domain/value_objects/isolation_policy.py` - 策略表 VO + 常量
-- `src/domain/ports/isolation_repository.py` - 仓储端口
-- `src/application/ports/isolation_management.py` - 管理服务端口 + 结果 DTO
-- `src/application/services/isolation_management_service.py` - 管理服务实现
-- `src/infrastructure/storage/redis/redis_isolation_repository.py` - Redis 仓储
-- tests 新建 10（unit 5 + contracts 2 + 集成 1 + 验收 feature/.py 2——见测试分类表；追加/同步 8 文件另计）
-- 修改：agent_config.py / isolation_events.py / agent_exceptions.py / _code_ranges.py / exceptions __init__.py / agent_instantiation.py / yaml_agent_config_loader.py / exception_handlers.py / agent_cli.py / composition_root.py
+src 新建 6:
+- `src/domain/entities/isolation_state.py` - IsolationState 聚合（initialize/switch_to 双条件守卫 + 延迟 import 环破解）
+- `src/domain/value_objects/isolation_policy.py` - IsolationPolicy VO + DataIsolationMode + ISOLATION_POLICIES + MVP_ALLOWED_LEVELS + get_isolation_policy
+- `src/domain/ports/isolation_repository.py` - IsolationRepository Protocol（四方法）
+- `src/application/ports/isolation_management.py` - IsolationManagementServicePort + IsolationSwitchResult
+- `src/application/services/isolation_management_service.py` - 三方法实现（守卫序/no-op/TTL 真源/发布容错）
+- `src/infrastructure/storage/redis/redis_isolation_repository.py` - Redis 仓储（namespace=isolation，MULTI/EXEC pipeline）
+
+src 修改 10:
+- `src/domain/value_objects/agent_config.py` - D6 回填（default_isolation_level 枚举化 + 标量 isinstance 守卫）
+- `src/domain/events/isolation_events.py` - IsolationLevelSwitched kw_only 收紧（DC-6）
+- `src/domain/exceptions/agent_exceptions.py` - 446/447 两异常
+- `src/domain/exceptions/_code_ranges.py` - 预留段改已分配 + 双映射
+- `src/domain/exceptions/__init__.py` - 446/447 导出
+- `src/domain/entities/__init__.py` - IsolationState 导出
+- `src/domain/value_objects/__init__.py` - isolation_policy 五符号导出
+- `src/application/use_cases/agent_instantiation.py` - 第四依赖 + fail-fast 编排骨位
+- `src/infrastructure/agent_orch/yaml_agent_config_loader.py` - str→IsolationLevel 转换守卫
+- `src/interfaces/api/exception_handlers.py` - 446→422/447→404 精确注册
+- `src/entrypoints/agent_cli.py` - isolation-status/set-isolation 两子命令 + _parse_isolation_level + SUPPORTED_ISOLATION_LEVELS
+- `src/composition_root.py` - 两端口注册 + 用例 lambda 四依赖
+
+tests 新建 10:
+- `tests/unit/domain/value_objects/test_isolation_policy.py`（24 用例）
+- `tests/unit/domain/entities/test_isolation_state.py`（24 用例）
+- `tests/unit/infrastructure/storage/redis/test_redis_isolation_repository.py`（15 用例）
+- `tests/unit/application/services/test_isolation_management_service.py`（17 用例）
+- `tests/unit/architecture/test_arch_agent_isolation.py`（15 断言——验证器 A-D）
+- `tests/contracts/test_port_contract_isolation_repository.py`（11 维度）
+- `tests/contracts/test_port_contract_isolation_management_service.py`（11 维度）
+- `tests/integration/test_integration_agent_isolation.py`（5 场景 + sample_isolation_perf/_PERF_CACHE/ISOLATION_P95_LIMIT_SECONDS 委托面）
+- `tests/acceptance/test_acceptance_agent_isolation.feature`（18 场景）
+- `tests/acceptance/test_acceptance_agent_isolation.py`（18 场景 PG 模板形态）
+
+tests 修改 12:
+- `tests/unit/application/use_cases/test_agent_instantiation.py` - 工厂四依赖 + iso.init 编排断言 + 第四依赖测试组
+- `tests/unit/domain/events/test_new_events.py` - TestIsolationLevelSwitched kw_only 改写
+- `tests/unit/domain/events/test_event_serialization.py` - 三处构造补参
+- `tests/unit/domain/exceptions/test_agent_exceptions.py` - 446/447 测试段
+- `tests/unit/domain/value_objects/test_agent_config.py` - D6 回填测试组
+- `tests/unit/infrastructure/agent_orch/test_yaml_agent_config_loader.py` - 转换守卫测试组
+- `tests/unit/interfaces/api/test_exception_handlers.py` - expected_types 双锁同步
+- `tests/unit/interfaces/cli/test_agent_cli.py` - 两子命令测试组
+- `tests/acceptance/test_acceptance_agent_instantiation.py` - 第四依赖真实组装 + teardown 双键化
+- `tests/acceptance/test_acceptance_agent_profile_loading.py` - 同上
+- `tests/acceptance/test_acceptance_agent_workflow.py` - 同上
+- `tests/contracts/test_port_contract_agent_instantiation_use_case.py` - DummyResolver 四依赖分支
+- `tests/integration/test_integration_agent_workflow.py` / `test_integration_agent_profile_loading.py` / `test_integration_agent_instantiation.py` - AsyncMock 第四依赖（集成 Mock 工厂子模式）
+
+文档 3:
+- `docs/architecture/architecture.md` - §5 MVP 实现状态注记 + §13 目录树 D-2 落位注记 + isolation_repository 新行
+- `docs/architecture/sisys-uni-exception-design.md` - §3.3.2 446/447 两行 + 448-449 预留改 5.5
+- `_bmad-output/implementation-artifacts/deferred-work.md` - D6/D7 索引行 + session_storage 再续期 + 工具熔断评估结论
+- `_bmad-output/implementation-artifacts/stories/5-1-ceo-agent-instantiation-mvp.md` - D6/D7 台账勾选核销注记
 
 ---
 
@@ -1078,7 +1142,7 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（从 Task 0 开始）
+- [x] 运行 `dev-story` 开始实施（从 Task 0 开始）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
@@ -1093,6 +1157,7 @@ src（新建 6 + 修改 10——R1-F26 计数勘误：原「新建 8 + 修改 8�
 | 2026-10-21 | v1.2.0 | 文档审查周期 Round 2（回归核查 + 组合交互面双审查）：P2×5 + P3×12 修复 17 表行。核心：R2-F02 第四依赖分派定稿（既有六文件 AsyncMock 回归同步 / 新验收场景真实四依赖组装——L214 引证失实校正）；R2-F01 DC-12 旧口径残留收口；R2-F04 AC-2 输入通道分层收口（"L9"→440 归单测面）；R2-F05 is_success=False 独立用例补红阶段；R2-F10 计时 helper 交付形态落 Task 6；.lower() 照抄警示；计数与归属勘误五项；R1 修复自引入破口清偿（表格转义/9→8 计数/先例归属） |
 | 2026-10-21 | v1.3.0 | 文档审查周期 Round 3（单深度推演：17+1 场景三轴 + 5 时间线 + 数学完备性——含 Python 3.11.15 实测）：P1×1 + P2×3 + P3×6 修复 10 项 + 误报改判 1 项。核心：R3-F01 守卫双条件化（str,Enum 混入语义实测：合法值域裸 str "L3" in frozenset == True 穿透单守卫——isinstance 先行是唯一防线，switch_to 路径防静默类型污染）；R3-F02/F03 446 验收驱动细化（完整 yaml 基线 + config_dir 注入 + 服务级直调零残键）；R3-F04 验收侧分派改真实组装（CLAUDE.md 验收禁 mock 硬约束）；R3-F07 447 成因①方向修正（TTL 漂移不可构造）；R3-F06 并发竞态风险 #7 登记；R3-F09 双清归称终校准；R3-F10 误报留痕（L269/L271 三次定谳维持） |
 | 2026-10-21 | v1.3.1 | 文档审查周期 R4 纯验证 + R5 独立终审判收敛：R4 零规范级修复（96 锚点 98.9% 精确/红线零违规/交叉计数全过——5 项台账级 P3/P4 留项）；R5 五节取证全过（周期闭合/六项关键修复双向一致/五高风险锚全中/红线零命中/R4 留项清偿行号复核无误）——零 P0/P1/P2 残留，**收敛声明入 Story，进入 dev-story 实施**；R4 五项留项随本收敛提交清偿 |
+| 2026-10-22 | v2.0.0 | **dev-story 实施完成（Task 0-8 全勾选）**: src 新建 6 + 修改 12、tests 新建 10 + 修改 15、文档 4；验收 18/18 场景全绿（含 Task 8 收尾）、集成 5/5 绿、契约 24 断言绿、架构验证器 A-D 15 断言绿；每 Task 完整红绿变异循环（变异实证 13 项全部先红后还原）；D6/D7 留项核销落盘（5-1 台账勾选 + deferred-work 索引）；R6 改造——验收测试组织结构对齐 PG 模板（用户裁定）；实施期两发现: BDD 参数化步骤须 parsers.parse 显式声明 / isolation_state 对 isolation_policy 依赖经方法内延迟 import 打破包初始化环 |
 
 ---
 

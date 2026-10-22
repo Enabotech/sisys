@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-21
+last_updated: 2026-10-22
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -159,7 +159,7 @@ development_status:
   5-1-ceo-agent-instantiation-mvp: done
   5-2-agent-identity-profile-loading: done
   5-3-single-agent-workflow: done
-  5-4-eip-basic-elastic-isolation: ready-for-dev
+  5-4-eip-basic-elastic-isolation: review
   5-5-agent-triple-hard-isolation: backlog
   5-6-isolation-switching-log: backlog
   5-7-phoenix-evaluation-harness: backlog

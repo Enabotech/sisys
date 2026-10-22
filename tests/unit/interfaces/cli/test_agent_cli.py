@@ -607,3 +607,326 @@ class TestRunTaskExecution:
         # conftest 已 bootstrap——本调用应被幂等守卫短路（count 不增）
         agent_cli._ensure_bootstrapped()
         assert bootstrap_calls["count"] == 0, "幂等守卫未生效（二次 bootstrap 必抛 ConflictError）"
+
+
+# ===================================================================
+# Story 5-4: isolation-status / set-isolation 子命令
+# ===================================================================
+
+
+class _StubIsolationState:
+    """isolation-status 摘要输出所需状态属性面。"""
+
+    def __init__(self, level: str = "L4", reason: str = "initial_default") -> None:
+        from datetime import UTC, datetime
+
+        from src.domain.events.enums import IsolationLevel
+
+        self.agent_id = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        self.current_level = IsolationLevel(level)  # 真实链路形态（枚举实例）
+        self.initialized_at = datetime(2026, 10, 22, 8, 0, 0, tzinfo=UTC)
+        self.updated_at = self.initialized_at
+        self.last_trigger_reason = reason
+
+
+class _StubSwitchedEvent:
+    """切换事件属性面（previous_level 枚举形态——对齐真实 IsolationLevelSwitched）。"""
+
+    def __init__(self, previous: str) -> None:
+        from src.domain.events.enums import IsolationLevel
+
+        self.previous_level = IsolationLevel(previous)
+
+
+class _StubSwitchResult:
+    """set-isolation 摘要输出所需结果属性面。"""
+
+    def __init__(self, switched: bool, previous: str, target: str, reason: str) -> None:
+        self.switched = switched
+        self.state = _StubIsolationState(level=target, reason=reason)
+        self.event = _StubSwitchedEvent(previous) if switched else None  # 真实链路: no-op 时 None
+
+
+class _StubIsolationService:
+    """isolation 两子命令共享 stub（get/switch 可注入错误）。"""
+
+    def __init__(
+        self,
+        state: object | None = None,
+        switch_result: object | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.state = state if state is not None else _StubIsolationState()
+        self.switch_result = switch_result or _StubSwitchResult(True, "L4", "L3", "CLI 链路验证")
+        self.error = error
+        self.get_calls: list[str] = []
+        self.switch_calls: list[tuple[str, str, str]] = []
+
+    async def get_isolation_state(self, agent_id: object) -> object:
+        self.get_calls.append(str(agent_id))
+        if self.error is not None:
+            raise self.error
+        return self.state
+
+    async def switch_isolation_level(
+        self, agent_id: object, target_level: object, trigger_reason: str, approval_chain: object = ()
+    ) -> object:
+        self.switch_calls.append((str(agent_id), str(target_level), trigger_reason))
+        if self.error is not None:
+            raise self.error
+        return self.switch_result
+
+
+def _patch_isolation_entry(monkeypatch: pytest.MonkeyPatch, service: _StubIsolationService) -> None:
+    """isolation 子命令三件套注入（bootstrap/resolve/get_resolver）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: service)
+    monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+
+
+class TestSupportedIsolationLevelsConstant:
+    """SUPPORTED_ISOLATION_LEVELS 常量双锁（显式元组 × MVP_ALLOWED_LEVELS 集合）。"""
+
+    def test_explicit_tuple_form(self) -> None:
+        """显式元组字面量（禁 frozenset 迭代派生——迭代序不稳定致帮助文本漂移）。"""
+        assert agent_cli.SUPPORTED_ISOLATION_LEVELS == ("L4", "L3", "L2")
+
+    def test_set_equals_mvp_allowed_levels(self) -> None:
+        """与 MVP_ALLOWED_LEVELS 集合相等（V2 开放 L1 时仅改常量——双锁防漏改）。"""
+        from src.domain.events.enums import IsolationLevel
+        from src.domain.value_objects.isolation_policy import MVP_ALLOWED_LEVELS
+
+        assert set(agent_cli.SUPPORTED_ISOLATION_LEVELS) == {level.value for level in MVP_ALLOWED_LEVELS}
+        assert IsolationLevel.L1_FUSED.value not in agent_cli.SUPPORTED_ISOLATION_LEVELS
+
+
+class TestParseIsolationLevelGuard:
+    """_parse_isolation_level 两道守卫（顺序对齐 _parse_role 先例——R1-F07）。"""
+
+    def test_valid_levels_parsed(self) -> None:
+        from src.domain.events.enums import IsolationLevel
+
+        assert agent_cli._parse_isolation_level("L4") is IsolationLevel.L4_HARD
+        assert agent_cli._parse_isolation_level("L3") is IsolationLevel.L3_SOFT
+        assert agent_cli._parse_isolation_level("L2") is IsolationLevel.L2_COLLAB
+
+    @pytest.mark.parametrize("raw", ["L9", "l4", "xyz", ""])
+    def test_invalid_string_raises_446(self, raw: str) -> None:
+        """第一道: 非法枚举字符串 → 446（禁裸 IsolationLevel(value) ValueError 逃逸；
+        大小写敏感——IsolationLevel 枚举值全大写，"l4" 属非法输入）。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        with pytest.raises(IsolationLevelNotSupportedError) as exc_info:
+            agent_cli._parse_isolation_level(raw)
+        assert exc_info.value.code == "EXCEPTION_446"
+        assert exc_info.value.context["level"] == raw
+        assert exc_info.value.context["supported_levels"] == ["L4", "L3", "L2"]
+
+    def test_l1_valid_enum_but_mvp_disabled_raises_446(self) -> None:
+        """第二道: 合法枚举但未开放（L1 融合态）→ 446（统一异常出口非 argparse 拒绝）。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        with pytest.raises(IsolationLevelNotSupportedError) as exc_info:
+            agent_cli._parse_isolation_level("L1")
+        assert exc_info.value.code == "EXCEPTION_446"
+
+
+class TestIsolationStatusCommand:
+    """isolation-status 子命令（查询与退出码契约）。"""
+
+    def test_success_outputs_level_and_policy_dimensions(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功: exit 0 + 等级/名称 + 三维度策略 + isoformat 时间 + 原因。"""
+        import re
+
+        service = _StubIsolationService(state=_StubIsolationState(level="L4"))
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(["isolation-status", "--agent-id", "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "当前隔离等级: L4" in captured.out
+        assert "硬隔离" in captured.out
+        assert "read_only" in captured.out, "三维度策略须随状态输出"
+        assert re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", captured.out), "时间须 isoformat 全格式"
+        assert "initial_default" in captured.out
+
+    @pytest.mark.parametrize(
+        ("error_code", "error_cls_name"),
+        [
+            ("EXCEPTION_443", "AgentNotFoundError"),
+            ("EXCEPTION_447", "IsolationStateNotInitializedError"),
+            ("EXCEPTION_201", "ValidationError"),
+        ],
+        ids=["443", "447", "201"],
+    )
+    def test_guard_paths_exit_one(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        error_code: str,
+        error_cls_name: str,
+    ) -> None:
+        """守卫路径: 443/447/201 → exit 1 + stderr 统一异常编码。"""
+        import src.domain.exceptions as exceptions_module
+
+        error_cls = getattr(exceptions_module, error_cls_name)
+        error = error_cls() if error_cls_name == "ValidationError" else error_cls(agent_id="x")
+        service = _StubIsolationService(error=error)
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(["isolation-status", "--agent-id", "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"])
+
+        assert exit_code == 1
+        assert error_code in capsys.readouterr().err
+
+
+class TestSetIsolationCommand:
+    """set-isolation 子命令（切换/no-op/退出码契约）。"""
+
+    def test_success_outputs_switch_summary(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功: exit 0 + 切换摘要 previous -> target。"""
+        from src.domain.events.enums import IsolationLevel
+
+        service = _StubIsolationService(switch_result=_StubSwitchResult(True, "L4", "L3", "CLI 链路验证"))
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(
+            [
+                "set-isolation",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L3",
+                "--reason",
+                "CLI 链路验证",
+            ]
+        )
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "L4 -> L3" in captured.out
+        assert service.switch_calls, "服务 switch 必须被调用"
+        assert service.switch_calls[0][1] == str(IsolationLevel.L3_SOFT)  # 枚举 str 混入形态
+
+    def test_noop_outputs_hint_exit_zero(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """no-op: exit 0 + 未变更提示（幂等是正常态非错误）。"""
+        service = _StubIsolationService(switch_result=_StubSwitchResult(False, "L4", "L4", "同等级重试"))
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(
+            [
+                "set-isolation",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L4",
+                "--reason",
+                "同等级重试",
+            ]
+        )
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "no-op" in captured.out
+
+    def test_invalid_level_string_l9_exit_one_446(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """CLI 层非法字符串（L9）→ 446（守卫先于 bootstrap——统一异常出口）。"""
+        service = _StubIsolationService()
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(
+            [
+                "set-isolation",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L9",
+                "--reason",
+                "非法等级探测",
+            ]
+        )
+
+        assert exit_code == 1
+        assert "EXCEPTION_446" in capsys.readouterr().err
+        assert service.switch_calls == [], "446 守卫不得触达服务"
+
+    def test_l1_string_exit_one_446(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """CLI 层 L1（合法枚举未开放）→ 446（第二道预检）。"""
+        service = _StubIsolationService()
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(
+            [
+                "set-isolation",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L1",
+                "--reason",
+                "融合态探测",
+            ]
+        )
+
+        assert exit_code == 1
+        assert "EXCEPTION_446" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        ("error_code", "error_cls_name"),
+        [
+            ("EXCEPTION_443", "AgentNotFoundError"),
+            ("EXCEPTION_447", "IsolationStateNotInitializedError"),
+            ("EXCEPTION_201", "ValidationError"),
+        ],
+        ids=["443", "447", "201"],
+    )
+    def test_service_error_paths_exit_one(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        error_code: str,
+        error_cls_name: str,
+    ) -> None:
+        """服务异常路径: 443/447/201 → exit 1 + stderr 编码。"""
+        import src.domain.exceptions as exceptions_module
+
+        error_cls = getattr(exceptions_module, error_cls_name)
+        error = error_cls() if error_cls_name == "ValidationError" else error_cls(agent_id="x")
+        service = _StubIsolationService(error=error)
+        _patch_isolation_entry(monkeypatch, service)
+
+        exit_code = agent_cli.main(
+            [
+                "set-isolation",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L3",
+                "--reason",
+                "异常路径",
+            ]
+        )
+
+        assert exit_code == 1
+        assert error_code in capsys.readouterr().err
+
+
+class TestIsolationSubcommandArgs:
+    """两子命令参数契约（argparse 层）。"""
+
+    def test_isolation_status_requires_agent_id(self) -> None:
+        """--agent-id 必填（缺失 → argparse 用法错 exit 2）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["isolation-status"])
+        assert exc_info.value.code == 2
+
+    def test_set_isolation_requires_all_three_args(self) -> None:
+        """--agent-id/--level/--reason 三参数必填。"""
+        with pytest.raises(SystemExit):
+            agent_cli.build_parser().parse_args(["set-isolation", "--agent-id", "x"])
+        with pytest.raises(SystemExit):
+            agent_cli.build_parser().parse_args(["set-isolation", "--agent-id", "x", "--level", "L3"])

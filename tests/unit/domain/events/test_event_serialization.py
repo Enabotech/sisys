@@ -8,7 +8,7 @@ import pytest
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.checkpoint_events import CheckpointRecovered
-from src.domain.events.enums import DeviationLevel, DeviationType, RecoveryMode
+from src.domain.events.enums import DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
     IsolationLevelSwitched,
@@ -145,6 +145,8 @@ class TestFromDictDeserialization:
         """IsolationLevelSwitched survives roundtrip."""
         original = IsolationLevelSwitched(
             agent_id=uuid.uuid4(),
+            previous_level=IsolationLevel.L4_HARD,
+            target_level=IsolationLevel.L2_COLLAB,
             trigger_reason="collaboration",
         )
         d = original.to_dict()
@@ -221,6 +223,9 @@ class TestJSONRoundTrip:
         """IsolationLevelSwitched survives JSON roundtrip."""
         event = IsolationLevelSwitched(
             agent_id=uuid.uuid4(),
+            previous_level=IsolationLevel.L4_HARD,
+            target_level=IsolationLevel.L3_SOFT,
+            trigger_reason="json_roundtrip",
             approval_chain=["admin", "sys_agent"],
         )
         d = event.to_dict()

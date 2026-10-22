@@ -2732,6 +2732,7 @@ def bootstrap() -> None:
             config_loader=resolver.resolve("agent_config_loader"),
             repository=resolver.resolve("agent_repository"),
             event_publisher=resolver.resolve("event_publisher"),
+            isolation_service=resolver.resolve("isolation_management_service"),
         ),
         module="src.application.use_cases.agent_instantiation",
         lifetime=Lifetime.SINGLETON,
@@ -2846,6 +2847,56 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("agent", "workflow"),
+    )
+
+    # === Story 5.4 — EIP 弹性隔离协议基础（四级隔离等级模型 + 默认 L4 + 切换）===
+    # IsolationRepository — EIP 隔离状态仓储端口（Redis 实现，键 sisys:isolation:{agent_id}；
+    # SINGLETON——D7 评估落地（Story 5.4 DC-7）：无状态仓储构造零 IO，被 SINGLETON
+    # isolation_management_service 捕获无 captive 实害，新增面从源头避免 captive dependency；
+    # adapter 经组合根 SINGLETON redis_adapter 注入）
+    register_port(
+        name="isolation_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.isolation_repository",
+            fromlist=["IsolationRepository"],
+        ).IsolationRepository,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.redis.redis_isolation_repository",
+            fromlist=["RedisIsolationRepository"],
+        ).RedisIsolationRepository(
+            adapter=resolver.resolve("redis_adapter"),
+        ),
+        module="src.infrastructure.storage.redis.redis_isolation_repository",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("redis", "agent", "isolation"),
+    )
+    # IsolationManagementService — EIP 隔离管理服务（R2 组合端口四依赖:
+    # isolation_repository + agent_repository[443 守卫] + event_publisher +
+    # agent_config_loader[switch 重置 TTL 真源——R1-F01]；SINGLETON——无状态服务，
+    # 新捕获关系登记（DC-7）: 本 SINGLETON 捕获存量 SCOPED agent_repository——
+    # 无实害（无状态仓储 + clear_scoped 未接线环境下 SCOPED≡SINGLETON））
+    register_port(
+        name="isolation_management_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.isolation_management",
+            fromlist=["IsolationManagementServicePort"],
+        ).IsolationManagementServicePort,
+        impl=lambda resolver: __import__(
+            "src.application.services.isolation_management_service",
+            fromlist=["IsolationManagementService"],
+        ).IsolationManagementService(
+            isolation_repository=resolver.resolve("isolation_repository"),
+            agent_repository=resolver.resolve("agent_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+            agent_config_loader=resolver.resolve("agent_config_loader"),
+        ),
+        module="src.application.services.isolation_management_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "isolation"),
     )
 
     # === 事件处理器注册（register_handlers）===

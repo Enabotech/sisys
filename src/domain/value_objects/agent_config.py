@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.domain.entities.agent import AgentRole
+from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import AgentConfigError
 
 # Agent 状态 TTL 闭区间边界（秒）：60 秒 ~ 30 天（范围数字对齐 RedisSnapshotStore.set_ttl，
@@ -43,7 +44,8 @@ class AgentConfig:
         preferred_model: 偏好模型名（纯 str 预留，本 Story 不引用 LLMConfig 类型——
             其无该字段；5.3 引擎消费时映射 LLMConfig.model；空串归一化为 None）
         state_ttl: Agent 状态 TTL 秒（闭区间 60~2592000，默认 86400）
-        default_isolation_level: 默认 EIP 隔离等级（5.4 消费，本 Story 仅承载）
+        default_isolation_level: 默认 EIP 隔离等级（Story 5-4 消费——枚举 SSOT
+            绑定，yaml 载入经 loader str→IsolationLevel 转换守卫）
     """
 
     role: AgentRole
@@ -54,7 +56,7 @@ class AgentConfig:
     domain_knowledge: tuple[str, ...]
     preferred_model: str | None
     state_ttl: int = 86400
-    default_isolation_level: str = "L4"
+    default_isolation_level: IsolationLevel = IsolationLevel.L4_HARD
 
     def __post_init__(self) -> None:
         """自校验与归一化（配置资产缺陷语义，抛 AgentConfigError 440）"""
@@ -68,11 +70,14 @@ class AgentConfig:
         # 必填非空：falsy 判空（非 is None）——空白串与空 tuple 均拦截；
         # 空职责/知识清单无下游防线（Agent.validate() 不校验非空），本 VO 是运行时
         # 唯一防线（mypy src 门禁为编译期另一道防线）
-        if not self.name or not self.name.strip():
+        # 标量类型守卫（Story 5-4 D6 回填）: isinstance str 先行——truthy 标量
+        # （如 name=123）越过 falsy 判空后在 .strip() 抛裸 AttributeError 逃逸
+        # 统一异常体系，统一 440 分码拦截
+        if not isinstance(self.name, str) or not self.name.strip():
             _fail("name 不能为空")
-        if not self.description or not self.description.strip():
+        if not isinstance(self.description, str) or not self.description.strip():
             _fail("description 不能为空")
-        if not self.version or not self.version.strip():
+        if not isinstance(self.version, str) or not self.version.strip():
             _fail("version 不能为空")
         # tuple 类型守卫先于判空：truthy 标量（如 str）越过 falsy 判空后会被用例层
         # list() 逐字符静默展开（静默数据损坏——加载器对同款陷阱显式设防，VO 补齐）
@@ -90,6 +95,15 @@ class AgentConfig:
             _fail("state_ttl 必须为整数")
         if not STATE_TTL_MIN_SECONDS <= self.state_ttl <= STATE_TTL_MAX_SECONDS:
             _fail(f"state_ttl 必须在 {STATE_TTL_MIN_SECONDS}~{STATE_TTL_MAX_SECONDS} 秒范围内（实际 {self.state_ttl}）")
+
+        # default_isolation_level 枚举类型守卫（Story 5-4 D6 回填——SSOT 枚举绑定）:
+        # 裸 str（含合法值域 "L4"）与异构值统一 440（配置资产语义；yaml 侧字符串
+        # 经 loader str→IsolationLevel 转换守卫后传入，直构造绕过 loader 是缺陷面）
+        if not isinstance(self.default_isolation_level, IsolationLevel):
+            _fail(
+                "default_isolation_level 必须为 IsolationLevel 枚举实例"
+                f"（实际类型 {type(self.default_isolation_level).__name__}——yaml 值经 loader 转换后传入）"
+            )
 
         # preferred_model 空串归一化为 None（与 YAML null 等价，消费方只见 None | str 两态）
         if self.preferred_model == "":

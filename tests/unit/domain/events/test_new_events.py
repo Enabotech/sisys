@@ -2,6 +2,8 @@
 
 import uuid
 
+import pytest
+
 from src.domain.events.checkpoint_events import CheckpointRecovered
 from src.domain.events.enums import DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from src.domain.events.heartbeat_events import HeartbeatTriggered
@@ -77,7 +79,12 @@ class TestHeartbeatTriggered:
 
 
 class TestIsolationLevelSwitched:
-    """Test IsolationLevelSwitched event."""
+    """Test IsolationLevelSwitched event.
+
+    Story 5-4 纪律收紧（DC-6）: agent_id/previous_level/target_level/trigger_reason
+    四核心字段 kw_only 必填（切换事件核心语义必填——空 reason 是无意义的切换事件）；
+    approval_chain/switch_timestamp 保留默认（MVP 用户请求无审批链）。
+    """
 
     def test_create_event(self):
         """Can create IsolationLevelSwitched event."""
@@ -94,16 +101,40 @@ class TestIsolationLevelSwitched:
         assert event.target_level == IsolationLevel.L2_COLLAB
         assert event.switch_timestamp.tzinfo is not None
 
-    def test_default_values(self):
-        """Event has sensible defaults."""
-        event = IsolationLevelSwitched(agent_id=uuid.uuid4())
-        assert event.previous_level == IsolationLevel.L4_HARD
-        assert event.target_level == IsolationLevel.L4_HARD
-        assert event.trigger_reason == ""
+    def test_optional_fields_keep_defaults(self):
+        """可选字段保留默认: approval_chain 空清单 + switch_timestamp 自动 now(UTC)。"""
+        event = IsolationLevelSwitched(
+            agent_id=uuid.uuid4(),
+            previous_level=IsolationLevel.L4_HARD,
+            target_level=IsolationLevel.L3_SOFT,
+            trigger_reason="任务需要软隔离",
+        )
+        assert event.approval_chain == []
+        assert event.switch_timestamp.tzinfo is not None
+
+    def test_required_fields_kw_only_missing_raises(self):
+        """四核心必填字段缺任一 → TypeError（kw_only 必填——5-2 纪律先例）。"""
+        from typing import Any
+
+        full_kwargs: dict[str, Any] = {
+            "agent_id": uuid.uuid4(),
+            "previous_level": IsolationLevel.L4_HARD,
+            "target_level": IsolationLevel.L3_SOFT,
+            "trigger_reason": "缺参探测",
+        }
+        for missing in ("agent_id", "previous_level", "target_level", "trigger_reason"):
+            partial = {key: value for key, value in full_kwargs.items() if key != missing}
+            with pytest.raises(TypeError):
+                IsolationLevelSwitched(**partial)
 
     def test_serialization(self):
         """IsolationLevelSwitched serializes correctly."""
-        event = IsolationLevelSwitched(agent_id=uuid.uuid4())
+        event = IsolationLevelSwitched(
+            agent_id=uuid.uuid4(),
+            previous_level=IsolationLevel.L4_HARD,
+            target_level=IsolationLevel.L2_COLLAB,
+            trigger_reason="joint_task_assigned",
+        )
         d = event.to_dict()
         assert d["event_type"] == "IsolationLevelSwitched"
 

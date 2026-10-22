@@ -61,6 +61,8 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    IsolationLevelNotSupportedError,
+    IsolationStateNotInitializedError,
     LayeredRetrievalError,
     LevelTransitionError,
     LLMAPIError,
@@ -271,6 +273,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     AgentNotFoundError: status.HTTP_404_NOT_FOUND,  # 443 — 请求的 Agent 实例不存在（精确注册，避免回退 400）
     AgentWorkflowError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 444 — 工作流阶段执行失败（系统执行语义，精确注册防回退歧义）
     ChainOfThoughtValidationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 445 — 思维链完整性校验失败（系统组装缺陷语义）
+    IsolationLevelNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 446 — 隔离等级不支持（MVP 白名单）
+    IsolationStateNotInitializedError: status.HTTP_404_NOT_FOUND,  # 447 — 隔离状态未初始化（404 族）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

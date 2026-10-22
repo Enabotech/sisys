@@ -57,6 +57,9 @@ async def assembled(real_redis: Any) -> AsyncGenerator[tuple[Any, Any, Any], Non
     Yields:
         (实例化用例, 档案加载用例, real_redis 客户端)
     """
+    from unittest.mock import AsyncMock
+
+    from src.application.ports.isolation_management import IsolationManagementServicePort
     from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
     from src.domain.ports.resolver import resolve
 
@@ -65,6 +68,7 @@ async def assembled(real_redis: Any) -> AsyncGenerator[tuple[Any, Any, Any], Non
         config_loader=resolve("agent_config_loader"),
         repository=repository,
         event_publisher=InMemoryEventBus(),
+        isolation_service=AsyncMock(spec=IsolationManagementServicePort),  # 集成 Mock 工厂子模式
     )
     load_case = LoadAgentProfileUseCase(
         profile_loader=resolve("agent_profile_loader"),

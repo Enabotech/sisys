@@ -451,3 +451,176 @@ class TestSubdomainRegistrationStory53:
             ChainOfThoughtValidationError.code,
         }
         assert len(codes) == 6, f"agent 子域六码应互异: {codes}"
+
+
+# ===================================================================
+# Story 5-4 追加：IsolationLevelNotSupportedError(446) / IsolationStateNotInitializedError(447)
+# ===================================================================
+
+
+class TestIsolationLevelNotSupportedErrorConstruction:
+    """446 构造契约（隔离等级不合法，继承 BusinessException——「不支持的取值」族）。
+
+    构造器对齐 441 实际形态: level 首参必填、supported_levels 接受 tuple 或 list。
+    """
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        error = IsolationLevelNotSupportedError(level="L1", supported_levels=("L4", "L3", "L2"))
+        assert error.code == "EXCEPTION_446"
+        assert error.message, "默认消息不能为空"
+
+    def test_level_is_required_first_param(self) -> None:
+        """level 必填（441 role 同款无默认值——省略即 TypeError；Any 变量调用
+        规避 mypy 签名检查——必填缺失本身就是要测的运行时行为）。"""
+        from typing import Any
+
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        error_cls: Any = IsolationLevelNotSupportedError
+        with pytest.raises(TypeError):
+            error_cls()
+
+    def test_context_carries_level_and_supported(self) -> None:
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        error = IsolationLevelNotSupportedError(level="L9", supported_levels=("L4", "L3", "L2"))
+        assert error.context["level"] == "L9"
+        assert error.context["supported_levels"] == ["L4", "L3", "L2"], "context 内 list 化（441 同款）"
+
+    def test_supported_levels_accepts_list_form(self) -> None:
+        """supported_levels 接受 tuple 或 list 两形态。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        error = IsolationLevelNotSupportedError(level="L1", supported_levels=["L4", "L3", "L2"])
+        assert error.context["supported_levels"] == ["L4", "L3", "L2"]
+
+    def test_inherits_business_exception(self) -> None:
+        """446 入 BusinessException（运行时用户错误族——422 语义）。"""
+        from src.domain.exceptions import BusinessException, IsolationLevelNotSupportedError
+
+        error = IsolationLevelNotSupportedError(level="L1")
+        assert isinstance(error, BusinessException)
+
+    @pytest.mark.parametrize(
+        ("level", "supported"),
+        [("L9", ("L4", "L3", "L2")), ("L1", ("L4", "L3", "L2"))],
+        ids=["非法枚举值字符串", "合法枚举但MVP禁用"],
+    )
+    def test_dual_trigger_paths(self, level: str, supported: tuple[str, ...]) -> None:
+        """446 双触发路径参数化: 非法枚举值字符串 + 合法枚举但 MVP 禁用（L1 融合态）。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+
+        error = IsolationLevelNotSupportedError(level=level, supported_levels=supported)
+        assert error.code == "EXCEPTION_446"
+        assert error.context["level"] == level
+
+
+class TestIsolationStateNotInitializedErrorConstruction:
+    """447 构造契约（隔离状态缺失，继承 BusinessException——404 NotFound 族语义）。"""
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import IsolationStateNotInitializedError
+
+        error = IsolationStateNotInitializedError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+        assert error.code == "EXCEPTION_447"
+        assert error.message, "默认消息不能为空"
+
+    def test_context_carries_agent_id(self) -> None:
+        from src.domain.exceptions import IsolationStateNotInitializedError
+
+        agent_id = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        error = IsolationStateNotInitializedError(agent_id=agent_id)
+        assert error.context["agent_id"] == agent_id
+
+    def test_agent_id_optional_default_empty(self) -> None:
+        """agent_id 可默认空串（兜底形态——上下文仍含键）。"""
+        from src.domain.exceptions import IsolationStateNotInitializedError
+
+        error = IsolationStateNotInitializedError()
+        assert error.context["agent_id"] == ""
+
+    def test_inherits_business_exception(self) -> None:
+        """447 入 BusinessException（资源不存在——对齐 443 族语义）。"""
+        from src.domain.exceptions import BusinessException, IsolationStateNotInitializedError
+
+        error = IsolationStateNotInitializedError(agent_id="x")
+        assert isinstance(error, BusinessException)
+
+    def test_to_dict_contains_code(self) -> None:
+        """to_dict 含编码（CLI stderr 断言锚）。"""
+        from src.domain.exceptions import IsolationStateNotInitializedError
+
+        error = IsolationStateNotInitializedError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_447"
+        assert data["context"]["agent_id"] == "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+
+
+class TestHttpMappingStory54:
+    """经 _get_http_status 反向验证 446/447 精确注册。"""
+
+    def test_level_not_supported_maps_422(self) -> None:
+        """446 → 422（「不支持的取值」族——对齐 441 精确注册先例）。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = IsolationLevelNotSupportedError(level="L1", supported_levels=("L4", "L3", "L2"))
+        assert _get_http_status(error) == 422
+
+    def test_state_not_initialized_maps_404(self) -> None:
+        """447 → 404（状态缺失 NotFound 族——对齐 443 语义）。"""
+        from src.domain.exceptions import IsolationStateNotInitializedError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = IsolationStateNotInitializedError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+        assert _get_http_status(error) == 404
+
+    def test_precise_registration_no_fallback(self) -> None:
+        """反向验证: BusinessException 基类 400，446/447 精确注册防回退歧义。"""
+        from src.domain.exceptions import IsolationLevelNotSupportedError, IsolationStateNotInitializedError
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert EXCEPTION_HTTP_MAP[IsolationLevelNotSupportedError] == 422
+        assert EXCEPTION_HTTP_MAP[IsolationStateNotInitializedError] == 404
+
+
+class TestSubdomainRegistrationStory54:
+    """446/447 子域登记（agent 段预留位核销——448-449 留给 5.5）。"""
+
+    def test_classes_registered_in_agent_subdomain(self) -> None:
+        assert _CLASS_TO_SUBDOMAIN["IsolationLevelNotSupportedError"] == "agent"
+        assert _CLASS_TO_SUBDOMAIN["IsolationStateNotInitializedError"] == "agent"
+
+    def test_codes_within_agent_range(self) -> None:
+        from src.domain.exceptions import IsolationLevelNotSupportedError, IsolationStateNotInitializedError
+
+        low, high = CODE_RANGES["agent"]
+        assert low <= int(IsolationLevelNotSupportedError.code.removeprefix("EXCEPTION_")) <= high
+        assert low <= int(IsolationStateNotInitializedError.code.removeprefix("EXCEPTION_")) <= high
+
+    def test_codes_unique_across_agent_subdomain(self) -> None:
+        """446/447 与既有 440-445 码值互异（八码全查重）。"""
+        from src.domain.exceptions import (
+            AgentConfigError,
+            AgentNotFoundError,
+            AgentProfileError,
+            AgentRoleNotSupportedError,
+            AgentWorkflowError,
+            ChainOfThoughtValidationError,
+            IsolationLevelNotSupportedError,
+            IsolationStateNotInitializedError,
+        )
+
+        codes = {
+            AgentConfigError.code,
+            AgentRoleNotSupportedError.code,
+            AgentProfileError.code,
+            AgentNotFoundError.code,
+            AgentWorkflowError.code,
+            ChainOfThoughtValidationError.code,
+            IsolationLevelNotSupportedError.code,
+            IsolationStateNotInitializedError.code,
+        }
+        assert len(codes) == 8, f"agent 子域八码应互异: {codes}"

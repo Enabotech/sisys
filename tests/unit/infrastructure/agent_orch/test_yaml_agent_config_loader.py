@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from src.domain.entities.agent import AgentRole
+from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import AgentConfigError
 
 # 合法配置模板（与 configs/agents/ceo_agent.yaml 生产资产同构）
@@ -257,3 +258,60 @@ class TestLoadFailures:
         error = exc_info.value
         assert error.context.get("role") == "ceo"
         assert error.context.get("reason")
+
+
+# ===================================================================
+# Story 5-4: str→IsolationLevel 转换守卫（D6 回填——枚举 SSOT 通道）
+# ===================================================================
+
+
+class TestIsolationLevelConversion:
+    """default_isolation_level 字符串→枚举转换（loader 只做转换合法性，不做 MVP 白名单）。
+
+    分层口径（R1-F03/F04）: 非法枚举值字符串 "L9" → 440（部署资产缺陷族）；
+    合法枚举 "L1"（越 MVP 白名单）放行 → 实体 initialize 446 拒绝（运行时
+    用户错误族）——输入通道决定异常族，禁止 loader 拦 L1「修平」。
+    """
+
+    async def test_valid_l4_string_converts_to_enum(self, tmp_path: Path) -> None:
+        """合法 "L4" → IsolationLevel.L4_HARD 枚举实例（SSOT 枚举绑定）。"""
+        _write_config(tmp_path, VALID_YAML)
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+
+    async def test_invalid_l9_raises_440_chinese_reason(self, tmp_path: Path) -> None:
+        """非法枚举值 "L9" → 440（reason 中文自然语言——对齐 role 先例风格）。"""
+        _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', 'default_isolation_level: "L9"'))
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "非法隔离等级值" in exc_info.value.context.get("reason", "")
+
+    async def test_missing_section_falls_back_l4_enum(self, tmp_path: Path) -> None:
+        """eip_config 段缺失 → 回落 L4 枚举（既有定稿语义保留——L128 语义原样）。"""
+        yaml_without_eip = VALID_YAML.replace('eip_config:\n  default_isolation_level: "L4"\n', "")
+        _write_config(tmp_path, yaml_without_eip)
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+
+    async def test_empty_string_falls_back_l4_enum(self, tmp_path: Path) -> None:
+        """空串 → 回落 L4 枚举（既有定稿语义保留——空串等价缺失）。"""
+        _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', 'default_isolation_level: ""'))
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+
+    async def test_null_falls_back_l4_enum(self, tmp_path: Path) -> None:
+        """YAML null → 回落 L4 枚举（既有定稿语义保留）。"""
+        _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', "default_isolation_level: null"))
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+
+    async def test_l1_valid_enum_passes_no_mvp_whitelist(self, tmp_path: Path) -> None:
+        """合法枚举 "L1" loader 放行（is L1_FUSED——MVP 白名单归实体 initialize 446）。
+
+        AC-2「配置 L1 → 446」路径依赖此分层: loader 拦 L1 将使实体守卫
+        不可达（446 验收断言面消失）。
+        """
+        _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', 'default_isolation_level: "L1"'))
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L1_FUSED

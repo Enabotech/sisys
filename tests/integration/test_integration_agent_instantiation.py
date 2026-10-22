@@ -62,6 +62,9 @@ async def assembled(
         (用例, 仓储, real_redis 客户端)——仓储供读回契约断言，客户端供键
         断言与 teardown 精确清理
     """
+    from unittest.mock import AsyncMock
+
+    from src.application.ports.isolation_management import IsolationManagementServicePort
     from src.domain.ports.resolver import resolve
 
     repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=real_redis))
@@ -69,6 +72,7 @@ async def assembled(
         config_loader=resolve("agent_config_loader"),
         repository=repository,
         event_publisher=InMemoryEventBus(),
+        isolation_service=AsyncMock(spec=IsolationManagementServicePort),  # 集成 Mock 工厂子模式
     )
     yield case, repository, real_redis
 
