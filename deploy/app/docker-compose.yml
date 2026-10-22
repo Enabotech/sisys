@@ -216,6 +216,207 @@ services:
           cpus: '0.25'
 
   # ===========================================================================
+  # 测试端口服务组（SISYS_USE_TEST_PORTS=1 配套 — Story 5.4 审查周期）
+  # ---------------------------------------------------------------------------
+  # 用途：pytest 以 SISYS_USE_TEST_PORTS=1 运行时（tests/environments.py 的
+  # TEST_CONFIG），隔离读写独立测试端口实例——不污染 dev 数据（outbox 测试行/
+  # Redis 残键），与本地开发服务互不冲突。
+  # 启停：`docker compose --profile test up -d`（默认 up 不启用本组——不影响
+  # dev 栈日常启停，也不会被 --remove-orphans 误清）
+  # schema：postgres-test 首次启用后跑任一 PG 验收测试（如
+  #   `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/acceptance/
+  #   test_acceptance_postgresql_relational_layer.py`）——测试基建的
+  #   ensure_alembic_migration（alembic 优先 + create_all 兜底）自动建表，
+  #   数据卷持久化后续无需重建
+  # ===========================================================================
+  redis-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    container_name: sisys-test-redis
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  postgres-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/postgres/postgres:15.4
+    container_name: sisys-test-postgres
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DATABASE:-sisys}
+      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME:-postgres} -d ${POSTGRES_DATABASE:-sisys}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  qdrant-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.1
+    container_name: sisys-test-qdrant
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - qdrant_test_data:/qdrant/storage
+      - ./qdrant/qdrant.yaml:/qdrant/config/custom_config.yaml:ro
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  minio-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: sisys-test-minio
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - minio_test_data:/data
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_VOLUMES=/data
+    command: ["server", "/data", "--console-address", ":9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  neo4j-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j/neo4j:5.15
+    container_name: sisys-test-neo4j
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    volumes:
+      - neo4j_test_data:/data
+      - ./neo4j/neo4j.conf:/neo4j/conf/neo4j.conf:ro
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password123}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=256m
+      - NEO4J_dbms_memory_heap_max__size=512m
+      - NEO4J_dbms_memory_pagecache_size=256m
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  rabbitmq-test:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/rabbitmq/rabbitmq:3.13-management
+    container_name: sisys-test-rabbitmq
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbitmq_test_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
+      - RABBITMQ_DEFAULT_VHOST=/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # ===========================================================================
   # Embedding API — BGE-M3 嵌入服务 (Story 3-1a)
   # 使用应用镜像（已含 src/ 全量源码），仅挂载模型缓存
   # ===========================================================================
@@ -335,6 +536,24 @@ volumes:
   rabbitmq_data:
     driver: local
     name: sisys-rabbitmq-data
+  redis_test_data:
+    driver: local
+    name: sisys-redis-test-data
+  postgres_test_data:
+    driver: local
+    name: sisys-postgres-test-data
+  qdrant_test_data:
+    driver: local
+    name: sisys-qdrant-test-data
+  minio_test_data:
+    driver: local
+    name: sisys-minio-test-data
+  neo4j_test_data:
+    driver: local
+    name: sisys-neo4j-test-data
+  rabbitmq_test_data:
+    driver: local
+    name: sisys-rabbitmq-test-data
   embedding_cache:
     driver: local
     name: sisys-embedding-cache

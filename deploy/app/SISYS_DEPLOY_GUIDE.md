@@ -58,6 +58,28 @@ docker compose -f deploy/app/docker-compose.yml up -d
 docker compose -f deploy/app/docker-compose.yml up -d --force-recreate redis
 ```
 
+### 测试端口服务组（test profile）
+
+以 `SISYS_USE_TEST_PORTS=1` 运行 pytest 时，测试框架（tests/environments.py 的 TEST_CONFIG）
+会连接独立测试端口实例（Redis 6380 / PostgreSQL 5433 / Qdrant 6335 / MinIO 9010 /
+Neo4j 7475,7688 / RabbitMQ 5673）——与 dev 服务隔离，测试不污染开发数据。
+
+```bash
+# 启用测试服务组（默认 up 不启用——不影响 dev 栈日常启停）
+docker compose -f deploy/app/docker-compose.yml --profile test up -d
+
+# 停止测试服务组（dev 服务不受影响；数据卷保留）
+docker compose -f deploy/app/docker-compose.yml --profile test stop
+
+# 首次启用后初始化测试库 schema（跑任一 PG 验收测试即可——测试基建自动建表，
+# 数据卷持久化后续无需重建）
+SISYS_USE_TEST_PORTS=1 poetry run pytest tests/acceptance/test_acceptance_postgresql_relational_layer.py
+
+# 以测试端口形态运行全量测试
+SISYS_USE_TEST_PORTS=1 poetry run pytest tests/ -n 8
+```
+```
+
 ### 停止所有服务
 
 ```bash
