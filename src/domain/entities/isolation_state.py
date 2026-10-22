@@ -27,25 +27,31 @@ from datetime import UTC, datetime
 from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import EntityValidationError, IsolationLevelNotSupportedError
 
-# 446 异常 context 的支持等级清单派生源（显式 tuple 保序——帮助文本与 context 稳定）
-_SUPPORTED_LEVEL_VALUES: tuple[str, ...] = (
-    IsolationLevel.L4_HARD.value,
-    IsolationLevel.L3_SOFT.value,
-    IsolationLevel.L2_COLLAB.value,
-)
-
 
 def _mvp_allowed_levels() -> frozenset[IsolationLevel]:
     """MVP 允许等级集（方法内延迟 import——打破包初始化环）。
 
-    模块级 import 会构成包互嵌环: entities → value_objects.isolation_policy →
-    events → entities（部分初始化）→ ImportError。MVP_ALLOWED_LEVELS 的 SSOT
-    在 value_objects/isolation_policy.py（策略域归属），运行时调用时各包均已
-    完成初始化，sys.modules 命中零开销。
+    模块级 import 会构成包互嵌环（实证 value_objects-first 入口: isolation_policy
+    部分初始化 → events/__init__ L7 archive_events → entities/__init__ → 本模块
+    回头 import 未完成的 isolation_policy → ImportError；entities-first 入口不断环）。
+    MVP_ALLOWED_LEVELS 的 SSOT 在 value_objects/isolation_policy.py（策略域归属），
+    运行时调用时各包均已完成初始化，sys.modules 命中零开销。
     """
     from src.domain.value_objects.isolation_policy import MVP_ALLOWED_LEVELS
 
     return MVP_ALLOWED_LEVELS
+
+
+def _supported_level_values() -> tuple[str, ...]:
+    """446 异常 context 的支持等级清单（从 MVP_ALLOWED_LEVELS 真派生）。
+
+    按枚举定义序（L4→L1）过滤迭代——定义序天然稳定（区别于 frozenset 迭代序
+    不稳定），与 446 docstring「从 MVP_ALLOWED_LEVELS 派生，勿硬编码」承诺一致；
+    V2 开放 L1 时仅改 MVP_ALLOWED_LEVELS 一处即可全链生效。仅在异常 raise 路径
+    调用（延迟 import 同 _mvp_allowed_levels——模块级 import 会断包初始化环）。
+    """
+    mvp = _mvp_allowed_levels()
+    return tuple(level.value for level in IsolationLevel if level in mvp)
 
 
 @dataclass
@@ -113,7 +119,7 @@ class IsolationState:
         if not isinstance(level, IsolationLevel) or level not in _mvp_allowed_levels():
             raise IsolationLevelNotSupportedError(
                 level=str(getattr(level, "value", level)),
-                supported_levels=_SUPPORTED_LEVEL_VALUES,
+                supported_levels=_supported_level_values(),
             )
         moment = now or datetime.now(UTC)
         return cls(
@@ -152,7 +158,7 @@ class IsolationState:
         if not isinstance(target_level, IsolationLevel) or target_level not in _mvp_allowed_levels():
             raise IsolationLevelNotSupportedError(
                 level=str(getattr(target_level, "value", target_level)),
-                supported_levels=_SUPPORTED_LEVEL_VALUES,
+                supported_levels=_supported_level_values(),
             )
         if not isinstance(trigger_reason, str) or not trigger_reason.strip():
             raise EntityValidationError(

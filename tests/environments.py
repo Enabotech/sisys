@@ -334,8 +334,11 @@ def get_test_env() -> TestEnvConfig:
     Layer 2: .env 文件填充
         → 仅填充 Layer 1 输出中的空值/默认值，不覆盖已有值
     Layer 3: os.environ 显式设置
-        → 绝对最高优先级，不可被任何机制覆盖
+        → 绝对最高优先级，不可被任何机制覆盖（端口例外：SISYS_USE_TEST_PORTS
+          生效时端口类覆盖跳过——防第三方库 import 副作用[如 conftest 模块级
+          litellm import 触发 load_dotenv]注入 dev 端口击穿测试端口隔离）
         → _sync_config_to_environ() 使用 setdefault 确保生产代码也能读取
+          （端口类在测试端口模式下强制覆写——防与 Config.from_env() 分叉）
     """
     global _test_env_config
 
@@ -473,7 +476,7 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
 
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
-    """从环境变量覆盖配置"""
+    """从环境变量覆盖配置（端口例外：测试端口开关生效时端口覆盖跳过）"""
     import copy
 
     config = copy.deepcopy(base_config)
@@ -483,31 +486,42 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     # 此类环境的预设 host 不是 localhost，故 localhost 一律视为注入污染，跳过不覆盖。
     _is_remote_env = config.env in (TestEnvironment.CI, TestEnvironment.K8S)
 
+    # SISYS_USE_TEST_PORTS 生效（LOCAL 分支选中 TEST_CONFIG）时，端口类 env 覆盖
+    # 跳过：测试端口开关是显式意图，权威高于 os.environ——第三方库 import 副作用
+    # （conftest 模块级 litellm import 触发 load_dotenv 将 .env 的 dev 端口注入
+    # os.environ）不得击穿测试端口隔离（测试静默读写 dev 6379/5432 实例）。
+    _use_test_ports = config.env == TestEnvironment.LOCAL and os.getenv("SISYS_USE_TEST_PORTS", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
     # Redis
     if redis_host := os.getenv("REDIS_HOST"):
         if not (_is_remote_env and redis_host == "localhost"):
             config.redis.host = redis_host
-    if redis_port := os.getenv("REDIS_PORT"):
+    if (redis_port := os.getenv("REDIS_PORT")) and not _use_test_ports:
         config.redis.port = int(redis_port)
 
     # PostgreSQL
     if pg_host := os.getenv("POSTGRES_HOST"):
         if not (_is_remote_env and pg_host == "localhost"):
             config.postgres.host = pg_host
-    if pg_port := os.getenv("POSTGRES_PORT"):
+    if (pg_port := os.getenv("POSTGRES_PORT")) and not _use_test_ports:
         config.postgres.port = int(pg_port)
 
     # Qdrant
     if qdrant_host := os.getenv("QDRANT_HOST"):
         if not (_is_remote_env and qdrant_host == "localhost"):
             config.qdrant.host = qdrant_host
-    if qdrant_port := os.getenv("QDRANT_PORT"):
+    if (qdrant_port := os.getenv("QDRANT_PORT")) and not _use_test_ports:
         config.qdrant.port = int(qdrant_port)
-    if qdrant_grpc_port := os.getenv("QDRANT_GRPC_PORT"):
+    if (qdrant_grpc_port := os.getenv("QDRANT_GRPC_PORT")) and not _use_test_ports:
         config.qdrant.grpc_port = int(qdrant_grpc_port)
 
-    # MinIO
-    if minio_host := os.getenv("MINIO_HOST"):
+    # MinIO（endpoint 是 host:port 派生值——测试端口模式下整体跳过，
+    # 防 host 分支内联重建 endpoint 绕过端口守卫）
+    if (minio_host := os.getenv("MINIO_HOST")) and not _use_test_ports:
         if not (_is_remote_env and minio_host == "localhost"):
             minio_port = os.getenv("MINIO_API_PORT", "9000")
             config.minio.endpoint = f"{minio_host}:{minio_port}"
@@ -527,9 +541,9 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     if rmq_host := os.getenv("RABBITMQ_HOST"):
         if not (_is_remote_env and rmq_host == "localhost"):
             config.rabbitmq.host = rmq_host
-    if rmq_port := os.getenv("RABBITMQ_PORT"):
+    if (rmq_port := os.getenv("RABBITMQ_PORT")) and not _use_test_ports:
         config.rabbitmq.port = int(rmq_port)
-    if rmq_mgmt_port := os.getenv("RABBITMQ_MGMT_PORT"):
+    if (rmq_mgmt_port := os.getenv("RABBITMQ_MGMT_PORT")) and not _use_test_ports:
         config.rabbitmq.mgmt_port = int(rmq_mgmt_port)
     if rmq_username := os.getenv("RABBITMQ_USERNAME"):
         config.rabbitmq.username = rmq_username
@@ -590,6 +604,9 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
       中已有非 localhost 的显式值则尊重之；若仅剩 localhost（第三方库如 litellm
       导入时 dotenv.load_dotenv() 注入的污染值），则强制覆盖为计算出的正确 host，
       保证生产代码 Config.from_env() 与 get_test_env() 解析一致。
+    - 对端口类变量：SISYS_USE_TEST_PORTS 生效时强制覆写——第三方库 import 副作用
+      注入的 dev 端口（如 REDIS_PORT=6379）已在 os.environ，setdefault 是 no-op，
+      生产代码 Config.from_env() 会与测试端口解析分叉（split-brain）。
     - 其余变量：使用 setdefault，尊重用户显式设置（最高优先级）。
 
     Args:
@@ -598,6 +615,21 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
     # 远程环境（CI/K8S）中 localhost 是 litellm 等第三方库导入副作用注入的污染值，
     # 需强制覆盖为计算出的正确 host，避免生产代码 Config.from_env() 读到错误值
     _is_remote_env = config.env in (TestEnvironment.CI, TestEnvironment.K8S)
+
+    # 测试端口模式下端口类变量强制覆写（理由见 docstring——与 _override_config_from_env
+    # 的端口守卫配对，双向闭合测试端口隔离）
+    _use_test_ports = config.env == TestEnvironment.LOCAL and os.getenv("SISYS_USE_TEST_PORTS", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    def _set_port_env(key: str, value: str) -> None:
+        """设置端口类环境变量（测试端口模式强制覆写，否则 setdefault 尊重显式值）"""
+        if _use_test_ports:
+            os.environ[key] = value
+        else:
+            os.environ.setdefault(key, value)
 
     def _set_host_env(key: str, value: str) -> None:
         """设置 host 类环境变量
@@ -611,36 +643,38 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # Redis
     _set_host_env("REDIS_HOST", config.redis.host)
-    os.environ.setdefault("REDIS_PORT", str(config.redis.port))
+    _set_port_env("REDIS_PORT", str(config.redis.port))
     if config.redis.password:
         os.environ.setdefault("REDIS_PASSWORD", config.redis.password)
 
     # PostgreSQL
     _set_host_env("POSTGRES_HOST", config.postgres.host)
-    os.environ.setdefault("POSTGRES_PORT", str(config.postgres.port))
+    _set_port_env("POSTGRES_PORT", str(config.postgres.port))
     os.environ.setdefault("POSTGRES_USERNAME", config.postgres.username)
     os.environ.setdefault("POSTGRES_PASSWORD", config.postgres.password)
     os.environ.setdefault("POSTGRES_DATABASE", config.postgres.database)
 
     # Qdrant
     _set_host_env("QDRANT_HOST", config.qdrant.host)
-    os.environ.setdefault("QDRANT_PORT", str(config.qdrant.port))
-    os.environ.setdefault("QDRANT_GRPC_PORT", str(config.qdrant.grpc_port))
+    _set_port_env("QDRANT_PORT", str(config.qdrant.port))
+    _set_port_env("QDRANT_GRPC_PORT", str(config.qdrant.grpc_port))
 
     # Neo4j
     _set_host_env("NEO4J_HOST", config.neo4j.host)
-    os.environ.setdefault("NEO4J_HTTP_PORT", str(config.neo4j.http_port))
-    os.environ.setdefault("NEO4J_BOLT_PORT", str(config.neo4j.bolt_port))
+    _set_port_env("NEO4J_HTTP_PORT", str(config.neo4j.http_port))
+    _set_port_env("NEO4J_BOLT_PORT", str(config.neo4j.bolt_port))
 
     # RabbitMQ
     _set_host_env("RABBITMQ_HOST", config.rabbitmq.host)
-    os.environ.setdefault("RABBITMQ_PORT", str(config.rabbitmq.port))
-    os.environ.setdefault("RABBITMQ_MGMT_PORT", str(config.rabbitmq.mgmt_port))
+    _set_port_env("RABBITMQ_PORT", str(config.rabbitmq.port))
+    _set_port_env("RABBITMQ_MGMT_PORT", str(config.rabbitmq.mgmt_port))
     os.environ.setdefault("RABBITMQ_USERNAME", config.rabbitmq.username)
     os.environ.setdefault("RABBITMQ_PASSWORD", config.rabbitmq.password)
 
     # MinIO - endpoint 是 "host:port" 格式，host 部分同样可能被污染
-    if _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
+    if _use_test_ports:
+        os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
+    elif _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
         os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
     else:
         os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)

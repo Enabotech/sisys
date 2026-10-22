@@ -215,8 +215,13 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="sisys-agent",
-        description="SISYS Agent 命令行工具 — Agent 实例化与身份档案加载（MVP: CEO 单 Agent）",
-        epilog="示例: sisys-agent instantiate --role ceo | sisys-agent load-profile --agent-id <uuid>",
+        description="SISYS Agent 命令行工具 — Agent 实例化/档案加载/任务执行/EIP 隔离管理（MVP: CEO 单 Agent）",
+        epilog=(
+            "示例: sisys-agent instantiate --role ceo | sisys-agent load-profile --agent-id <uuid> | "
+            "sisys-agent run-task --agent-id <uuid> --task <文本> | "
+            "sisys-agent isolation-status --agent-id <uuid> | "
+            "sisys-agent set-isolation --agent-id <uuid> --level L3 --reason <文本>"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

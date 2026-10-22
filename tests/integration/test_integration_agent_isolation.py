@@ -198,15 +198,18 @@ class TestFullChainIsolation:
         service = chain["isolation_service"]
         recorder = chain["recorder"]
 
-        # 1. 实例化即 L4（端到端锚——组合根 lambda 四依赖的运行时背书）
-        instantiation = await use_case.execute(role=AgentRole.CEO)
-        agent_id = instantiation.agent_id
-        isolation_key = build_key("isolation", str(agent_id))
-        raw = await real_redis.hget(isolation_key, "latest")
-        assert raw is not None, "实例化后隔离键必须真实出现"
-        assert json.loads(raw)["current_level"] == "L4"
-
+        # 预绑定（异常路径 finally 守卫——写键后任意失败仍清理双键）
+        agent_id: Any = None
+        isolation_key: str | None = None
         try:
+            # 1. 实例化即 L4（端到端锚——组合根 lambda 四依赖的运行时背书）
+            instantiation = await use_case.execute(role=AgentRole.CEO)
+            agent_id = instantiation.agent_id
+            isolation_key = build_key("isolation", str(agent_id))
+            raw = await real_redis.hget(isolation_key, "latest")
+            assert raw is not None, "实例化后隔离键必须真实出现"
+            assert json.loads(raw)["current_level"] == "L4"
+
             # 2. 服务切换 L3 → Redis 状态一致 + 事件恰一次
             result = await service.switch_isolation_level(agent_id, IsolationLevel.L3_SOFT, "集成全链切换")
             assert result.switched is True
@@ -216,8 +219,11 @@ class TestFullChainIsolation:
             assert len(events) == 1, f"事件应恰发布一次（实际 {len(events)}）"
             assert events[0].target_level is IsolationLevel.L3_SOFT
         finally:
-            # 3. 双键 teardown + exists 复核删净
-            await real_redis.delete(build_key("agent", str(agent_id)), isolation_key)
+            # 3. 双键 teardown（自包含纪律——写键后异常路径覆盖）
+            if agent_id is not None:
+                await real_redis.delete(build_key("agent", str(agent_id)), build_key("isolation", str(agent_id)))
+        assert agent_id is not None  # 成功路径必达（Optional 收窄）
+        assert isolation_key is not None
         assert not await real_redis.exists(build_key("agent", str(agent_id))), "agent 键未清理"
         assert not await real_redis.exists(isolation_key), "隔离键未清理"
 
@@ -261,15 +267,20 @@ class TestConcurrentIsolation:
         use_case = chain["use_case"]
         service = chain["isolation_service"]
 
+        # key 即时登记（写键即入册——gather 部分失败时已完成写键仍可清理）
+        keys: list[str] = []
+
         async def _one_agent(index: int) -> dict[str, Any]:
             instantiation = await use_case.execute(role=AgentRole.CEO)
+            keys.append(build_key("agent", str(instantiation.agent_id)))
+            keys.append(build_key("isolation", str(instantiation.agent_id)))
             target = IsolationLevel.L3_SOFT if index % 2 == 0 else IsolationLevel.L2_COLLAB
             switch = await service.switch_isolation_level(instantiation.agent_id, target, f"并发切换-{index}")
             state = await service.get_isolation_state(instantiation.agent_id)
             return {"agent_id": instantiation.agent_id, "target": target, "switch": switch, "state": state}
 
-        results = list(await asyncio.gather(*(_one_agent(i) for i in range(10))))
         try:
+            results = list(await asyncio.gather(*(_one_agent(i) for i in range(10))))
             assert len(results) == 10
             for item in results:
                 assert item["switch"].switched is True
@@ -279,11 +290,9 @@ class TestConcurrentIsolation:
             # 互异覆盖断言（奇偶两族均有代表）
             assert {item["target"] for item in results} == {IsolationLevel.L3_SOFT, IsolationLevel.L2_COLLAB}
         finally:
-            keys = []
-            for item in results:
-                keys.append(build_key("agent", str(item["agent_id"])))
-                keys.append(build_key("isolation", str(item["agent_id"])))
-            await real_redis.delete(*keys)
+            # 双键 teardown（登记面清理——gather 中途失败时已完成 agent 的键仍覆盖）
+            if keys:
+                await real_redis.delete(*keys)
         for key in keys:
             assert not await real_redis.exists(key), f"并发场景键未清理: {key}"
 
@@ -336,6 +345,15 @@ class TestRealEventPublishingOutbox:
             )
             from sqlalchemy import text
             from sqlalchemy.ext.asyncio import AsyncSession
+
+            # 连接级预检（PG 基建已装但服务未运行 → skip 而非红——对齐 Redis 侧
+            # ping 门控形态；短超时防拖慢 PG 在位的常规运行，dispose 防绑循环引擎泄漏）
+            try:
+                async with AsyncSession(manager.get_async_engine()) as probe_session:
+                    await probe_session.execute(text("SELECT 1"))
+            except Exception as exc:
+                await manager.get_async_engine().dispose()
+                pytest.skip(f"PostgreSQL 连接不可达: {exc}")
 
             async with AsyncSession(manager.get_async_engine(), expire_on_commit=False) as session:
                 query = text(

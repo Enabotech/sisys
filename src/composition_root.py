@@ -2716,8 +2716,9 @@ def bootstrap() -> None:
         tags=("redis", "agent"),
     )
     # InstantiateAgentUseCase — Agent 实例化用例（应用层，interface 绑定自身类型——
-    # 对齐 orchestration_service 先例；SINGLETON，工厂 resolve 三依赖：
-    # agent_config_loader + agent_repository + event_publisher）
+    # 对齐 orchestration_service 先例；SINGLETON，工厂 resolve 四依赖：
+    # agent_config_loader + agent_repository + event_publisher +
+    # isolation_management_service——Story 5.4 隔离初始化接线）
     register_port(
         name="agent_instantiation_use_case",
         version="v1.0.0",

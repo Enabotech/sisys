@@ -123,6 +123,7 @@ class IsolationManagementServicePort(Protocol):
             AgentNotFoundError: Agent 不存在（EXCEPTION_443）
             IsolationStateNotInitializedError: 隔离状态缺失（EXCEPTION_447）
             IsolationLevelNotSupportedError: 等级非法（EXCEPTION_446——实体 switch_to）
+            EntityValidationError: trigger_reason 空/空白（EXCEPTION_242——实体不变量透传）
             AgentConfigError: 配置加载失败/TTL 越界（EXCEPTION_440）
             StorageError: 存储故障（EXCEPTION_103）
         """

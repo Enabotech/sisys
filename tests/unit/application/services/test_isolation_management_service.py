@@ -193,12 +193,14 @@ class TestInitializeAgentIsolation:
     async def test_initialize_upsert_semantics(self) -> None:
         """重复初始化覆盖（upsert——重复初始化覆盖回默认等级是安全方向设计意图，
         R1-F33 注记的运行时锚）。"""
-        service, _ = _make_service()
+        service, mocks = _make_service()
         first = await service.initialize_agent_isolation(AGENT_ID, IsolationLevel.L4_HARD, 777)
         second = await service.initialize_agent_isolation(AGENT_ID, IsolationLevel.L3_SOFT, 888)
         assert second.current_level is IsolationLevel.L3_SOFT
         assert second.last_trigger_reason == "initial_default"
         assert first.initialized_at == first.updated_at  # 单 now 双用不变量
+        # upsert 语义锚: 两次初始化各触发一次仓储写（mock 仓储下的覆盖语义由 save 计数锁定）
+        assert mocks["isolation_repo"].save.await_count == 2, "重复初始化应各写一次（第二次覆盖第一次）"
 
 
 class TestGetIsolationState:
@@ -275,6 +277,20 @@ class TestSwitchIsolationLevel:
         mocks["publisher"].publish.assert_not_awaited()
         mocks["config_loader"].load.assert_not_awaited()
 
+    async def test_switch_config_load_failure_propagates_440(self) -> None:
+        """config_loader.load 抛 440 → 向上透传且 save/publish 零调用（TTL 真源在 load）。"""
+        from src.domain.exceptions import AgentConfigError
+
+        state = _make_state(IsolationLevel.L4_HARD)
+        service, mocks = _make_service(agent=_make_agent(), state=state)
+        mocks["config_loader"].load = AsyncMock(side_effect=AgentConfigError(reason="yaml 配置解析失败"))
+        with pytest.raises(AgentConfigError) as exc_info:
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "配置失败面")
+        assert exc_info.value.code == "EXCEPTION_440"
+        # load 先于 save（编排骨位 L145→L146）——配置失败时零仓储写零事件
+        mocks["isolation_repo"].save.assert_not_awaited()
+        mocks["publisher"].publish.assert_not_awaited()
+
     async def test_valid_switch_saves_with_config_ttl_and_publishes(self) -> None:
         """合法切换: save 恰一次且 ttl == config.state_ttl（config_loader.load 恰一次）
         + publish 恰一次 + 事件六字段。"""
@@ -301,6 +317,8 @@ class TestSwitchIsolationLevel:
         assert event.trigger_reason == "任务需要软隔离"
         assert event.aggregate_id == AGENT_ID
         assert event.aggregate_type == "Agent"
+        # 单钟纪律锚: 事件时刻即状态变更时刻（服务不得独立取钟——对齐实体单 now 双用叙事）
+        assert event.switch_timestamp is result.state.updated_at
         assert result.event is event
 
     async def test_publish_raise_logs_and_returns_result(self, caplog: pytest.LogCaptureFixture) -> None:

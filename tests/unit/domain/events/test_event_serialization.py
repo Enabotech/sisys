@@ -67,8 +67,8 @@ class TestToDictSerialization:
         """IsolationLevelSwitched serializes to dict."""
         event = IsolationLevelSwitched(
             agent_id=uuid.uuid4(),
-            previous_level="L4",
-            target_level="L2",
+            previous_level=IsolationLevel.L4_HARD,
+            target_level=IsolationLevel.L2_COLLAB,
             trigger_reason="joint_task",
         )
         d = event.to_dict()

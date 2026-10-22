@@ -1122,20 +1122,51 @@ tests 修改 12:
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待实施后）
-**审查模式:** （待定）
+**审查日期:** 2026-10-22 起（Round 1）
+**审查模式:** 四视角并行调研（领域模型/服务编排/Redis 仓储/CLI 与测试实跑）+ 双评审员（技术正确性/纪律合规）+ 主会话事实裁决
+
+> **编号规则**：R<轮>-F<序号> 修复落码 / R<轮>-DF<序号> deferred 登记 / 维持项入证伪留痕段。
+
+#### Round 1（2026-10-22，四视角调研 + 双评审：P1×2 + P2×5 + P3×7 落码 14 项 + 登记 2 项 + 维持 8 项）
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R1-F01 | P1 | MULTI/EXEC pipeline 原子性契约零判别力锁定——仓储 docstring 明言原子提交防孤儿键，但单测无 pipeline 交互断言，save 降级为两条独立 await 命令后全部测试仍绿（5-1 先例 test_save_uses_single_pipeline_transaction 漏抄） | 移植先例 _PipelineStub 形态至 test_redis_isolation_repository.py（pipeline 恰一次 + transaction=True + ops 恰 [hset,expire] + 同键 + execute awaited） |
+| R1-F02 | P1 | **SISYS_USE_TEST_PORTS 端口隔离被 litellm load_dotenv 静默击穿**：conftest 模块级 `_disable_litellm_logging_worker()` → import litellm → load_dotenv 将 .env 的 dev 端口注入 os.environ → `_override_config_from_env` 端口无守卫 → 6380/5433 翻回 6379/5432，验收/集成实际读写 dev 实例（实测：6380 未运行时 23 测全过；dev PG outbox 出现测试写入行） | tests/environments.py 双向修复：①`_override_config_from_env` 门控 `config.env==LOCAL and 开关` 下端口类覆盖跳过（含 MinIO host 分支内联重建 endpoint 的绕过洞）；②`_sync_config_to_environ` 端口类从 setdefault 改强制覆写（防生产 Config.from_env 与测试端口 split-brain——评审员甲抓的 P0 级遗漏联动面）；③三层 docstring 开例外注记；④tests/unit/shared/test_test_env_port_isolation.py 双向锁定 4 用例（含 dev 模式显式端口语义保留——防过度修复）。修复位选 environments.py 端口权威守卫而非 conftest（对任意第三方 import 副作用鲁棒——评审员乙合规裁定附四条件） |
+| R1-F03 | P2 | 脏数据 fail-loud 契约零测试锁定——实现侧 get_by_agent_id except Exception 已包装脏数据为 103（视角 A 静态误报「裸转换逃逸」，主会话实测定谳），但未来 except 收窄为 redis.RedisError 时脏数据将裸逃逸且测试全绿 | 3 用例锁定（非法 JSON/非法枚举值 "L9"/缺字段 → StorageError(103) + cause is not None）；实现零改动 |
+| R1-F04 | P2 | TTL 边界接受值与 bool/float 形态测试缺失——实现 L75 的 isinstance(ttl, bool) 守卫零测试（死代码态）；闭区间端点 60/2592000 无接受用例 | parametrize 补 [60,86400,2592000] 接受 + [True,3600.5] 拒绝 440（对齐 5-1 先例） |
+| R1-F05 | P2 | 446 docstring「supported_levels 从 MVP_ALLOWED_LEVELS 派生，勿硬编码」承诺与现实相悖——_SUPPORTED_LEVEL_VALUES 硬编码三枚举 .value，V2 开放 L1 需改 3 处（承诺为虚） | 改函数 `_supported_level_values()` 真派生（定义序过滤迭代——L4,L3,L2 序稳定；延迟 import 同 _mvp_allowed_levels 环约束形态）；CLI 侧 SUPPORTED_ISOLATION_LEVELS 维持字面量+双锁（R1-F34 决策在案——评审员乙裁定 A 方案正确：441 家族先例真派生 + 承诺是 5-4 自己立的） |
+| R1-F06 | P2 | 组合根 stale 注释「工厂 resolve 三依赖」vs lambda 实际四依赖（8af9a17a 只改 lambda 未改注释） | 注释改四依赖（+isolation_management_service——Story 5.4） |
+| R1-F07 | P2 | 集成场景⑤「PG 缺席动态 skip」仅拦 import 失败不拦连接失败——PG 端口不可达时测试 FAILED 而非 SKIP（违 DoD「PG 缺席 4 绿+1 skip」；对照 Redis 侧 ping→skip 门控） | 查询前连接预检（SELECT 1 失败 → dispose 引擎 + pytest.skip） |
+| R1-F08 | P3 | test_event_serialization.py L70-71 残留裸 str 构造（previous_level="L4"/target_level="L2"——8af9a17a 漏改的第三处构造点，与本 Story「裸 str 是缺陷面」纪律叙事自相矛盾） | 两行改传 IsolationLevel 枚举 |
+| R1-F09 | P3 | switch_timestamp 与 state.updated_at 两次独立取钟——一次切换三个时钟读数（事件基类 timestamp/state.updated_at/switch_timestamp），审计回溯（5.6 WORM 归档）时状态时刻与事件时刻可能不一致，背离本 Story initialize「单 now 双用」纪律 | 事件构造改 switch_timestamp=state.updated_at（事件时刻=状态变更时刻）+ import 清理 + 单测补 `is` 恒等断言（单钟纪律锚） |
+| R1-F10 | P3 | 包初始化环 docstring 链路方向叙述失实（原称 entities-first 断环）——主会话独立实验定谳（副本注入模块级 import 两方向实测）：唯一断环方向是 value_objects-first，链路经 events/__init__ L7 **archive_events**（调研视角 A 报的 tool_chain_events 亦误——events/__init__ 不导入它；评审员甲真实文件副本实证 + 主会话复现三方一致；评审员乙自建同构模拟「两方向均不断环」为方法学误报） | docstring 改实证链（value_objects-first，经 events/__init__ L7 archive_events 触发 entities/__init__） |
+| R1-F11 | P3 | 端口/服务 switch 方法 Raises 契约缺 242——空 trigger_reason 经实体 switch_to 抛 EntityValidationError 242 透传（CLI `--reason "  "` 真实可达），异常契约文档面不完整 | 两处 Raises 补 EntityValidationError 行 |
+| R1-F12 | P3 | 服务单测两缺口：①config_loader.load 抛 440 分支（端口 Raises 明文列出）零用例；②test_initialize_upsert_semantics 名为 upsert 却无 save 计数断言（判别力弱于命名承诺） | 补 test_switch_config_load_failure_propagates_440（透传 + save/publish 零调用——load 先于 save 编排骨位锚）；upsert 用例补 save.await_count == 2 |
+| R1-F13 | P3 | 集成场景① execute 段与场景④ gather 在 try 之外——中途异常时 finally 不执行/已完成写键不在清理面（违自包含纪律异常路径；朴素移入有 finally UnboundLocalError 机械坑——评审员甲注记） | 场景①预绑定 agent_id/isolation_key=None + finally 守卫 + 成功路径收窄断言；场景④ key 即时登记模式（_one_agent 内写键即入册——gather 部分失败时已完成 agent 双键仍清理） |
+| R1-F14 | P3 | CLI 帮助文本漂移——description「实例化与身份档案加载」+ epilog 仅两命令示例，未含 run-task/isolation 两代子命令（5-3 起陈旧） | description/epilog 更新含五子命令 |
+
+**登记（deferred-work.md 镜像）**：
+
+| # | 项 | 处置 |
+|---|----|------|
+| R1-DF1 | clear_scoped 接线纪律约束：DC-7 captive 缓解依赖「clear_scoped 生产未接线（SCOPED≡SINGLETON）」前提——组合根 L2879 注释自认；未来接线请求作用域时若只清 SCOPED 不清 SINGLETON，isolation_management_service 将持有绑已关闭事件循环的死亡 RedisAgentRepository（"Event loop is closed"） | deferred 登记（触发=请求作用域接线立项；接线时 clear_scoped 必须连同 clear_singleton 或翻 agent_repository SINGLETON） |
+| R1-DF2 | StorageError(103) 同码双语义分化：①构造纪律分化——redis_snapshot_store.py:133/183 `raise StorageError(...) from e` 不带 cause= 构造参数（agent/isolation 仓储 cause=exc 形态——5-1 Task 3 教训）同码两种构造纪律（snapshot 域他 Story 资产）；②语义分化——数据损坏与连接故障同码 103，监控维度不可区分（context 标记 data_corrupt 或专用码） | deferred 登记（触发=存储层异常码专项或 5.5；与 agent_repository 先例统一行动——单仓先例不动） |
+
+> **R1 证伪留痕（维持现状项——评审在案）**：①并发竞态（风险 #7 已登记，MVP 单用户 CLI 设计接受）；②publish 失败 warning 级别 vs 5-1 error 分裂已知——归属后续统一评估（DC-10 决策在案，修复需动 5-1 文件）；③get 443 守卫用 get_by_id 而非 exists（switch 需 role、单次取实例无多余往返）；④loader 放行 L1 到运行时 446（分层设计——440 配置无效 vs 446 阶段不支持语义区分）；⑤447 agent_id 默认空串（444/445 家族形态对齐，测试锁定）；⑥AC-6.2 stderr 正则宽匹配（R1-F15 文档审查定稿决策）；⑦aggregate_type="Agent"（__post_init__ 派生在位，弱观察）；⑧_print_switch_summary 防御回退/_PERF_CACHE 入参忽略（恒填充/前提文档化——弱观察）。
+> **R1 评审过程记录**：双评审员对方案给出 4 条最小修正（甲：F02 补 _sync_config_to_environ 强覆写[P0 级遗漏联动面——只修 Layer 3 会产生 split-brain 红两个真实测试]/F02 补 MinIO endpoint 洞+门控收窄/F10 链路中间环节 archive_events/F13 预绑定守卫；乙：F02 双向修复裁定/D02 钉死所指+DF 命名/DC-10 维持注记/F05 保序勿 sorted）全部吸收；评审员甲乙在环方向上事实冲突由主会话副本实验定谳（甲对）。
 
 #### 需决策 Decision Needed
 
-- [ ] （待审查周期填充）
+- [ ] （无——Round 1 无需用户决策项）
 
 #### 已修复 Patch
 
-- [ ] （待审查周期填充）
+- [x] R1-F01~F14 全部落码（14 项——详见 Round 1 表；全量回归验证见提交）
 
 #### 已推迟 Defer
 
-- [ ] （待审查周期填充）
+- [x] R1-DF1/DF2 登记 deferred-work.md（触发条件在案）
 
 ---
 
@@ -1158,15 +1189,18 @@ tests 修改 12:
 | 2026-10-21 | v1.3.0 | 文档审查周期 Round 3（单深度推演：17+1 场景三轴 + 5 时间线 + 数学完备性——含 Python 3.11.15 实测）：P1×1 + P2×3 + P3×6 修复 10 项 + 误报改判 1 项。核心：R3-F01 守卫双条件化（str,Enum 混入语义实测：合法值域裸 str "L3" in frozenset == True 穿透单守卫——isinstance 先行是唯一防线，switch_to 路径防静默类型污染）；R3-F02/F03 446 验收驱动细化（完整 yaml 基线 + config_dir 注入 + 服务级直调零残键）；R3-F04 验收侧分派改真实组装（CLAUDE.md 验收禁 mock 硬约束）；R3-F07 447 成因①方向修正（TTL 漂移不可构造）；R3-F06 并发竞态风险 #7 登记；R3-F09 双清归称终校准；R3-F10 误报留痕（L269/L271 三次定谳维持） |
 | 2026-10-21 | v1.3.1 | 文档审查周期 R4 纯验证 + R5 独立终审判收敛：R4 零规范级修复（96 锚点 98.9% 精确/红线零违规/交叉计数全过——5 项台账级 P3/P4 留项）；R5 五节取证全过（周期闭合/六项关键修复双向一致/五高风险锚全中/红线零命中/R4 留项清偿行号复核无误）——零 P0/P1/P2 残留，**收敛声明入 Story，进入 dev-story 实施**；R4 五项留项随本收敛提交清偿 |
 | 2026-10-22 | v2.0.0 | **dev-story 实施完成（Task 0-8 全勾选）**: src 新建 6 + 修改 12、tests 新建 10 + 修改 15、文档 4；验收 18/18 场景全绿（含 Task 8 收尾）、集成 5/5 绿、契约 24 断言绿、架构验证器 A-D 15 断言绿；每 Task 完整红绿变异循环（变异实证 13 项全部先红后还原）；D6/D7 留项核销落盘（5-1 台账勾选 + deferred-work 索引）；R6 改造——验收测试组织结构对齐 PG 模板（用户裁定）；实施期两发现: BDD 参数化步骤须 parsers.parse 显式声明 / isolation_state 对 isolation_policy 依赖经方法内延迟 import 打破包初始化环 |
+| 2026-10-22 | v2.1.0 | **代码审查周期 Round 1**（四视角调研 + 双评审 + 主会话事实裁决）：P1×2 + P2×5 + P3×7 落码 14 项 + 登记 DF×2 + 维持 8 项（证伪留痕）。核心：R1-F02 SISYS_USE_TEST_PORTS 端口隔离被 conftest 模块级 litellm import 的 load_dotenv 副作用静默击穿（测试实读写 dev 6379/5432——environments.py 双向修复：Layer 3 端口守卫 + sync 强覆写 + MinIO endpoint 洞 + 4 用例锁定）；R1-F01 pipeline 原子性契约判别力锁定（5-1 先例移植）；R1-F05 446 supported_levels 真派生兑现 docstring 承诺；R1-F10 环方向 docstring 主会话副本实验定谳（value_objects-first 经 archive_events 断环——三方交叉验证，调研与评审员乙的两版链路均为误报）；R1-F13 集成异常路径清理闭合（key 即时登记模式）；双评审 4 条修正全吸收（甲 P0 级 split-brain 联动面最高价值） |
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v2.1.0
 **创建日期/Created:** 2026-10-21
-**最后更新/Last Updated:** 2026-10-21
+**最后更新/Last Updated:** 2026-10-22
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查周期 Round 1（48 表行修复——详见 Docs Review Fixes R1 表）
 - v1.2.0: 文档审查周期 Round 2（17 表行修复——详见 Docs Review Fixes R2 表）
 - v1.3.0: 文档审查周期 Round 3（10 项修复 + 1 误报改判——详见 Docs Review Fixes R3 表）
 - v1.3.1: R4 纯验证 + R5 独立终审判收敛（收敛声明入 Story + R4 五项留项清偿）
+- v2.0.0: dev-story 实施完成（Task 0-8 全交付）
+- v2.1.0: 代码审查周期 Round 1（14 落码 + 2 登记 + 8 维持——详见 Review Findings R1 表）

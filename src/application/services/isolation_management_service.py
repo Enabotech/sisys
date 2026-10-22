@@ -24,7 +24,6 @@ no-op 语义（DC-5）: switch_to 返回 False → switched=False + 零仓储写
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import Sequence
 from uuid import UUID
 
@@ -123,6 +122,7 @@ class IsolationManagementService(IsolationManagementServicePort):
             AgentNotFoundError: Agent 不存在（EXCEPTION_443）
             IsolationStateNotInitializedError: 隔离状态缺失（EXCEPTION_447）
             IsolationLevelNotSupportedError: 等级非法（EXCEPTION_446——实体 switch_to）
+            EntityValidationError: trigger_reason 空/空白（EXCEPTION_242——实体不变量透传）
             AgentConfigError: 配置加载失败/TTL 越界（EXCEPTION_440）
             StorageError: 存储故障（EXCEPTION_103——透传）
         """
@@ -151,7 +151,7 @@ class IsolationManagementService(IsolationManagementServicePort):
             target_level=target_level,
             trigger_reason=trigger_reason,
             approval_chain=list(approval_chain),  # kw_only 必填形态（DC-6）+ 显式转发
-            switch_timestamp=datetime.now(UTC),
+            switch_timestamp=state.updated_at,  # 单钟纪律: 事件时刻=状态变更时刻（对齐 initialize 单 now 双用叙事）
         )
         try:
             publish_result = await self._event_publisher.publish(event)
