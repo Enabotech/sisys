@@ -16,10 +16,35 @@ POSTGRES_PORT=5432 等）注入 os.environ。若端口解析层无守卫，测�
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 
 import pytest
 
 from tests.environments import get_test_env
+
+
+@pytest.fixture(autouse=True)
+def _environ_snapshot_restore() -> Generator[None, None, None]:
+    """os.environ 全量快照恢复（文件级 autouse——对任意写入分支免疫）。
+
+    get_test_env() 的 _sync_config_to_environ 会向 os.environ 写入 host/端口
+    类键，写入面随解析分支不同（CI 分支 setdefault 写 host.docker.internal
+    全套 HOST 键与 CI 端口；test-ports 分支强覆写 11 键）——monkeypatch 只恢复
+    它自己 setenv 的键，CI 形态用例（R2-F01）的 sync 写入面全部残留
+    （QDRANT_HOST/NEO4J_HOST=host.docker.internal 等），同 worker 后续测试经
+    Layer 3 覆盖或生产 Config.from_env 直读被打到不存在的 host（R6-F01 实测
+    复现：全量跑 10 failed 的 Qdrant DNS/Neo4j resolve 失败族）。快照 diff
+    恢复对任意分支写入免疫——删除新增键 + 还原改动键。
+    """
+    snapshot = dict(os.environ)
+    yield
+    for key in list(os.environ):
+        if key not in snapshot:
+            del os.environ[key]
+    for key, value in snapshot.items():
+        if os.environ.get(key) != value:
+            os.environ[key] = value
+
 
 # litellm load_dotenv 注入形态的 dev 端口污染集（.env 同款键值）。
 # 注入集 = _sync_config_to_environ 测试端口模式强覆写写集全量（11 键）——
@@ -156,3 +181,25 @@ class TestCiEnvKeepsPortOverrideSemantics:
         assert config.env.value == "ci"
         assert config.redis.host == "host.docker.internal", "CI_CONFIG 预设 host 选择锁定"
         assert config.redis.port == 6390, "CI 形态下端口 env 覆盖应保留（门控不得误扩到 CI）"
+
+    def test_ci_case_leaves_no_host_pollution_for_successors(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CI 用例（上一用例）跑完后，同进程后续测试的 ambient 解析 host 不被污染。
+
+        回归锁（R6-F01——文件内定义序保证本用例在 CI 用例后执行）：CI 用例的
+        _sync_config_to_environ setdefault 写入面（QDRANT_HOST/NEO4J_HOST 等
+        host.docker.internal 全套）若残留，后续 get_test_env 的 Layer 3 会以
+        残留值覆盖 TEST_CONFIG 的 localhost、生产 from_env 直读同中招——
+        全量跑 Qdrant DNS/Neo4j resolve 失败族的根因形态。
+        """
+        _anchor_local_env(monkeypatch)
+        monkeypatch.setenv("SISYS_USE_TEST_PORTS", "1")
+
+        # 上一 CI 用例残留检查（快照恢复 fixture 生效则零残留）
+        for key in ("QDRANT_HOST", "NEO4J_HOST", "POSTGRES_HOST", "RABBITMQ_HOST", "MINIO_ENDPOINT"):
+            assert os.environ.get(key) != "host.docker.internal", (
+                f"{key} 残留 host.docker.internal——CI 用例 sync 写入面未恢复，后续测试 host 将被打到不存在的域名"
+            )
+
+        config = get_test_env()
+        assert config.qdrant.host == "localhost", "TEST_CONFIG 的 qdrant.host 不得被残留 env 覆盖"
+        assert config.neo4j.host == "localhost", "TEST_CONFIG 的 neo4j.host 不得被残留 env 覆盖"

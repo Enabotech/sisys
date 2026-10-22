@@ -1193,6 +1193,14 @@ tests 修改 12:
 
 > **代码审查周期收敛声明（R5 终审）**：Story 5.4 代码审查周期经 R1（四视角调研 + 双评审 + 主会话事实裁决——P1×2 + P2×5 + P3×7 落码 14 项）、R2（回归核查 + 组合交互面——P0×1 + P2×1 + P3×4 落码 6 项，其中 P0 为 R1 修复自引入的 CI 门禁击穿）、R3（单深度推演——16 格环境矩阵/CLI 三路径/八路径事件矩阵/9 格异码矩阵全闭合，P3×3 落码）、R4（纯验证——零规范级发现，9374 passed 零 warning）、R5（独立终审五节取证全过）——共 23 项落码修复 + 3 项 deferred 登记（R1-DF1/DF2/R5-DF1）+ 9 项维持（证伪留痕在案）。核心修复：SISYS_USE_TEST_PORTS 端口隔离击穿闭合（双向修复链经 R1→R2→R3 三轮深化收敛——Layer 3 守卫/sync 强覆写/MinIO 腿/CI 门禁/恢复键集）、pipeline 原子性等六类判别力锁定、446 真派生与单钟纪律兑现。全部证据与仓库现实一致，零 P0/P1/P2 残留。**代码审查周期正式收敛，Story 5.4 状态 review → done。**
 
+#### Round 6（2026-10-22，收敛后用户全量反馈紧急修复轮：R5 收敛后发现 R2-F01 自引入回归——P0×1 落码）
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| R6-F01 | **P0** | **R2-F01 新增 CI 形态用例的 sync 写入面残留回归**（用户全量实测 10 failed 中的 8 个 DNS/resolve 失败族）：CI 用例执行时 `_sync_config_to_environ` 将 CI_CONFIG 全套 host（host.docker.internal）经 setdefault 写入 os.environ（QDRANT_HOST/NEO4J_HOST/POSTGRES_HOST/RABBITMQ_HOST/MINIO_ENDPOINT + CI 端口键）——这些键不在 monkeypatch 管辖（用例只 setenv 4 键）→ teardown 全残留 → 同 worker 后续测试经 Layer 3 覆盖（qdrant.host='host.docker.internal'）或生产 from_env 直读到不存在域名（Neo4j `Cannot resolve host.docker.internal:7687`/Qdrant `Name or service not known`）。**主会话三阶段脚本复现实证**（CI 用例 → teardown 残留 → 后续 get_test_env 被污染）；R3-F01 只修了 test-ports 分支的 11 键恢复，CI 分支的 HOST 键写入面漏修（写集随分支不同） | 文件级 autouse `_environ_snapshot_restore` fixture——os.environ 全量快照 diff 恢复（删除新增键+还原改动键，对任意写入分支免疫）+ 回归锁用例 `test_ci_case_leaves_no_host_pollution_for_successors`（文件内序在 CI 用例后，断言零 host 残留 + ambient 解析 localhost）。验证：失败面 dev 模式 66 passed 全绿 |
+
+> R6 同批甄别（用户 10 failed 全量定谳）：①8 个 DNS/resolve 失败 = R6-F01 回归（已修复——dev 模式复跑 66 passed）；②1 个 Redis 6380 ConnectionRefused = test-ports 模式 6380 容器缺失的诚实红（修复前假绿打 dev 6379；已重起 6380 容器，storage 测试 23 passed）+ 该测试无 ping 门控属既有缺口族；③1 个 LLM smoke = 环境波动（单独跑 passed 209s 真实调用——全量并发下 LLM 端点慢，非回归）。
+
 **登记（deferred-work.md 镜像）**：
 
 | # | 项 | 处置 |
