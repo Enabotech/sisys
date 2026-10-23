@@ -18,7 +18,9 @@ from src.domain.exceptions.agent_exceptions import (
     AgentRoleNotSupportedError,
     AgentWorkflowError,
     ChainOfThoughtValidationError,
+    IsolationAccessViolationError,
     IsolationLevelNotSupportedError,
+    IsolationOperationForbiddenError,
     IsolationStateNotInitializedError,
 )
 from src.domain.exceptions.archive_exceptions import (
@@ -297,7 +299,7 @@ __all__ = [
     "ToolVersionAlreadyExistsError",
     "ToolVersionTrafficWeightError",
     "ToolVersionRollbackError",
-    # Agent 子域异常（Story 5.1 + Story 5.2 + Story 5.3 + Story 5.4）
+    # Agent 子域异常（Story 5.1 + Story 5.2 + Story 5.3 + Story 5.4 + Story 5.5）
     "AgentConfigError",
     "AgentRoleNotSupportedError",
     "AgentProfileError",
@@ -306,6 +308,8 @@ __all__ = [
     "ChainOfThoughtValidationError",
     "IsolationLevelNotSupportedError",
     "IsolationStateNotInitializedError",
+    "IsolationAccessViolationError",
+    "IsolationOperationForbiddenError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

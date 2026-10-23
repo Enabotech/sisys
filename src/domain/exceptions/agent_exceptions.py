@@ -380,6 +380,101 @@ class IsolationStateNotInitializedError(BusinessException):
         super().__init__(message=message, cause=cause, context=context)
 
 
+class IsolationAccessViolationError(BusinessException):
+    """跨 Agent 私有资源访问越权（Story 5.5 — Agent 三重硬隔离保证）
+
+    触发场景: actor ≠ target 且目标资源归属 private 类（Prompt/数据面全资源——
+    三重隔离判定矩阵 private+cross 格拒绝）。与 449 的分界: 448 = 跨主体越权，
+    449 = 单主体操作被自身等级策略禁止——两语义轴正交。
+    HTTP 403（权限不足族——Forbidden 语义，非 404 资源不存在也非 422 取值非法）。
+
+    Attributes:
+        code: EXCEPTION_448
+        message: 默认消息（面向调用方可理解——禁泄露资源内容/内部键名，仅资源类别）
+        context: 领域上下文五字段（actor_agent_id/target_agent_id/resource/operation/
+            reason——reason 承载判定依据含等级名，并发串扰判别与三段式断言锚）
+    """
+
+    code = "EXCEPTION_448"
+    message = "Agent 间私有资源访问被隔离策略拒绝"
+
+    def __init__(
+        self,
+        actor_agent_id: str,
+        target_agent_id: str,
+        resource: str,
+        operation: str,
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化跨 Agent 私有资源访问越权异常
+
+        Args:
+            actor_agent_id: 发起访问的 Agent 标识（字符串形态）
+            target_agent_id: 被访问的 Agent 标识（字符串形态）
+            resource: 资源归属分类值（IsolationResource.value——仅类别非内容）
+            operation: 访问操作（read/write）
+            reason: 判定依据（decision.reason——含等级名「硬隔离/软隔离」）
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链）
+        """
+        context: dict[str, str] = {
+            "actor_agent_id": actor_agent_id,
+            "target_agent_id": target_agent_id,
+            "resource": resource,
+            "operation": operation,
+            "reason": reason,
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class IsolationOperationForbiddenError(BusinessException):
+    """当前隔离等级策略禁止的操作（Story 5.5 — Agent 三重硬隔离保证）
+
+    触发场景（两类——同码多因，context.reason 编码触发细分）:
+    ① L4 严格白名单外工具请求（reason=tool_not_in_allowlist:{tool_name}）；
+    ② READ_ONLY/RESTRICTED_WRITE 等级下共享面写（reason=data_isolation:{mode}——
+       MVP 受限写白名单未定义一律拒，Story 5.5 D-4）。
+    与 448 的分界: 449 = 单主体操作被自身等级策略禁止（不涉跨主体）。
+    HTTP 403（权限不足族）。
+
+    Attributes:
+        code: EXCEPTION_449
+        message: 默认消息
+        context: 领域上下文三字段（agent_id/operation/reason——最小化，白名单
+            明细不进 context，经配置通道可查）
+    """
+
+    code = "EXCEPTION_449"
+    message = "当前隔离等级策略禁止该操作"
+
+    def __init__(
+        self,
+        agent_id: str,
+        operation: str,
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """初始化隔离等级策略禁止操作异常
+
+        Args:
+            agent_id: 被策略约束的 Agent 标识（字符串形态）
+            operation: 被禁止的操作（execute/write 等动词形态）
+            reason: 判定依据（decision.reason——tool_not_in_allowlist:{name} 或
+                data_isolation:{mode} 双形态）
+            message: 覆盖默认消息（可选）
+            cause: 原始异常（可选，用于异常链）
+        """
+        context: dict[str, str] = {
+            "agent_id": agent_id,
+            "operation": operation,
+            "reason": reason,
+        }
+        super().__init__(message=message, cause=cause, context=context)
+
+
 __all__ = [
     "AgentConfigError",
     "AgentNotFoundError",
@@ -387,6 +482,8 @@ __all__ = [
     "AgentRoleNotSupportedError",
     "AgentWorkflowError",
     "ChainOfThoughtValidationError",
+    "IsolationAccessViolationError",
     "IsolationLevelNotSupportedError",
+    "IsolationOperationForbiddenError",
     "IsolationStateNotInitializedError",
 ]

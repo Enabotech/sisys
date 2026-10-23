@@ -61,7 +61,9 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    IsolationAccessViolationError,
     IsolationLevelNotSupportedError,
+    IsolationOperationForbiddenError,
     IsolationStateNotInitializedError,
     LayeredRetrievalError,
     LevelTransitionError,
@@ -275,6 +277,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ChainOfThoughtValidationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 445 — 思维链完整性校验失败（系统组装缺陷语义）
     IsolationLevelNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,  # 446 — 隔离等级不支持（MVP 白名单）
     IsolationStateNotInitializedError: status.HTTP_404_NOT_FOUND,  # 447 — 隔离状态未初始化（404 族）
+    IsolationAccessViolationError: status.HTTP_403_FORBIDDEN,  # 448 — 跨 Agent 私有资源访问越权（Story 5.5 三重硬隔离）
+    IsolationOperationForbiddenError: status.HTTP_403_FORBIDDEN,  # 449 — 等级策略禁止操作（Story 5.5 白名单外工具/共享面写拒）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

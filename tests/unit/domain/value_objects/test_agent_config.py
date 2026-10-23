@@ -14,6 +14,7 @@ Run with:
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 import pytest
 
@@ -270,3 +271,61 @@ class TestScalarFieldTypeGuards:
         with pytest.raises(AgentConfigError) as exc_info:
             _make_config(name="   ")
         assert exc_info.value.code == "EXCEPTION_440"
+
+
+# ===================================================================
+# Story 5-5 追加：allowed_tools 工具白名单字段（eip_config 配置资产）
+# ===================================================================
+
+
+class TestAllowedToolsField:
+    """allowed_tools 字段契约（Story 5.5——工具白名单配置载体）。
+
+    默认空元组 = L4 下全部工具被拒的 fail-closed 安全默认（忘配即全拒，
+    集成测试红即暴露）；去重归一由 loader 承载（VO 只守卫不归一）。
+    """
+
+    def test_default_empty_tuple(self) -> None:
+        """默认空元组（fail-closed 安全默认——未配置白名单即全拒）。"""
+        config = _make_config()
+        assert config.allowed_tools == ()
+
+    def test_valid_list_construction(self) -> None:
+        """合法清单构造 + tuple 形态断言（frozen VO 惯例 tuple 形态）。"""
+        config = _make_config(allowed_tools=("PESTEL 分析", "SWOT-TOWS"))
+        assert config.allowed_tools == ("PESTEL 分析", "SWOT-TOWS")
+        assert isinstance(config.allowed_tools, tuple)
+
+    def test_non_string_element_raises_440(self) -> None:
+        """元素非 str → 440（配置资产 VO 分码——Any 变量传参规避 mypy 静态
+        类型拒绝，运行时守卫行为本身就是要测的；5-4 R1-F03 分界原则沿用）。"""
+        bad_value: Any = ("PESTEL 分析", 123)
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(allowed_tools=bad_value)
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "allowed_tools" in exc_info.value.context.get("reason", "")
+
+    def test_whitespace_string_element_raises_440(self) -> None:
+        """空白串元素 → 440（白名单条目必须是有效工具名——空白即无效）。"""
+        with pytest.raises(AgentConfigError) as exc_info:
+            _make_config(allowed_tools=("PESTEL 分析", "   "))
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "allowed_tools" in exc_info.value.context.get("reason", "")
+
+    def test_empty_tuple_is_valid(self) -> None:
+        """空元组合法（显式配置空白名单 = 全拒语义——与默认值同态）。"""
+        config = _make_config(allowed_tools=())
+        assert config.allowed_tools == ()
+
+    def test_backward_compatible_without_field(self) -> None:
+        """既有构造点不带 allowed_tools 零破坏（向后兼容确认——默认空元组）。"""
+        config = AgentConfig(
+            role=AgentRole.CEO,
+            name="CEO Agent",
+            description="首席执行官 Agent",
+            version="1.0.0",
+            responsibilities=("战略方向",),
+            domain_knowledge=("宏观趋势",),
+            preferred_model=None,
+        )
+        assert config.allowed_tools == ()

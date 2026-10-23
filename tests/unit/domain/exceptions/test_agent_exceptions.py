@@ -624,3 +624,227 @@ class TestSubdomainRegistrationStory54:
             IsolationStateNotInitializedError.code,
         }
         assert len(codes) == 8, f"agent 子域八码应互异: {codes}"
+
+
+# ===================================================================
+# Story 5-5 追加：IsolationAccessViolationError(448) / IsolationOperationForbiddenError(449)
+# ===================================================================
+
+
+class TestIsolationAccessViolationErrorConstruction:
+    """448 构造契约（跨 Agent 私有资源访问越权，继承 BusinessException——403 Forbidden 族）。
+
+    构造器对齐 446/441 首参必填形态: actor_agent_id 必填; context 携带五字段
+    （actor/target/resource/operation/reason——reason 承载判定依据含等级名，
+    并发串扰判别与三段式断言的结构化通道）。
+    """
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import IsolationAccessViolationError
+
+        error = IsolationAccessViolationError(
+            actor_agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            target_agent_id="1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+            resource="profile",
+            operation="read",
+            reason="跨 Agent 私有资源访问被拒（硬隔离）",
+        )
+        assert error.code == "EXCEPTION_448"
+        assert error.message, "默认消息不能为空"
+        assert "隔离" in error.message, "消息面向调用方可理解（禁泄露资源内容/内部键名）"
+
+    def test_actor_agent_id_is_required_first_param(self) -> None:
+        """actor_agent_id 必填（446/441 同款无默认值——省略即 TypeError；Any
+        变量调用规避 mypy 签名检查——必填缺失本身就是要测的运行时行为）。"""
+        from typing import Any
+
+        from src.domain.exceptions import IsolationAccessViolationError
+
+        error_cls: Any = IsolationAccessViolationError
+        with pytest.raises(TypeError):
+            error_cls()
+
+    def test_context_carries_five_fields(self) -> None:
+        """context 五字段逐项（actor/target/resource/operation/reason——
+        reason 含等级名是并发串扰判别锚）。"""
+        from src.domain.exceptions import IsolationAccessViolationError
+
+        actor = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        target = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+        reason = "跨 Agent 私有资源访问被拒（软隔离）"
+        error = IsolationAccessViolationError(
+            actor_agent_id=actor, target_agent_id=target, resource="session", operation="write", reason=reason
+        )
+        assert set(error.context) == {"actor_agent_id", "target_agent_id", "resource", "operation", "reason"}
+        assert error.context["actor_agent_id"] == actor
+        assert error.context["target_agent_id"] == target
+        assert error.context["resource"] == "session"
+        assert error.context["operation"] == "write"
+        assert error.context["reason"] == reason
+        assert "软隔离" in error.context["reason"], "reason 须含等级名（串扰判别锚）"
+
+    def test_inherits_business_exception(self) -> None:
+        """448 入 BusinessException（跨主体越权——403 权限不足族语义）。"""
+        from src.domain.exceptions import BusinessException, IsolationAccessViolationError
+
+        error = IsolationAccessViolationError(
+            actor_agent_id="a", target_agent_id="b", resource="memory", operation="read", reason="判定依据"
+        )
+        assert isinstance(error, BusinessException)
+
+    def test_to_dict_contains_code_and_context(self) -> None:
+        """to_dict 含编码与五字段 context（CLI stderr 断言锚）。"""
+        from src.domain.exceptions import IsolationAccessViolationError
+
+        error = IsolationAccessViolationError(
+            actor_agent_id="a", target_agent_id="b", resource="profile", operation="read", reason="判定依据"
+        )
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_448"
+        assert data["context"]["actor_agent_id"] == "a"
+        assert data["context"]["resource"] == "profile"
+
+
+class TestIsolationOperationForbiddenErrorConstruction:
+    """449 构造契约（当前隔离等级策略禁止的操作，继承 BusinessException——403 族）。
+
+    与 448 分界: 448 = 跨主体越权（actor≠target 私有资源）; 449 = 单主体操作被
+    自身等级策略禁止（白名单外工具 / READ_ONLY·RESTRICTED_WRITE 共享面写）——
+    两语义轴正交。reason 双形态: tool_not_in_allowlist:{name} / data_isolation:{mode}。
+    """
+
+    def test_default_message_and_code(self) -> None:
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        error = IsolationOperationForbiddenError(agent_id="0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", operation="execute")
+        assert error.code == "EXCEPTION_449"
+        assert error.message, "默认消息不能为空"
+
+    def test_agent_id_is_required_first_param(self) -> None:
+        """agent_id 必填（448/446/441 同款无默认值——省略即 TypeError）。"""
+        from typing import Any
+
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        error_cls: Any = IsolationOperationForbiddenError
+        with pytest.raises(TypeError):
+            error_cls()
+
+    def test_context_carries_three_fields(self) -> None:
+        """context 三字段（agent_id/operation/reason——最小化，白名单明细不进）。"""
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        error = IsolationOperationForbiddenError(
+            agent_id="agent-1", operation="execute", reason="tool_not_in_allowlist:幻觉工具"
+        )
+        assert set(error.context) == {"agent_id", "operation", "reason"}
+        assert error.context["agent_id"] == "agent-1"
+        assert error.context["operation"] == "execute"
+        assert error.context["reason"] == "tool_not_in_allowlist:幻觉工具"
+
+    @pytest.mark.parametrize(
+        ("operation", "reason"),
+        [
+            ("execute", "tool_not_in_allowlist:GE-麦肯锡矩阵"),
+            ("write", "data_isolation:read_only"),
+        ],
+        ids=["工具白名单外", "共享面只读写"],
+    )
+    def test_dual_trigger_paths(self, operation: str, reason: str) -> None:
+        """449 双触发路径参数化: L4 白名单外工具 + READ_ONLY 等级共享面写
+        （同码多因经 context reason 区分——446 双路径先例）。"""
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        error = IsolationOperationForbiddenError(agent_id="agent-1", operation=operation, reason=reason)
+        assert error.code == "EXCEPTION_449"
+        assert error.context["reason"] == reason
+
+    def test_inherits_business_exception(self) -> None:
+        """449 入 BusinessException（操作被策略禁止——403 族语义）。"""
+        from src.domain.exceptions import BusinessException, IsolationOperationForbiddenError
+
+        error = IsolationOperationForbiddenError(agent_id="a", operation="write", reason="data_isolation:read_only")
+        assert isinstance(error, BusinessException)
+
+    def test_to_dict_contains_code(self) -> None:
+        """to_dict 含编码（CLI stderr 断言锚）。"""
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        error = IsolationOperationForbiddenError(agent_id="a", operation="execute", reason="r")
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_449"
+        assert data["context"]["agent_id"] == "a"
+
+
+class TestHttpMappingStory55:
+    """经 _get_http_status 反向验证 448/449 精确注册（403 权限不足族）。"""
+
+    def test_access_violation_maps_403(self) -> None:
+        """448 → 403（Forbidden——跨主体越权标准码）。"""
+        from src.domain.exceptions import IsolationAccessViolationError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = IsolationAccessViolationError(
+            actor_agent_id="a", target_agent_id="b", resource="profile", operation="read", reason="r"
+        )
+        assert _get_http_status(error) == 403
+
+    def test_operation_forbidden_maps_403(self) -> None:
+        """449 → 403（Forbidden——操作被策略禁止）。"""
+        from src.domain.exceptions import IsolationOperationForbiddenError
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = IsolationOperationForbiddenError(agent_id="a", operation="execute", reason="r")
+        assert _get_http_status(error) == 403
+
+    def test_precise_registration_no_fallback(self) -> None:
+        """反向验证: EXCEPTION_HTTP_MAP 精确注册 448/449 → 403。"""
+        from src.domain.exceptions import IsolationAccessViolationError, IsolationOperationForbiddenError
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert EXCEPTION_HTTP_MAP[IsolationAccessViolationError] == 403
+        assert EXCEPTION_HTTP_MAP[IsolationOperationForbiddenError] == 403
+
+
+class TestSubdomainRegistrationStory55:
+    """448/449 子域登记（agent 段预留位核销——440-449 至此全分配）。"""
+
+    def test_classes_registered_in_agent_subdomain(self) -> None:
+        assert _CLASS_TO_SUBDOMAIN["IsolationAccessViolationError"] == "agent"
+        assert _CLASS_TO_SUBDOMAIN["IsolationOperationForbiddenError"] == "agent"
+
+    def test_codes_within_agent_range(self) -> None:
+        from src.domain.exceptions import IsolationAccessViolationError, IsolationOperationForbiddenError
+
+        low, high = CODE_RANGES["agent"]
+        assert low <= int(IsolationAccessViolationError.code.removeprefix("EXCEPTION_")) <= high
+        assert low <= int(IsolationOperationForbiddenError.code.removeprefix("EXCEPTION_")) <= high
+
+    def test_codes_unique_across_agent_subdomain_ten(self) -> None:
+        """448/449 与既有 440-447 码值互异（十码全查重——agent 段全分配终态）。"""
+        from src.domain.exceptions import (
+            AgentConfigError,
+            AgentNotFoundError,
+            AgentProfileError,
+            AgentRoleNotSupportedError,
+            AgentWorkflowError,
+            ChainOfThoughtValidationError,
+            IsolationAccessViolationError,
+            IsolationLevelNotSupportedError,
+            IsolationOperationForbiddenError,
+            IsolationStateNotInitializedError,
+        )
+
+        codes = {
+            AgentConfigError.code,
+            AgentRoleNotSupportedError.code,
+            AgentProfileError.code,
+            AgentNotFoundError.code,
+            AgentWorkflowError.code,
+            ChainOfThoughtValidationError.code,
+            IsolationLevelNotSupportedError.code,
+            IsolationStateNotInitializedError.code,
+            IsolationAccessViolationError.code,
+            IsolationOperationForbiddenError.code,
+        }
+        assert len(codes) == 10, f"agent 子域十码应互异: {codes}"

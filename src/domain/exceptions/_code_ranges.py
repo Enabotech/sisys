@@ -109,7 +109,7 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 遵循 data_source 410-419 / debate 420-429 独立段先例）
     # EXCEPTION_434-439 暂不分配，保持空段预留
     "tool_version": (430, 439),
-    # Agent 子域（440-449）—— Story 5.1 注册 2 个 + Story 5.2 追加 2 个 + Story 5.3 追加 2 个 + Story 5.4 追加 2 个异常:
+    # Agent 子域（440-449）—— Story 5.1 注册 2 个 + 5.2 追加 2 个 + 5.3 追加 2 个 + 5.4 追加 2 个 + 5.5 追加 2 个:
     # EXCEPTION_440 AgentConfigError (Story 5.1, 配置文件缺失/YAML 解析失败/必填字段无效/role 不匹配/state_ttl 越界)
     # EXCEPTION_441 AgentRoleNotSupportedError (Story 5.1, MVP 未开放角色实例化请求)
     # EXCEPTION_442 AgentProfileError (Story 5.2, 档案目录缺失/文件缺失/不可读/编码非法/内容空白/超 64KB 上限/VO 字段类型非法)
@@ -120,11 +120,15 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   合法枚举越 MVP 白名单即 L1 融合态)
     # EXCEPTION_447 IsolationStateNotInitializedError (Story 5.4, 隔离状态缺失——存量 Agent 无隔离键/
     #   未初始化查询/fail-fast 残留态)
+    # EXCEPTION_448 IsolationAccessViolationError (Story 5.5, 跨 Agent 私有资源访问越权——Prompt/数据面
+    #   private+cross 格拦截，context 五字段含 reason 等级名)
+    # EXCEPTION_449 IsolationOperationForbiddenError (Story 5.5, 当前隔离等级策略禁止的操作——白名单外工具
+    #   [tool_not_in_allowlist:{name}] 或 READ_ONLY/RESTRICTED_WRITE 共享面写 [data_isolation:{mode}] 双形态)
     # 445 的 missing_fields 上下文为同码多因区分锚点（异常契约三层校验次序②的改写目标）
     # 440/442/444/445 语义归属 system（SystemException 子类——配置/档案资产/工作流执行属系统资源）、
-    # 441/443/446/447 语义归属 business（BusinessException 子类——阶段性能力范围限制/请求资源不存在/
-    # 不支持的隔离取值/隔离状态资源缺失），物理段独立（遵循独立段先例）
-    # EXCEPTION_448-449 预留（Story 5.5 三重硬隔离强制执行）
+    # 441/443/446/447/448/449 语义归属 business（BusinessException 子类——阶段性能力范围限制/请求资源不存在/
+    # 不支持的隔离取值/隔离状态资源缺失/跨主体越权/等级策略禁止操作），物理段独立（遵循独立段先例）
+    # agent 段 440-449 至此全分配（Story 5.5 预留位核销）
     "agent": (440, 449),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -278,7 +282,7 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ToolVersionAlreadyExistsError": "tool_version",
     "ToolVersionTrafficWeightError": "tool_version",
     "ToolVersionRollbackError": "tool_version",
-    # agent_exceptions.py (Story 5.1 新增 2 个异常, Story 5.2 追加 2 个, Story 5.3 追加 2 个)
+    # agent_exceptions.py (Story 5.1 新增 2 个异常, Story 5.2 追加 2 个, Story 5.3 追加 2 个, Story 5.5 追加 2 个)
     "AgentConfigError": "agent",
     "AgentRoleNotSupportedError": "agent",
     "AgentProfileError": "agent",
@@ -287,6 +291,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ChainOfThoughtValidationError": "agent",
     "IsolationLevelNotSupportedError": "agent",
     "IsolationStateNotInitializedError": "agent",
+    "IsolationAccessViolationError": "agent",
+    "IsolationOperationForbiddenError": "agent",
 }
 
 

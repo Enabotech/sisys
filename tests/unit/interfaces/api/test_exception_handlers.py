@@ -67,7 +67,9 @@ from src.domain.exceptions import (
     InsufficientTokenError,
     InvalidStateError,
     InvalidStateTransitionError,
+    IsolationAccessViolationError,
     IsolationLevelNotSupportedError,
+    IsolationOperationForbiddenError,
     IsolationStateNotInitializedError,
     LayeredRetrievalError,
     LevelTransitionError,
@@ -344,6 +346,8 @@ class TestExceptionHttpMap:
             ChainOfThoughtValidationError,  # 445 — Story 5.3 思维链完整性校验失败（500）
             IsolationLevelNotSupportedError,  # 446 — Story 5.4 隔离等级不支持（422）
             IsolationStateNotInitializedError,  # 447 — Story 5.4 隔离状态未初始化（404）
+            IsolationAccessViolationError,  # 448 — Story 5.5 跨 Agent 私有资源访问越权（403）
+            IsolationOperationForbiddenError,  # 449 — Story 5.5 隔离等级策略禁止操作（403）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

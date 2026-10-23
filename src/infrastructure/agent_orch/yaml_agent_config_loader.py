@@ -135,6 +135,20 @@ class YamlAgentConfigLoader(AgentConfigLoader):
         except ValueError:
             _fail(f"eip_config.default_isolation_level 非法隔离等级值: {isolation_str}")
 
+        # eip_config.allowed_tools：缺失 → 空元组（fail-closed 安全默认——L4 下全拒）；
+        # 非 list 显式 440；元素逐个 str + 非空白守卫（白名单条目必须是有效工具名——
+        # 中文名含半角空格/$ 等特殊字符逐字节保真，禁归一改写）；
+        # 去重保序是 loader 新引入行为（dict.fromkeys 模式——配置容错，Story 5.5）
+        allowed_raw = eip_config.get("allowed_tools") if isinstance(eip_config, dict) else None
+        allowed_tools: tuple[str, ...] = ()
+        if allowed_raw is not None:
+            if not isinstance(allowed_raw, list):
+                _fail("eip_config.allowed_tools 必须为字符串列表")
+            for item in allowed_raw:
+                if not isinstance(item, str) or not item.strip():
+                    _fail(f"eip_config.allowed_tools 元素必须为非空白字符串（实际 {item!r}）")
+            allowed_tools = tuple(dict.fromkeys(allowed_raw))
+
         memory_raw = data.get("memory_config")
         if memory_raw is not None and not isinstance(memory_raw, dict):
             _fail("memory_config 段必须为映射结构")
@@ -159,6 +173,7 @@ class YamlAgentConfigLoader(AgentConfigLoader):
             preferred_model=preferred_model,
             state_ttl=state_ttl,
             default_isolation_level=default_isolation_level,
+            allowed_tools=allowed_tools,
         )
 
     @staticmethod

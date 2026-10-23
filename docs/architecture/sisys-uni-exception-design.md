@@ -737,7 +737,8 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_445 | ChainOfThoughtValidationError | SystemException | 500 |（Story 5.3，思维链终局组装后完整性校验失败——五字段缺一/空值/结构非法，context.missing_fields 区分锚点；三层校验次序：LLM Schema 失败→331→444、VO 242 改写 445、服务自检直接 445）|
 | EXCEPTION_446 | IsolationLevelNotSupportedError | BusinessException | 422 |（Story 5.4，EIP 隔离等级不合法——双触发路径：①非法枚举值字符串（CLI `_parse_isolation_level` 第一道转换守卫，禁裸 IsolationLevel(value) 的 ValueError 逃逸）②合法枚举但越 MVP_ALLOWED_LEVELS 即 L1 融合态（实体 initialize/switch_to 双条件 isinstance 守卫）；构造器对齐 441 形态，context={level, supported_levels}；HTTP 422 对齐 441「不支持的取值」族精确注册先例）|
 | EXCEPTION_447 | IsolationStateNotInitializedError | BusinessException | 404 |（Story 5.4，Agent EIP 隔离状态缺失——三成因：存量 Agent 无隔离键（5.4 部署前实例化）/未初始化查询/实例化 fail-fast 后键残留（服务级同 id 重 initialize 可自愈，用例/CLI 通道靠 TTL 回收）；与 443「Agent 不存在」是两聚合两语义的精确诊断分离，context={agent_id}；HTTP 404 对齐 443 NotFound 族）|
-| EXCEPTION_448~449 | （预留 agent 子域）| — | — |（Story 5.5 三重硬隔离强制执行）|
+| EXCEPTION_448 | IsolationAccessViolationError | BusinessException | 403 |（Story 5.5，跨 Agent 私有资源访问越权——三重隔离判定矩阵 private+cross 格拦截（Prompt/数据面全资源，L4/L3/L2 全等级）；与 449 两语义轴正交：448=跨主体越权（actor≠target 私有资源）、449=单主体操作被自身等级禁止；构造器对齐 446/441 首参必填形态，context 五字段={actor_agent_id, target_agent_id, resource, operation, reason}——reason 承载判定依据含等级名（decision.reason，并发串扰判别锚）；消息面向调用方可理解禁泄露资源内容/内部键名；HTTP 403 权限不足族（Forbidden 语义，非 404 非 422））|
+| EXCEPTION_449 | IsolationOperationForbiddenError | BusinessException | 403 |（Story 5.5，当前隔离等级策略禁止的操作——双触发路径（同码多因 context.reason 编码区分，446 双路径先例）：①L4 严格白名单外工具请求（reason=tool_not_in_allowlist:{tool_name}——白名单明细不进 context 禁泄露，经配置通道可查）②READ_ONLY/RESTRICTED_WRITE 等级共享面写（reason=data_isolation:{mode}——MVP 受限写白名单未定义一律拒，D-4）；context 三字段={agent_id, operation, reason}；HTTP 403；agent 段 440-449 至此全分配）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——

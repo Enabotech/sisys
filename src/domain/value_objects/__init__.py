@@ -52,6 +52,15 @@ from src.domain.value_objects.intrusion_detection_result import (
     AttackDetectionResult,
     IntrusionStats,
 )
+from src.domain.value_objects.isolation_access import (
+    AccessOperation,
+    IsolationAccessDecision,
+    IsolationResource,
+    IsolationViolationKind,
+    decide_isolation_access,
+    decide_tool_access,
+    resource_is_private,
+)
 from src.domain.value_objects.isolation_policy import (
     ISOLATION_POLICIES,
     MVP_ALLOWED_LEVELS,
@@ -138,6 +147,13 @@ __all__ = [
     "DataIsolationMode",
     "IsolationPolicy",
     "get_isolation_policy",
+    "AccessOperation",
+    "IsolationAccessDecision",
+    "IsolationResource",
+    "IsolationViolationKind",
+    "decide_isolation_access",
+    "decide_tool_access",
+    "resource_is_private",
     "MAX_ARCHIVE_EXTRACTED_SIZE",
     "MAX_BATCH_COUNT",
     "MAX_BATCH_SIZE",

@@ -315,3 +315,93 @@ class TestIsolationLevelConversion:
         _write_config(tmp_path, VALID_YAML.replace('default_isolation_level: "L4"', 'default_isolation_level: "L1"'))
         config = await _load(tmp_path)
         assert config.default_isolation_level is IsolationLevel.L1_FUSED
+
+
+# ===================================================================
+# Story 5-5 追加：eip_config.allowed_tools 工具白名单解析
+# ===================================================================
+
+
+class TestAllowedToolsParsing:
+    """eip_config.allowed_tools 解析契约（Story 5.5——工具白名单真源通道）。
+
+    照抄 default_isolation_level 解析形态: 缺失回落（空元组 fail-closed）/
+    类型守卫非 list → 440 / 元素空白 → 440; 去重保序是 loader 新引入行为
+    （dict.fromkeys 模式——run_tool_chain.py 仓内先例，配置容错）。
+    """
+
+    async def test_missing_key_falls_back_empty_tuple(self, tmp_path: Path) -> None:
+        """eip_config.allowed_tools 缺失 → 空元组（fail-closed 安全默认）。"""
+        _write_config(tmp_path, VALID_YAML)
+        config = await _load(tmp_path)
+        assert config.allowed_tools == ()
+
+    async def test_eip_section_missing_falls_back_empty_tuple(self, tmp_path: Path) -> None:
+        """eip_config 整段缺失 → 空元组（与键缺失同回落）。"""
+        yaml_without_eip = VALID_YAML.replace('eip_config:\n  default_isolation_level: "L4"\n', "")
+        _write_config(tmp_path, yaml_without_eip)
+        config = await _load(tmp_path)
+        assert config.default_isolation_level is IsolationLevel.L4_HARD
+        assert config.allowed_tools == ()
+
+    async def test_valid_list_parsed(self, tmp_path: Path) -> None:
+        """合法清单解析（中文名含半角空格逐字节保真——禁 yaml 改写）。"""
+        yaml_with_tools = VALID_YAML.replace(
+            'eip_config:\n  default_isolation_level: "L4"\n',
+            'eip_config:\n  default_isolation_level: "L4"\n'
+            '  allowed_tools:\n    - "PESTEL 分析"\n    - "GE-麦肯锡矩阵"\n    - "$APPEALS"\n',
+        )
+        _write_config(tmp_path, yaml_with_tools)
+        config = await _load(tmp_path)
+        assert config.allowed_tools == ("PESTEL 分析", "GE-麦肯锡矩阵", "$APPEALS")
+
+    async def test_dedup_preserving_order(self, tmp_path: Path) -> None:
+        """重复项去重保序（loader 配置容错——dict.fromkeys 模式）。"""
+        yaml_with_dupes = VALID_YAML.replace(
+            'eip_config:\n  default_isolation_level: "L4"\n',
+            'eip_config:\n  default_isolation_level: "L4"\n'
+            '  allowed_tools:\n    - "SWOT-TOWS"\n    - "PESTEL 分析"\n    - "SWOT-TOWS"\n',
+        )
+        _write_config(tmp_path, yaml_with_dupes)
+        config = await _load(tmp_path)
+        assert config.allowed_tools == ("SWOT-TOWS", "PESTEL 分析")
+
+    async def test_non_list_type_raises_440(self, tmp_path: Path) -> None:
+        """非 list 类型（字符串标量）→ 440。"""
+        yaml_scalar_tool = VALID_YAML.replace(
+            '  default_isolation_level: "L4"\n', '  default_isolation_level: "L4"\n  allowed_tools: "PESTEL 分析"\n'
+        )
+        _write_config(tmp_path, yaml_scalar_tool)
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+        assert "allowed_tools" in exc_info.value.context.get("reason", "")
+
+    async def test_blank_element_raises_440(self, tmp_path: Path) -> None:
+        """元素空串/空白 → 440（白名单条目必须是有效工具名）。"""
+        yaml_with_blank = VALID_YAML.replace(
+            'eip_config:\n  default_isolation_level: "L4"\n',
+            'eip_config:\n  default_isolation_level: "L4"\n  allowed_tools:\n    - "PESTEL 分析"\n    - ""\n',
+        )
+        _write_config(tmp_path, yaml_with_blank)
+        with pytest.raises(AgentConfigError) as exc_info:
+            await _load(tmp_path)
+        assert exc_info.value.code == "EXCEPTION_440"
+
+
+class TestCeoAgentYamlBaseline:
+    """生产 ceo_agent.yaml 白名单基线锚（防配置漂移到不存在的工具名）。"""
+
+    async def test_production_allowlist_nonempty_and_within_catalog(self) -> None:
+        """真实加载: 白名单非空且 ⊆ TOOL_CATALOG 名集（初值 = 全部 23 名——
+        基线锚，白名单配置漂移到不存在工具名即红）。"""
+        from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+        from src.infrastructure.agent_orch.yaml_agent_config_loader import YamlAgentConfigLoader
+
+        loader = YamlAgentConfigLoader()  # 默认 config_dir 指向生产 configs/agents
+        config = await loader.load(AgentRole.CEO)
+        catalog_names = {tool.name for tool in TOOL_CATALOG}
+        assert len(config.allowed_tools) > 0, "生产白名单不可为空（空 = L4 全拒主链红）"
+        assert set(config.allowed_tools) <= catalog_names, (
+            f"白名单含 TOOL_CATALOG 之外的工具名（漂移）: {set(config.allowed_tools) - catalog_names}"
+        )

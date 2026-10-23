@@ -46,6 +46,9 @@ class AgentConfig:
         state_ttl: Agent 状态 TTL 秒（闭区间 60~2592000，默认 86400）
         default_isolation_level: 默认 EIP 隔离等级（Story 5-4 消费——枚举 SSOT
             绑定，yaml 载入经 loader str→IsolationLevel 转换守卫）
+        allowed_tools: 工具白名单（Story 5.5 三重硬隔离——L4 严格白名单真源；
+            默认空元组 = L4 下全部工具被拒的 fail-closed 安全默认；去重归一
+            由 loader 承载[dict.fromkeys 保序]，本 VO 只守卫不归一）
     """
 
     role: AgentRole
@@ -57,6 +60,7 @@ class AgentConfig:
     preferred_model: str | None
     state_ttl: int = 86400
     default_isolation_level: IsolationLevel = IsolationLevel.L4_HARD
+    allowed_tools: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """自校验与归一化（配置资产缺陷语义，抛 AgentConfigError 440）"""
@@ -104,6 +108,15 @@ class AgentConfig:
                 "default_isolation_level 必须为 IsolationLevel 枚举实例"
                 f"（实际类型 {type(self.default_isolation_level).__name__}——yaml 值经 loader 转换后传入）"
             )
+
+        # allowed_tools 元素守卫（Story 5.5——白名单条目必须是有效工具名形态）:
+        # 非空元组时逐元素 isinstance str + 非空白（空白条目 = 无效白名单项）；
+        # 去重归一归 loader（配置容错），本 VO 只守卫
+        if not isinstance(self.allowed_tools, tuple):
+            _fail("allowed_tools 必须为 tuple（字符串元组）")
+        for tool_name in self.allowed_tools:
+            if not isinstance(tool_name, str) or not tool_name.strip():
+                _fail(f"allowed_tools 元素必须为非空白字符串（实际 {tool_name!r}——白名单条目必须是有效工具名）")
 
         # preferred_model 空串归一化为 None（与 YAML null 等价，消费方只见 None | str 两态）
         if self.preferred_model == "":
