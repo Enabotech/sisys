@@ -1,6 +1,6 @@
 # Story 5.5: Agent 三重硬隔离保证
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -566,8 +566,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟡 变异 | 矩阵某探针预期码改错（448→449）→ 对应用例红 → 还原[探针断言活性证明]；guard cross 判定翻转 → 16 条 448 探针集体红 → 还原[矩阵判别力实证] |
 | 🔄 重构 | 探针用例命名收敛（id 即矩阵编号——审计可对照）+ 安全覆盖率专项跑通（两段式命令 ≥90 达标——见基建契约节） |
 
-- [ ] Subtask 4.1-4.2: 两循环红绿变异重构
-- [ ] Subtask 4.3: 安全覆盖率专项 ≥90% 确认
+- [x] Subtask 4.1-4.2: 两循环红绿变异重构
+- [x] Subtask 4.3: 安全覆盖率专项 ≥90% 确认
 
 **完成标准/Definition of Done:** 四件套就绪；21 穿透探针 21/21 拦截 + 7 条辅用例绿；安全覆盖率 ≥90%
 
@@ -586,9 +586,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟡 变异 | P95 阈值突变（0.05→0.0001）→ 红 → 还原；并发探针断言弱化为聚合 → 个体判别力验算[L4/L3 actor 的 448 reason 等级名互异断言——串扰可检测证明] → 还原 |
 | 🔄 重构 | xdist_group + benchmark 标记收敛；委托 helper 文档化（验收侧 import 姿态） |
 
-- [ ] Subtask 5.1: 🔴 红 — 六场景编写
-- [ ] Subtask 5.2: 🟢 绿 — 转绿 + 计时校准
-- [ ] Subtask 5.3: 🟡 变异 + 🔄 重构
+- [x] Subtask 5.1: 🔴 红 — 六场景编写
+- [x] Subtask 5.2: 🟢 绿 — 转绿 + 计时校准
+- [x] Subtask 5.3: 🟡 变异 + 🔄 重构
 
 **完成标准/Definition of Done:** 集成 6 场景绿；性能三指标断言活；委托 helper 可共享
 
@@ -600,12 +600,12 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 #### 架构验证测试实现（验证器 A-D）
 
-- [ ] Subtask 6.1: 创建 `tests/unit/architecture/test_arch_agent_triple_isolation.py`（REPO_ROOT 四层 parent 锚定——5-4 同款）
-- [ ] Subtask 6.2: 验证器 A——domain 零外部依赖（isolation_access.py/agent_exceptions.py AST 扫描禁 pydantic/redis import）
-- [ ] Subtask 6.3: 验证器 B——组合根外零实例化（IsolationGuardService **仅扫 src/ 面** AST 扫描禁业务代码直接实例化——对齐 5-4 验证器 B 现形态，tests 不在扫描面[tests 白名单前缀已按 5-3 R1-F12 移除，禁复活]）
-- [ ] Subtask 6.4: 验证器 C——端口方向（isolation_guard_service.py 与两接线点 import 白名单：domain.*/application.ports 合法 / src.infrastructure 非法；**接线静态锚**：run_agent_workflow.py 与 agent_workflow_service.py 均含 isolation_guard 引用[AST 属性扫描——lambda 漏注入的架构面防线，验收 AC-6.2 行为锚的静态互补]；**判定真源防线**：isolation_access 模块的 src/ 生产方 import 白名单仅 isolation_guard_service[tests/ 豁免——把「矩阵唯一真源」从纪律升级为 AST 门禁，防第三处判定面绕过守卫自建异常翻译]）
-- [ ] Subtask 6.5: 验证器 D——lifetime 决策落地（`_global_registry.get("isolation_guard_service")` 两行式收窄断言 SINGLETON——mypy Optional 纪律，5-4 R1-F29 先例）
-- [ ] Subtask 6.6: 循环依赖检测用 ruff/isort（不引入 pylint）+ 全套报告
+- [x] Subtask 6.1: 创建 `tests/unit/architecture/test_arch_agent_triple_isolation.py`（REPO_ROOT 四层 parent 锚定——5-4 同款）
+- [x] Subtask 6.2: 验证器 A——domain 零外部依赖（isolation_access.py/agent_exceptions.py AST 扫描禁 pydantic/redis import）
+- [x] Subtask 6.3: 验证器 B——组合根外零实例化（IsolationGuardService **仅扫 src/ 面** AST 扫描禁业务代码直接实例化——对齐 5-4 验证器 B 现形态，tests 不在扫描面[tests 白名单前缀已按 5-3 R1-F12 移除，禁复活]）
+- [x] Subtask 6.4: 验证器 C——端口方向（isolation_guard_service.py 与两接线点 import 白名单：domain.*/application.ports 合法 / src.infrastructure 非法；**接线静态锚**：run_agent_workflow.py 与 agent_workflow_service.py 均含 isolation_guard 引用[AST 属性扫描——lambda 漏注入的架构面防线，验收 AC-6.2 行为锚的静态互补]；**判定真源防线**：isolation_access 模块的 src/ 生产方 import 白名单仅 isolation_guard_service[tests/ 豁免——把「矩阵唯一真源」从纪律升级为 AST 门禁，防第三处判定面绕过守卫自建异常翻译]）
+- [x] Subtask 6.5: 验证器 D——lifetime 决策落地（`_global_registry.get("isolation_guard_service")` 两行式收窄断言 SINGLETON——mypy Optional 纪律，5-4 R1-F29 先例）
+- [x] Subtask 6.6: 循环依赖检测用 ruff/isort（不引入 pylint）+ 全套报告
 
 **完成标准/Definition of Done:** 验证器 A-D 全绿；违规即红
 
@@ -621,12 +621,12 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟢 绿 | BDD 步骤实现（文件存在性 + 关键符号 grep/AST 断言——5-4 AC-6.3 同款） |
 | 🔄 重构 | 场景命名收敛 |
 
-- [ ] Subtask 7.1: 收尾场景红绿（全量 20 场景）
-- [ ] Subtask 7.2: 全量回归（`pytest tests/` 默认 `-n auto` + 连续 5 次稳定）+ ruff/mypy 收尾校验 + 三条红线自查 + 安全覆盖率专项复跑
-- [ ] Subtask 7.3: 文档同步（architecture.md §5 注记更新[三重隔离运行时强制拦截已交付——Story 5.5] + §13 目录树 isolation_access/isolation_guard 落位 + sisys-uni-exception-design.md §3.3.2 已随 Task 1 同步复验 + deferred-work.md 三处置终态更新）+ 留项终态核对
+- [x] Subtask 7.1: 收尾场景红绿（全量 20 场景）
+- [x] Subtask 7.2: 全量回归（`pytest tests/` 默认 `-n auto` + 连续 5 次稳定）+ ruff/mypy 收尾校验 + 三条红线自查 + 安全覆盖率专项复跑
+- [x] Subtask 7.3: 文档同步（architecture.md §5 注记更新[三重隔离运行时强制拦截已交付——Story 5.5] + §13 目录树 isolation_access/isolation_guard 落位 + sisys-uni-exception-design.md §3.3.2 已随 Task 1 同步复验 + deferred-work.md 三处置终态更新）+ 留项终态核对
 
 **完成标准/Definition of Done:**
-- [ ] 全量 20 场景（19 + 收尾 1）全绿；Story 可进入 review
+- [x] 全量 20 场景（19 + 收尾 1）全绿；Story 可进入 review
 
 ---
 
@@ -893,6 +893,13 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 
 ### 完成清单 Completion Notes List
 
+- [x] **Task 1（2026-10-23）**: 判定核心 isolation_access.py（矩阵三步纯函数 36 格全格 + shared+self 不豁免 + L1 前向格 + 派生锚 monkeypatch 三轴——71 用例）；异常 448/449 四件套（agent 段 440-449 全分配 + HTTP 403×2 + 设计文档 §3.3.2）；AgentConfig.allowed_tools + loader 解析（缺失回落/dict.fromkeys 去重保序/440 守卫）+ ceo_agent.yaml 23 名白名单（基线锚防漂移）。变异 ×5（矩阵翻转 15 红/FREE_WRITE 格 4 红/码值突变红/去重删除红/基线写错红）。domain 94%
+- [x] **Task 2（2026-10-23）**: IsolationGuardPort 三方法 Protocol + IsolationGuardService R2 三依赖（22 用例——守卫序/矩阵消费单点/白名单真源/共享池短路/443·447 透传/calls 顺序断言/get_by_id None 显式 443 收窄）+ 契约 11 维度 + 组合根注册（SINGLETON/tags[agent,isolation,security]）。变异 ×4。application 90%
+- [x] **Task 3（2026-10-23）**: 双接线原子提交——RunAgentWorkflowUseCase 第五依赖 + 编排骨位 443→441→guard→档案（4 用例）+ AgentWorkflowService 第五依赖 + execute 全量预检（all-or-nothing 449 先于 get_tool——5 用例）+ 回归面 12 构造点全修补（组合根双 lambda/集成 6 AsyncMock 工厂/验收 _assemble_workflow 真实 guard+真实 instantiate[R3-F1 连带]+feature 10 场景门控升档/契约 _DummyResolver）。变异 ×2。5-3 验收 18+集成 29+unit 1711 全绿零回归
+- [x] **Task 4（2026-10-23）**: 基建四件套（tests/security 目录+conftest ping 门控+pyproject marker+CI integration job 双改+Makefile test-security 两段式）+ PROBE_MATRIX 21 探针（参数化独立用例 face 分派——T-02/03 access 消歧/T-01·T-04 tmp 窄配置篡改+基线锚/D-09 切 L3）+ 7 辅用例 = 28 passed 21/21 拦截；变异 ×2（预期码改错红/guard 翻转 17 红）。安全覆盖率 96% ≥90%
+- [x] **Task 5（2026-10-23）**: 集成六场景（守卫矩阵抽查/P95 0.05 常量单源+_TRIPLE_PERF_CACHE 委托/通过率 20/20/并发 10×50 等级互异 reason 下钻 500/500/入口 fail-closed/execute 449 真实拒）；变异 ×2（阈值突变双红/等级名错配红）。验收 19 场景全绿（实施期自纠 7 处验收文件缺陷）
+- [x] **Task 6（2026-10-23）**: 验证器 A-D + 基建验证器节 12 用例（domain 白名单+黑名单双断言/组合根外零实例化仅扫 src/端口方向+接线静态锚+判定真源白名单三合法面/SINGLETON 两行式）；变异越界 import 红实证
+- [x] **Task 7（2026-10-23）**: 收尾场景 20 场景终态全绿；全量回归两轮（24min 13098 passed/36 failed + 8min 13099 passed/37 failed——失败集稳定=环境型非随机）——37 failed 全部 pre-existing 环境型四族：RediSearch 模块缺席 18（semantic_cache 族 FT.CREATE——基线 d68bc496 worktree 复现证实）/OCR 引擎资源 16（benchmark）/Docker sandbox 1/deploy 工具链 2——git diff 确认全部失败域文件本 Story 零改动；核心域（unit/contracts/security/Agent 集成与验收）各 Task 期间多轮重复全绿；三条红线自查本 Story 改动文件零命中（存量命中均为 pre-existing 有登记——strategic_archive Pydantic validator 合法形态/embedding_api_server 归 Story 91-1）；ruff/mypy 全绿；文档同步（architecture.md §5 三重隔离执行注记[Prompt MVP 语义=实例级越权拦截 D-3/L3 受限写 MVP 全拒 D-4]+§13 目录树 isolation_access/isolation_guard 落位+deferred-work.md 三处置终态确认）
 - [x] **Task 0（2026-10-23 dev-story）**: SDD 规范项全部定稿于故事文件（v1.3.1 审查收敛态——数据模型/端口契约/异常契约/21 探针矩阵/安全基建契约五节）；Gherkin 19 场景 + BDD 步骤实现完整编写（`test_acceptance_agent_triple_isolation.feature/.py`——PG 模板 R6 基准组织 + 5-4 Redis 验收机制，19 场景三属性分档表落 docstring；用户 mid-turn 纠偏 3 处：删 `# noqa` 红线/模板基准声明改 PG 主基准/feature 横幅三行式对齐）；红阶段确认 19/19 全失败（ModuleNotFoundError isolation_access·isolation_guard_service·tests.security + 断言红——合法红，16.7s@8workers）；移交三项处置落盘 deferred-work.md（#6 核销新区段 + #7 维持 + R1-DF2 原条目 5-5 注记——DC-12）
 - [x] 故事需求从 `epics_v1.0.md` 提取（含范围边界表——与 5.6/V1/V2/5.11 精确切分）
 - [x] 架构约束从 architecture.md/core-domain-design/or.md/prd.md 提取
@@ -1053,6 +1060,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 | 2026-10-23 | v1.3.0 | 文档审查 Round 3 单深度穷举推演（登记处置 5 项：P1×1 + P2×1 + P3×3）：**5-3 验收组装点真实 guard 连带处置**（裸 uuid4 锚点接真 guard 三场景 443 红——改真实 instantiate + 门控升档[R3-1]）；T-02/T-03 dispatch face="access" 钉死（审计归类与分派轴词汇碰撞消除）；空格计数 10→6 勘误；AC-3.4 非白名单名直构造注记；场景⑥ A 真实 instantiate 前置。176 格矩阵枚举分布定谳（114/54/8 零矛盾）+ 证伪留痕 10 条 |
 | 2026-10-23 | v1.3.1 | 文档审查 Round 4 纯验证 + Round 5 终审**收敛**：R4 全量 75 锚点独立核验通过（0 失实/1 导航级）、26 项修复抽样 100% 存续、登记 2 项留项并清偿（agent.py 实体区间锚 L39-175→L39-174 勘正；4 处「5 对照/透传」旧口径统一为「7 条辅用例[对照 4+透传 2+直调 1]」——R2-4 口径全量对齐）；R5 终审五节取证：周期闭合（4 提交链+工作区清偿零游离）/关键修复 10/10 双向核验/锚点 12/12 抽验采信 R4/红线终扫零命中（零抑制教唆·mock 分层分派合规·异常四件套齐备·零 AI 署名）/收敛判据全满足——**55 项审查处置 + 2 项 R4 留项 = 57 项全闭环，零 P0/P1/P2/P3 残留，审查周期收敛**，Story 维持 ready-for-dev 待实施态（终审特权记录：R1 提交信息「48 项」与台账定稿 37 项的历史差异已由 R2-6 台账核销口径自洽——历史提交不可变仅留痕） |
 | 2026-10-23 | v1.4.0 | **dev-story 实施启动**：Task 0 完成——SDD 规范定稿 + Gherkin 19 场景红阶段确认（19/19 合法红）+ 移交三项处置落盘（#6 核销/#7 维持/R1-DF2 维持）；实施期纠偏 3 处（R6 模板基准对齐 PG 模板主基准/noqa 红线清除/feature 横幅三行式） |
+| 2026-10-23 | v2.0.0 | **dev-story 全 Task 实施完成（Task 0-7）**：判定核心（矩阵 36 格+派生锚）/448·449 四件套/白名单真源（ceo_agent.yaml 23 名）/IsolationGuardService+契约/双接线（入口 fail-closed + 工具位全量预检）+ 回归面 12 构造点/安全四件套 + 21 探针 100% 拦截 + 7 辅/集成六场景（P95·通过率·并发 500/500）/验证器 A-D/验收 20 场景全绿；每 Task 独立 TDD 红绿变异（累计变异实证 17 处全红→还原绿）；全量回归 13098 passed（36 failed 全部 pre-existing 环境型——基线 d68bc496 复现证实）；domain 94%/application 90%/安全专项 96%；文档同步（architecture.md §5+§13/deferred-work 终态）；Status → review |
 
 ---
 

@@ -648,9 +648,26 @@ UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本�
 > ——Agent 实体 isolation_level 字段规划归 V1 评估，见偏离声明 D-1）+ 实例化即 L4 硬隔离
 > 默认 + 用户显式请求切换通道（CLI `set-isolation`）+ `IsolationLevelSwitched` 事件发布。
 > 触发条件 MVP 仅「用户请求」通道（SYS 命令/关键词频率/任务依赖归 V1——FR-AC-09）；
-> 自动恢复（§5.3）归 V1；三重隔离的运行时强制拦截归 Story 5.5；`IsolationSwitchLog`
+> 自动恢复（§5.3）归 V1；~~三重隔离的运行时强制拦截归 Story 5.5~~（**已交付——Story 5.5
+> 三重硬隔离保证**，见下方注记）；`IsolationSwitchLog`
 > 切换日志归 Story 5.6。异常契约: 446 `IsolationLevelNotSupportedError`（422）/
 > 447 `IsolationStateNotInitializedError`（404）。
+
+> **三重隔离运行时强制执行注记（Story 5.5 — Agent 三重硬隔离保证）**：三重隔离
+> （Prompt/工具/数据）的运行时强制拦截已交付——PDP/PEP 分离架构：`decide_isolation_
+> access`/`decide_tool_access` 纯函数判定矩阵（domain——从 `ISOLATION_POLICIES` 策略
+> 字段派生，零等级硬编码）+ `IsolationGuardService` 守卫服务（application——443→447
+> 守卫序复用 + 异常翻译单点）+ 双接线点强制（工作流入口 `ensure_agent_executable`
+> fail-closed 447 先于档案加载 + 工具执行位 plan 全量工具名预检 all-or-nothing 449
+> 先于工具存在性）。**Prompt 隔离 MVP 语义 = 实例级越权拦截**（actor≠target 的
+> PROFILE/SYSTEM_PROMPT 等访问 448——同角色多实例共享静态档案文本是 5-1/5-2 既有
+> 架构，隔离防的是跨 Agent 实例的运行时上下文越权，D-3 偏离声明）。**L3「受限写入」
+> MVP 口径 = shared 面写一律 449 拒**（受限写白名单归 V1，D-4）。工具白名单真源 =
+> `AgentConfig.allowed_tools`（eip_config per-role yaml 配置，默认空元组 fail-closed）。
+> 异常契约: 448 `IsolationAccessViolationError`（403——跨主体越权）/ 449
+> `IsolationOperationForbiddenError`（403——等级策略禁止操作，reason 双形态
+> `tool_not_in_allowlist:{name}`|`data_isolation:{mode}`）。跨 Agent 穿透探针安全套件
+> （`tests/security/`——21 条探针矩阵 100% 拦截 + 7 条辅用例 + 执行面覆盖率 ≥90% 专项）。
 
 ### 5.1 四级隔离等级
 
@@ -1746,7 +1763,8 @@ src/domain/
 │   ├── embedding.py                                       # 嵌入向量值对象
 │   ├── citation.py                                        # 引用索引值对象
 │   ├── confidence.py                                      # 置信度值对象
-│   └── cost.py                                            # 成本值对象
+│   ├── cost.py                                            # 成本值对象
+│   └── isolation_access.py                                # 三重隔离判定核心 ⭐（Story 5.5——IsolationResource 11 成员/decide_isolation_access 矩阵/decide_tool_access 纯函数，PDP 唯一真源从 ISOLATION_POLICIES 派生）
 │
 ├── services/                                              # 领域服务接口
 │   ├── __init__.py
@@ -1756,7 +1774,7 @@ src/domain/
 │   ├── agent_service.py                                   # Agent 协作服务接口
 │   ├── planning_service.py                                # 规划服务接口（BLM/BEM）
 │   ├── routing_service.py                                 # UDMR 路由服务接口 ⭐
-│   ├── isolation_service.py                               # EIP 隔离服务接口 ⭐（MVP 落位注记 Story 5.4: 实际落位 application/ports/isolation_management.py——隔离管理需编排仓储读写与事件发布属应用编排关注点，纯策略表已留 domain/value_objects/isolation_policy.py——偏离声明 D-2）
+│   ├── isolation_service.py                               # EIP 隔离服务接口 ⭐（MVP 落位注记 Story 5.4: 实际落位 application/ports/isolation_management.py——隔离管理需编排仓储读写与事件发布属应用编排关注点，纯策略表已留 domain/value_objects/isolation_policy.py——偏离声明 D-2；Story 5.5 三重隔离守卫落位 application/ports/isolation_guard.py——IsolationGuardPort 三方法守卫[PEP]，判定消费 domain 纯函数矩阵）
 │   ├── evaluation_service.py                              # 评估服务接口
 │   └── visualization_service.py                           # 可视化服务接口
 │

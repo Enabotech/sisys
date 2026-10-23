@@ -1349,3 +1349,58 @@ def then_makefile_security_target(context: dict[str, Any]) -> None:
     assert "test-security:" in makefile, "Makefile 缺 test-security target"
     assert "tests/security" in makefile, "test-security target 未跑 tests/security"
     assert "--fail-under=90" in makefile, "安全覆盖率专项未含 fail-under=90 门禁"
+
+
+# ===================================================================
+# Task 7 收尾: 完成清单场景（src 执行面六文件 + tests 五目录）
+# ===================================================================
+
+
+@scenario(
+    "test_acceptance_agent_triple_isolation.feature",
+    "收尾 - Story 5.5 完成清单确认",
+)
+def test_completion_checklist(context: dict[str, Any]) -> None:
+    """收尾: 执行面源码六文件 + 测试五目录齐备（5-4 收尾同款）。"""
+
+
+@when("检查三重隔离执行面与测试交付文件清单")
+def when_check_triple_isolation_manifest(context: dict[str, Any]) -> None:
+    """存在性清单断言（src 六文件——含修改件；tests 五目录关键文件）。"""
+    src_files = [
+        "src/domain/value_objects/isolation_access.py",
+        "src/domain/value_objects/agent_config.py",
+        "src/domain/exceptions/agent_exceptions.py",
+        "src/application/ports/isolation_guard.py",
+        "src/application/services/isolation_guard_service.py",
+        "src/application/services/agent_workflow_service.py",
+    ]
+    test_files = [
+        "tests/unit/domain/value_objects/test_isolation_access.py",
+        "tests/unit/application/services/test_isolation_guard_service.py",
+        "tests/unit/architecture/test_arch_agent_triple_isolation.py",
+        "tests/contracts/test_port_contract_isolation_guard.py",
+        "tests/integration/test_integration_agent_triple_isolation.py",
+        "tests/security/test_isolation_security.py",
+        "tests/acceptance/test_acceptance_agent_triple_isolation.feature",
+        "tests/acceptance/test_acceptance_agent_triple_isolation.py",
+    ]
+    missing = [rel for rel in src_files + test_files if not (REPO_ROOT / rel).exists()]
+    context["manifest_missing"] = missing
+    context["manifest_src_count"] = len(src_files)
+    context["manifest_test_count"] = len(test_files)
+
+
+@then("执行面源码六文件全部存在")
+def then_src_six_files_delivered(context: dict[str, Any]) -> None:
+    """src 交付面完整（六文件——新建与修改件并计，见 Story File List）。"""
+    assert context["manifest_src_count"] == 6
+    assert not context["manifest_missing"], f"交付文件缺失: {context['manifest_missing']}"
+
+
+@then("测试文件五目录齐备")
+def then_test_five_directories_complete(context: dict[str, Any]) -> None:
+    """unit（3 文件——含追加）/contracts（1）/integration（1）/security（1）/
+    acceptance（2）齐备。"""
+    assert context["manifest_test_count"] == 8
+    assert not context["manifest_missing"], f"测试文件缺失: {context['manifest_missing']}"
