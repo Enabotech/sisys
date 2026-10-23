@@ -197,7 +197,13 @@
 ## Deferred from: code review of 5-4-eip-basic-elastic-isolation Round 1 (2026-10-22)
 
 - 【R1-DF1·P3】clear_scoped 接线纪律约束（captive dependency 缓解前提）— DC-7 的「无实害」论证依赖「clear_scoped 生产未接线（SCOPED≡SINGLETON 进程级共享）」环境前提（组合根 isolation_management_service 注册注释自认；retry_helpers.py:66 同款注释）；未来接线请求作用域清理时若只调 clear_scoped 不调 clear_singleton，SINGLETON isolation_management_service 将持有绑已关闭事件循环的死亡 RedisAgentRepository（"Event loop is closed"——测试环境验收 _run_cli 双清正是此形态的规避）— 核销触发：请求作用域接线立项（接线时 clear_scoped 必须连同 clear_singleton，或评估 agent_repository 翻 SINGLETON）
-- 【R1-DF2·P3】StorageError(103) 同码双语义分化 — ①构造纪律分化：redis_snapshot_store.py:133/183 `raise StorageError(...) from e` 不带 cause= 构造参数，与 agent/isolation 仓储 cause=exc 形态（5-1 Task 3 教训）同码两种构造纪律（snapshot 域归他 Story 资产不动）；②语义分化：数据损坏与连接故障同码 103，监控维度不可区分（可观测性分化形态=except 内分支 context 标记 data_corrupt 或专用码）— 核销触发：存储层异常码专项或 5.5（与 agent_repository 先例统一行动，单仓先例不孤立改）
+- 【R1-DF2·P3】StorageError(103) 同码双语义分化 — ①构造纪律分化：redis_snapshot_store.py:133/183 `raise StorageError(...) from e` 不带 cause= 构造参数，与 agent/isolation 仓储 cause=exc 形态（5-1 Task 3 教训）同码两种构造纪律（snapshot 域归他 Story 资产不动）；②语义分化：数据损坏与连接故障同码 103，监控维度不可区分（可观测性分化形态=except 内分支 context 标记 data_corrupt 或专用码）— 核销触发：存储层异常码专项或 5.5（与 agent_repository 先例统一行动，单仓先例不孤立改）。**5-5 Task 0 处置（2026-10-23）：维持 deferred**——5-5 零存储层改动（无新仓储、无异常包装面），触发条件不变，归存储层异常码专项（5-5 DC-12）
+
+## Deferred from: Story 5-5 Task 0 移交三项处置 (2026-10-23)
+
+- 【5-4 风险 #6·已核销】孤儿隔离键自愈策略（原登记位 = 5-4 story 已知下游风险 #6：切换重置 TTL 使隔离键晚于 Agent 键过期，消费方可选自愈策略归 5.5/后续决策）— **核销于 Story 5-5（2026-10-23）Task 0（DC-12）**：5-5 交付的工作流入口 fail-closed 检查已闭合其危害面——孤儿态下 Agent 键存活/隔离键缺失 → 执行入口 447 拒（不可用即拒绝，安全方向）；自愈通道 5-4 已实现（initialize upsert 覆盖回 L4），无需新代码
+- 【5-4 风险 #7·维持】同 Agent 并发切换无锁竞态（原登记位 = 5-4 story 已知下游风险 #7：后写覆盖 + 事件序与终态可能不一致，5.5/V1 自动触发多源并发立项时需评估）— **5-5 Task 0 处置（2026-10-23）：维持 deferred**——5-5 探针全部为跨 Agent 面（不同 agent_id 键空间天然隔离），不构造同 Agent 并发切换；触发条件（多源并发切换）仍属 V1 动态触发立项（5-5 DC-12）
+- 【5-4 R1-DF2·维持】见上区段原条目 5-5 处置注记（零存储层改动，维持归存储异常码专项）
 
 ## Deferred from: code review of 5-4-eip-basic-elastic-isolation R5 终审特权发现 (2026-10-22)
 
