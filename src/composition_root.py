@@ -2899,6 +2899,33 @@ def bootstrap() -> None:
         owner="platform",
         tags=("agent", "isolation"),
     )
+    # IsolationGuardService — 三重隔离守卫服务（Story 5.5 PEP——Policy
+    # Enforcement Point；R2 组合端口三依赖: isolation_management_service
+    # [状态获取 + 443→447 守卫序复用——禁绕过直查隔离仓储] + agent_repository
+    # [ensure_tool_access 经 get_by_id 取 role] + agent_config_loader
+    # [白名单真源 AgentConfig.allowed_tools]；SINGLETON——无状态纯判定服务，
+    # 捕获关系注记沿 5-4 DC-7 形态: 捕获 SCOPED agent_repository 无实害
+    # （无状态仓储 + clear_scoped 未接线环境下 SCOPED≡SINGLETON））
+    register_port(
+        name="isolation_guard_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.isolation_guard",
+            fromlist=["IsolationGuardPort"],
+        ).IsolationGuardPort,
+        impl=lambda resolver: __import__(
+            "src.application.services.isolation_guard_service",
+            fromlist=["IsolationGuardService"],
+        ).IsolationGuardService(
+            isolation_management_service=resolver.resolve("isolation_management_service"),
+            agent_repository=resolver.resolve("agent_repository"),
+            agent_config_loader=resolver.resolve("agent_config_loader"),
+        ),
+        module="src.application.services.isolation_guard_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "isolation", "security"),
+    )
 
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
