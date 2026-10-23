@@ -258,6 +258,21 @@ def _make_registry() -> Any:
     return registry
 
 
+def _make_guard_mock() -> Any:
+    """隔离守卫 AsyncMock 替身（集成 Mock 工厂子模式——Story 5.5 双接线构造
+    签名回归面；放行语义默认: ensure_agent_executable 返回 L4 策略 /
+    ensure_tool_access 静默放行）。"""
+    from unittest.mock import AsyncMock
+
+    from src.application.ports.isolation_guard import IsolationGuardPort
+    from src.domain.events.enums import IsolationLevel
+    from src.domain.value_objects.isolation_policy import get_isolation_policy
+
+    guard = AsyncMock(spec=IsolationGuardPort)
+    guard.ensure_agent_executable.return_value = get_isolation_policy(IsolationLevel.L4_HARD)
+    return guard
+
+
 def _assemble_run_chain(
     redis_client: Any,
     *,
@@ -286,6 +301,7 @@ def _assemble_run_chain(
         tool_execution_service=_build_tool_execution_service(fake_llm),
         skill_loader=_resolve("skill_loader"),
         tool_registry_service=_make_registry(),
+        isolation_guard=_make_guard_mock(),
     )
     engine = LangGraphEngine(
         config=LangGraphConfig.from_env(),
@@ -297,6 +313,7 @@ def _assemble_run_chain(
         agent_profile_use_case=profile_use_case,
         agent_engine=engine,
         agent_workflow_service=workflow_service,
+        isolation_guard=_make_guard_mock(),
     )
 
 
@@ -507,6 +524,7 @@ async def test_scenario_4_real_llm_smoke(real_redis: Any) -> None:
             tool_execution_service=_build_tool_execution_service(real_llm),
             skill_loader=_resolve("skill_loader"),
             tool_registry_service=_make_registry(),
+            isolation_guard=_make_guard_mock(),
             base_config=llm_config,
             per_call_timeout_sec=60.0,
         )
@@ -532,6 +550,7 @@ async def test_scenario_4_real_llm_smoke(real_redis: Any) -> None:
             agent_profile_use_case=profile_use_case,
             agent_engine=engine,
             agent_workflow_service=workflow_service,
+            isolation_guard=_make_guard_mock(),
         )
 
         result = await _execute_workflow(use_case, agent_id, "用一句话概括 SWOT 分析的用途")
@@ -641,6 +660,7 @@ async def test_scenario_5_real_publish_outbox_row(real_redis: Any) -> None:
             tool_execution_service=_build_tool_execution_service(fake_llm),
             skill_loader=_resolve("skill_loader"),
             tool_registry_service=_make_registry(),
+            isolation_guard=_make_guard_mock(),
         )
         engine = LangGraphEngine(
             config=LangGraphConfig.from_env(),
@@ -652,6 +672,7 @@ async def test_scenario_5_real_publish_outbox_row(real_redis: Any) -> None:
             agent_profile_use_case=profile_use_case,
             agent_engine=engine,
             agent_workflow_service=workflow_service,
+            isolation_guard=_make_guard_mock(),
         )
 
         result = await _execute_workflow(use_case, agent_id, "真实发布链路验证任务")

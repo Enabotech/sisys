@@ -50,6 +50,7 @@ def _make_fake_llm(
     llm_error_by_schema: dict[type, BaseException] | None = None,
     non_schema_return: bool = False,
     chain_echo_instance: Any = None,
+    plan_tool_names: tuple[str, ...] | None = None,
 ) -> Any:
     """六阶段 Fake LLM 端口替身。
 
@@ -65,6 +66,8 @@ def _make_fake_llm(
         non_schema_return: structured_generate 返回非 Schema 实例（守卫测试）
         chain_echo_instance: 终局分支直接返回的实例（model_construct 穿透
             Schema 校验——三层次序② VO 242 路径测试用）
+        plan_tool_names: plan 阶段步骤工具名定制（None 用默认两步；空串元素
+            表示直接推理步——Story 5.5 白名单预检测试面）
 
     Returns:
         AsyncMock(spec=LLMClientPort) 替身（_workflow_calls 记录列表）
@@ -79,6 +82,17 @@ def _make_fake_llm(
 
     calls: list[tuple[str, str | None, type, float | None]] = []
     errors = llm_error_by_schema or {}
+    plan_steps = (
+        [
+            {"description": f"步骤 {index + 1}", "tool_name": tool_name, "arguments": {}}
+            for index, tool_name in enumerate(plan_tool_names)
+        ]
+        if plan_tool_names is not None
+        else [
+            {"description": "执行宏观环境分析", "tool_name": "PESTEL 分析", "arguments": {"scope": "CN"}},
+            {"description": "综合建议（零工具步）", "tool_name": "", "arguments": {}},
+        ]
+    )
 
     async def _structured_generate(
         prompt: str,
@@ -96,11 +110,8 @@ def _make_fake_llm(
             return PerceptionSchema(summary="任务摘要：战略分析")
         if response_schema is PlanSchema:
             return PlanSchema(
-                steps=[
-                    {"description": "执行宏观环境分析", "tool_name": "PESTEL 分析", "arguments": {"scope": "CN"}},
-                    {"description": "综合建议（零工具步）", "tool_name": "", "arguments": {}},
-                ],
-                selected_tools=["PESTEL 分析"],
+                steps=plan_steps,
+                selected_tools=[step["tool_name"] for step in plan_steps if step["tool_name"]],
             )
         if response_schema is VerificationSchema:
             return VerificationSchema(
@@ -163,16 +174,28 @@ def _make_service(
     fake_llm: Any,
     registry: Any,
     execution_service: Any,
+    isolation_guard: Any = None,
 ) -> Any:
-    """构造 AgentWorkflowService（R2 组合端口四依赖——skill_loader 本测试面未触）。"""
+    """构造 AgentWorkflowService（R2 组合端口五依赖——skill_loader/guard 注入）。
+
+    Args:
+        fake_llm: 六阶段 Fake LLM 替身。
+        registry: 工具注册服务 mock。
+        execution_service: 工具执行服务 mock。
+        isolation_guard: 隔离守卫替身（None 时构造默认放行 AsyncMock——
+            ensure_tool_access 静默返回 None）。
+    """
+    from src.application.ports.isolation_guard import IsolationGuardPort
     from src.application.services.agent_workflow_service import AgentWorkflowService
 
     skill_loader = AsyncMock()
+    guard = isolation_guard if isolation_guard is not None else AsyncMock(spec=IsolationGuardPort)
     return AgentWorkflowService(
         llm_client=fake_llm,
         tool_execution_service=execution_service,
         skill_loader=skill_loader,
         tool_registry_service=registry,
+        isolation_guard=guard,
     )
 
 
@@ -804,3 +827,112 @@ class TestErrorContract:
             asyncio.run(service.package_evidence(_make_terminal_state()))
         assert exc_info.value.code == "EXCEPTION_445"
         assert "reflection" in exc_info.value.context["missing_fields"]
+
+
+# ===================================================================
+# Story 5-5 追加：execute 工具位白名单全量预检（第五依赖接线）
+# ===================================================================
+
+
+class TestToolAllowlistPreflight:
+    """execute 工具位预检契约（Story 5.5——进执行循环前 plan 全量工具名预检）。
+
+    all-or-nothing fail-closed: 任一白名单外工具 449 先于首个工具执行（杜绝
+    「前 N 步已执行、第 N+1 步才拒」的部分执行副作用）；449 先于工具存在性
+    （白名单外名不炸 ToolNotFound 而炸 449——判别锚，guard 不查注册表）。
+    """
+
+    def _make_guard(self, denied_tools: tuple[str, ...]) -> Any:
+        """构造守卫替身（denied_tools 内工具名抛 449——白名单外模拟）。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.isolation_guard import IsolationGuardPort
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        guard = AsyncMock(spec=IsolationGuardPort)
+
+        async def _ensure_tool(agent_id: Any, tool_name: str) -> None:
+            if tool_name in denied_tools:
+                raise IsolationOperationForbiddenError(
+                    agent_id=str(agent_id), operation="execute", reason=f"tool_not_in_allowlist:{tool_name}"
+                )
+
+        guard.ensure_tool_access = AsyncMock(side_effect=_ensure_tool)
+        return guard
+
+    def _plan_state(self, tool_names: tuple[str, ...], agent_id: str) -> dict[str, Any]:
+        """构造携带 plan 产物的 state（steps 三元组直供——既有 TestExecute 形态）。"""
+        from src.application.ports.agent_workflow import PlanResult
+
+        return _make_state(
+            agent_id=agent_id,
+            plan=PlanResult(steps=tuple((f"步骤 {index + 1}", tool_name, {}) for index, tool_name in enumerate(tool_names))),
+        )
+
+    def test_preflight_denies_before_first_tool_execution(self) -> None:
+        """多工具 plan 且其一白名单外 → 449 向上抛且 get_tool 零调用
+        （预检先于首个工具执行——部分执行副作用杜绝；白名单外名不炸
+        ToolNotFound 而炸 449——判别锚）。"""
+        from src.domain.exceptions import IsolationOperationForbiddenError
+
+        fake_llm = _make_fake_llm()
+        registry, execution_service = _make_tool_mocks()
+        guard = self._make_guard(denied_tools=("绝对不在白名单的工具",))
+        service = _make_service(fake_llm, registry, execution_service, isolation_guard=guard)
+        state = self._plan_state(("PESTEL 分析", "绝对不在白名单的工具", "SWOT-TOWS"), str(uuid.uuid4()))
+
+        with pytest.raises(IsolationOperationForbiddenError) as exc_info:
+            asyncio.run(service.execute(state))
+        assert exc_info.value.code == "EXCEPTION_449"
+        assert registry.get_tool.call_count == 0, "预检须先于 get_tool（449 先于工具存在性——判别锚）"
+        assert execution_service.execute.await_count == 0
+
+    def test_preflight_calls_guard_for_every_tool_name_exactly_once(self) -> None:
+        """全白名单多工具 plan: ensure_tool_access 对全部工具名逐名调用且恰一遍
+        （空工具名步骤跳过——直接推理步不进预检）。"""
+        fake_llm = _make_fake_llm()
+        registry, execution_service = _make_tool_mocks()
+        guard = self._make_guard(denied_tools=())
+        service = _make_service(fake_llm, registry, execution_service, isolation_guard=guard)
+        state = self._plan_state(("PESTEL 分析", "", "SWOT-TOWS"), "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+
+        asyncio.run(service.execute(state))
+        called_names = [call.args[1] for call in guard.ensure_tool_access.await_args_list]
+        assert called_names == ["PESTEL 分析", "SWOT-TOWS"], "预检逐名恰一遍（空工具名步骤跳过）"
+
+    def test_preflight_agent_id_uuid_conversion(self) -> None:
+        """state['agent_id'] 是 str 形态——进循环前 UUID 显式转换一次断言。"""
+        fake_llm = _make_fake_llm()
+        registry, execution_service = _make_tool_mocks()
+        guard = self._make_guard(denied_tools=())
+        service = _make_service(fake_llm, registry, execution_service, isolation_guard=guard)
+        state = self._plan_state(("PESTEL 分析",), "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+
+        asyncio.run(service.execute(state))
+        call = guard.ensure_tool_access.await_args_list[0]
+        assert isinstance(call.args[0], uuid.UUID), "guard 入参必须 UUID 实例（state str 形态转换）"
+        assert call.args[0] == uuid.UUID("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+
+    def test_all_allowlisted_plan_executes_normally(self) -> None:
+        """全部白名单内 → 预检放行且后续执行正常（既有主链零回归锚）。"""
+        fake_llm = _make_fake_llm()
+        registry, execution_service = _make_tool_mocks()
+        guard = self._make_guard(denied_tools=())
+        service = _make_service(fake_llm, registry, execution_service, isolation_guard=guard)
+        state = self._plan_state(("PESTEL 分析", ""), str(uuid.uuid4()))
+
+        result = asyncio.run(service.execute(state))
+        registry.get_tool.assert_called_once_with(tool_name="PESTEL 分析")
+        assert result.tool_trace == ("PESTEL 分析:1.2.0",)
+
+    def test_no_tool_steps_zero_guard_calls(self) -> None:
+        """无工具名步骤（直接推理 plan）→ guard 零调用。"""
+        fake_llm = _make_fake_llm()
+        registry, execution_service = _make_tool_mocks()
+        guard = self._make_guard(denied_tools=())
+        service = _make_service(fake_llm, registry, execution_service, isolation_guard=guard)
+        state = self._plan_state(("", ""), str(uuid.uuid4()))
+
+        asyncio.run(service.execute(state))
+        guard.ensure_tool_access.assert_not_awaited()
+        registry.get_tool.assert_not_called()

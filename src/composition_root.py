@@ -2816,6 +2816,7 @@ def bootstrap() -> None:
             tool_execution_service=resolver.resolve("tool_execution_service"),
             skill_loader=resolver.resolve("skill_loader"),
             tool_registry_service=resolver.resolve("tool_registry_service"),
+            isolation_guard=resolver.resolve("isolation_guard_service"),
             base_config=__import__(
                 "src.infrastructure.config.llm",
                 fromlist=["build_default_llm_config"],
@@ -2826,8 +2827,8 @@ def bootstrap() -> None:
         owner="platform",
         tags=("agent", "workflow"),
     )
-    # Story 5-3 — 单 Agent 工作流执行用例（run-task 全链编排：守卫→档案加载→
-    # 装配→图执行→结果组装；R2 组合端口四依赖）
+    # Story 5-3 — 单 Agent 工作流执行用例（run-task 全链编排：守卫→入口隔离检查
+    # [Story 5.5 fail-closed]→档案加载→装配→图执行→结果组装；R2 组合端口五依赖）
     register_port(
         name="agent_workflow_use_case",
         version="v1.0.0",
@@ -2843,6 +2844,7 @@ def bootstrap() -> None:
             agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
             agent_engine=resolver.resolve("agent_engine"),
             agent_workflow_service=resolver.resolve("agent_workflow_service"),
+            isolation_guard=resolver.resolve("isolation_guard_service"),
         ),
         module="src.application.use_cases.run_agent_workflow",
         lifetime=Lifetime.SINGLETON,

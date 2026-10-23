@@ -259,14 +259,87 @@ def _make_fake_llm(
     return fake
 
 
+def _make_real_guard_chain(context: dict[str, Any]) -> Any:
+    """手动组装三重隔离守卫真实链（场景级客户端——Story 5.5 R3-F1 连带处置）。
+
+    真实 IsolationGuardService 三依赖注入（isolation_management_service[场景级
+    Redis 仓储] + agent_repository + agent_config_loader[resolve 无状态实例]）；
+    验收禁 mock——guard 及隔离管理全真实。链缓存 context（同场景多构造点共享）。
+    """
+    if "isolation_guard_chain" in context:
+        return context["isolation_guard_chain"]["guard"]
+
+    from src.application.services.isolation_guard_service import IsolationGuardService
+    from src.application.services.isolation_management_service import IsolationManagementService
+    from src.domain.ports.resolver import resolve
+    from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+    from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+    from src.infrastructure.storage.redis.redis_agent_repository import RedisAgentRepository
+    from src.infrastructure.storage.redis.redis_isolation_repository import RedisIsolationRepository
+
+    loop = context["_loop"]
+    redis_client = context["_redis_client"]
+    agent_repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=redis_client))
+    isolation_repository = RedisIsolationRepository(adapter=RedisAdapter(redis_client=redis_client))
+    isolation_service = IsolationManagementService(
+        isolation_repository=isolation_repository,
+        agent_repository=agent_repository,
+        event_publisher=InMemoryEventBus(),
+        agent_config_loader=resolve("agent_config_loader"),
+    )
+    guard = IsolationGuardService(
+        isolation_management_service=isolation_service,
+        agent_repository=agent_repository,
+        agent_config_loader=resolve("agent_config_loader"),
+    )
+    context["isolation_guard_chain"] = {
+        "guard": guard,
+        "agent_repository": agent_repository,
+        "isolation_service": isolation_service,
+    }
+    _run_async(loop, context["_redis_client"].ping())  # 组装前置连通性复核（场景门控已 ping——防御性一致）
+    return guard
+
+
+def _make_instantiate_use_case(context: dict[str, Any]) -> Any:
+    """构造真实实例化用例（复用 guard 链仓储——同场景 Redis 连接，同步/协程两态共用）。"""
+    from src.application.use_cases.agent_instantiation import InstantiateAgentUseCase
+    from src.domain.ports.resolver import resolve
+    from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+
+    chain = context["isolation_guard_chain"]
+    return InstantiateAgentUseCase(
+        config_loader=resolve("agent_config_loader"),
+        repository=chain["agent_repository"],
+        event_publisher=InMemoryEventBus(),
+        isolation_service=chain["isolation_service"],
+    )
+
+
+def _instantiate_real_agent(context: dict[str, Any]) -> uuid.UUID:
+    """经真实实例化用例构造 CEO Agent（默认 L4——双键登记清理；同步形态）。
+
+    Story 5.5 R3-F1: 原 uuid4 裸锚点接入真实 guard 后 ensure_tool_access 经
+    get_isolation_state 得 443——须真实 instantiate（同文件 CLI given 先例）。
+    协程内调用（并发场景）经 _make_instantiate_use_case + await 直用。
+    """
+    use_case = _make_instantiate_use_case(context)
+    result = _run_async(context["_loop"], use_case.execute(role=AgentRole.CEO))
+    agent_id: uuid.UUID = result.agent_id  # Any 经声明类型收窄（mypy no-any-return）
+    context["_agent_ids"].append(agent_id)
+    return agent_id
+
+
 def _assemble_workflow(context: dict[str, Any], **fake_kwargs: Any) -> None:
     """端口级手工装配六阶段全链（真实档案加载 + 真实图执行 + Fake LLM 替身）。
 
     装配面（全部真实组件，LLM 是唯一豁免替身）：
     - 档案加载：resolve("agent_profile_loader")（本地静态文件只读、无连接构造
       跨循环安全）→ 真实 AgentProfile；tools_l1 经真实 skill_selector
+    - Agent 锚点：真实 instantiate（默认 L4 隔离键落 Redis——Story 5.5 guard
+      状态依赖，双键登记清理；原 uuid4 裸锚点形态已升级）
     - 六阶段服务：AgentWorkflowService 手动实例化（Fake LLM + 真实工具执行链 +
-      skill_loader + tool_registry_service 构造注入——R2 组合端口）
+      skill_loader + tool_registry_service + 真实 isolation_guard 构造注入）
     - 图执行：LangGraphEngine 手动构造（workflow_service 注入 + recording
       publisher——R3-F4 引擎构造注入位实证）
     """
@@ -276,9 +349,10 @@ def _assemble_workflow(context: dict[str, Any], **fake_kwargs: Any) -> None:
     from src.infrastructure.config.langgraph import LangGraphConfig
 
     loop = context["_loop"]
+    guard = _make_real_guard_chain(context)
 
-    # 真实档案加载（本地静态文件——无 Redis 依赖，uuid4 随机锚点）
-    context["agent_id"] = uuid.uuid4()
+    # 真实档案加载（本地静态文件——无 Redis 依赖；agent_id 真实实例化锚点）
+    context["agent_id"] = _instantiate_real_agent(context)
     profile_loader = resolve("agent_profile_loader")
     profile = _run_async(loop, profile_loader.load(role=AgentRole.CEO, agent_id=context["agent_id"]))
     skill_selector = resolve("skill_selector")
@@ -303,6 +377,7 @@ def _assemble_workflow(context: dict[str, Any], **fake_kwargs: Any) -> None:
         tool_execution_service=tool_execution_service,
         skill_loader=resolve("skill_loader"),
         tool_registry_service=_make_registry(),
+        isolation_guard=guard,
     )
     context["service"] = service
 
@@ -973,7 +1048,12 @@ def test_ac_5_3_concurrent_ten_sessions(context: dict[str, Any]) -> None:
 
 @when("以 10 个不同 agent_id 并发执行工作流任务")
 def when_concurrent_ten_sessions(context: dict[str, Any]) -> None:
-    """asyncio.gather 10 个 agent_id 并发全链（单进程并发先例）。"""
+    """asyncio.gather 10 个 agent_id 并发全链（单进程并发先例）。
+
+    Story 5.5 R3-F1 连带: agent_id 真实 instantiate（guard 状态依赖——裸 uuid4
+    得 443）+ service 注入真实 isolation_guard（双键登记清理）。
+    """
+    guard = _make_real_guard_chain(context)
 
     async def _run_session(agent_id: uuid.UUID) -> dict[str, Any]:
         from src.domain.ports.resolver import resolve
@@ -1003,6 +1083,7 @@ def when_concurrent_ten_sessions(context: dict[str, Any]) -> None:
             tool_execution_service=tool_execution_service,
             skill_loader=resolve("skill_loader"),
             tool_registry_service=_make_registry(),
+            isolation_guard=guard,
         )
         recorder = _RecordingEventBus()
         from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
@@ -1018,7 +1099,14 @@ def when_concurrent_ten_sessions(context: dict[str, Any]) -> None:
     async def _gather_all() -> list[dict[str, Any]]:
         import asyncio as aio
 
-        agent_ids = [uuid.uuid4() for _ in range(10)]
+        # 真实 instantiate ×10（协程内 await 直用——_run_async 在运行循环内禁用；
+        # 双键即时登记——gather 部分失败时已构造键仍可清理）
+        instantiate_use_case = _make_instantiate_use_case(context)
+        agent_ids: list[uuid.UUID] = []
+        for _ in range(10):
+            instantiation = await instantiate_use_case.execute(role=AgentRole.CEO)
+            context["_agent_ids"].append(instantiation.agent_id)
+            agent_ids.append(instantiation.agent_id)
         return list(await aio.gather(*(_run_session(aid) for aid in agent_ids)))
 
     context["concurrent_results"] = _run_async(context["_loop"], _gather_all())

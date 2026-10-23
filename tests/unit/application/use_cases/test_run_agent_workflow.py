@@ -38,8 +38,11 @@ def _make_agent(role: AgentRole = AgentRole.CEO) -> Any:
 
 
 def _make_mocks() -> dict[str, Any]:
-    """构造四依赖 mock（仓储/档案用例/引擎/工作流服务）。"""
+    """构造五依赖 mock（仓储/档案用例/引擎/工作流服务/隔离守卫——Story 5.5 第五依赖）。"""
+    from src.application.ports.isolation_guard import IsolationGuardPort
+    from src.domain.events.enums import IsolationLevel
     from src.domain.ports.agent_engine import AgentEnginePort
+    from src.domain.value_objects.isolation_policy import get_isolation_policy
 
     repository = AsyncMock()
     repository.get_by_id.return_value = _make_agent()
@@ -55,16 +58,22 @@ def _make_mocks() -> dict[str, Any]:
     agent_engine = AsyncMock(spec=AgentEnginePort)
     workflow_service = Mock()
     workflow_service.build_context.return_value = Mock()
+
+    # 隔离守卫替身（默认放行语义：executable 返回 L4 策略 / tool 放行静默）
+    isolation_guard = AsyncMock(spec=IsolationGuardPort)
+    isolation_guard.ensure_agent_executable.return_value = get_isolation_policy(IsolationLevel.L4_HARD)
+
     return {
         "repository": repository,
         "profile_use_case": profile_use_case,
         "agent_engine": agent_engine,
         "workflow_service": workflow_service,
+        "isolation_guard": isolation_guard,
     }
 
 
 def _make_use_case(mocks: dict[str, Any]) -> Any:
-    """构造 RunAgentWorkflowUseCase（R2 组合四依赖具名）。"""
+    """构造 RunAgentWorkflowUseCase（R2 组合五依赖具名——Story 5.5 追加隔离守卫）。"""
     from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
 
     return RunAgentWorkflowUseCase(
@@ -72,6 +81,7 @@ def _make_use_case(mocks: dict[str, Any]) -> Any:
         agent_profile_use_case=mocks["profile_use_case"],
         agent_engine=mocks["agent_engine"],
         agent_workflow_service=mocks["workflow_service"],
+        isolation_guard=mocks["isolation_guard"],
     )
 
 
@@ -259,3 +269,70 @@ class TestErrorPropagation:
         with pytest.raises(AgentWorkflowError) as exc_info:
             await use_case.execute(agent_id=uuid.uuid4(), task="任务")
         assert exc_info.value.code == "EXCEPTION_444"
+
+
+# ===================================================================
+# Story 5-5 追加：入口 fail-closed 隔离检查（第五依赖接线）
+# ===================================================================
+
+
+class TestIsolationGuardWiring:
+    """入口隔离检查接线契约（Story 5.5——441 后、档案加载前 fail-closed）。
+
+    编排骨位: 443 存在 → 441 角色 → guard.ensure_agent_executable → 档案加载
+    → 装配 → 图执行（DC-6——guard 在角色守卫后[既有序零回归]、档案加载前
+    [fail-closed 于最早可判定点]）。
+    """
+
+    async def test_guard_called_exactly_once_before_profile_loading(self) -> None:
+        """放行路径: ensure_agent_executable 恰一次且先于档案加载（顺序断言）。"""
+        mocks = _make_mocks()
+        _wire_engine_success(mocks)
+        use_case = _make_use_case(mocks)
+
+        agent_id = uuid.uuid4()
+        await use_case.execute(agent_id=agent_id, task="任务")
+
+        mocks["isolation_guard"].ensure_agent_executable.assert_awaited_once_with(agent_id)
+        mocks["profile_use_case"].execute.assert_awaited_once()
+
+    async def test_guard_447_denies_execution_before_profile_loading(self) -> None:
+        """447 fail-closed: guard 抛 447 → execute 向上抛且 profile/engine 零调用
+        （隔离态不可证明即拒绝——无档案读取无图执行无事件，零副作用）。"""
+        from src.domain.exceptions import IsolationStateNotInitializedError
+
+        mocks = _make_mocks()
+        mocks["isolation_guard"].ensure_agent_executable.side_effect = IsolationStateNotInitializedError(agent_id="missing")
+        use_case = _make_use_case(mocks)
+
+        with pytest.raises(IsolationStateNotInitializedError) as exc_info:
+            await use_case.execute(agent_id=uuid.uuid4(), task="任务")
+        assert exc_info.value.code == "EXCEPTION_447"
+        mocks["profile_use_case"].execute.assert_not_awaited()
+        mocks["agent_engine"].submit_graph.assert_not_awaited()
+        mocks["workflow_service"].build_context.assert_not_called()
+
+    async def test_guard_443_passthrough(self) -> None:
+        """guard 抛 443 → 透传（守卫序异常族原样向上）。"""
+        from src.domain.exceptions import AgentNotFoundError
+
+        mocks = _make_mocks()
+        mocks["isolation_guard"].ensure_agent_executable.side_effect = AgentNotFoundError(agent_id="missing")
+        use_case = _make_use_case(mocks)
+
+        with pytest.raises(AgentNotFoundError) as exc_info:
+            await use_case.execute(agent_id=uuid.uuid4(), task="任务")
+        assert exc_info.value.code == "EXCEPTION_443"
+        mocks["profile_use_case"].execute.assert_not_awaited()
+
+    async def test_role_guard_precedes_isolation_guard(self) -> None:
+        """441 仍先于 guard（角色守卫在前的既有序保持——非 CEO 角色不到达隔离检查）。"""
+        from src.domain.exceptions import AgentRoleNotSupportedError
+
+        mocks = _make_mocks()
+        mocks["repository"].get_by_id.return_value = _make_agent(role=AgentRole.CFO)
+        use_case = _make_use_case(mocks)
+
+        with pytest.raises(AgentRoleNotSupportedError):
+            await use_case.execute(agent_id=uuid.uuid4(), task="任务")
+        mocks["isolation_guard"].ensure_agent_executable.assert_not_awaited()

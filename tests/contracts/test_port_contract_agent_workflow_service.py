@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, Mock
 
 
 class _DummyResolver:
-    """测试用最小 Resolver 占位符（服务工厂注入四依赖）。"""
+    """测试用最小 Resolver 占位符（服务工厂注入五依赖——isolation_guard 为 Story 5.5 追加）。"""
 
     def resolve(self, name: str) -> Any:
         if name == "llm_client":
@@ -34,6 +34,10 @@ class _DummyResolver:
             from src.application.ports.tool_registry_service import ToolRegistryServicePort
 
             return Mock(spec=ToolRegistryServicePort)
+        if name == "isolation_guard_service":
+            from src.application.ports.isolation_guard import IsolationGuardPort
+
+            return AsyncMock(spec=IsolationGuardPort)
         raise KeyError(f"未注册的端口: {name}")
 
 

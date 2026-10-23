@@ -25,6 +25,8 @@ RunAgentWorkflowUseCase——run-task 全链编排：守卫（443/441）→ 档�
 Raises 契约（传播语义）：
 - AgentNotFoundError(443): get_by_id 返回 None
 - AgentRoleNotSupportedError(441): 非 MVP 开放角色
+- IsolationStateNotInitializedError(447): 入口隔离检查（Story 5.5——隔离态
+  不可证明即拒绝执行，fail-closed 先于档案加载）
 - AgentWorkflowError(444)/ChainOfThoughtValidationError(445): 引擎 DomainError
   透传（用例零改写）
 """
@@ -35,6 +37,7 @@ import logging
 from uuid import UUID
 
 from src.application.ports.agent_workflow import AgentWorkflowResult, AgentWorkflowServicePort
+from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.use_cases.agent_instantiation import SUPPORTED_ROLES
 from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
 from src.domain.exceptions import AgentNotFoundError, AgentRoleNotSupportedError
@@ -50,9 +53,10 @@ logger = logging.getLogger(__name__)
 class RunAgentWorkflowUseCase:
     """单 Agent 工作流执行用例（run-task 全链编排）
 
-    R2 组合端口四依赖具名：agent_repository（守卫）/ agent_profile_use_case
+    R2 组合端口五依赖具名：agent_repository（守卫）/ agent_profile_use_case
     （档案加载——5-2 交付复用）/ agent_engine（图执行）/ agent_workflow_service
-    （上下文装配——build_context 材料传参）。
+    （上下文装配——build_context 材料传参）/ isolation_guard（入口隔离检查——
+    Story 5.5 三重硬隔离，fail-closed 必填弃 None 容忍：守卫可被绕过是安全缺口）。
     """
 
     def __init__(
@@ -61,19 +65,23 @@ class RunAgentWorkflowUseCase:
         agent_profile_use_case: LoadAgentProfileUseCase,
         agent_engine: AgentEnginePort,
         agent_workflow_service: AgentWorkflowServicePort,
+        isolation_guard: IsolationGuardPort,
     ) -> None:
-        """初始化执行用例（四依赖注入——编排模板对齐 5-2 六步形态）
+        """初始化执行用例（五依赖注入——编排模板对齐 5-2 六步形态）
 
         Args:
             agent_repository: Agent 仓储端口（存在性守卫）
             agent_profile_use_case: 档案加载用例（LoadAgentProfileUseCase）
             agent_engine: Agent 引擎端口（SingleAgentWorkflow 图执行）
             agent_workflow_service: 六阶段工作流服务端口（上下文装配）
+            isolation_guard: 三重隔离守卫端口（Story 5.5——入口 fail-closed 检查，
+                必填无默认：RunAgentWorkflowUseCase 构造缺守卫即 TypeError）
         """
         self._repository = agent_repository
         self._profile_use_case = agent_profile_use_case
         self._agent_engine = agent_engine
         self._workflow_service = agent_workflow_service
+        self._isolation_guard = isolation_guard
 
     async def execute(self, agent_id: UUID, task: str) -> AgentWorkflowResult:
         """执行单 Agent 工作流（守卫 → 装配 → 图执行 → 结果组装）
@@ -104,13 +112,18 @@ class RunAgentWorkflowUseCase:
                 supported_roles=tuple(sorted(supported.value for supported in SUPPORTED_ROLES)),
             )
 
-        # 3. 档案加载（5-2 用例复用——六档案 + tools_l1 + 计量）
+        # 3. 入口隔离检查（Story 5.5 三重硬隔离——fail-closed：隔离态不可证明即拒绝执行；
+        #    441 后档案加载前（DC-6）——447 时零档案读取零图执行零事件；返回策略
+        #    MVP 暂不消费，前置 fail-closed 是目的）
+        await self._isolation_guard.ensure_agent_executable(agent_id)
+
+        # 4. 档案加载（5-2 用例复用——六档案 + tools_l1 + 计量）
         profile_result = await self._profile_use_case.execute(agent_id=agent_id)
 
-        # 4. 上下文装配（单向装配——材料传参，服务不自行加载档案）
+        # 5. 上下文装配（单向装配——材料传参，服务不自行加载档案）
         workflow_context = self._workflow_service.build_context(profile_result, task)
 
-        # 5. 图执行（阻塞语义——submit 返回即终态；agent_id 必须 str 序列化）
+        # 6. 图执行（阻塞语义——submit 返回即终态；agent_id 必须 str 序列化）
         parameters = {
             "agent_id": str(agent_id),
             "task": task,
@@ -121,7 +134,7 @@ class RunAgentWorkflowUseCase:
         if status != FlowStatus.COMPLETED:
             logger.error("工作流图执行未完成 [run_id=%s status=%s]", graph_run_id, status)
 
-        # 6. 结果组装（get_graph_result 终态 state——VO 实例直读，禁反序列化层）
+        # 7. 结果组装（get_graph_result 终态 state——VO 实例直读，禁反序列化层）
         final_state = await self._agent_engine.get_graph_result(graph_run_id)
         if final_state is None:
             # 引擎失败路径（DomainError 已透传的上抛场景之外——系统错误兜底）

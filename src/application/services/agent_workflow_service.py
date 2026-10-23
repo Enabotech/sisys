@@ -37,6 +37,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+import uuid
 from typing import Any
 
 from src.application.ports.agent_workflow import (
@@ -112,16 +113,20 @@ class AgentWorkflowService:
         tool_execution_service: Any,
         skill_loader: Any,
         tool_registry_service: Any,
+        isolation_guard: Any,
         per_call_timeout_sec: float = _DEFAULT_PER_CALL_TIMEOUT_SEC,
         base_config: LLMConfig | None = None,
     ) -> None:
-        """初始化工作流服务（R2 组合端口四依赖）
+        """初始化工作流服务（R2 组合端口五依赖——isolation_guard 为 Story 5.5 追加）
 
         Args:
             llm_client: LLM 客户端端口（六阶段 structured_generate）
             tool_execution_service: 工具执行服务端口（执行阶段唯一调用通道）
             skill_loader: 技能加载端口（L2 SOP 按需加载）
             tool_registry_service: 工具注册服务端口（tool_name→Tool 实体）
+            isolation_guard: 三重隔离守卫端口（Story 5.5——execute 工具位白名单
+                全量预检；必填无默认：构造缺守卫即 TypeError——守卫可被绕过
+                是安全缺口，弃 None 容忍）
             per_call_timeout_sec: 单次 LLM 调用超时上限（默认 8.0s）
             base_config: 每次调用的基底配置（连接字段 endpoint/api_key/model 随基底
                 继承——温度分档基于基底派生完整配置，防丢连接字段）
@@ -130,6 +135,7 @@ class AgentWorkflowService:
         self._tool_execution_service = tool_execution_service
         self._skill_loader = skill_loader
         self._tool_registry_service = tool_registry_service
+        self._isolation_guard = isolation_guard
         self._per_call_timeout_sec = per_call_timeout_sec
         self._base_config = base_config
 
@@ -220,6 +226,17 @@ class AgentWorkflowService:
                 step_summaries=tuple(step_summaries),
                 citations=tuple(citations),
             )
+
+        # Story 5.5 三重硬隔离: plan 全量工具名预检（all-or-nothing fail-closed——
+        # 进执行循环前逐名 ensure_tool_access，任一白名单外工具 449 先于首个工具执行
+        # [杜绝「前 N 步已执行、第 N+1 步才拒」的部分执行副作用]；449 先于工具存在性
+        # [白名单外名不炸 ToolNotFound 而炸 449——判别锚，guard 不查注册表]；预检零 IO
+        # 纯白名单比对无性能代价）。state["agent_id"] 是 str 形态（schemas L67）——
+        # 进循环前 UUID 显式转换一次
+        agent_uuid = uuid.UUID(str(state.get("agent_id", "")))
+        for _, preflight_tool_name, _ in plan.steps:
+            if preflight_tool_name:
+                await self._isolation_guard.ensure_tool_access(agent_uuid, preflight_tool_name)
 
         for description, tool_name, arguments in plan.steps:
             if not tool_name:
