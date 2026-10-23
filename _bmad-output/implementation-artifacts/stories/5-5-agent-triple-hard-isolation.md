@@ -914,7 +914,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-5-agent-triple-hard-isolation.md`（本文件）
 
-**待创建的文件/To Be Created (Dev Story 实施):**
+**已创建的文件/Created (Dev Story 实施完成 ✅):**
 - `src/domain/value_objects/isolation_access.py` - 三重隔离判定核心（纯函数矩阵）
 - `src/application/ports/isolation_guard.py` - 守卫端口（三方法）
 - `src/application/services/isolation_guard_service.py` - 守卫服务实现
@@ -926,7 +926,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 - `tests/integration/test_integration_agent_triple_isolation.py` - 集成与性能
 - `tests/acceptance/test_acceptance_agent_triple_isolation.{feature,py}` - 验收（19 场景 + 收尾）
 
-**待修改的文件/To Be Modified（与「项目结构说明」节一致）:**
+**已修改的文件/Modified（与「项目结构说明」节一致——全部落地 ✅）:**
 - `src/domain/exceptions/agent_exceptions.py`（追加 448/449）+ `_code_ranges.py`（预留改已分配+双映射）+ `exceptions/__init__.py`（导出）
 - `src/domain/value_objects/agent_config.py`（allowed_tools 字段+440 守卫）
 - `src/infrastructure/agent_orch/yaml_agent_config_loader.py`（eip_config.allowed_tools 解析）
