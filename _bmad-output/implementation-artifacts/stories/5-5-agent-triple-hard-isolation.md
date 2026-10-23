@@ -471,8 +471,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟡 变异 | loader 守卫删除 → 非 list 用例红（裸 AttributeError/TypeError 逃逸）→ 还原；白名单 yaml 某名写错 → 基线锚用例红 → 还原 |
 | 🔄 重构 | 既有 AgentConfig/loader 测试全绿（默认空元组不破坏既有构造——向后兼容确认） |
 
-- [ ] Subtask 1.1-1.3: 三循环各红绿变异重构
-- [ ] Subtask 1.4: 领域层覆盖率 ≥90% 维持确认
+- [x] Subtask 1.1-1.3: 三循环各红绿变异重构
+- [x] Subtask 1.4: 领域层覆盖率 ≥90% 维持确认
 
 **完成标准/Definition of Done:** 判定核心/异常/白名单配置全绿；domain ≥90%；ceo_agent.yaml 白名单基线锚生效
 
@@ -500,7 +500,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟡 变异 | impl 路径突变 → resolve 失败红 → 还原；lifetime 突变 → 契约维度红 → 还原 |
 | 🔄 重构 | 契约 11 项绿 |
 
-- [ ] Subtask 2.1-2.2: 两循环红绿变异重构
+- [x] Subtask 2.1-2.2: 两循环红绿变异重构
 
 **完成标准/Definition of Done:** 三方法全绿（守卫序/矩阵消费/白名单真源/分码）；契约绿；application ≥85%
 
@@ -537,8 +537,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🟡 变异 | lambda 漏注入 isolation_guard → resolve 构造失败红 → 还原 |
 | 🔄 重构 | **回归面全量跑**（5-3 验收/集成存量测试全绿 + 组合根冒烟） |
 
-- [ ] Subtask 3.1-3.3: 三循环红绿变异重构
-- [ ] Subtask 3.4: 回归面清单全绿确认（含 5-3 全量存量）
+- [x] Subtask 3.1-3.3: 三循环红绿变异重构
+- [x] Subtask 3.4: 回归面清单全绿确认（含 5-3 全量存量）
 
 **完成标准/Definition of Done:** 双接线完整；fail-closed 端到端可达；回归面全绿
 

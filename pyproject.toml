@@ -266,6 +266,7 @@ markers = [
     "minio: 需要 MinIO 的测试",
     "neo4j: 需要 Neo4j 的测试",
     "llm: 需要 LLM API 的测试",
+    "security: 安全探针套件（跨 Agent 穿透/隔离强制执行验证）",
     "AC-1: Acceptance Criterion - common use for AC tests",
     "AC-2: Acceptance Criterion - common use for AC tests",
     "AC-3: Acceptance Criterion - common use for AC tests",
