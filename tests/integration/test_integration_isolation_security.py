@@ -36,7 +36,11 @@
 访问走 ensure_agent_access——face="access"，R3-F2 词汇碰撞消歧）。
 
 Run with:
-    SISYS_USE_TEST_PORTS=1 poetry run pytest tests/security/test_isolation_security.py -v
+    SISYS_USE_TEST_PORTS=1 poetry run pytest tests/integration/test_integration_isolation_security.py -v
+
+归属（2026-10-24 用户裁定）: 探针套件归入集成测试范畴（原规划 tests/security
+独立目录 + security marker + 覆盖率专项裁撤——专项不合适，复用集成既有基建
+real_redis fixture 与 CI integration job 挂载面，marker 非必要不新增）。
 
 测试隔离:
     - function 级 A/B fixture（每探针独立实例化——杜绝等级切换跨探针污染；
@@ -67,9 +71,8 @@ from src.domain.value_objects.isolation_access import (
 from src.domain.value_objects.isolation_policy import get_isolation_policy
 from src.infrastructure.storage.redis.key_builder import build_key
 
-# 语义上属集成族（CI 挂 integration job 一致——探针需真实 Redis）
+# 归入集成族（2026-10-24 用户裁定——marker 非必要不新增，探针需真实 Redis）
 pytestmark = [
-    pytest.mark.security,
     pytest.mark.redis,
     pytest.mark.integration,
 ]
@@ -310,7 +313,7 @@ def _assemble_guard_chain(redis_client: Any, config_loader: Any = None) -> dict[
     """手动组装守卫真实链（场景级客户端——禁 resolve 发命令纪律）。
 
     Args:
-        redis_client: 场景级 Redis 客户端（security_redis fixture）。
+        redis_client: 场景级 Redis 客户端（integration conftest real_redis fixture——复用既有基建）。
         config_loader: 配置加载器（None 时经 resolve 取生产实例；窄配置探针
             传入 tmp config_dir 的 YamlAgentConfigLoader——配置篡改通道）。
 
@@ -378,11 +381,11 @@ def _make_narrow_loader(tmp_path: Path, allowlist: tuple[str, ...]) -> Any:
 
 
 @pytest.fixture
-async def guard_chain(security_redis: Any) -> Any:
+async def guard_chain(real_redis: Any) -> Any:
     """function 级 A/B fixture（每探针独立实例化默认 L4 A/B + 双键登记清理）。"""
     from src.domain.entities.agent import AgentRole
 
-    chain = _assemble_guard_chain(security_redis)
+    chain = _assemble_guard_chain(real_redis)
     instantiation_a = await chain["instantiate_use_case"].execute(role=AgentRole.CEO)
     instantiation_b = await chain["instantiate_use_case"].execute(role=AgentRole.CEO)
     chain["agent_a"] = instantiation_a.agent_id
@@ -393,11 +396,11 @@ async def guard_chain(security_redis: Any) -> Any:
     # teardown: 双键精确删除 + exists 复核（delete 幂等——被测删除键二次删无害）
     for agent_id in chain["agent_ids"]:
         for namespace in ("agent", "isolation"):
-            await security_redis.delete(build_key(namespace, str(agent_id)))
+            await real_redis.delete(build_key(namespace, str(agent_id)))
     for agent_id in chain["agent_ids"]:
         for namespace in ("agent", "isolation"):
             key = build_key(namespace, str(agent_id))
-            assert not await security_redis.exists(key), f"探针键未清理: {key}"
+            assert not await real_redis.exists(key), f"探针键未清理: {key}"
 
 
 # ===================================================================
@@ -406,7 +409,7 @@ async def guard_chain(security_redis: Any) -> Any:
 
 
 @pytest.mark.parametrize("probe", PROBE_MATRIX, ids=[p.id for p in PROBE_MATRIX])
-async def test_probe_cross_agent_access(probe: ProbeSpec, guard_chain: Any, tmp_path: Path, security_redis: Any) -> None:
+async def test_probe_cross_agent_access(probe: ProbeSpec, guard_chain: Any, tmp_path: Path, real_redis: Any) -> None:
     """单条穿透探针: 按 face 分派 ensure_agent_access / ensure_tool_access，
     断言异常类型 + code + context 关键字段（安全审计资产——矩阵见模块 docstring）。"""
     from src.domain.entities.agent import AgentRole
@@ -425,7 +428,7 @@ async def test_probe_cross_agent_access(probe: ProbeSpec, guard_chain: Any, tmp_
         # 基线锚: loader 读回白名单恰为收窄集（篡改前置验证——防配置篡改静默失效）
         narrow_config = await narrow_loader.load(AgentRole.CEO)
         assert narrow_config.allowed_tools == narrow_allowlist, "窄配置基线锚失败（配置篡改未生效）"
-        narrow_chain = _assemble_guard_chain(security_redis, config_loader=narrow_loader)
+        narrow_chain = _assemble_guard_chain(real_redis, config_loader=narrow_loader)
         narrow_instantiation = await narrow_chain["instantiate_use_case"].execute(role=AgentRole.CEO)
         chain = narrow_chain
         actor_id = narrow_instantiation.agent_id
@@ -445,7 +448,7 @@ async def test_probe_cross_agent_access(probe: ProbeSpec, guard_chain: Any, tmp_
         # 窄链自建 actor 的双键即时清理（fixture teardown 只清登记名单——此处补删）
         if probe.id in ("T-01", "T-04"):
             for namespace in ("agent", "isolation"):
-                await security_redis.delete(build_key(namespace, str(actor_id)))
+                await real_redis.delete(build_key(namespace, str(actor_id)))
 
     error = exc_info.value
     assert error.code == probe.expected_code, f"{probe.id}: code 漂移 {error.code}"
@@ -506,12 +509,12 @@ async def test_passthrough_443_random_uuid(guard_chain: Any) -> None:
         await guard_chain["guard"].ensure_agent_executable(uuid.uuid4())
 
 
-async def test_passthrough_447_isolation_key_missing(guard_chain: Any, security_redis: Any) -> None:
+async def test_passthrough_447_isolation_key_missing(guard_chain: Any, real_redis: Any) -> None:
     """守卫透传②: 447 删 actor A 侧隔离键（单边语义——guard 只取 actor state，
     删 target 键将得 448 非 447；A 真实创建已登记 fixture 双键清理）。"""
     from src.domain.exceptions import IsolationStateNotInitializedError
 
-    await security_redis.delete(build_key("isolation", str(guard_chain["agent_a"])))
+    await real_redis.delete(build_key("isolation", str(guard_chain["agent_a"])))
     with pytest.raises(IsolationStateNotInitializedError):
         await guard_chain["guard"].ensure_agent_executable(guard_chain["agent_a"])
 

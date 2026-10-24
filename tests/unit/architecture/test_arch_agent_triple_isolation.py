@@ -1,9 +1,9 @@
-"""Story 5.5 架构约束验证测试（Agent 三重硬隔离——验证器 A-D + 基建四件套）
+"""Story 5.5 架构约束验证测试（Agent 三重硬隔离——验证器 A-D + 探针归位断言）
 
-覆盖 AC-6.3（架构合规）+ AC-6.4（安全测试基建就绪）:
-- 基建验证器节: tests/security 四件套（目录三文件 + pyproject security marker
-  [文本断言防漏注册——--strict-markers 收集期守卫] + CI integration job 挂载
-  tests/security + Makefile test-security target 两段式覆盖率命令）
+覆盖 AC-6.3（架构合规）+ AC-6.4 修订（探针套件归位集成范畴——2026-10-24
+用户裁定: 专项裁撤 + marker 非必要不新增）:
+- 基建验证器节: 探针套件位于 tests/integration（随既有 CI 挂载面运行）+
+  专项裁撤钉子（tests/security 目录/security marker/test-security target 均不存在）
 - 验证器 A: domain 零外部依赖（isolation_access.py / agent_exceptions.py AST 扫描）
 - 验证器 B: 组合根外零实例化（IsolationGuardService——仅扫 src/ 面）
 - 验证器 C: 端口方向（守卫服务与两接线点 import 白名单 + 接线静态锚 +
@@ -26,45 +26,31 @@ SRC_DIR = REPO_ROOT / "src"
 
 
 # ===================================================================
-# 基建验证器节: 安全测试基建四件套（AC-6.4——文件存在性 + 配置文本断言）
+# 基建验证器节: 探针套件归位集成范畴（AC-6.4 修订——2026-10-24 用户裁定）
 # ===================================================================
 
 
-class TestSecurityInfrastructureFourPiece:
-    """tests/security 四件套就绪断言（基建不存在时断言真红——TDD 先行钉死预期形态）。
-
-    落位本文件（tests/unit/architecture/）而非 tests/security 自身——断言本文件
-    存在自指恒真（Task 4 循环 A 豁免条款注记）。
+class TestProbeSuiteIntegrationPlacement:
+    """探针套件归入集成测试范畴断言（原 tests/security 独立目录 + security
+    marker + 覆盖率专项规划裁撤——专项不合适，marker 非必要不新增；探针随
+    tests/integration 既有 CI 挂载面与 conftest 基建运行）。
     """
 
-    def test_security_suite_files_exist(self) -> None:
-        """三文件存在性（目录 __init__ + conftest + 探针套件）。"""
-        expected = [
-            "tests/security/__init__.py",
-            "tests/security/conftest.py",
-            "tests/security/test_isolation_security.py",
-        ]
-        missing = [rel for rel in expected if not (REPO_ROOT / rel).exists()]
-        assert not missing, f"安全测试基建文件缺失: {missing}"
+    def test_probe_suite_file_in_integration_directory(self) -> None:
+        """探针套件文件存在于集成目录（CI integration job pytest 路径
+        `tests/integration` 天然涵盖——无需独立挂载）。"""
+        assert (REPO_ROOT / "tests/integration/test_integration_isolation_security.py").exists(), (
+            "探针套件应位于 tests/integration/（集成范畴归位——2026-10-24 用户裁定）"
+        )
 
-    def test_pyproject_registers_security_marker(self) -> None:
-        """pyproject markers 注册 security（--strict-markers 下未注册即收集期炸）。"""
+    def test_no_dedicated_security_directory_or_marker(self) -> None:
+        """专项裁撤钉子: tests/security 独立目录与 security marker 均不存在
+        （marker 非必要不新增——--strict-markers 下无注册即无声明）。"""
+        assert not (REPO_ROOT / "tests" / "security").exists(), "tests/security 独立目录应裁撤"
         pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        assert '"security:' in pyproject, "pyproject [tool.pytest.ini_options].markers 未注册 security"
-
-    def test_ci_integration_job_mounts_security_suite(self) -> None:
-        """CI integration-tests job pytest 命令含 tests/security（探针需真实 Redis——
-        挂有 compose 服务栈的 job）。"""
-        ci = (REPO_ROOT / ".gitea" / "workflows" / "ci.yaml").read_text(encoding="utf-8")
-        assert "tests/security" in ci, "CI integration job 未挂载 tests/security"
-
-    def test_makefile_security_coverage_target(self) -> None:
-        """Makefile test-security target（两段式覆盖率口径——D-2 偏离声明落地；
-        禁 --cov=src.<module> 单段形态[仓库 coverage 配置陷阱]）。"""
+        assert '"security:' not in pyproject, "security marker 应不注册（非必要不新增）"
         makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-        assert "test-security:" in makefile, "Makefile 缺 test-security target"
-        assert "tests/security" in makefile, "test-security 未跑 tests/security"
-        assert "--fail-under=90" in makefile, "安全覆盖率专项未含 fail-under=90 门禁"
+        assert "test-security:" not in makefile, "test-security 专项 target 应裁撤"
 
 
 # ===================================================================

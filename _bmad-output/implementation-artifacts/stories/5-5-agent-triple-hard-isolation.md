@@ -893,6 +893,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 
 ### 完成清单 Completion Notes List
 
+- [x] **专项裁撤裁定落地（2026-10-24 用户裁定）**: 「总是搞专项很不合适，应该放到集成测试或验收测试范畴。marker 非必要也不要新增」——探针套件从 tests/security/ 独立目录迁至 **tests/integration/test_integration_isolation_security.py**（复用集成既有 real_redis fixture 与 CI integration job 挂载面——`tests/integration` 已在 CI 命令中，无需独立挂载）；**裁撤** security marker 注册（pyproject 恢复原状）/CI 安全覆盖率专项 step（ci.yaml 恢复原状——本 Story 对 ci.yaml 归零改动）/Makefile test-security target；安全覆盖率独立口径（D-2 实例化）随之裁撤——执行面模块由四层门禁兜底（domain ≥90/application ≥85 实测 94%/90%）；AC-6.4 验收场景与架构基建断言改写为「归位断言 + 专项裁撤钉子」（探针在集成目录 + 目录/marker/target 三不存在）；pytestmark 改 [redis, integration]。验证: 探针 28 用例新位置全绿 + 隔离域集成回归 44 passed + 验收 20 场景全绿 + ruff/mypy 通过
 - [x] **Task 1（2026-10-23）**: 判定核心 isolation_access.py（矩阵三步纯函数 36 格全格 + shared+self 不豁免 + L1 前向格 + 派生锚 monkeypatch 三轴——71 用例）；异常 448/449 四件套（agent 段 440-449 全分配 + HTTP 403×2 + 设计文档 §3.3.2）；AgentConfig.allowed_tools + loader 解析（缺失回落/dict.fromkeys 去重保序/440 守卫）+ ceo_agent.yaml 23 名白名单（基线锚防漂移）。变异 ×5（矩阵翻转 15 红/FREE_WRITE 格 4 红/码值突变红/去重删除红/基线写错红）。domain 94%
 - [x] **Task 2（2026-10-23）**: IsolationGuardPort 三方法 Protocol + IsolationGuardService R2 三依赖（22 用例——守卫序/矩阵消费单点/白名单真源/共享池短路/443·447 透传/calls 顺序断言/get_by_id None 显式 443 收窄）+ 契约 11 维度 + 组合根注册（SINGLETON/tags[agent,isolation,security]）。变异 ×4。application 90%
 - [x] **Task 3（2026-10-23）**: 双接线原子提交——RunAgentWorkflowUseCase 第五依赖 + 编排骨位 443→441→guard→档案（4 用例）+ AgentWorkflowService 第五依赖 + execute 全量预检（all-or-nothing 449 先于 get_tool——5 用例）+ 回归面 12 构造点全修补（组合根双 lambda/集成 6 AsyncMock 工厂/验收 _assemble_workflow 真实 guard+真实 instantiate[R3-F1 连带]+feature 10 场景门控升档/契约 _DummyResolver）。变异 ×2。5-3 验收 18+集成 29+unit 1711 全绿零回归
@@ -1061,10 +1062,11 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 | 2026-10-23 | v1.3.1 | 文档审查 Round 4 纯验证 + Round 5 终审**收敛**：R4 全量 75 锚点独立核验通过（0 失实/1 导航级）、26 项修复抽样 100% 存续、登记 2 项留项并清偿（agent.py 实体区间锚 L39-175→L39-174 勘正；4 处「5 对照/透传」旧口径统一为「7 条辅用例[对照 4+透传 2+直调 1]」——R2-4 口径全量对齐）；R5 终审五节取证：周期闭合（4 提交链+工作区清偿零游离）/关键修复 10/10 双向核验/锚点 12/12 抽验采信 R4/红线终扫零命中（零抑制教唆·mock 分层分派合规·异常四件套齐备·零 AI 署名）/收敛判据全满足——**55 项审查处置 + 2 项 R4 留项 = 57 项全闭环，零 P0/P1/P2/P3 残留，审查周期收敛**，Story 维持 ready-for-dev 待实施态（终审特权记录：R1 提交信息「48 项」与台账定稿 37 项的历史差异已由 R2-6 台账核销口径自洽——历史提交不可变仅留痕） |
 | 2026-10-23 | v1.4.0 | **dev-story 实施启动**：Task 0 完成——SDD 规范定稿 + Gherkin 19 场景红阶段确认（19/19 合法红）+ 移交三项处置落盘（#6 核销/#7 维持/R1-DF2 维持）；实施期纠偏 3 处（R6 模板基准对齐 PG 模板主基准/noqa 红线清除/feature 横幅三行式） |
 | 2026-10-23 | v2.0.0 | **dev-story 全 Task 实施完成（Task 0-7）**：判定核心（矩阵 36 格+派生锚）/448·449 四件套/白名单真源（ceo_agent.yaml 23 名）/IsolationGuardService+契约/双接线（入口 fail-closed + 工具位全量预检）+ 回归面 12 构造点/安全四件套 + 21 探针 100% 拦截 + 7 辅/集成六场景（P95·通过率·并发 500/500）/验证器 A-D/验收 20 场景全绿；每 Task 独立 TDD 红绿变异（累计变异实证 17 处全红→还原绿）；全量回归 13098 passed（36 failed 全部 pre-existing 环境型——基线 d68bc496 复现证实）；domain 94%/application 90%/安全专项 96%；文档同步（architecture.md §5+§13/deferred-work 终态）；Status → review |
+| 2026-10-24 | v2.1.0 | **专项裁撤（用户裁定）**：探针套件归入集成测试范畴（tests/security → tests/integration/test_integration_isolation_security.py，复用 real_redis/CI 既有挂载面）+ security marker 不注册（pyproject 恢复原状）+ CI 覆盖率专项 step 与 Makefile test-security target 裁撤（ci.yaml 本 Story 改动归零）——D-2 安全覆盖率独立口径推翻（执行面由四层门禁兜底）+ DC-8 修订 + AC-6.4 改写为归位断言与裁撤钉子；探针 28 用例/隔离域集成 44/验收 20 全绿复验 |
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v2.1.0
 **创建日期/Created:** 2026-10-23
 **最后更新/Last Updated:** 2026-10-23
 **更新说明/Description:**

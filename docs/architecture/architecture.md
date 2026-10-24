@@ -667,7 +667,7 @@ UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本�
 > 异常契约: 448 `IsolationAccessViolationError`（403——跨主体越权）/ 449
 > `IsolationOperationForbiddenError`（403——等级策略禁止操作，reason 双形态
 > `tool_not_in_allowlist:{name}`|`data_isolation:{mode}`）。跨 Agent 穿透探针安全套件
-> （`tests/security/`——21 条探针矩阵 100% 拦截 + 7 条辅用例 + 执行面覆盖率 ≥90% 专项）。
+> （`tests/integration/test_integration_isolation_security.py`——21 条探针矩阵 100% 拦截 + 7 条辅用例；探针套件归入集成测试范畴，随 CI integration job 既有挂载面运行——2026-10-24 裁定，无独立目录/marker/覆盖率专项）。
 
 ### 5.1 四级隔离等级
 

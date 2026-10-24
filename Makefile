@@ -258,7 +258,7 @@ code-quality: lint format-check type-check
 # -----------------------------------------------------------------------------
 # 测试（Story 0.2 验收标准 - 阶段 2）
 # -----------------------------------------------------------------------------
-.PHONY: test test-cov test-cov-html test-cov-domain test-cov-application test-cov-infrastructure test-cov-gates test-security test-unit test-integration test-e2e pytest
+.PHONY: test test-cov test-cov-html test-cov-domain test-cov-application test-cov-infrastructure test-cov-gates test-unit test-integration test-e2e pytest
 
 test: pytest
 
@@ -299,14 +299,6 @@ test-cov-gates:
 	@echo "🧪 运行全部分层覆盖率门禁（domain≥90/application≥85/infrastructure≥75/overall≥80）..."
 	$(POETRY) run pytest tests/unit/ --cov=src -q
 	$(POETRY) run python scripts/check_coverage_gates.py
-
-# 安全覆盖率专项（Story 5.5——安全套件对三重隔离执行面模块集 ≥90%）
-# 两段式口径（D-2 偏离声明）: 与四层门禁并存不替代；探针需真实 Redis
-# （SISYS_USE_TEST_PORTS=1 测试端口 6380）
-test-security:
-	@echo "🛡️ 运行安全探针套件 + 执行面覆盖率门禁（≥90%）..."
-	$(POETRY) run pytest tests/security --cov=src -q
-	$(POETRY) run coverage report --include="src/application/services/isolation_guard_service.py,src/domain/value_objects/isolation_access.py" --fail-under=90
 
 test-unit:
 	@echo "🧪 运行单元测试..."

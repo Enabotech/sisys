@@ -372,21 +372,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p reports/integration
-          poetry run pytest tests/integration tests/contracts tests/security \
+          poetry run pytest tests/integration tests/contracts \
             --junitxml=reports/integration/integration-tests.xml \
             --html=reports/integration/integration-tests.html \
             --self-contained-html \
             -v \
             --tb=short
-
-      # Story 5.5 安全覆盖率专项（D-2 两段式口径——与主 pytest 命令独立，
-      # 套件在 job 内双跑为覆盖率口径的既定成本；禁 --cov=src.<module> 单段
-      # 形态[pyproject coverage source 覆盖陷阱——Makefile L278-282 已文档化]）
-      - name: 安全覆盖率专项（三重隔离执行面 ≥90%）
-        shell: bash
-        run: |
-          poetry run pytest tests/security --cov=src -q
-          poetry run coverage report --include="src/application/services/isolation_guard_service.py,src/domain/value_objects/isolation_access.py" --fail-under=90
 
       - name: 上传集成测试报告
         if: always()

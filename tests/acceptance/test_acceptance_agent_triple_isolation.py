@@ -29,14 +29,14 @@
 | 16 | AC-6.1 | 端口级         | 无（禁命令）| 组合根接线（PortSpec+resolve）  |
 | 17 | AC-6.2 | 服务级         | 真实      | 真实链行为锚（resolve 用例 447）|
 | 18 | AC-6.3 | 端口级         | 无        | AST 静态扫描（验证器三面）       |
-| 19 | AC-6.4 | 资产面（端口级）| 无        | 基建四件套存在性                |
+| 19 | AC-6.4 | 资产面（端口级）| 无        | 探针套件归位集成范畴（专项裁撤）|
 
 场景序约束: AC-6.2 resolve 用例场景内自清 SINGLETON（AC-6.1 resolve 缓存的
 guard 实例绑已关循环——clear_singleton 后重建绑当前场景循环，restorer 收尾
 再清，5-3 DC-12 同款问题的自解形态）。
 
 新模块延迟 import 纪律：本 Story 新交付模块（isolation_access / isolation_guard
-端口与实现 / 448-449 异常 / tests.security 套件 / 集成计时 helper）一律在步骤
+端口与实现 / 448-449 异常 / 探针套件[归位集成目录] / 集成计时 helper）一律在步骤
 函数体内延迟 import——模块顶部 import 会使 pytest 收集期整文件 collection
 error，无法逐 Task 转绿（5-3 纪律）。
 
@@ -70,7 +70,7 @@ from src.infrastructure.storage.redis.key_builder import build_key
 
 REPO_ROOT = Path(__file__).parents[2]
 
-# 验收侧硬编码期望清单（与 tests/security PROBE_MATRIX 双源比对——程序可内省通道）
+# 验收侧硬编码期望清单（与探针套件 PROBE_MATRIX 双源比对——程序可内省通道）
 _EXPECTED_PROBES: tuple[tuple[str, str], ...] = (
     ("P-01", "EXCEPTION_448"),
     ("P-02", "EXCEPTION_448"),
@@ -861,10 +861,10 @@ def when_self_blackboard_write(context: dict[str, Any]) -> None:
 @given("安全测试套件与探针矩阵常量已加载")
 def given_probe_matrix_loaded(context: dict[str, Any]) -> None:
     """加载安全套件模块（资产面——无 Redis，套件缺失即红）。"""
-    from tests.security import test_isolation_security
+    from tests.integration import test_integration_isolation_security as probe_module
 
-    context["probe_matrix"] = test_isolation_security.PROBE_MATRIX
-    context["security_module"] = test_isolation_security
+    context["probe_matrix"] = probe_module.PROBE_MATRIX
+    context["security_module"] = probe_module
 
 
 @scenario(
@@ -1310,49 +1310,43 @@ def then_port_direction_and_decision_source_legal(context: dict[str, Any]) -> No
 
 @scenario(
     "test_acceptance_agent_triple_isolation.feature",
-    "AC-6.4 - 安全测试基建四件套就绪",
+    "AC-6.4 - 探针套件归位集成测试范畴",
 )
-def test_ac_6_4_security_infrastructure_ready(context: dict[str, Any]) -> None:
-    """AC-6.4: 目录/marker/CI 挂载/覆盖率命令四件套存在性。"""
+def test_ac_6_4_probe_suite_integration_placement(context: dict[str, Any]) -> None:
+    """AC-6.4 修订（2026-10-24 用户裁定）: 探针套件归入集成范畴——专项裁撤 +
+    marker 非必要不新增。"""
 
 
-@given("安全测试基建已部署")
-def given_security_infrastructure_deployed(context: dict[str, Any]) -> None:
-    """基建登记（四件套断言上下文——文件缺失即断言红）。"""
-    context["security_paths"] = [
-        "tests/security/__init__.py",
-        "tests/security/conftest.py",
-        "tests/security/test_isolation_security.py",
-    ]
+@given("探针套件交付形态待核验")
+def given_probe_suite_placement_context(context: dict[str, Any]) -> None:
+    """归位断言上下文（文件缺失即断言红）。"""
+    context["probe_suite_path"] = "tests/integration/test_integration_isolation_security.py"
 
 
-@then("tests/security 目录与探针套件文件存在")
-def then_security_directory_exists(context: dict[str, Any]) -> None:
-    """三文件存在性（目录 + conftest + 探针套件）。"""
-    missing = [rel for rel in context["security_paths"] if not (REPO_ROOT / rel).exists()]
-    assert not missing, f"安全测试基建文件缺失: {missing}"
-
-
-@then("pyproject 注册 security marker 且 CI 挂载 tests/security")
-def then_marker_registered_and_ci_mounted(context: dict[str, Any]) -> None:
-    """文本断言防漏注册（--strict-markers 收集期守卫）+ CI integration job 挂载。"""
-    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert '"security:' in pyproject, "pyproject markers 未注册 security（--strict-markers 下收集期炸）"
+@then("探针套件位于集成目录且随既有 CI 挂载面运行")
+def then_probe_suite_in_integration_directory(context: dict[str, Any]) -> None:
+    """探针套件文件存在于 tests/integration（CI integration job pytest 路径
+    `tests/integration` 天然涵盖——无需独立目录/挂载）。"""
+    assert (REPO_ROOT / context["probe_suite_path"]).exists(), (
+        "探针套件应位于 tests/integration/（集成范畴归位——2026-10-24 用户裁定）"
+    )
     ci = (REPO_ROOT / ".gitea" / "workflows" / "ci.yaml").read_text(encoding="utf-8")
-    assert "tests/security" in ci, "CI integration job 未挂载 tests/security（探针需真实 Redis）"
+    assert "tests/integration" in ci, "CI integration job 应涵盖集成目录（探针随行）"
 
 
-@then("Makefile 提供安全覆盖率专项命令")
-def then_makefile_security_target(context: dict[str, Any]) -> None:
-    """test-security target（两段式覆盖率口径——D-2 偏离声明落地）。"""
+@then("独立安全目录与 security marker 均不存在")
+def then_no_dedicated_security_infrastructure(context: dict[str, Any]) -> None:
+    """专项裁撤钉子: tests/security 目录/security marker/test-security target
+    均不存在（marker 非必要不新增——--strict-markers 下无注册即无声明）。"""
+    assert not (REPO_ROOT / "tests" / "security").exists(), "tests/security 独立目录应裁撤"
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"security:' not in pyproject, "security marker 应不注册（非必要不新增）"
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    assert "test-security:" in makefile, "Makefile 缺 test-security target"
-    assert "tests/security" in makefile, "test-security target 未跑 tests/security"
-    assert "--fail-under=90" in makefile, "安全覆盖率专项未含 fail-under=90 门禁"
+    assert "test-security:" not in makefile, "test-security 专项 target 应裁撤"
 
 
 # ===================================================================
-# Task 7 收尾: 完成清单场景（src 执行面六文件 + tests 五目录）
+# Task 7 收尾: 完成清单场景（src 执行面六文件 + tests 四目录——探针归集成范畴）
 # ===================================================================
 
 
@@ -1361,12 +1355,12 @@ def then_makefile_security_target(context: dict[str, Any]) -> None:
     "收尾 - Story 5.5 完成清单确认",
 )
 def test_completion_checklist(context: dict[str, Any]) -> None:
-    """收尾: 执行面源码六文件 + 测试五目录齐备（5-4 收尾同款）。"""
+    """收尾: 执行面源码六文件 + 测试四目录齐备（5-4 收尾同款——探针归集成）。"""
 
 
 @when("检查三重隔离执行面与测试交付文件清单")
 def when_check_triple_isolation_manifest(context: dict[str, Any]) -> None:
-    """存在性清单断言（src 六文件——含修改件；tests 五目录关键文件）。"""
+    """存在性清单断言（src 六文件——含修改件；tests 四目录关键文件——探针归集成）。"""
     src_files = [
         "src/domain/value_objects/isolation_access.py",
         "src/domain/value_objects/agent_config.py",
@@ -1381,7 +1375,7 @@ def when_check_triple_isolation_manifest(context: dict[str, Any]) -> None:
         "tests/unit/architecture/test_arch_agent_triple_isolation.py",
         "tests/contracts/test_port_contract_isolation_guard.py",
         "tests/integration/test_integration_agent_triple_isolation.py",
-        "tests/security/test_isolation_security.py",
+        "tests/integration/test_integration_isolation_security.py",
         "tests/acceptance/test_acceptance_agent_triple_isolation.feature",
         "tests/acceptance/test_acceptance_agent_triple_isolation.py",
     ]
