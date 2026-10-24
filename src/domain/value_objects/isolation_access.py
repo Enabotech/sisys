@@ -21,7 +21,6 @@ Copyright:
 
 from __future__ import annotations
 
-from collections.abc import Collection
 from dataclasses import dataclass
 from enum import Enum
 
@@ -173,7 +172,7 @@ def decide_tool_access(
     policy: IsolationPolicy,
     *,
     tool_name: str,
-    allowed_tools: Collection[str],
+    allowed_tools: tuple[str, ...],
 ) -> IsolationAccessDecision:
     """工具白名单判定（工具面——纯函数零 IO）。
 
@@ -185,7 +184,8 @@ def decide_tool_access(
     Args:
         policy: 隔离策略（tool_isolation 维度消费）。
         tool_name: 请求执行的工具名（中文显示名——TOOL_CATALOG 真源形态）。
-        allowed_tools: 角色工具白名单（AgentConfig.allowed_tools 真源）。
+        allowed_tools: 角色工具白名单（tuple 形态——AgentConfig.allowed_tools
+            真源；类型收紧防裸 str 传入退化为子串匹配的白名单放大）。
 
     Returns:
         判定决策对象（allowed/violation/reason 三件套）。

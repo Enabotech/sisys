@@ -30,8 +30,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 工具执行位白名单拦截（L4 严格白名单） | ✅ AgentWorkflowService.execute 接线 | — |
 | 工具白名单配置真源（eip_config.allowed_tools + ceo_agent.yaml） | ✅ | — |
 | 异常 448/449（跨 Agent 越权 / 策略禁止操作） | ✅ 领取 agent 段预留码位 | — |
-| 跨 Agent 穿透探针（21 条拦截率 100% + 并发 10×50） | ✅ tests/security 安全套件 | — |
-| 安全测试基建（tests/security 目录/marker/CI 挂载/覆盖率口径） | ✅ | — |
+| 跨 Agent 穿透探针（21 条拦截率 100% + 并发 10×50） | ✅ tests/integration/test_integration_isolation_security.py（v2.1.0 专项裁撤——探针归入集成范畴） | — |
+| 安全测试基建（独立目录/marker/CI 挂载/覆盖率口径） | ✅ 交付后裁撤（v2.1.0 用户裁定——归入集成测试范畴，marker 不新增；CI 挂载面复用 integration job 既有路径） | — |
 | IsolationSwitchLog 切换日志、多维检索、WORM 归档 | ❌ 不做 | 5.6（P1-6） |
 | 隔离切换审计记录（AuditService 调用） | ❌ 不做 | 5.6（事件 payload 是 5.6 数据源契约） |
 | 违规拦截事件发布（如 IsolationViolationDetected） | ❌ 不做（拦截即异常+日志，事件 YAGNI） | V1 安全专项评估 |
@@ -86,7 +86,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 验收测试骨架（PG 模板 R6 形态：多行 @scenario 字面量 + 场景绑定与步骤交替排列 + context dict fixture 场景级 Redis 客户端 + `_run_async` 同循环 + 双键清理 + AC 横幅 + 门控步骤化 skip + 延迟 import） | `tests/acceptance/test_acceptance_agent_isolation.py`（5-4 最新形态，1267 行） | **参考照抄**——R6 主体基准；PG 模板仅取 AC 横幅/门控/AST 扫描三要素（禁 then-pass 占位） |
 | 异常四件套流程（定义文件 + `_code_ranges.py` 双映射 + `__init__.py` 暴露 + `EXCEPTION_HTTP_MAP` + §3.3.2 文档表） | 5-4 Task 1 循环 C 交付形态（agent_exceptions.py 446/447 段） | **参考照抄**——448/449 同款四件套 |
 | `build_key(namespace, *parts)` | `src/infrastructure/storage/redis/key_builder.py` L11-22 | **直接复用**——探针清理双键构造 |
-| pyproject markers 注册表 | `pyproject.toml` L253-278 | **扩展**——注册 `security` marker（`--strict-markers` L286 开启，未注册即收集期炸） |
+| pyproject markers 注册表 | `pyproject.toml` L253-278 | **不扩展**（v2.1.0 专项裁撤——security marker 不注册，pyproject 对本 Story 归零改动；`--strict-markers` L286 对既有 marker 生效） |
 
 **明确不存在、本 Story 需新建**（全仓 grep 验证：`src/` 下 `IsolationGuard|isolation_guard|ensure_agent_access|ensure_tool_access|IsolationResource|allowed_tools|IsolationAccessViolation|IsolationOperationForbidden|tests/security` 零命中；`get_isolation_state` 在 run_agent_workflow.py / agent_workflow_service.py 全文零引用——执行链零隔离消费；`tests/security/` 目录不存在）：
 
@@ -97,7 +97,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 5. `AgentConfig.allowed_tools` 字段 + `YamlAgentConfigLoader` eip_config.allowed_tools 解析 + ceo_agent.yaml 白名单清单
 6. `RunAgentWorkflowUseCase` 第五依赖接线（isolation_guard）+ `AgentWorkflowService` 第五依赖接线（isolation_guard + execute 工具位拦截）
 7. 组合根 `isolation_guard_service` 注册
-8. `tests/security/` 目录（`__init__.py` + `conftest.py` + `test_isolation_security.py`）+ pyproject `security` marker + CI integration job 挂载 `tests/security`
+8. `tests/security/` 目录（`__init__.py` + `conftest.py` + `test_isolation_security.py`）+ pyproject `security` marker + CI integration job 挂载 `tests/security`（**v2.1.0 专项裁撤**——交付后归入 `tests/integration/test_integration_isolation_security.py`，marker/target/CI 专项全部不保留，终态见完成清单专项裁撤条目）
 9. `tests/unit/application/services/test_isolation_guard_service.py` / `tests/unit/domain/value_objects/test_isolation_access.py` / `tests/unit/architecture/test_arch_agent_triple_isolation.py` / `tests/contracts/test_port_contract_isolation_guard.py` / `tests/integration/test_integration_agent_triple_isolation.py` / `tests/acceptance/test_acceptance_agent_triple_isolation.{feature,py}`
 
 ---
@@ -158,7 +158,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 - [ ] 拦截率分子分母显式断言（21/21——穷举枚举断言非采样置信；与 AC-5.2 通过率分立；对照/透传用例不计入分子分母）
 - [ ] T-01/T-04 白名单外工具经「配置篡改」构造（ceo_agent.yaml 全文复制到 tmp、收窄 allowed_tools——5-4 AC-2.3 驱动先例）；生产 yaml 保持宽白名单（5-3 主链兼容）
 - [ ] 探针矩阵定义即文档 + 单真源常量：模块级 `PROBE_MATRIX: tuple[ProbeSpec, ...]`（ProbeSpec 为 NamedTuple——字段定义见 Task 4 循环 B；docstring 内 21 条清单表与之对齐——安全审计资产；参数化用例由 PROBE_MATRIX 派生，验收 AC-4×2 import 后 `len() == 21` + 逐条 (id, expected_code) 比对——程序可内省通道）
-- [ ] 套件内放行对照与透传用例 7 条（OWASP 授权回归正负用例并存惯例；覆盖 90% 门禁分母——三方法主路径/放行分支/透传分支/L1 格/242 不变量均在 security 侧覆盖）：放行对照 4（自身 private 资源读 / BLACKBOARD READ[L4] / 白名单内工具[L4] / **ensure_agent_executable 放行返回 L4 策略[三维度断言]**）+ 守卫透传 2（443 随机 UUID / 447 删隔离键——**均经 `ensure_agent_executable(A)` 自体形态构造**，删键删 **actor A 侧**[单边语义——guard 只取 actor state，删 target 键将得 448 非 447]，A 真实创建须登记双键清理）+ 纯函数直调 1（decide_isolation_access L1 前向格 + IsolationAccessDecision 242 不变量——补 isolation_access 的 L1 分支/校验分支覆盖）
+- [ ] 套件内放行对照与透传用例 7 条（OWASP 授权回归正负用例并存惯例——正负对照是套件自检面，防「一刀切过阻断」缺陷不可检测）：放行对照 4（自身 private 资源读 / BLACKBOARD READ[L4] / 白名单内工具[L4] / **ensure_agent_executable 放行返回 L4 策略[三维度断言]**）+ 守卫透传 2（443 随机 UUID / 447 删隔离键——**均经 `ensure_agent_executable(A)` 自体形态构造**，删键删 **actor A 侧**[单边语义——guard 只取 actor state，删 target 键将得 448 非 447]，A 真实创建须登记双键清理）+ 纯函数直调 1（decide_isolation_access L1 前向格 + IsolationAccessDecision 242 不变量——补 isolation_access 的 L1 分支/校验分支覆盖）
 
 ### AC-5: 性能与并发
 
@@ -178,14 +178,14 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 **Given** 判定核心、守卫服务、接线、安全基建全部交付
 **When** 验证接线与合规
-**Then** 新端口 `isolation_guard_service`（SINGLETON）经组合根注册且 resolve 可达（PortSpec 全参数含 module/owner）；`RunAgentWorkflowUseCase` 与 `AgentWorkflowService` 组合根 lambda 注入第五依赖（接线完整）；domain 零外部依赖（isolation_access.py/guard 异常 AST 扫描）；组合根外零实例化；**安全测试基建就绪**：`tests/security/` 目录 + conftest 存在、pyproject markers 注册 `security`、CI integration job pytest 路径含 `tests/security`（探针需真实 Redis——挂载有服务栈的 job）、安全覆盖率口径落地（专项命令对执行面模块 fail-under 90）
-**And** 白名单接线行为锚：`AgentWorkflowService.execute` 进工具执行循环**前**对 plan.steps 全量工具名预检 `ensure_tool_access`（all-or-nothing fail-closed——任一白名单外工具 449 先于**首个**工具执行，杜绝「前 N 步已执行、第 N+1 步才拒」的部分执行副作用；白名单外 → 449 真实拒，ToolNotFoundError 不再先炸；预检是零 IO 纯白名单比对——无性能代价）；既有 5-3 工作流全量测试零回归（CEO 白名单覆盖其工具面）
+**Then** 新端口 `isolation_guard_service`（SINGLETON）经组合根注册且 resolve 可达（PortSpec 全参数含 module/owner）；`RunAgentWorkflowUseCase` 与 `AgentWorkflowService` 组合根 lambda 注入第五依赖（接线完整）；domain 零外部依赖（isolation_access.py/guard 异常 AST 扫描）；组合根外零实例化；**安全测试资产归位（v2.1.0 专项裁撤终态）**：探针套件位于 `tests/integration/test_integration_isolation_security.py`、CI integration job pytest 路径 `tests/integration` 天然涵盖（探针需真实 Redis——该 job 有服务栈）、`tests/security/` 目录与 pyproject `security` marker 与 Makefile `test-security` target 三不存在（裁撤钉子——防专项复活）
+**And** 白名单接线行为锚：`AgentWorkflowService.execute` 进工具执行循环**前**对 plan.steps 全量工具名预检 `ensure_tool_access`（all-or-nothing fail-closed——任一白名单外工具 449 先于**首个**工具执行，杜绝「前 N 步已执行、第 N+1 步才拒」的部分执行副作用；白名单外 → 449 真实拒，ToolNotFoundError 不再先炸；预检经守卫全链每名三次 IO[隔离态读/实体读/配置加载——R1 勘误：非零 IO]，判定核心纯函数零 IO）；既有 5-3 工作流全量测试零回归（CEO 白名单覆盖其工具面）
 
 **验证标准/Validation Criteria:**
 - [ ] 组合根注册 + resolve + isinstance + lifetime==SINGLETON 断言（5-4 AC-6.1 同款）
 - [ ] 两接线点 lambda 注入确认（构造签名扩展——回归面清单全量同步见 Task 3）
 - [ ] 架构验证器：domain 零外部依赖 + 组合根外零实例化（IsolationGuardService）+ 端口方向（application 服务 import 白名单含 application.ports）
-- [ ] 基建四件套断言（文件存在性 + pyproject `security` marker 在注册表 + ci.yaml integration job pytest 命令含 tests/security + 专项覆盖率命令可执行）
+- [ ] 安全资产归位断言 + 裁撤钉子（v2.1.0 终态）：`tests/integration/test_integration_isolation_security.py` 存在且可收集 + ci.yaml integration job pytest 命令含 `tests/integration` + **三不存在钉子**（`tests/security/` 目录不 existence / pyproject markers 无 `security` / Makefile 无 `test-security` target）——归位与防复活双向锁定（验收 AC-6.4 场景与架构测试基建验证器节同款断言）
 - [ ] 5-3 验收/集成存量测试零回归（run-task 主链 + 工具执行链）
 
 ---
@@ -257,7 +257,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 #### API 契约 (API Contract)
 
 - [x] 本 Story 无 REST API、无新 CLI 子命令（守卫是内嵌执行面非用户功能——探针是测试面）。CLI 既有 `set-isolation`/`isolation-status` 零改动（探针场景经服务级调用构造等级）
-- [x] 配置契约：`configs/agents/ceo_agent.yaml` eip_config 段追加 `allowed_tools` 显式清单——**初值 = TOOL_CATALOG 全部 23 名**（当前 23 条目均未显式传 status、默认 `ToolStatus.ACTIVE`，故「ACTIVE 全集」效果等同全部 23 名；status 筛选语义待 V1 出现 DEPRECATED 工具时才生效——届时初值生成方式需按 `tool.status` 过滤而非目录直抄）（保证 5-3 主链与既有验收/集成测试零回归——plan 阶段 LLM 可选工具均在白名单内）；探针判别力经「配置篡改」获得（tmp 目录收窄白名单——AC-4 验证标准）。清单按 `strategic_tool_catalog.py` 实际 tool_name 逐项列出（dev 实施时从 `TOOL_CATALOG` 提取，**禁省略号/通配**——显式性即审计性；**注意工具名是中文显示名形态**：6 个含半角空格（「PESTEL 分析」「VRIO 框架」「GE-麦肯锡矩阵」「SPACE 矩阵」「BSC 平衡计分卡」「RACI 矩阵」）、另有 `$APPEALS`/`SWOT-TOWS` 特殊字符——yaml 逐字节照抄禁改写，全角空格混入即 449）
+- [x] 配置契约：`configs/agents/ceo_agent.yaml` eip_config 段追加 `allowed_tools` 显式清单——**初值 = TOOL_CATALOG 全部 23 名**（当前 23 条目均未显式传 status、默认 `ToolStatus.ACTIVE`，故「ACTIVE 全集」效果等同全部 23 名；status 筛选语义待 V1 出现 DEPRECATED 工具时才生效——届时初值生成方式需按 `tool.status` 过滤而非目录直抄）（保证 5-3 主链与既有验收/集成测试零回归——plan 阶段 LLM 可选工具均在白名单内）；探针判别力经「配置篡改」获得（tmp 目录收窄白名单——AC-4 验证标准）。清单按 `strategic_tool_catalog.py` 实际 tool_name 逐项列出（dev 实施时从 `TOOL_CATALOG` 提取，**禁省略号/通配**——显式性即审计性；**注意工具名是中文显示名形态**：5 个含半角空格（「PESTEL 分析」「VRIO 框架」「SPACE 矩阵」「BSC 平衡计分卡」「RACI 矩阵」）、另有 `$APPEALS`/`SWOT-TOWS`/「GE-麦肯锡矩阵」特殊字符（$ / 连字符）——yaml 逐字节照抄禁改写，全角空格混入即 449）
 
 #### 六边形架构约束（必须遵守）
 
@@ -266,7 +266,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 - [x] `isolation_access.py`（枚举 + 决策 + 纯函数）全部 domain 层，仅标准库 + 同层 isolation_policy/events.enums/exceptions——`.importlinter` domain 契约（禁 pydantic/redis）
 - [x] `IsolationGuardService`（application）构造注入一应用端口（isolation_management_service）+ 一 domain 端口（agent_repository）+ 一应用端口（agent_config_loader）——application→application 同层合法（5-4 先例）+ application→domain 合法；禁 import infrastructure
 - [x] 两接线点（use_case/services）注入 `IsolationGuardPort`（application 端口）——同层端口组合注入合法（R2）
-- [x] tests/security/ 是测试目录不属四层、不在架构扫描面；探针测试手动组装（验证器 B 仅扫 src/ 面——组合根外零实例化，对齐 5-4 验证器 B 现形态：tests 白名单前缀已按 5-3 R1-F12 判定冗余并移除，禁复活）
+- [x] 探针所在测试目录不属四层、不在架构扫描面；探针测试手动组装（v2.1.0 裁撤后归 `tests/integration/`——验证器 B 仅扫 src/ 面：组合根外零实例化，对齐 5-4 验证器 B 现形态，tests 白名单前缀已按 5-3 R1-F12 判定冗余并移除，禁复活）
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
@@ -277,9 +277,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
   - AC-1 ×2（端口级，无 Redis）：判定矩阵完备性（MVP 三级全格 + L1 前向）/ 资源归属与工具判定
   - AC-2 ×3（服务级，真实 Redis）：L4 放行返回策略 / 447 拒执行（删隔离键）/ 443 拒执行（随机 UUID）
   - AC-3 ×5（服务级，真实 Redis）：Prompt 面 448 / 私有数据面 448（读+写）/ 共享面矩阵（L4 读放行 + L4 写 449 + L2 写放行）/ 工具白名单（449[非白名单名直构造——guard 不查注册表假名即 449，无需 tmp 通道] + 白名单内放行 + L3 切换后共享池放行）/ 自身 private 资源放行
-  - AC-4 ×2（安全套件资产面——验收侧断言套件存在与探针矩阵定义完备性[文件 + 场景计数 + 21 条清单]，21 穿透探针实跑归 tests/security——分档口径 DC-10）：探针矩阵资产就绪 / 拦截率断言口径
+  - AC-4 ×2（安全套件资产面——验收侧断言套件存在与探针矩阵定义完备性[文件 + 场景计数 + 21 条清单]，21 穿透探针实跑归 tests/integration/test_integration_isolation_security.py——v2.1.0 裁撤终态，分档口径 DC-10）：探针矩阵资产就绪 / 拦截率断言口径
   - AC-5 ×3（委托集成计时 + 并发自跑）：P95<50ms（委托 helper）/ 检查通过率 100% / 并发 10×50 零泄露
-  - AC-6 ×4（端口级 + 服务级）：组合根接线 / 入口接线真实链（instantiate→run-task 主链零回归 + 447 fail-closed 验收面）/ 架构合规静态扫描 / 安全测试基建就绪（四件套）
+  - AC-6 ×4（端口级 + 服务级）：组合根接线 / 入口接线真实链（instantiate→run-task 主链零回归 + 447 fail-closed 验收面）/ 架构合规静态扫描 / 安全测试资产归位（v2.1.0 裁撤终态——归位断言 + 三不存在钉子）
   - 收尾 ×1：完成清单逐项确认
 - [x] BDD 步骤约束：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；Redis 依赖场景前置「假如 Redis 缓存服务可用」门控步骤（ping 失败 `pytest.skip` 动态跳过）；纯端口级场景（AC-1×2、AC-4×2 资产面、AC-6 部分扫描）脱离门控；参数化步骤显式 `parsers.parse`（5-4 实施期发现——pytest-bdd 默认 re parser）；**AC-6.2 主链 LLM 面 = 5-3 验收 Fake LLM 端口替身豁免先例**（`_make_fake_llm`——外部 SaaS 面豁免，guard 及其余依赖全真实——Task 3 循环 C ② 形态）
 - [x] **场景三属性分档表**（Task 0.6 定稿落 docstring）：每场景「层级（端口级/服务级）+ Redis 依赖（真实/无）+ 断言面（异常矩阵/放行对照/性能/静态扫描）」
@@ -318,11 +318,13 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 #### 安全测试基建契约（Task 0 定稿——DC-8）
 
+> **⚠️ v2.1.0 专项裁撤终态（用户裁定 2026-10-24）**：「总是搞专项很不合适，应该放到集成测试或验收测试范畴。marker 非必要也不要新增」——本节四件套（独立目录/security marker/CI 专项挂载/覆盖率专项）交付（v2.0.0）后**整体裁撤**：探针套件迁至 `tests/integration/test_integration_isolation_security.py`（复用集成 real_redis fixture 与 CI integration job 既有 `tests/integration` 挂载面）；pyproject/Makefile/ci.yaml 对本 Story 改动归零；安全覆盖率独立口径（D-2）推翻——执行面模块由四层门禁兜底（domain ≥90/application ≥85）；pytestmark 改 `[redis, integration]`。下述 checkbox 为 Task 0 当时的定义记录（执行史实保留），终态形态见完成清单「专项裁撤裁定落地」条目与 DC-8 修订。
+
 - [x] `tests/security/__init__.py` + `tests/security/conftest.py`（场景级 Redis 客户端 fixture + ping 门控 skip——对齐 tests/integration/conftest.py real_redis 形态的精简版）+ `tests/security/test_isolation_security.py`
 - [x] pyproject `[tool.pytest.ini_options].markers` 追加 `"security: 安全探针套件（跨 Agent 穿透/隔离强制执行验证）"`（`--strict-markers` 下未注册即收集期炸——必改）
 - [x] CI 挂载：`.gitea/workflows/ci.yaml` integration-tests job 的 pytest 命令 `tests/integration tests/contracts` 扩展为 `tests/integration tests/contracts tests/security`（探针需真实 Redis——该 job 已 compose 起服务栈；unit-tests job 不动[无服务栈，探针全 skip 造成假绿幻觉]；security-scan job 是纯静态扫描[Bandit/detect-secrets/Trivy]不混入 pytest 面）
 - [x] 安全覆盖率口径（epics「安全测试覆盖率≥90%」实例化——D-2 偏离声明）：专项命令采用**两段式**（`poetry run pytest tests/security --cov=src -q && poetry run coverage report --include="src/application/services/isolation_guard_service.py,src/domain/value_objects/isolation_access.py" --fail-under=90`）——**禁用 `--cov=src.<module> --cov-fail-under` 单段形态**（pyproject `[tool.coverage.run] source=["src"]` 会覆盖 `--cov` 指定使 TOTAL 恒为全 src、门禁必红——Makefile L278-282 已文档化的仓库级陷阱；两段式是 test-cov-domain target 同款正确机制）（安全套件对**三重隔离执行面模块集**的语句覆盖率 ≥90%——套件含 21 穿透 + 7 辅用例[对照 4 + 透传 2 + 纯函数直调 1]，三方法主路径/放行分支/443·447 透传分支/L1 前向格/242 不变量均在 security 侧覆盖）——落地为 Makefile target `test-security`（含覆盖率门禁）+ CI integration job 内联同款 step（**CI 形态 = 新增单 step `run: |` 两行**[poetry run pytest tests/security --cov=src -q / poetry run coverage report --include=… --fail-under=90]——与主 pytest 命令独立，套件在 job 内双跑为覆盖率口径的既定成本）；与四层门禁（check_coverage_gates.py）并存不替代
-- [x] 安全套件 pytestmark：`[pytest.mark.security, pytest.mark.redis, pytest.mark.integration]`（语义上属集成族——CI 挂 integration job 一致）
+- [x] 安全套件 pytestmark：`[pytest.mark.security, pytest.mark.redis, pytest.mark.integration]`（语义上属集成族——CI 挂 integration job 一致）（v2.1.0 裁撤后终态为 `[redis, integration]`——security marker 随专项裁撤不注册）
 
 **Task 0 完成标志：**
 - [x] 上述规范项全部定义完毕；Gherkin 已编写且运行确认失败（红阶段验证——ModuleNotFoundError/断言红为合法红）
@@ -331,7 +333,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
   2. `RunAgentWorkflowUseCase` lambda 注入 isolation_guard 确认（**端到端锚：resolve 用例 → 删隔离键 → run-task 抛 447**——lambda 漏注入则入口检查静默缺失，验收 AC-2.2 抓红）
   3. `AgentWorkflowService` lambda 注入 isolation_guard 确认（**端到端锚：窄白名单配置 → execute 传白名单外工具步骤 → 449**）
   4. 事件面：本 Story 零新事件零登记（复验既有 IsolationLevelSwitched 双登记不漂移——探针构造切换时真实发布）
-  5. tests/security 四件套（目录/marker/CI/覆盖率命令）接线断言（AC-6.4）
+  5. 安全测试资产接线断言（AC-6.4——v2.1.0 终态：探针文件归位 `tests/integration/` + 目录/marker/target 三不存在钉子）
 - [x] **移交三项处置落盘**（DC-12：#6 核销登记 + #7 维持 + R1-DF2 维持——deferred-work.md 原条目更新）
 
 ---
@@ -340,7 +342,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 > 每 Task 依次执行 🔴红→🟢绿→🟡变异→🔄重构；变异实证 = 对新行为契约的断言改坏→红→还原→绿（Epic 4 行动项 7.1-2 强制）。禁止行为四条同模板基线（先码后测/测试后置/跳红/跳变异）。
 >
-> **套件型 Task 豁免条款**（Task 4 循环 B / Task 5 / Task 7 收尾场景）：这三类 Task 编写的是**验证型测试层**（对 Task 1-3 已交付链/产物编写断言——探针首跑即绿，无设计红可先）。其红由 Task 0 验收红阶段前置承担（Subtask 0.7 验收测试红）；断言活性由 🟡 变异实证强制保证（预期码改错→红、guard 判定翻转→448 探针集体红）——变异是该类 Task 的红替代物，不可跳过。Task 4 循环 A（基建四件套断言）是正常 TDD——基建不存在时断言真红；其用例落 `tests/unit/architecture/test_arch_agent_triple_isolation.py`（基建验证器节）或验收 AC-6.4，**禁放 tests/security 自身**（断言本文件存在自指恒真）。
+> **套件型 Task 豁免条款**（Task 4 循环 B / Task 5 / Task 7 收尾场景）：这三类 Task 编写的是**验证型测试层**（对 Task 1-3 已交付链/产物编写断言——探针首跑即绿，无设计红可先）。其红由 Task 0 验收红阶段前置承担（Subtask 0.7 验收测试红）；断言活性由 🟡 变异实证强制保证（预期码改错→红、guard 判定翻转→448 探针集体红）——变异是该类 Task 的红替代物，不可跳过。Task 4 循环 A（基建四件套断言——v2.1.0 裁撤后为归位断言+三不存在钉子）是正常 TDD——基建不存在时断言真红；其用例落 `tests/unit/architecture/test_arch_agent_triple_isolation.py`（基建验证器节）或验收 AC-6.4，**禁放探针套件自身目录**（断言本文件存在自指恒真）。
 
 ---
 
@@ -356,7 +358,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | TDD 单元测试 | RunAgentWorkflowUseCase 接线 | 第五依赖/447 fail-closed 先于档案/443·441 零回归/放行策略断言 | `tests/unit/application/use_cases/test_run_agent_workflow.py`（追加 + 存量同步——存量构造点补依赖） | Task 3 |
 | TDD 单元测试 | AgentWorkflowService 工具位 | 第五依赖/白名单外 449 先于 get_tool/白名单内放行/L3 共享池放行/无工具步骤直推理零守卫调用 | `tests/unit/application/services/test_agent_workflow_service.py`（追加 + 存量同步——文件名以仓库实际为准） | Task 3 |
 | TDD 验收测试 | Gherkin + BDD | 19 场景 Task 0 编写（收尾场景 Task 7 追加成 20 终态）；各 Task 转绿——AC-1 随 Task 1、AC-2/AC-3 随 Task 2/3、AC-4 随 Task 4、AC-5×3 随 Task 5、AC-6 随 Task 3/6 | `test_acceptance_agent_triple_isolation.feature/.py` | Task 0-7 |
-| 安全测试（探针套件） | 跨 Agent 穿透 | 21 穿透探针矩阵 100% 拦截 + 7 条辅用例（对照 4+透传 2+直调 1）/真实 A/B 链/PROBE_MATRIX 单真源资产 | `tests/security/test_isolation_security.py` | Task 4 |
+| 安全测试（探针套件——v2.1.0 裁撤后归集成范畴） | 跨 Agent 穿透 | 21 穿透探针矩阵 100% 拦截 + 7 条辅用例（对照 4+透传 2+直调 1）/真实 A/B 链/PROBE_MATRIX 单真源资产 | `tests/integration/test_integration_isolation_security.py` | Task 4 |
 | SDD 架构验证 | 六边形约束 | domain 零外部依赖/组合根外零实例化/端口方向/接线静态锚 | `tests/unit/architecture/test_arch_agent_triple_isolation.py` | Task 6 |
 | 集成测试 | 全链（真实 Redis） | A/B 构造 + 守卫矩阵抽查/P95<50ms/通过率 20/20/并发 10×50/入口 fail-closed 真实链/execute 白名单 449 真实拒 | `tests/integration/test_integration_agent_triple_isolation.py` | Task 5 |
 
@@ -367,7 +369,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 #### 覆盖率要求
 
 - [ ] 整体 ≥80%（P0 阻断）；domain ≥90%（判定矩阵主战场）；**应用层 ≥85%**（守卫服务主战场）；infrastructure ≥75%（本 Story 零新仓储——维持）；四档与 `scripts/check_coverage_gates.py` 一致
-- [ ] **安全覆盖率专项 ≥90%**：两段式（`pytest tests/security --cov=src` → `coverage report --include=<执行面模块集> --fail-under=90`——D-2 口径，Makefile `test-security` target + CI integration job step；禁单段 `--cov=src.<module>` 形态——仓库级 coverage 配置陷阱）
+- [ ] **安全覆盖率专项口径已裁撤（v2.1.0）**：原 D-2 两段式专项命令（`pytest tests/security --cov=src` → `coverage report --include=<执行面模块集> --fail-under=90`）随专项裁撤整体推翻——执行面模块（isolation_guard_service/isolation_access）由四层门禁兜底（domain ≥90/application ≥85，v2.0.0 实测 94%/90%）
 - [ ] 集成测试覆盖率 ≥75%（沿 5-2/5-3/5-4 先例）；关键分支可执行口径：矩阵四分支（shared-write/private-cross/private-self/工具白名单）各配独立命名测试用例（用例名即分支清单）
 
 #### 代码质量门禁
@@ -389,7 +391,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 - [ ] BDD 步骤禁 `@pytest.mark.asyncio`；步骤函数同步 def + `_run_async` 调度
 - [ ] 本 Story 计时组（agent-triple-isolation-perf，集成/验收侧）与 5-4 计时组（agent-isolation-perf）xdist_group 名不同不冲突（loadgroup 各自串行）
 
-**验证要求：** `pytest tests/` 通过（仓库默认 `-n auto --dist loadgroup`——pyproject addopts；无需显式 `-n 8`）；连续 5 次无随机失败；ruff/mypy 通过；`make test-security`（或等价命令）通过。
+**验证要求：** `pytest tests/` 通过（仓库默认 `-n auto --dist loadgroup`——pyproject addopts；无需显式 `-n 8`）；连续 5 次无随机失败；ruff/mypy 通过；探针套件随 `tests/integration` 全量路径通过（v2.1.0 裁撤后无独立专项命令——原 `make test-security` target 已裁撤）。
 
 ---
 
@@ -405,7 +407,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | AC-3 | 共享面矩阵（449/放行） | Task 1/2 | data_isolation 分支 + ensure_agent_access | test_isolation_access + 验收 AC-3.3 |
 | AC-3 | 工具白名单 449/放行 | Task 1/2 | decide_tool_access + ensure_tool_access | test_isolation_access + 验收 AC-3.4 |
 | AC-3 | 自身 private 资源放行 | Task 1 | cross_agent=False 分支 | test_isolation_access + 验收 AC-3.5 |
-| AC-4 | 21 穿透探针矩阵 100% 拦截 | Task 4 | tests/security 套件 | test_isolation_security + 验收 AC-4×2 |
+| AC-4 | 21 穿透探针矩阵 100% 拦截 | Task 4 | tests/integration 探针套件（v2.1.0 裁撤归位） | test_integration_isolation_security + 验收 AC-4×2 |
 | AC-4 | 白名单判别力（窄配置） | Task 1/4 | 配置篡改 + T-04 真实名 | test_yaml_agent_config_loader（追加）+ 安全套件 |
 | AC-5 | P95<50ms | Task 5 | 委托计时 helper | test_integration_agent_triple_isolation + 验收 AC-5.1 |
 | AC-5 | 通过率 100% | Task 5 | 20 采样分子分母 | test_integration_agent_triple_isolation + 验收 AC-5.2 |
@@ -413,7 +415,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | AC-6 | 组合根接线 + resolve | Task 2 | PortSpec 注册 | 契约测试 + 验收 AC-6.1 |
 | AC-6 | 两接线点端到端锚 | Task 3 | lambda 注入 + 行为锚 | test_run_agent_workflow/test_agent_workflow_service + 验收 AC-6.2 |
 | AC-6 | 架构合规 | Task 6 | 验证器 A-D | test_arch_agent_triple_isolation + 验收 AC-6.3 |
-| AC-6 | 安全测试基建四件套 | Task 4 | 目录/marker/CI/覆盖率 | 文件存在性断言 + 验收 AC-6.4 |
+| AC-6 | 安全测试资产归位（v2.1.0 裁撤终态） | Task 4 | 探针归位 tests/integration + 三不存在钉子 | 归位断言 + 裁撤钉子（验收 AC-6.4 + 架构测试基建验证器节） |
 | 全 AC | 收尾清单 | Task 7 | 完成清单场景 | 验收收尾场景 |
 
 ---
@@ -430,7 +432,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 - [ ] Subtask 0.2: 定义端口契约——IsolationGuardPort 三方法 + IsolationGuardService 三依赖 + 组合根注册元数据 + 两接线点签名扩展（契约变更登记）
 - [ ] Subtask 0.3: 定义异常契约——448/449（code/parent/context 字段/HTTP 403/双触发场景表 + 448-449 分界原则）
 - [ ] Subtask 0.4: 定义 21 条探针矩阵定稿表 + 对照/透传用例清单（本文件「探针矩阵」节——安全审计资产）
-- [ ] Subtask 0.5: 定义安全测试基建契约——tests/security 四件套 + marker 注册 + CI 挂载 + 覆盖率专项口径
+- [ ] Subtask 0.5: 定义安全测试基建契约——tests/security 四件套 + marker 注册 + CI 挂载 + 覆盖率专项口径（v2.1.0 专项裁撤——该契约交付后推翻，终态见基建契约节注记与 DC-8 修订）
 - [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_triple_isolation.feature`（19 场景——收尾场景按模板归 Task 7 追加）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + 双键清理）+ **19 场景三属性分档表**定稿（docstring）
 - [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
 - [ ] Subtask 0.8: 移交三项处置落盘（DC-12——5-4 风险 #6 核销登记/#7 维持/R1-DF2 维持，deferred-work.md 原条目更新）
@@ -546,7 +548,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 ### Task 4: 安全测试基建 + 21 探针矩阵套件
 
-**关联 AC:** AC-4（全部）、AC-6.4（基建四件套）
+> **⚠️ v2.1.0 专项裁撤终态注记**：本 Task 交付的基建四件套（循环 A：tests/security 目录/pyproject security marker/ci.yaml 专项挂载/Makefile test-security target——含循环 A 红/绿/变异三行所述形态）已随用户裁定（2026-10-24）**整体裁撤**：探针套件（循环 B）迁至 `tests/integration/test_integration_isolation_security.py`（pytestmark 终态 `[redis, integration]`，复用集成 real_redis fixture 与 CI integration job 既有挂载面——CI/Makefile/pyproject 对本 Story 改动归零）；循环 A 断言面同步改写为「归位断言 + 三不存在钉子」。下述 TDD 表格为实施期执行记录（史实保留——变异行「marker 行删除→收集期炸」等描述对应当时形态）；Subtask 4.3 安全覆盖率专项（96%）为裁撤前实测记录，独立口径已随 D-2 推翻，执行面现由四层门禁兜底。
+
+**关联 AC:** AC-4（全部）、AC-6.4（安全测试资产归位——v2.1.0 裁撤终态）
 
 #### TDD 循环 A：基建四件套
 
@@ -567,9 +571,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | 🔄 重构 | 探针用例命名收敛（id 即矩阵编号——审计可对照）+ 安全覆盖率专项跑通（两段式命令 ≥90 达标——见基建契约节） |
 
 - [x] Subtask 4.1-4.2: 两循环红绿变异重构
-- [x] Subtask 4.3: 安全覆盖率专项 ≥90% 确认
+- [x] Subtask 4.3: 安全覆盖率专项 ≥90% 确认（裁撤前实测 96%——v2.1.0 专项口径推翻后由四层门禁兜底）
 
-**完成标准/Definition of Done:** 四件套就绪；21 穿透探针 21/21 拦截 + 7 条辅用例绿；安全覆盖率 ≥90%
+**完成标准/Definition of Done:** 探针套件归位 `tests/integration/`（v2.1.0 终态）；21 穿透探针 21/21 拦截 + 7 条辅用例绿；归位断言 + 三不存在钉子就绪
 
 ---
 
@@ -617,7 +621,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 验收 feature 追加收尾场景（src 完成清单/tests 四目录 + tests/security 完成清单逐项确认——AC-6.4 形态） |
+| 🔴 红 | 验收 feature 追加收尾场景（src 完成清单 + tests 四目录完成清单逐项确认——AC-6.4 形态；v2.1.0 裁撤后无独立 tests/security 目录） |
 | 🟢 绿 | BDD 步骤实现（文件存在性 + 关键符号 grep/AST 断言——5-4 AC-6.3 同款） |
 | 🔄 重构 | 场景命名收敛 |
 
@@ -649,12 +653,12 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | DC-2 | 三面判定语义矩阵 | **资源归属二分[private×9/shared×2] × 操作[READ/WRITE] × 跨主体[cross/self] 三轴矩阵**：private+cross → 448（L4/L3/L2 全拒——「独立」贯穿三级）；private+self → 放行；shared+READ → 放行（全等级）；shared+WRITE → 按 data_isolation（L4 READ_ONLY→449 / L3 RESTRICTED_WRITE→449[MVP 拒，D-4] / L2 FREE_WRITE→放行）——**shared 面不分 cross/self**（自身共享写不豁免）；工具独立轴：tool_isolation=True→白名单 else 449。**跨主体判定取 actor 侧策略（单边语义）**——MVP 全 L4 默认下无差异，但 A=L1+B=L4 场景是 fail-open 方向语义缺口（V2 开放 L1 前须补 target 侧或双侧 AND 校验——风险 #7，XACML deny-overrides 对标）。**epics「A 无法读取 B 的数据」语义 = private 面**；§5.1「L4 数据只读」语义 = shared 面写约束——两语义轴正交统一进矩阵 | a) 资源逐一定义许可表（弃用：11 资源×4 等级×2 操作×2 主体=176 格显式表——维护灾难；三轴派生仅 ~10 条规则）；b) shared 面写全等级放行（弃用：READ_ONLY 策略维度无消费方——策略表沦为声明摆设违本 Story 使命）；c) private 面按等级差异化（L2 允许跨 Agent 读 private——弃用：违反 AC「A 无法读取 B 数据」字面且 L2 语义是共享面自由写非私有面开放）；d) 双侧策略合取判定（弃用于 MVP：target 侧状态获取使每次判定翻倍 IO——MVP 无暴露面[全 L4]，登记 V2 前置义务） | architecture §5.1 三维度表；epics AC 探针语义；5-4 策略表三维度；OWASP BOLA/Multi-Tenant 惯例 |
 | DC-3 | 端口形态 | **单端口 `IsolationGuardPort` 三方法**（ensure_agent_executable/ensure_agent_access/ensure_tool_access——ensure_* 断言型[deny 即抛]，无 check_*/decision 双方法[check 返回决策+ensure 抛异常的双套 API 冗余——YAGNI；放行场景以「不抛」断言]）+ 三依赖组合（isolation_management_service + agent_repository + agent_config_loader） | a) check + ensure 双方法六件套（弃用：API 面翻倍，MVP 无「查询判定结果不执行」消费方）；b) 三端口分立（弃用：三方法同关注点[隔离守卫]同依赖集——类蔓延）；c) 守卫塞进 IsolationManagementService（弃用：管理[切换/查询]与守卫[拦截]两关注点混一端口——违单一职责） | 5-4 DC-4 单端口先例；ensure 命名惯例 |
 | DC-4 | 异常 448/449 | **448 IsolationAccessViolationError（跨主体越权——actor≠target 私有资源，403）+ 449 IsolationOperationForbiddenError（单主体操作被自身等级禁止——白名单外工具/READ_ONLY·RESTRICTED_WRITE 写，403）**：两轴正交分码——探针矩阵 448×16/449×5 各归其位；context 携带判定位（448 五字段 actor/target/resource/operation/**reason**[guard 传 decision.reason 含等级名——并发串扰判别锚，R2 审查补]；449 三字段 agent_id/operation/reason[reason 编码触发细分：tool_not_in_allowlist:{name} / data_isolation:{mode}]——两类 reason-in-context 对称，同码多因 context 区分锚，5-4 446 双路径先例） | a) 单异常 448 全包（弃用：跨主体 vs 单主体语义混杂——监控/审计维度不可分；449 码位空置浪费预留段）；b) 449 用 446 IsolationLevelNotSupportedError（弃用：446 是「等级值不合法」输入校验族，非「操作被等级禁止」运行时拦截族——语义错位）；c) HTTP 401/422（弃用：403 Forbidden 是越权标准码；鉴权未失败非 401；请求格式无错非 422） | _code_ranges L127 预留；403 权限族惯例；441→422/443→404 精确注册先例 |
-| DC-5 | 工具白名单真源 | **AgentConfig.allowed_tools（eip_config.allowed_tools per-role yaml 配置）**：配置资产随角色（or.md L23 技能列表是角色属性）；默认空元组（fail-closed——忘配即全拒，集成测试红即暴露）；ceo_agent.yaml 初值 = TOOL_CATALOG 全部 23 名[当前均默认 ACTIVE——status 筛选语义 V1 才需要]（5-3 主链零回归；工具名是中文显示名[6 个含半角空格/$/连字符]——逐字节照抄）；探针判别力经配置篡改（tmp 收窄——5-4 AC-2.3 先例）；loader 缺失回落空 + 去重保序[loader 新行为，dict.fromkeys 先例] + 类型守卫 440 | a) Agent 实体加 tools 字段（弃用：改 5-1 实体+序列化——回归面大且白名单是部署配置非实例状态）；b) 域常量表 per-role 工具映射（弃用：硬编码配置语义——增删工具要改代码；yaml 是既有角色配置通道先例）；c) TOOLS.md 档案承载（弃用：档案是 Prompt 注入文本资产，结构化配置语义错位） | AgentConfig eip_config 先例；fail-closed 安全默认；配置篡改测试先例 |
+| DC-5 | 工具白名单真源 | **AgentConfig.allowed_tools（eip_config.allowed_tools per-role yaml 配置）**：配置资产随角色（or.md L23 技能列表是角色属性）；默认空元组（fail-closed——忘配即全拒，集成测试红即暴露）；ceo_agent.yaml 初值 = TOOL_CATALOG 全部 23 名[当前均默认 ACTIVE——status 筛选语义 V1 才需要]（5-3 主链零回归；工具名是中文显示名[5 个含半角空格，另有 $APPEALS/SWOT-TOWS/GE-麦肯锡矩阵 含 $ 或连字符特殊字符]——逐字节照抄）；探针判别力经配置篡改（tmp 收窄——5-4 AC-2.3 先例）；loader 缺失回落空 + 去重保序[loader 新行为，dict.fromkeys 先例] + 类型守卫 440 | a) Agent 实体加 tools 字段（弃用：改 5-1 实体+序列化——回归面大且白名单是部署配置非实例状态）；b) 域常量表 per-role 工具映射（弃用：硬编码配置语义——增删工具要改代码；yaml 是既有角色配置通道先例）；c) TOOLS.md 档案承载（弃用：档案是 Prompt 注入文本资产，结构化配置语义错位） | AgentConfig eip_config 先例；fail-closed 安全默认；配置篡改测试先例 |
 | DC-6 | 入口接线序与 fail-closed | **RunAgentWorkflowUseCase 编排骨位：443 存在 → 441 角色 → guard.ensure_agent_executable → 档案加载 → 装配 → 图执行**：guard 在角色守卫后（441 是既有序——非 CEO 角色的档案目录不存在先 441 才可达，guard 依赖隔离态与角色无关但保持既有序零回归）、档案加载前（档案 = Prompt 面资产——fail-closed 于最早可判定点，447 时零档案读取零图执行零事件）。**fail-closed 语义兑现 5-4 端口 docstring 预留的「执行前强制检查消费面」** | a) guard 放最前（443 前——弃用：447 依赖 agent 存在语义，443 先行是 get_isolation_state 内部守卫序一致）；b) guard 放图执行前最后（弃用：档案/装配已执行——LLM 配额/资产访问已发生，fail-closed 名存实亡）；c) 惰性检查图节点内（弃用：LangGraph 节点内异常处理复杂化重试语义；入口单点拦截更清晰） | run_agent_workflow.py L93-119 既有编排骨位；isolation_management.py L82 docstring 预留 |
-| DC-7 | 工具位接线 + L1 视图边界 | **AgentWorkflowService.execute 工具位全量预检硬拦截**（进执行循环前对 plan.steps 全部工具名逐个 ensure_tool_access——all-or-nothing fail-closed：任一白名单外工具 449 先于首个工具执行，杜绝部分执行副作用[沙箱产物/轨迹已落盘后才拒]；预检零 IO 纯白名单比对无性能代价；449 先于工具存在性[白名单外名不炸 ToolNotFound 而炸 449，判别锚]）+ **TOOLS L1 视图按白名单过滤归 V1**（plan 阶段可见性是软优化——L1 视图来自 SkillSelector 全局 ACTIVE[5-2 资产]，过滤需 per-role 白名单注入档案链[改动 LoadAgentProfileUseCase + SkillSelector 两 5-2 资产]；执行位硬拦截已闭环 P0 验收——即使 LLM 选了白名单外工具也 449 硬拒；L1 过滤提升效率与提示一致性，V1 与 5-2 演进联动） | a) L1 视图过滤一并做（弃用：改 5-2 档案链两资产——surgical 越界且 P0 验收不依赖；登记 V1 联动）；b) 仅 L1 过滤无执行位拦截（弃用：视图过滤可被 LLM 输出绕过——无硬防线）；c) 拦截放 ToolExecutionService（弃用：ExecutionContext 无 agent_id 字段——身份不可得需改 Epic 4 VO；且工具执行服务是通用通道[工具链编排/战略分析也走]非 Agent 专用位——Agent 工作流链的工具名调用编排位归 AgentWorkflowService）；d) 逐工具边执行边拦截（弃用：第 N+1 步才拒时前 N 步副作用已发生——fail-closed 应在副作用前完成全量策略预检，5-4 R7 场景⑤预检先例） | agent_workflow_service.py L224-246 工具位；skill 链 5-2 资产边界；OWASP fail-closed 预检惯例 |
-| DC-8 | 安全测试基建 | **tests/security 新目录四件套**（目录+conftest / pyproject security marker / CI integration job 挂载 / 安全覆盖率专项）：探针需真实 Redis → 挂有 compose 栈的 integration job（unit job 无栈全 skip = 假绿幻觉）；marker 必注册（--strict-markers 收集期守卫）；覆盖率口径 = 专项命令对执行面模块集 fail-under 90（epics 字面实例化——D-2 偏离声明）；Makefile test-security 本地等价通道 | a) 探针并入 tests/integration（弃用：epics 明确要求 tests/security/test_isolation_security.py 独立文件[epics L1669 命名保真]；安全套件独立成目录是可审计资产边界）；b) 挂 security-scan job（弃用：该 job 是纯静态扫描无服务栈——探针全 skip）；c) 安全覆盖率并入四层门禁（弃用：check_coverage_gates 是全量跑口径，安全专项是 tests/security 单独跑的覆盖贡献——分母口径不同不可合并；并存不替代） | epics L1666-1669；pyproject L286 strict-markers；ci.yaml L290-397 job 划分 |
+| DC-7 | 工具位接线 + L1 视图边界 | **AgentWorkflowService.execute 工具位全量预检硬拦截**（进执行循环前对 plan.steps 全部工具名逐个 ensure_tool_access——all-or-nothing fail-closed：任一白名单外工具 449 先于首个工具执行，杜绝部分执行副作用[沙箱产物/轨迹已落盘后才拒]；预检经守卫全链[每名含隔离态读/Agent 实体读/配置加载三次 IO——代码审查 R1 勘误：非「零 IO」，判定核心 decide_tool_access 纯函数零 IO]；449 先于工具存在性[白名单外名不炸 ToolNotFound 而炸 449，判别锚]）+ **TOOLS L1 视图按白名单过滤归 V1**（plan 阶段可见性是软优化——L1 视图来自 SkillSelector 全局 ACTIVE[5-2 资产]，过滤需 per-role 白名单注入档案链[改动 LoadAgentProfileUseCase + SkillSelector 两 5-2 资产]；执行位硬拦截已闭环 P0 验收——即使 LLM 选了白名单外工具也 449 硬拒；L1 过滤提升效率与提示一致性，V1 与 5-2 演进联动） | a) L1 视图过滤一并做（弃用：改 5-2 档案链两资产——surgical 越界且 P0 验收不依赖；登记 V1 联动）；b) 仅 L1 过滤无执行位拦截（弃用：视图过滤可被 LLM 输出绕过——无硬防线）；c) 拦截放 ToolExecutionService（弃用：ExecutionContext 无 agent_id 字段——身份不可得需改 Epic 4 VO；且工具执行服务是通用通道[工具链编排/战略分析也走]非 Agent 专用位——Agent 工作流链的工具名调用编排位归 AgentWorkflowService）；d) 逐工具边执行边拦截（弃用：第 N+1 步才拒时前 N 步副作用已发生——fail-closed 应在副作用前完成全量策略预检，5-4 R7 场景⑤预检先例） | agent_workflow_service.py L224-246 工具位；skill 链 5-2 资产边界；OWASP fail-closed 预检惯例 |
+| DC-8 | 安全测试基建 | **原方案（v2.0.0 交付）：tests/security 新目录四件套**（目录+conftest / pyproject security marker / CI integration job 挂载 / 安全覆盖率专项）：探针需真实 Redis → 挂有 compose 栈的 integration job（unit job 无栈全 skip = 假绿幻觉）；marker 必注册（--strict-markers 收集期守卫）；覆盖率口径 = 专项命令对执行面模块集 fail-under 90（epics 字面实例化——D-2 偏离声明）；Makefile test-security 本地等价通道。**→ v2.1.0 专项裁撤修订（用户裁定 2026-10-24：「总是搞专项很不合适，应该放到集成测试或验收测试范畴。marker 非必要也不要新增」）**：探针套件迁至 `tests/integration/test_integration_isolation_security.py`（复用集成 real_redis fixture 与 CI integration job 既有 `tests/integration` 挂载面）；security marker/target/CI 专项 step 全部不保留（pyproject/Makefile/ci.yaml 对本 Story 改动归零）；安全覆盖率独立口径随 D-2 推翻——执行面由四层门禁兜底；AC-6.4 断言面改写为「归位断言 + 三不存在钉子」（验收场景与架构测试基建验证器节双钉，防专项复活） | a) 探针并入 tests/integration（v1.0.0 弃用：epics 明确要求 tests/security/test_isolation_security.py 独立文件[epics L1669 命名保真]；安全套件独立成目录是可审计资产边界——**v2.1.0 用户裁定反转采纳本备选**：专项独立资产形态被裁定为过度工程，归入集成范畴复用既有基建）；b) 挂 security-scan job（弃用：该 job 是纯静态扫描无服务栈——探针全 skip）；c) 安全覆盖率并入四层门禁（v1.0.0 弃用：分母口径不同不可合并——**v2.1.0 裁撤后实质反转**：专项整体裁撤，执行面模块回归四层门禁统一兜底[domain ≥90/application ≥85]） | epics L1666-1669；pyproject L286 strict-markers；ci.yaml L290-397 job 划分；v2.1.0 用户裁定 |
 | DC-9 | 性能口径 | **P95<50ms 计时锚 = ensure_agent_executable 服务全链**（443 存在性守卫 + 隔离态读[两次真实 Redis 读] + 策略联查——「隔离检查」即入口检查，与 AC-2 语义同锚；warmup 1 + 20 采样 quantiles[18] < 0.05[工程回归锚非统计置信断言——n=20 的分位数方差大，25 倍裕量下作 CI 回归锚可接受]；本地 Redis 两读 ~2ms 预算 25 倍裕量）；通过率 = 20 轮全放行分子分母显式；并发 = 10 agent × 50 探针 gather[return_exceptions 逐条分类]（拦截率 500/500 + **actor 等级互异**[奇 L4 偶 L3 + 448 reason 等级名下钻——串扰可检测；纯「目标等级互异」在 actor 侧判定语义下无判别力，R1 审查改判]）；委托模式沿 5-4（_TRIPLE_PERF_CACHE + 新 xdist_group 与 5-4 组不冲突） | a) P95 测纯 decide 纯函数（弃用：纳秒级纯函数无意义——口径必须含 IO 全链才是「隔离检查」成本）；b) 并发仅断言全成功（弃用：聚合断言对串扰不敏感——变异不可红，5-4 DC-11 同款论证）；c) 复用 5-4 计时组（弃用：xdist_group 同名会与 5-4 计时面互相串行拖慢——新组隔离） | epics L1653-1655；5-4 DC-11/委托先例 |
-| DC-10 | 探针矩阵与验收分档 | **21 条穿透探针 = 16×448 + 5×449 三面分布（P×7/T×4/D×10——Task 0 定稿表，P-07 系 R1 审查补全 WRITE 面高危代表）+ 7 条辅用例（放行对照 4 + 透传 2 + 纯函数直调 1，不计拦截率分子分母——OWASP 正负用例并存惯例 + 覆盖率分母可达性）实跑归 tests/security**（安全套件 = 独立可审计资产 + CI 独立挂载面）；**验收侧 AC-4×2 只断言资产完备性**（文件存在 + PROBE_MATRIX 计数/逐条比对——程序可内省单真源通道；探针实跑不在验收重复[双跑拖慢]；验收 AC-3×5 场景覆盖守卫放行/拒绝代表性抽查——两层互补，放行对照有限重叠属套件自检面[备选 d]）；T-04 强约束 TOOL_CATALOG 真实名（判别力——证明白名单判定独立于存在性） | a) 探针全放验收（弃用：验收+安全双跑——拖慢且边界模糊；epics 把安全测试列为独立文件即意图独立资产）；b) 探针循环套表生成（弃用：弱断言[循环内 assert 失败定位差]——参数化独立用例 id 可对照矩阵审计）；c) 探针全 mock（弃用：安全测试 = 验收级真实服务纪律——mock 掉守卫依赖即 mock 掉被测面）；d) 套件仅拒绝对照用例（弃用：全拒套件发现不了「一刀切过阻断」缺陷——辅用例 7 条是套件自检面） | epics L1647-1670；R6 验收纪律；安全审计资产定位 |
+| DC-10 | 探针矩阵与验收分档 | **21 条穿透探针 = 16×448 + 5×449 三面分布（P×7/T×4/D×10——Task 0 定稿表，P-07 系 R1 审查补全 WRITE 面高危代表）+ 7 条辅用例（放行对照 4 + 透传 2 + 纯函数直调 1，不计拦截率分子分母——OWASP 正负用例并存惯例 + 套件自检面）实跑归 tests/integration/test_integration_isolation_security.py（v2.1.0 专项裁撤后归位集成范畴——审计资产属性不因目录归并而变，PROBE_MATRIX 单真源 + docstring 审计表仍是可内省资产；CI 经 integration job 既有 `tests/integration` 路径涵盖）**；**验收侧 AC-4×2 只断言资产完备性**（文件存在 + PROBE_MATRIX 计数/逐条比对——程序可内省单真源通道；探针实跑不在验收重复[双跑拖慢]；验收 AC-3×5 场景覆盖守卫放行/拒绝代表性抽查——两层互补，放行对照有限重叠属套件自检面[备选 d]）；T-04 强约束 TOOL_CATALOG 真实名（判别力——证明白名单判定独立于存在性） | a) 探针全放验收（弃用：验收+安全双跑——拖慢且边界模糊；epics 把安全测试列为独立文件即意图独立资产）；b) 探针循环套表生成（弃用：弱断言[循环内 assert 失败定位差]——参数化独立用例 id 可对照矩阵审计）；c) 探针全 mock（弃用：安全测试 = 验收级真实服务纪律——mock 掉守卫依赖即 mock 掉被测面）；d) 套件仅拒绝对照用例（弃用：全拒套件发现不了「一刀切过阻断」缺陷——辅用例 7 条是套件自检面） | epics L1647-1670；R6 验收纪律；安全审计资产定位 |
 | DC-11 | 深度加固边界（威胁模型） | **本 Story 防线 = 应用层强制拦截面（guard + 双接线）**；**登记不做的深度项**：黑板 API 属主过滤（PublicBlackboard.get 返回会话全部条目——V1 协作组 Story[黑板是 L2 协作资产，MVP 无消费链]）/ get_graph_result(run_id) 归属校验（持 run_id 可读终态 state——run_id 是不可枚举随机 UUID，越权前提是能力泄露非直接越权；引擎 _runs 1h TTL——V2 引擎加固）/ L0 记忆 agent 前缀 / ExecutionContext/沙箱 agent 身份贯通（沙箱容器名仅 tenant 维度——Epic 4 资产，Docker 沙箱本身已是纵深第二层）。**威胁模型声明**：本 Story 拦截「Agent 运行时经应用层通道的越权」；基础设施直读（redis-cli/DBA）与「持有不可枚举 id 的越权」不在 MVP 威胁模型内（分别归运维边界与 V1/V2 加固项） | a) 本 Story 一并加固黑板/引擎（弃用：三项全是既有 Story 资产深改[5-3/Epic4/V1 协作面]——surgical 越界且黑板/引擎的协作消费方尚未立项[改了无验收方]；登记移交）；b) 不登记裸放（弃用：已知限制必须台账化——否则 V1 协作组立项时无人知道防线缺口） | or.md L256 五层纵深[第一层隔离即本 Story，二~五层各有归属]；风险登记纪律 |
 | DC-12 | 5-4 移交三项处置 | **#6 孤儿隔离键：核销**——入口 fail-closed（447 拒执行）已闭合危害面[Agent 键存活/隔离键缺失 → 拒执行 → TTL 自然回收]；自愈通道 5-4 已实现（initialize upsert）——无需新代码，核销登记。**#7 并发切换竞态：维持**——本 Story 探针全跨 Agent 面（键空间天然隔离），不涉同 Agent 并发切换；触发条件（多源并发）归 V1 动态触发立项。**R1-DF2 StorageError 语义：维持**——本 Story 零存储层改动，触发条件不变归存储异常码专项 | a) #7 本 Story 加 Agent 级锁（弃用：MVP 单用户 CLI 通道无并发切换源——为不存在的并发加锁违 YAGNI；5-4 风险 #7 已论证）；b) R1-DF2 顺手改（弃用：零存储改动面——无顺手位） | 5-4 风险 #6/#7/R1-DF2 台账 |
 
@@ -665,8 +669,9 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 3. **TOOLS L1 视图未过滤**（DC-7）：plan 阶段 LLM 可见全部 ACTIVE 工具——白名单外工具会被选中然后在执行位 449 拒（浪费一轮 plan token）。V1 做 L1 过滤时需同步 SkillSelector per-role 维度（5-2 资产演进）。
 4. **L3 RESTRICTED_WRITE 语义 MVP 收窄为全拒**（D-4）：受限写白名单（写哪些共享资源可豁免）V1 定义——届时 decide 矩阵第 1 步需扩白名单参数（矩阵签名预留 Collection 参数位即可，无需重构）。
 5. **探针矩阵静态性**：21 条是 MVP 威胁模型快照——IsolationResource 新增成员（V1 协作资源）时矩阵表与探针集须同步扩（矩阵派生自策略表的部分自动随动，探针是手工资产需人工扩——审计文档即 Task 0 定稿表，扩资源时先扩表）。
-6. **安全覆盖率口径的窄分母**：专项 cov 分母仅两执行面模块（guard + access）——未来执行面扩模块（如黑板过滤器）须同步扩 cov 模块集，否则新模块逃逸在 90% 门禁外。
+6. **安全覆盖率口径的窄分母**（**v2.1.0 已失效**——专项口径随 D-2 推翻整体裁撤，执行面由四层门禁统一兜底；留档备查）：原专项 cov 分母仅两执行面模块（guard + access）——未来执行面扩模块（如黑板过滤器）由四层门禁按层覆盖率自然涵盖。
 7. **跨主体判定的单边语义**（R1 审查登记——DC-2d）：guard 跨主体判定只取 **actor 侧**策略，target 侧等级不进判定。MVP 全 L4 默认下无实际暴露；但 A=L1（融合态）访问 B=L4 私有资源会放行（fail-open 方向——B 未降级未同意）、A=L4 访问 B=L1 自愿共享资源会拒（target 侧语义被吞）。对标 XACML 多策略组合 deny-overrides 惯例与 OWASP BOLA——**V2 开放 L1 前的前置义务**：补 target 侧或双侧 AND 合取判定（届时 ensure_agent_access 需增 target 状态获取——IO 翻倍，MVP 无暴露面故不做）；L1 前向格单测已注记单边语义假设。V1 落点候选：core-domain L1460 既有 `collaboration_partners`（eip_config）字段可作 target 侧授权维度。
+8. **判定-执行时间窗（TOCTOU）**（代码审查周期 Round 1 登记——与 #7 正交：#7 是**主体轴**（actor/target 空间维），本条是**时间轴**（判定时刻 vs 执行时刻的策略陈旧））：`ensure_agent_executable` 入口检查与 execute 工具位全量预检各自独立调 `get_isolation_state`——预检完成后、工具执行前，若同 Agent 被切换等级，后续工具按**预检时**策略执行。方向不对称：**升档（L3→L4 收紧 / 白名单收窄）方向 = fail-open**（预检在宽松等级下放行的工具，执行时当前策略本应拒）；降档方向预检比目标态更严（无害）。触发面：run-task 与 set-isolation 并发、或长运行工作流中途切换。MVP 暴露面评估：全 L4 默认 + set-isolation 是人工 CLI 通道（需先降档再升档的人工操作序列）——实际不可达，与 5-4 风险 #7（同 Agent 并发切换竞态——DC-12 维持裁定）同族同归 **V1 动态升降级（FR-AC-09）立项时评估**（候选防线：执行位逐工具复核当前等级，或隔离态 epoch/版本号校验）。
 
 ### 设计文档偏离声明
 
@@ -674,8 +679,8 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 | # | 冲突点 | 偏离内容 | 实施后同步动作 |
 |---|--------|---------|---------------|
-| D-1 | epics L1666-1669 测试路径 `tests/unit/architecture/test_triple_isolation.py` / `tests/integration/test_triple_isolation_integration.py` | 按项目实际目录与命名惯例：架构验证 `test_arch_agent_triple_isolation.py`（test_arch_* 前缀 + agent 域家族命名）、集成 `test_integration_agent_triple_isolation.py`（集成无 "integration" 后缀惯例）；`tests/security/test_isolation_security.py` 按 epics 原名保真（新目录新文件）——5-4 D-4 同款 | 不修改 epics（历史规划文档）；dev 以本 Story 测试分类表为准 |
-| D-2 | epics L1659「安全测试覆盖率≥90%」字面模糊（无口径） | 实例化为两段式：`pytest tests/security --cov=src -q && coverage report --include="src/application/services/isolation_guard_service.py,src/domain/value_objects/isolation_access.py" --fail-under=90`（安全套件对执行面模块集的语句覆盖率；单段 `--cov=src.<module>` 形态被 pyproject `[tool.coverage.run] source=["src"]` 击穿——Makefile L278-282 已文档化陷阱）——与四层门禁并存 | Makefile test-security target + CI step 落地即口径文档化 |
+| D-1 | epics L1666-1669 测试路径 `tests/unit/architecture/test_triple_isolation.py` / `tests/integration/test_triple_isolation_integration.py` | 按项目实际目录与命名惯例：架构验证 `test_arch_agent_triple_isolation.py`（test_arch_* 前缀 + agent 域家族命名）、集成 `test_integration_agent_triple_isolation.py`（集成无 "integration" 后缀惯例）；`tests/security/test_isolation_security.py` 按 epics 原名保真（新目录新文件）——5-4 D-4 同款（**v2.1.0 修订**：专项裁撤后探针终态为 `tests/integration/test_integration_isolation_security.py`——「epics 原名保真」表述失效，终态以用户裁定为准） | 不修改 epics（历史规划文档）；dev 以本 Story 测试分类表为准 |
+| D-2 | epics L1659「安全测试覆盖率≥90%」字面模糊（无口径） | 原实例化为两段式：`pytest tests/security --cov=src -q && coverage report --include="src/application/services/isolation_guard_service.py,src/domain/value_objects/isolation_access.py" --fail-under=90`（安全套件对执行面模块集的语句覆盖率；单段 `--cov=src.<module>` 形态被 pyproject `[tool.coverage.run] source=["src"]` 击穿——Makefile L278-282 已文档化陷阱）——与四层门禁并存。**→ v2.1.0 推翻（用户裁定专项裁撤）**：独立口径整体裁撤——执行面模块由四层门禁统一兜底（domain ≥90/application ≥85，v2.0.0 实测 94%/90%）；两段式命令形态本身正确（覆盖陷阱注记仍有效），仅「独立专项」形态被裁定过度工程 | 原落地（Makefile target + CI step）已随 v2.1.0 裁撤移除；裁撤记录见变更日志 v2.1.0 |
 | D-3 | or.md L617「Prompt 三重硬隔离」在角色级共享档案（configs/agents/profiles/{role}/）架构下的语义 | Prompt 隔离的 MVP 执行语义 = **实例级越权拦截**（actor≠target 的 PROFILE/SYSTEM_PROMPT/WORKFLOW_CONTEXT 访问 448）——同角色多实例共享静态档案文本是 5-1/5-2 既有架构（档案是 role 资产非实例资产），「隔离」防的是跨 Agent 实例的运行时上下文/输出越权非静态文本重数 | Task 7 在 architecture.md §5 注记「Prompt 隔离 MVP 语义 = 实例级越权拦截」 |
 | D-4 | architecture §5.1 L3「受限写入」白名单未定义 | MVP 口径：RESTRICTED_WRITE 等级下 shared 面写一律 449 拒（受限写白名单归 V1——矩阵签名预留扩展位） | D-4 随 D-2 一并入 §5 注记 |
 | D-5 | epics L1649「构造 20 条跨 Agent 数据访问探针」未列清单 | 本 Story Task 0 定稿 **21 条**穿透矩阵表（P×7/T×4/D×10，16×448+5×449）——R1 审查补 P-07（SYSTEM_PROMPT WRITE：改写他 Agent 系统提示词是提示注入头号攻击向量[OWASP LLM Top 10 LLM01 同族]，WRITE 面 9 私有资源原仅覆盖 6）+ 7 条辅用例（对照/透传/直调，不计拦截率）——探针矩阵即安全审计资产 | 定稿表随 Story 归档即文档化 |
@@ -741,7 +746,8 @@ async def ensure_agent_access(self, actor_agent_id, target_agent_id, resource, o
 ```python
 agent_uuid = uuid.UUID(state["agent_id"])  # state 是 str 形态（schemas.py L67）——进循环前转换一次
 # Story 5-5 三重硬隔离：plan 全量工具名预检（all-or-nothing fail-closed——白名单外名炸 449 而非
-# ToolNotFound[判别锚]，且先于任何工具执行[杜绝部分执行副作用]；预检零 IO 纯白名单比对）
+# ToolNotFound[判别锚]，且先于任何工具执行[杜绝部分执行副作用]；预检经守卫全链[每名三次
+# IO——状态/实体/配置]，判定核心纯函数零 IO）
 for _, tool_name, _ in plan.steps:
     if tool_name:
         await self._isolation_guard.ensure_tool_access(agent_uuid, tool_name)
@@ -753,7 +759,7 @@ for description, tool_name, arguments in plan.steps:
     tool = self._tool_registry_service.get_tool(tool_name=tool_name)            # 既有链零改动
 ```
 
-**探针参数化形态骨架（tests/security/test_isolation_security.py——PROBE_MATRIX 单真源派生，21 条独立用例 id 可对照矩阵审计；face 字段分派 access/tool 两面）：**
+**探针参数化形态骨架（tests/integration/test_integration_isolation_security.py——v2.1.0 裁撤归位后路径；PROBE_MATRIX 单真源派生，21 条独立用例 id 可对照矩阵审计；face 字段分派 access/tool 两面）：**
 
 ```python
 PROBE_MATRIX: tuple[ProbeSpec, ...] = (
@@ -854,19 +860,18 @@ tests/
 ├── unit/architecture/test_arch_agent_triple_isolation.py       # 新建（验证器 A-D）
 ├── contracts/test_port_contract_isolation_guard.py             # 新建（11 维度）
 ├── integration/test_integration_agent_triple_isolation.py      # 新建（6 场景 + 委托计时）
+├── integration/test_integration_isolation_security.py          # 21 穿透探针 + 7 条辅用例
+│                                                                # （v2.1.0 裁撤终态——原 tests/security/
+│                                                                #   目录形态整体迁并，复用集成 real_redis fixture）
 ├── acceptance/test_acceptance_agent_triple_isolation.feature   # 新建（19 场景 + Task 7 收尾 = 20 终态）
-├── acceptance/test_acceptance_agent_triple_isolation.py        # 新建（BDD 步骤）
-└── security/                                                     # 新建目录
-    ├── __init__.py
-    ├── conftest.py                                               # 场景级 Redis 客户端 + 门控
-    └── test_isolation_security.py                                # 21 穿透探针 + 7 条辅用例（对照/透传/直调）
+└── acceptance/test_acceptance_agent_triple_isolation.py        # 新建（BDD 步骤）
 
-pyproject.toml                        # 修改：markers 注册 security
-Makefile                              # 修改：test-security target
-.gitea/workflows/ci.yaml              # 修改：integration job 挂载 tests/security
+# v2.1.0 专项裁撤：pyproject.toml / Makefile / .gitea/workflows/ci.yaml 对本 Story 改动归零
+# （原 markers 注册 security / test-security target / integration job 挂载 tests/security 均已回退）
 docs/architecture/architecture.md     # 修改：§5 注记 + §13 目录树（Task 7）
 docs/architecture/sisys-uni-exception-design.md  # 修改：§3.3.2 448/449（Task 1）
 _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终态（Task 0/7）
+_bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态流转（backlog → review）
 ```
 
 ---
@@ -915,29 +920,30 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-5-agent-triple-hard-isolation.md`（本文件）
 
-**已创建的文件/Created (Dev Story 实施完成 ✅):**
+**已创建的文件/Created (Dev Story 实施完成 ✅——v2.1.0 专项裁撤后终态):**
 - `src/domain/value_objects/isolation_access.py` - 三重隔离判定核心（纯函数矩阵）
 - `src/application/ports/isolation_guard.py` - 守卫端口（三方法）
 - `src/application/services/isolation_guard_service.py` - 守卫服务实现
 - `tests/unit/domain/value_objects/test_isolation_access.py` - 矩阵全格单测
 - `tests/unit/application/services/test_isolation_guard_service.py` - 守卫服务单测
 - `tests/contracts/test_port_contract_isolation_guard.py` - 端口契约
-- `tests/security/{__init__.py,conftest.py,test_isolation_security.py}` - 安全探针套件
+- `tests/integration/test_integration_isolation_security.py` - 安全探针套件（21 穿透 + 7 辅用例；v2.0.0 创建于 `tests/security/{__init__.py,conftest.py,test_isolation_security.py}`，v2.1.0 专项裁撤迁并至本终态路径——原三件套已删除）
 - `tests/unit/architecture/test_arch_agent_triple_isolation.py` - 架构验证
 - `tests/integration/test_integration_agent_triple_isolation.py` - 集成与性能
 - `tests/acceptance/test_acceptance_agent_triple_isolation.{feature,py}` - 验收（19 场景 + 收尾）
 
 **已修改的文件/Modified（与「项目结构说明」节一致——全部落地 ✅）:**
 - `src/domain/exceptions/agent_exceptions.py`（追加 448/449）+ `_code_ranges.py`（预留改已分配+双映射）+ `exceptions/__init__.py`（导出）
-- `src/domain/value_objects/agent_config.py`（allowed_tools 字段+440 守卫）
+- `src/domain/value_objects/agent_config.py`（allowed_tools 字段+440 守卫）+ `src/domain/value_objects/__init__.py`（isolation_access 导出）
 - `src/infrastructure/agent_orch/yaml_agent_config_loader.py`（eip_config.allowed_tools 解析）
 - `src/application/use_cases/run_agent_workflow.py` + `src/application/services/agent_workflow_service.py`（第五依赖+两接线）
 - `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 448→403/449→403）
 - `src/composition_root.py`（isolation_guard_service 注册+两 lambda 注入改造）
 - `configs/agents/ceo_agent.yaml`（allowed_tools 清单）
 - 既有测试追加/同步：`test_agent_config.py` / `test_yaml_agent_config_loader.py` / `test_agent_exceptions.py` / `test_exception_handlers.py` / `test_run_agent_workflow.py` / `test_agent_workflow_service.py` / `test_port_contract_agent_workflow_service.py`（_DummyResolver）
-- `pyproject.toml`（security marker）+ `Makefile`（test-security target）+ `.gitea/workflows/ci.yaml`（integration job 挂载）
-- `docs/architecture/architecture.md`（§5 注记+§13 目录树）+ `docs/architecture/sisys-uni-exception-design.md`（§3.3.2）+ `_bmad-output/implementation-artifacts/deferred-work.md`（三处置终态）
+- 5-3 回归面同步（Task 3 循环 C 回归面全量修补）：`tests/acceptance/test_acceptance_agent_workflow.py`（_assemble_workflow 真实 guard 链 + 真实 instantiate + feature 门控升档 10 场景）+ `tests/acceptance/test_acceptance_agent_workflow.feature`（Redis 门控步骤）+ `tests/integration/test_integration_agent_workflow.py`（6 构造点 AsyncMock 工厂同步）
+- ~~`pyproject.toml`（security marker）+ `Makefile`（test-security target）+ `.gitea/workflows/ci.yaml`（integration job 挂载）~~（v2.1.0 专项裁撤——三文件对本 Story 改动归零，恢复原状）
+- `docs/architecture/architecture.md`（§5 注记+§13 目录树）+ `docs/architecture/sisys-uni-exception-design.md`（§3.3.2）+ `_bmad-output/implementation-artifacts/deferred-work.md`（三处置终态）+ `_bmad-output/implementation-artifacts/sprint-status.yaml`（5-5 状态流转）
 
 ---
 
@@ -953,7 +959,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 | **优先级** | P0-5 |
 | **覆盖 FR** | FR-AC-05（P0） |
 | **性能锚** | epics L1652-1655（隔离检查 P95<50ms@L1653 / 隔离测试通过率 100%@L1654 / 并发 Agent≥10×50 探针拦截率 100%@L1655） |
-| **覆盖率锚** | 应用层 ≥85% + 安全测试覆盖率 ≥90%（D-2 口径） |
+| **覆盖率锚** | 应用层 ≥85%（domain ≥90——四层门禁统一兜底；原「安全测试覆盖率 ≥90%（D-2 口径）」已随 v2.1.0 专项裁撤推翻，v2.0.0 裁撤前实测 96% 留档） |
 
 ### 完成总结 Completion Summary
 
@@ -1015,7 +1021,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 |---|------|--------|----------|
 | R3-1 | 真实 guard 接入 5-3 验收 `_assemble_workflow`（裸 uuid4 锚点/无 Redis 键）与「5-3 零回归」承诺矛盾——L437/L478/L503 三场景含工具步，接入后 ensure_tool_access 经 get_isolation_state 得 443 而非放行、必红（白名单维度零回归已实证，状态维度回归） | P1 | Task 3 循环 C ② 补连带处置定稿：组装点改真实 instantiate（同文件 CLI given L1077-1105 先例）+ `_agent_ids` 双键登记 + feature 三场景补 Redis 门控步骤（分档升档） |
 | R3-2 | T-02/T-03 的 dispatch face 值未钉死——矩阵表「面」列「工具」是审计归类，与分派轴 face=="tool"（→ensure_tool_access）词汇碰撞，dev 照直觉写 face="tool" 将错路由得 449≠448（响亮红非静默绿，但制造混淆红 + 污染审计双词汇一致性） | P2 | Task 4 红单元格钉死：T-02/T-03 dispatch face="access"（资源访问探针）+「面」列仅审计归类注记 |
-| R3-3 | 「10 个含半角空格」计数失实（TOOL_CATALOG 实际 6 个：PESTEL 分析/VRIO 框架/GE-麦肯锡矩阵/SPACE 矩阵/BSC 平衡计分卡/RACI 矩阵） | P3 | 两处（API 契约/DC-5）改「6 个」并逐名列出 |
+| R3-3 | 「10 个含半角空格」计数失实（TOOL_CATALOG 实际 6 个：PESTEL 分析/VRIO 框架/GE-麦肯锡矩阵/SPACE 矩阵/BSC 平衡计分卡/RACI 矩阵） | P3 | 两处（API 契约/DC-5）改「6 个」并逐名列出（**代码审查 R1 勘误**：R3-3 自身计数仍有误——GE-麦肯锡矩阵含连字符无空格，实际 5 个含空格[PESTEL 分析/VRIO 框架/SPACE 矩阵/BSC 平衡计分卡/RACI 矩阵]，GE-麦肯锡矩阵归 $/连字符特殊字符族；现行规范处已按 5 个 + 分族形态修正） |
 | R3-4 | AC-3.4 验收侧 449 构造通道未指明（生产 yaml 全白名单下任一真实名放行） | P3 | 分档行补「非白名单名直构造——guard 不查注册表假名即 449，无需 tmp 通道」 |
 | R3-5 | Task 5 场景⑥ execute 449 缺 agent 存在前置（真实 guard 先经 443/447——A 未实例化得 443 非 449） | P3 | 场景⑥补「A 须真实 instantiate + state.agent_id 用 A 真实 id」 |
 
@@ -1027,18 +1033,28 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 
 **审查日期:** （待 dev-story 实施后）
 **审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**实际执行:** 四视角并行调研（领域层正确性 / 应用层接线与回归面 / 测试判别力实跑[157 passed + 双变异实证红] / 文档-代码一致性与安全对标）+ 双评审员并行评审（完备性/风险可行性——6 项修复方案全通过附修订要求）
 
 #### 需决策 Decision Needed
 
-- [ ] （无）
+- [ ] （无——R1 无 P0；专项裁撤形态已由用户 v2.1.0 裁定）
 
 #### 已修复 Patch
 
-- [ ] （待审查轮填充）
+- [x] **R1-F1（P1）** 故事规范面专项裁撤对齐 ~30 处：AC-6 Then/AC-6.4 验证标准改写「归位断言 + 三不存在钉子」；基建契约节/Task 4 节加裁撤终态注记块（执行史实保留）；DC-8 原地改写（原方案保留 + v2.1.0 修订 + 备选 a)/c) 双反转注记）；DC-10/D-1/D-2 同步；风险 #6 失效注记；范围边界/继承表/需新建清单/测试分类表/覆盖率节/验证要求/追溯矩阵/Subtask 0.5/Task 7/骨架路径/项目结构树/File List 双向对账（补列探针终态路径 + value_objects/__init__.py + 5-3 回归面 4 文件 + sprint-status.yaml）/覆盖率锚——历史记录表（变更日志/R1-R3 修复表/完成清单）原样保留
+- [x] **R1-F2（P2）** 风险 #8 TOCTOU 登记（判定-执行时间窗——升档 L3→L4 方向 fail-open；与 #7 主体轴正交注记 + 5-4 风险 #7/DC-12 交叉引用；MVP 人工 CLI 通道不可达，归 V1 动态升降级立项评估）
+- [x] **R1-F3（P2）** `decide_tool_access` 签名 `Collection[str]` → `tuple[str, ...]`（裸 str 传入退化为子串匹配的白名单放大防御——类型对齐 VO 真源不变量）+ 孤儿 `Collection` import 删除
+- [x] **R1-F4（P2/P3）** 「6 个含半角空格」→「5 个」勘误（GE-麦肯锡矩阵含连字符归 $/连字符特殊字符族——R3-3 修复自引入计数失实；ceo_agent.yaml 注释 + API 契约 + DC-5 分立形态 + R3-3 台账勘误注记）
+- [x] **R1-F5（P3）** `agent_workflow_service.execute` 预检位 `uuid.UUID(str(state.get("agent_id", "")))` → `uuid.UUID(state["agent_id"])`（schemas L67 必填键——去空串默认的内置 ValueError 隐式破口，缺键即 KeyError 诚实契约信号）；附带「预检零 IO 无性能代价」事实错误措辞勘误三处（agent_workflow_service.py 注释 + AC-6 And + DC-7——实为每名三次 IO[状态/实体/配置]，判定核心纯函数零 IO）
+- [x] **R1-F6（P3）** 收尾场景「五目录」→「四目录」五处联动（feature 注释 + feature 步骤文本 + @then 绑定串 + 函数名 `then_test_five_directories_complete` → `then_test_isolation_test_assets_complete` + 步骤 docstring「security（1）」残留修正——integration（2）实态）
 
 #### 已推迟 Defer
 
-- [ ] （待审查轮填充）
+- [ ] 探针 448 reason 断言收紧（`"隔离" in reason` 弱于「等级名」宣称——并发场景与验收/单测侧已有精确等级名断言兜底，分层分工成立；改 21 个绿参数化用例收益/成本比不成立）
+- [ ] 集成场景⑤/计时 helper 清理后 exists 复核（清理执行无缺口——finally delete 本体在；纯一致性装饰）
+- [ ] `isolation_guard: Any` 类型注解（与相邻三依赖 Any 风格一致——统一 Protocol 化应四依赖一次性处理，本轮夹带属范围蔓延）
+- [ ] 预检逐名 IO 去重优化（设计既定逐名 ensure 幂等无害——性能优化非本轮范围）
+- [ ] 探针矩阵 3 细格显式声明（PROFILE WRITE/SANDBOX_SESSION WRITE cross 格 + SHARED_WORKSPACE READ 正例——类级构造性覆盖成立[矩阵对 resource 仅经二值谓词分派]，风险 #5 静态快照声明兜底）
 
 ---
 
@@ -1063,10 +1079,11 @@ _bmad-output/implementation-artifacts/deferred-work.md  # 修改：三处置终�
 | 2026-10-23 | v1.4.0 | **dev-story 实施启动**：Task 0 完成——SDD 规范定稿 + Gherkin 19 场景红阶段确认（19/19 合法红）+ 移交三项处置落盘（#6 核销/#7 维持/R1-DF2 维持）；实施期纠偏 3 处（R6 模板基准对齐 PG 模板主基准/noqa 红线清除/feature 横幅三行式） |
 | 2026-10-23 | v2.0.0 | **dev-story 全 Task 实施完成（Task 0-7）**：判定核心（矩阵 36 格+派生锚）/448·449 四件套/白名单真源（ceo_agent.yaml 23 名）/IsolationGuardService+契约/双接线（入口 fail-closed + 工具位全量预检）+ 回归面 12 构造点/安全四件套 + 21 探针 100% 拦截 + 7 辅/集成六场景（P95·通过率·并发 500/500）/验证器 A-D/验收 20 场景全绿；每 Task 独立 TDD 红绿变异（累计变异实证 17 处全红→还原绿）；全量回归 13098 passed（36 failed 全部 pre-existing 环境型——基线 d68bc496 复现证实）；domain 94%/application 90%/安全专项 96%；文档同步（architecture.md §5+§13/deferred-work 终态）；Status → review |
 | 2026-10-24 | v2.1.0 | **专项裁撤（用户裁定）**：探针套件归入集成测试范畴（tests/security → tests/integration/test_integration_isolation_security.py，复用 real_redis/CI 既有挂载面）+ security marker 不注册（pyproject 恢复原状）+ CI 覆盖率专项 step 与 Makefile test-security target 裁撤（ci.yaml 本 Story 改动归零）——D-2 安全覆盖率独立口径推翻（执行面由四层门禁兜底）+ DC-8 修订 + AC-6.4 改写为归位断言与裁撤钉子；探针 28 用例/隔离域集成 44/验收 20 全绿复验 |
+| 2026-10-24 | v2.1.1 | **代码审查 Round 1**（四视角调研[领域层/应用层/测试判别力实跑 157 passed + 双变异红/一致性对标] + 双评审员[完备性/风险可行性]——零 P0，P1×2 + P2×3 + P3 若干，修复 6 项）：**R1-F1（P1）故事规范面裁撤对齐 ~30 处**（v2.1.0 裁撤只写了变更日志未改正文——AC-6 Then/AC-6.4/基建契约节/DC-8[备选 a)c) 双反转注记]/DC-10/D-1/D-2/风险 #6 失效注记/覆盖率节/验证要求/追溯矩阵/范围边界/项目结构/File List 双向对账[补列探针终态路径 + value_objects/__init__ + 5-3 回归面 4 文件 + sprint-status.yaml]/覆盖率锚）；**R1-F2（P2）风险 #8 TOCTOU 登记**（判定-执行时间窗升档方向 fail-open——与 #7 主体轴正交注记，归 V1）；**R1-F3（P2）decide_tool_access 签名收紧 tuple[str,...]**（裸 str 子串匹配防御 + 删孤儿 Collection import）；**R1-F4（P2/P3）「6 个含半角空格」→5 个勘误**（R3-3 自引入——GE-麦肯锡矩阵是连字符归特殊字符族；yaml 注释 + 故事三处）；**R1-F5（P3）execute 预检 agent_uuid 下标化**（去 state.get 空串默认——ValueError 隐式破口，schemas 必填键 KeyError 诚实信号）+ 预检 IO 措辞勘误三处（「零 IO 无性能代价」→「每名三次 IO，判定核心纯函数零 IO」——事实错误修正）；**R1-F6（P3）收尾场景「五目录」→「四目录」五处联动**（feature 注释/步骤 + @then 绑定 + 函数名 + docstring）。不修清单：探针 reason 精确断言（分层兜底）/场景⑤ exists 复核/Any 注解/预检逐名 IO |
 
 ---
 
-**故事版本/Story Version:** v2.1.0
+**故事版本/Story Version:** v2.1.1
 **创建日期/Created:** 2026-10-23
 **最后更新/Last Updated:** 2026-10-23
 **更新说明/Description:**

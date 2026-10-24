@@ -25,8 +25,8 @@ eip_config:
   # 5.5 三重硬隔离消费：L4 严格工具白名单（真源 = TOOL_CATALOG 全部 23 名，
   # 当前 23 条目均默认 ACTIVE 故「ACTIVE 全集」效果等同全部名；V1 出现
   # DEPRECATED 工具时需按 tool.status 过滤再生成）。工具名是中文显示名形态，
-  # 6 个含半角空格（PESTEL 分析/VRIO 框架/GE-麦肯锡矩阵/SPACE 矩阵/
-  # BSC 平衡计分卡/RACI 矩阵），另有 $APPEALS/SWOT-TOWS 特殊字符——
+  # 5 个含半角空格（PESTEL 分析/VRIO 框架/SPACE 矩阵/BSC 平衡计分卡/
+  # RACI 矩阵），另有 $APPEALS/SWOT-TOWS/GE-麦肯锡矩阵 特殊字符——
   # 逐字节照抄禁改写，全角空格混入即 449（fail-closed 全拒）
   allowed_tools:
     - "PESTEL 分析"
