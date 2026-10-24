@@ -1,6 +1,6 @@
 # Story 5.5: Agent 三重硬隔离保证
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -314,7 +314,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 | D-09 | 数据 | BLACKBOARD（shared） | WRITE | A=L3（切换） | 449（受限写 MVP 拒） |
 | D-10 | 数据 | SHARED_WORKSPACE（shared） | WRITE | A=L4 | 449（READ_ONLY） |
 
-> 统计：448×16 + 449×5 = 21，拦截率 100% 断言面 = 21/21（穷举枚举断言）。P-07 是 R1 审查补全的 WRITE 面高危代表（改写他 Agent 系统提示词是提示注入头号攻击向量——OWASP LLM Top 10 LLM01 同族威胁；epics 字面「20 条」按 D-5 偏离声明扩为 21 条）。套件内对照/透传/直调用例 7 条（不计入拦截率分子分母）：放行对照 4——自身 private 资源读 / BLACKBOARD READ（L4）/ 白名单内工具（L4）/ ensure_agent_executable 放行返回 L4 策略；透传 2——443（随机 UUID）/ 447（删 actor A 侧隔离键，ensure_agent_executable 自体形态）；纯函数直调 1——L1 前向格 + 242 不变量。验收 AC-3 场景另有放行对照（含 BLACKBOARD WRITE[L2 切换后放行]与共享池工具[L3 切换后放行]——切换类对照归验收/集成层，两层互补）。T-01 与 T-04 的区分：T-01 用任意窄白名单外名（构造简单），T-04 强约束 TOOL_CATALOG 真实存在名（判别力锁定——证明白名单判定先于工具存在性判定，非靠「工具不存在」误拦截）。
+> 统计：448×16 + 449×5 = 21，拦截率 100% 断言面 = 21/21（穷举枚举断言）。P-07 是 R1 审查补全的 WRITE 面高危代表（改写他 Agent 系统提示词是提示注入头号攻击向量——OWASP LLM Top 10 LLM01 同族威胁；epics 字面「20 条」按 D-5 偏离声明扩为 21 条）。套件内对照/透传/直调等辅助用例 8 条（不计入拦截率分子分母；代码审查 R3 增目录真实名守护 1——test_t04_tool_name_in_catalog）：放行对照 4——自身 private 资源读 / BLACKBOARD READ（L4）/ 白名单内工具（L4）/ ensure_agent_executable 放行返回 L4 策略；透传 2——443（随机 UUID）/ 447（删 actor A 侧隔离键，ensure_agent_executable 自体形态）；纯函数直调 1——L1 前向格 + 242 不变量。验收 AC-3 场景另有放行对照（含 BLACKBOARD WRITE[L2 切换后放行]与共享池工具[L3 切换后放行]——切换类对照归验收/集成层，两层互补）。T-01 与 T-04 的区分：T-01 用任意窄白名单外名（构造简单），T-04 强约束 TOOL_CATALOG 真实存在名（判别力锁定——证明白名单判定先于工具存在性判定，非靠「工具不存在」误拦截）。
 
 #### 安全测试基建契约（Task 0 定稿——DC-8）
 
@@ -927,7 +927,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 - `tests/unit/domain/value_objects/test_isolation_access.py` - 矩阵全格单测
 - `tests/unit/application/services/test_isolation_guard_service.py` - 守卫服务单测
 - `tests/contracts/test_port_contract_isolation_guard.py` - 端口契约
-- `tests/integration/test_integration_isolation_security.py` - 安全探针套件（21 穿透 + 7 辅用例；v2.0.0 创建于 `tests/security/{__init__.py,conftest.py,test_isolation_security.py}`，v2.1.0 专项裁撤迁并至本终态路径——原三件套已删除）
+- `tests/integration/test_integration_isolation_security.py` - 安全探针套件（21 穿透 + 8 辅用例——R3 增目录真实名守护；v2.0.0 创建于 `tests/security/{__init__.py,conftest.py,test_isolation_security.py}`，v2.1.0 专项裁撤迁并至本终态路径——原三件套已删除）
 - `tests/unit/architecture/test_arch_agent_triple_isolation.py` - 架构验证
 - `tests/integration/test_integration_agent_triple_isolation.py` - 集成与性能
 - `tests/acceptance/test_acceptance_agent_triple_isolation.{feature,py}` - 验收（19 场景 + 收尾）
@@ -1060,6 +1060,16 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 - [ ] execute 预检畸形非空串 agent_id 的内置 ValueError 窗口（R3-F1——引擎收敛位单一写方生产不可达；R1-F5 KeyError 哲学同源，不为不可达路径写 try/except；state 写入面扩展为多写方时重估）
 - [ ] instantiate 半写 agent 键不入测试清理册（R3-F6——save 成功而隔离初始化失败的 Redis 写故障窗口，键登记在 execute 成功后；5-4 先例同款形态，归 5-4/5-5 共同测试基建维护）
 
+#### Round 4 纯验证 + Round 5 独立终审**收敛**（R4 七维度全 PASS + R5 五节全过）
+
+> **R4 纯验证（七维度）**：①修复存续 10/10 锚点抽验全在位；②全量回归分段实跑 ~13114 passed——5.5 面 497 测试全绿，21 failed 中 19 项为基线既知环境族（OCR 16 + Docker 1 + deploy 2 精确复现；RediSearch 18 族当前环境未现身）、2 项新失败均定谳非 5.5 面（real_llm_smoke 真实 SaaS 外呼超时——guard 为 mock 5.5 逻辑不在路径；data_staleness test_ac7 非确定性 flaky——单文件/配对/同组复跑三重绿实证，属既有验收跨测试干扰类）；③门禁全过（ruff/mypy + 三红线与基线逐条一致零新增）；④周期提交链零游离；⑤Defer 台账实数 9 项（3 项有触发+归属/1 弱触发/5 项理由型不做留痕）；⑥rebase 吸收 bot 提交零冲突；⑦File List 对账 39 文件双向吻合。
+>
+> **R5 独立终审（五节，不轻信自报）**：①周期闭合——22 笔提交全归属零游离（创建 1+文档审查 5+dev 8+裁撤 1+独立修复 1+bot 3+代码审查 3）；②关键修复 6/6 台账-现实双向核验存续（DC-8 修订形态/tuple 链/注释形态/守护用例联动/风险 #8 双向互链/File List 对账）；③独立快扫——P4 残余确认 + 增量发现 L317 同构位，验收 20 + 探针 29（21 穿透+8 辅）实跑 49 passed；④门禁终扫全过——22 笔提交零 AI 署名、三红线改动面零命中（2 处 noqa 溯源存量 5face7b9 非本周期）；⑤收敛判据全满足。
+>
+> **P4 残余三处随收敛提交清偿**：故事 L930 File List「7 辅用例」→8、探针 L470 节头注释补守护用例口径、故事 L317 探针矩阵统计行「7 条」→「8 条（含目录真实名守护 1[R3 增]）」——R3-F2 联动遗漏位（R4 报 2 处 + R5 终审特权发现 1 处）。
+>
+> **收敛判据**：零 P0/P1/P2/P3 残留（周期累计 19 项修复落地 + 9 项显式 Defer 均有论证）+ 全部修复存续 + 全量回归零 5.5 面新失败 + 门禁全过——四项全满足。依 5-4 先例（R5 终审五节全过后 done），**Status 由 review 流转 done**。
+
 #### Round 3 修复（单深度穷举推演——零 P0/P1/P2，P3×6：4 落地 + 2 Defer）
 
 | # | 问题 | 严重度 | 修复方案 |
@@ -1113,10 +1123,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 | 2026-10-24 | v2.1.1 | **代码审查 Round 1**（四视角调研[领域层/应用层/测试判别力实跑 157 passed + 双变异红/一致性对标] + 双评审员[完备性/风险可行性]——零 P0，P1×2 + P2×3 + P3 若干，修复 6 项）：**R1-F1（P1）故事规范面裁撤对齐 ~30 处**（v2.1.0 裁撤只写了变更日志未改正文——AC-6 Then/AC-6.4/基建契约节/DC-8[备选 a)c) 双反转注记]/DC-10/D-1/D-2/风险 #6 失效注记/覆盖率节/验证要求/追溯矩阵/范围边界/项目结构/File List 双向对账[补列探针终态路径 + value_objects/__init__ + 5-3 回归面 4 文件 + sprint-status.yaml]/覆盖率锚）；**R1-F2（P2）风险 #8 TOCTOU 登记**（判定-执行时间窗升档方向 fail-open——与 #7 主体轴正交注记，归 V1）；**R1-F3（P2）decide_tool_access 签名收紧 tuple[str,...]**（裸 str 子串匹配防御 + 删孤儿 Collection import）；**R1-F4（P2/P3）「6 个含半角空格」→5 个勘误**（R3-3 自引入——GE-麦肯锡矩阵是连字符归特殊字符族；yaml 注释 + 故事三处）；**R1-F5（P3）execute 预检 agent_uuid 下标化**（去 state.get 空串默认——ValueError 隐式破口，schemas 必填键 KeyError 诚实信号）+ 预检 IO 措辞勘误三处（「零 IO 无性能代价」→「每名三次 IO，判定核心纯函数零 IO」——事实错误修正）；**R1-F6（P3）收尾场景「五目录」→「四目录」五处联动**（feature 注释/步骤 + @then 绑定 + 函数名 + docstring）。不修清单：探针 reason 精确断言（分层兜底）/场景⑤ exists 复核/Any 注解/预检逐名 IO |
 | 2026-10-24 | v2.1.2 | **代码审查 Round 2**（R2-A 传播核查 + R2-B 组合互拆双 Agent + 单快评 7/7——零 P0/P1，P2×1 + P3×6 落地）：R2-F1(P2) SDD 数据模型节 decide_tool_access 签名 Collection→tuple 与 R1-F3 后代码失配修正（唯一真源自证失实——F3×F1 组合漏网）+「白名单规模」矛盾删除；R2-F2 execute 注释「引擎收敛位 201 守卫」论据失实修正（201 是异常码且只拦键非法）；R2-F3 AC-6.4 三处声称对齐实际断言面；R2-F4 风险 #4 参数位措辞与 tuple 收紧原则对齐；R2-F5 deferred-work 补风险 #8 反向互链；R2-F6 收尾 docstring「含追加」失实删除；R2-F7 R1 台账两处计数勘误。Defer 新增 2（agent_id 惯用法分裂归 5-3 资产维护/ci.yaml 断言粒度）。R2-A 证实 R1 修复零游荡零遗漏零结构破坏 |
 | 2026-10-24 | v2.1.3 | **代码审查 Round 3**（单深度穷举推演五轴——零 P0/P1/P2，P3×6：4 落地 + 2 Defer）：176 格矩阵独立枚举 114/54/8 与文档定谳逐位一致 + 探针 21 条逐格落位核对零矛盾 + 证伪留痕 12 条；R3-F2 T-04 目录真实名守护红哨（test_t04_tool_name_in_catalog + 套件 docstring/验收 _EXPECTED_AUX_CASES/故事四处联动 7→8 条辅用例）；R3-F3 ProbeSpec 字段清单对齐七字段（R3 勘误：原规八字段含 reason）；R3-F4 依赖表锚勘正 L2860-2903；R3-F5 验证器白名单声称对齐三成员集；R3-F1/F6 Defer（畸形串 ValueError 窗口/半写键清理窗口） |
+| 2026-10-24 | v2.2.0 | **代码审查周期收敛（R4 纯验证 + R5 独立终审）——Status → done**：R4 七维度全 PASS（修复存续 10/10 + 全量分段 ~13114 passed/5.5 面 497 全绿 + 2 新失败均定谳非 5.5 面[SaaS 超时 + data_staleness flaky 三重复跑绿实证] + 门禁全过 + 零游离）；R5 终审五节全过（22 笔提交全归属/6/6 双向核验/49 passed 实跑/零 AI 署名/收敛判据全满足）；P4 残余三处随本提交清偿（L930/L470/L317 七→八辅用例口径——R3-F2 联动遗漏位）；周期累计 19 修复落地 + 9 Defer，零 P0/P1/P2/P3 残留 |
 
 ---
 
-**故事版本/Story Version:** v2.1.3
+**故事版本/Story Version:** v2.2.0
 **创建日期/Created:** 2026-10-23
 **最后更新/Last Updated:** 2026-10-23
 **更新说明/Description:**
