@@ -13,12 +13,40 @@ Copyright:
 from __future__ import annotations
 
 import asyncio
+import sys
+from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.entrypoints.api_app import _lifespan, create_app
+
+
+@pytest.fixture(autouse=True)
+def _heal_frozen_mock_bindings():
+    """治愈 patch 窗口内首次导入固化的 from-import mock 绑定。
+
+    根因: create_app() 在 patch 窗口内经函数内 import 首次导入路由模块（如
+    traceability），其模块级 ``from src.domain.ports.resolver import get_resolver``
+    把 mock 固化进路由模块命名空间——patch 退出只还原源模块属性，不追踪
+    from-import 绑定 → 后续同进程测试（如契约 test_api_contract_traceability
+    的 401 认证场景）经路由模块拿到 mock → KeyError('auth_service') → 500。
+
+    治愈机制（通用，不维护受害者清单）: 测试后扫描 sys.modules 的 src.* 模块，
+    凡 get_resolver 绑定是 MagicMock（被固化）的一律重置为源模块当前真值。
+    """
+    yield
+    import src.domain.ports.resolver as resolver_module
+
+    true_get_resolver = resolver_module.get_resolver  # patch 已退出——此为真函数
+    for module in [m for m in list(sys.modules.values()) if isinstance(m, ModuleType)]:
+        if not module.__name__.startswith("src."):
+            continue
+        bound = getattr(module, "get_resolver", None)
+        if isinstance(bound, MagicMock):
+            module.get_resolver = true_get_resolver
 
 
 class TestLifespanStartup:
