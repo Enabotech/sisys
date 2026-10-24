@@ -185,7 +185,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 - [ ] 组合根注册 + resolve + isinstance + lifetime==SINGLETON 断言（5-4 AC-6.1 同款）
 - [ ] 两接线点 lambda 注入确认（构造签名扩展——回归面清单全量同步见 Task 3）
 - [ ] 架构验证器：domain 零外部依赖 + 组合根外零实例化（IsolationGuardService）+ 端口方向（application 服务 import 白名单含 application.ports）
-- [ ] 安全资产归位断言 + 裁撤钉子（v2.1.0 终态）：`tests/integration/test_integration_isolation_security.py` 存在且可收集 + ci.yaml integration job pytest 命令含 `tests/integration` + **三不存在钉子**（`tests/security/` 目录不 existence / pyproject markers 无 `security` / Makefile 无 `test-security` target）——归位与防复活双向锁定（验收 AC-6.4 场景与架构测试基建验证器节同款断言）
+- [ ] 安全资产归位断言 + 裁撤钉子（v2.1.0 终态）：`tests/integration/test_integration_isolation_security.py` 存在 + ci.yaml 文本含 `tests/integration` + **三不存在钉子**（`tests/security/` 目录不 existence / pyproject markers 无 `security` / Makefile 无 `test-security` target）——归位与防复活双向锁定（存在与三不存在钉子在验收 AC-6.4 场景与架构测试基建验证器节同款断言；ci.yaml 子串断言仅验收侧）
 - [ ] 5-3 验收/集成存量测试零回归（run-task 主链 + 工具执行链）
 
 ---
@@ -217,7 +217,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
   2. `resource` 是 private 且 `not cross_agent`：放行（自身资源自由读写）
   3. `resource` 是 private 且 `cross_agent`：`policy.prompt_isolation` 为 True（L4/L3/L2——三级全部独立）→ 拒[ACCESS_VIOLATION]；False（L1 融合态）→ 放行（FULL_SHARED 语义自洽——MVP 禁用但矩阵格完整，单测锁定 V2 前向）
   - **矩阵从策略字段派生**（prompt_isolation/data_isolation 消费 5-4 契约），本函数零等级硬编码
-- [x] `decide_tool_access(policy: IsolationPolicy, *, tool_name: str, allowed_tools: Collection[str]) -> IsolationAccessDecision` 纯函数：`policy.tool_isolation` False（L3/L2/L1 共享池）→ 放行；True（L4 严格隔离）→ `tool_name in allowed_tools` 放行 else 拒[OPERATION_FORBIDDEN]（reason 携带工具名与白名单规模——禁泄露全白名单内容进 reason；allowed_tools 明细**不进异常 context**——449 context 保持最小化三字段 {agent_id, operation, reason}，明细经配置通道可查）
+- [x] `decide_tool_access(policy: IsolationPolicy, *, tool_name: str, allowed_tools: tuple[str, ...]) -> IsolationAccessDecision` 纯函数（R1-F3 签名收紧——tuple 对齐 AgentConfig.allowed_tools 真源形态，防裸 str 传入退化为子串匹配）：`policy.tool_isolation` False（L3/L2/L1 共享池）→ 放行；True（L4 严格隔离）→ `tool_name in allowed_tools` 放行 else 拒[OPERATION_FORBIDDEN]（reason 携带工具名——禁泄露全白名单内容进 reason；allowed_tools 明细**不进异常 context**——449 context 保持最小化三字段 {agent_id, operation, reason}，明细经配置通道可查）
 - [x] `resource_is_private(resource: IsolationResource) -> bool` helper（矩阵第 1/2 步分类依据 + AC-1.2 断言面）
 - [x] `AgentConfig.allowed_tools: tuple[str, ...] = ()` 字段扩展（domain/value_objects/agent_config.py——frozen VO 惯例 tuple 形态；默认空元组 = L4 下全部工具被拒的 fail-closed 安全默认）：`__post_init__` 守卫——元素非 str / 空白串元素 → `AgentConfigError`（440，配置资产 VO 分码——5-4 R1-F03 分界原则沿用）；去重归一由 loader 承载（重复项去重保序——配置容错）
 - [x] `YamlAgentConfigLoader` 扩展：eip_config 段解析 `allowed_tools`（缺失 → 空元组；类型守卫非 list → 440；元素空串/空白 → 440——reason 中文自然语言）——照抄 default_isolation_level 解析形态（yaml_agent_config_loader.py L121-136 先例）；去重保序是 loader **新引入行为**（`dict.fromkeys` 模式——run_tool_chain.py L101 仓内先例，loader 自身现无去重逻辑）
@@ -667,7 +667,7 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 1. **守卫覆盖面 = 应用层通道**：guard 是显式调用防线——新资源通道（未来的 Agent 间消息/SAP 消费）必须自觉经 guard（5.11 SAP 实现时的接线义务）。架构面无「强制全通道过 guard」的机制保证（Python 无 capability 系统）——依赖 code review + 架构测试静态锚（验证器 C 扩展新接线位时同步）。
 2. **黑板/引擎/L0/沙箱四处深度缺口**（DC-11 登记不做的四项）：V1 协作组立项时黑板属主过滤是**前置义务**（L2 协作态真实消费黑板时，`PublicBlackboard.get` 全量返回与 FREE_WRITE 放行叠加 = 跨 Agent 输出可见——但那是 L2 语义[共享]非缺陷；需过滤的是「协作组外成员」维度——届时 guard 矩阵需扩 conversation 维度）；get_graph_result 归属校验归 V2 引擎加固。
 3. **TOOLS L1 视图未过滤**（DC-7）：plan 阶段 LLM 可见全部 ACTIVE 工具——白名单外工具会被选中然后在执行位 449 拒（浪费一轮 plan token）。V1 做 L1 过滤时需同步 SkillSelector per-role 维度（5-2 资产演进）。
-4. **L3 RESTRICTED_WRITE 语义 MVP 收窄为全拒**（D-4）：受限写白名单（写哪些共享资源可豁免）V1 定义——届时 decide 矩阵第 1 步需扩白名单参数（矩阵签名预留 Collection 参数位即可，无需重构）。
+4. **L3 RESTRICTED_WRITE 语义 MVP 收窄为全拒**（D-4）：受限写白名单（写哪些共享资源可豁免）V1 定义——届时 decide 矩阵第 1 步需扩白名单参数（矩阵签名预留 tuple 参数位即可，无需重构——R2 勘误：原「Collection 参数位」与 R1-F3 确立的 tuple 收紧防御原则[防裸 str 子串匹配白名单放大]相悖）。
 5. **探针矩阵静态性**：21 条是 MVP 威胁模型快照——IsolationResource 新增成员（V1 协作资源）时矩阵表与探针集须同步扩（矩阵派生自策略表的部分自动随动，探针是手工资产需人工扩——审计文档即 Task 0 定稿表，扩资源时先扩表）。
 6. **安全覆盖率口径的窄分母**（**v2.1.0 已失效**——专项口径随 D-2 推翻整体裁撤，执行面由四层门禁统一兜底；留档备查）：原专项 cov 分母仅两执行面模块（guard + access）——未来执行面扩模块（如黑板过滤器）由四层门禁按层覆盖率自然涵盖。
 7. **跨主体判定的单边语义**（R1 审查登记——DC-2d）：guard 跨主体判定只取 **actor 侧**策略，target 侧等级不进判定。MVP 全 L4 默认下无实际暴露；但 A=L1（融合态）访问 B=L4 私有资源会放行（fail-open 方向——B 未降级未同意）、A=L4 访问 B=L1 自愿共享资源会拒（target 侧语义被吞）。对标 XACML 多策略组合 deny-overrides 惯例与 OWASP BOLA——**V2 开放 L1 前的前置义务**：补 target 侧或双侧 AND 合取判定（届时 ensure_agent_access 需增 target 状态获取——IO 翻倍，MVP 无暴露面故不做）；L1 前向格单测已注记单边语义假设。V1 落点候选：core-domain L1460 既有 `collaboration_partners`（eip_config）字段可作 target 侧授权维度。
@@ -1041,11 +1041,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 
 #### 已修复 Patch
 
-- [x] **R1-F1（P1）** 故事规范面专项裁撤对齐 ~30 处：AC-6 Then/AC-6.4 验证标准改写「归位断言 + 三不存在钉子」；基建契约节/Task 4 节加裁撤终态注记块（执行史实保留）；DC-8 原地改写（原方案保留 + v2.1.0 修订 + 备选 a)/c) 双反转注记）；DC-10/D-1/D-2 同步；风险 #6 失效注记；范围边界/继承表/需新建清单/测试分类表/覆盖率节/验证要求/追溯矩阵/Subtask 0.5/Task 7/骨架路径/项目结构树/File List 双向对账（补列探针终态路径 + value_objects/__init__.py + 5-3 回归面 4 文件 + sprint-status.yaml）/覆盖率锚——历史记录表（变更日志/R1-R3 修复表/完成清单）原样保留
+- [x] **R1-F1（P1）** 故事规范面专项裁撤对齐 ~30 处：AC-6 Then/AC-6.4 验证标准改写「归位断言 + 三不存在钉子」；基建契约节/Task 4 节加裁撤终态注记块（执行史实保留）；DC-8 原地改写（原方案保留 + v2.1.0 修订 + 备选 a)/c) 双反转注记）；DC-10/D-1/D-2 同步；风险 #6 失效注记；范围边界/继承表/需新建清单/测试分类表/覆盖率节/验证要求/追溯矩阵/Subtask 0.5/Task 7/骨架路径/项目结构树/File List 双向对账（补列探针终态路径 + value_objects/__init__.py + 5-3 回归面 4 文件[R2 注：回归面行新列 3 文件 + test_port_contract_agent_workflow_service.py 在既有测试行] + sprint-status.yaml）/覆盖率锚——历史记录表（变更日志/R1-R3 修复表/完成清单）原样保留
 - [x] **R1-F2（P2）** 风险 #8 TOCTOU 登记（判定-执行时间窗——升档 L3→L4 方向 fail-open；与 #7 主体轴正交注记 + 5-4 风险 #7/DC-12 交叉引用；MVP 人工 CLI 通道不可达，归 V1 动态升降级立项评估）
 - [x] **R1-F3（P2）** `decide_tool_access` 签名 `Collection[str]` → `tuple[str, ...]`（裸 str 传入退化为子串匹配的白名单放大防御——类型对齐 VO 真源不变量）+ 孤儿 `Collection` import 删除
 - [x] **R1-F4（P2/P3）** 「6 个含半角空格」→「5 个」勘误（GE-麦肯锡矩阵含连字符归 $/连字符特殊字符族——R3-3 修复自引入计数失实；ceo_agent.yaml 注释 + API 契约 + DC-5 分立形态 + R3-3 台账勘误注记）
-- [x] **R1-F5（P3）** `agent_workflow_service.execute` 预检位 `uuid.UUID(str(state.get("agent_id", "")))` → `uuid.UUID(state["agent_id"])`（schemas L67 必填键——去空串默认的内置 ValueError 隐式破口，缺键即 KeyError 诚实契约信号）；附带「预检零 IO 无性能代价」事实错误措辞勘误三处（agent_workflow_service.py 注释 + AC-6 And + DC-7——实为每名三次 IO[状态/实体/配置]，判定核心纯函数零 IO）
+- [x] **R1-F5（P3）** `agent_workflow_service.execute` 预检位 `uuid.UUID(str(state.get("agent_id", "")))` → `uuid.UUID(state["agent_id"])`（schemas L67 必填键——去空串默认的内置 ValueError 隐式破口，缺键即 KeyError 诚实契约信号）；附带「预检零 IO 无性能代价」事实错误措辞勘误四处（R2 勘误：原记三处——agent_workflow_service.py 注释 + AC-6 And + DC-7 + 关键代码模式骨架注释；实为每名三次 IO[状态/实体/配置]，判定核心纯函数零 IO）
 - [x] **R1-F6（P3）** 收尾场景「五目录」→「四目录」五处联动（feature 注释 + feature 步骤文本 + @then 绑定串 + 函数名 `then_test_five_directories_complete` → `then_test_isolation_test_assets_complete` + 步骤 docstring「security（1）」残留修正——integration（2）实态）
 
 #### 已推迟 Defer
@@ -1055,6 +1055,22 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 - [ ] `isolation_guard: Any` 类型注解（与相邻三依赖 Any 风格一致——统一 Protocol 化应四依赖一次性处理，本轮夹带属范围蔓延）
 - [ ] 预检逐名 IO 去重优化（设计既定逐名 ensure 幂等无害——性能优化非本轮范围）
 - [ ] 探针矩阵 3 细格显式声明（PROFILE WRITE/SANDBOX_SESSION WRITE cross 格 + SHARED_WORKSPACE READ 正例——类级构造性覆盖成立[矩阵对 resource 仅经二值谓词分派]，风险 #5 静态快照声明兜底）
+- [ ] agent_id 读取惯用法分裂（execute 预检位 1 处下标[KeyError] + 同文件 5 处 `.get` 容缺[L174/194/287/309/334——5-3 遗留观测位，444 context 空串兜底无害]——surgical 原则范围外，统一化归 5-3 资产维护时一并处理）
+- [ ] ci.yaml 断言粒度增强（现状整文件子串匹配 vs 声称 job 命令域——R2-F3 已按实际断言面对齐声称；增强为 job 域解析属过度工程）
+
+#### Round 2 修复（回归核查 + 组合互拆——R2-A 传播核查 + R2-B 组合互拆双 Agent + 单快评 7/7 通过）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-F1 | 故事 Task 0 SDD 数据模型节 `decide_tool_access(allowed_tools: Collection[str])` 与 R1-F3 后代码 `tuple[str, ...]` 失配——「本节数据模型为唯一真源」自证失实；同行「reason 携带工具名与白名单规模」与交付形态（reason 恒为 tool_not_in_allowlist:{name}）及 DC-4 自身口径矛盾（R1-F3×R1-F1 组合漏网：改码与对齐均未触达 L220） | P2 | 签名改 tuple[str, ...]（附 R1-F3 注记）+ 删「与白名单规模」 |
+| R2-F2 | execute 预检注释「引擎收敛位 201 守卫」论据失实——201 是异常码非行号，且该守卫只拦键存在但非法（键缺失时引擎自铸 UUID 不回写 state，不构成键存在保证） | P3 | 注释改为「schemas L67 必填 + 用例恒置键——缺键即 KeyError 诚实契约信号」（删 201 误引） |
+| R2-F3 | AC-6.4 声称面宽于实际断言面三处：「存在且可收集」（可收集无断言——仅 AC-4.1 import 旁证）/「ci.yaml integration job pytest 命令含」（实为整文件子串匹配）/「同款断言」括注（ci.yaml 断言仅验收侧有） | P3 | 三处声称对齐实际断言面（L181 Then 经查为事实陈述无需改；L559 属执行史实冻结区） |
+| R2-F4 | 风险 #4「矩阵签名预留 Collection 参数位」与 R1-F3 确立的 tuple 收紧防御原则相悖（V1 照办会重引裸 str 子串隐患） | P3 | 改「预留 tuple 参数位」+ R2 勘误注记 |
+| R2-F5 | 风险 #8 无 deferred-work 互链（同族 5-4 风险 #7 有锚点——V1 立项方经 deferred-work 只能追到 5-4 #7 链） | P3 | deferred-work L205 尾补 5-5 风险 #8 反向互链 |
+| R2-F6 | 收尾 docstring「unit（3 文件——含追加）」失实（3 个清单 unit 文件均新建——git diff-filter=A 实证；追加的 6 个不在清单） | P3 | 删「——含追加」（承自 F6 前旧文案） |
+| R2-F7 | R1 台账两处计数失实：「措辞勘误三处」实为四处（漏关键代码模式骨架注释）；「5-3 回归面 4 文件」实态为回归面行新列 3 文件 + 契约测试在既有测试行 | P3 | 台账行内勘误（「四处（勘误原记三处）」显式消歧 + 归属注记） |
+
+> **Round 2 统计**：登记处置 7 项 = P2×1 + P3×6；Defer 新增 2 项（惯用法分裂/ci.yaml 断言粒度）。来源：R2-A 传播核查（git diff 逐 hunk 对账零游荡零遗漏 + 残留 grep 三类合法全核销 + 结构核验新旧标题序列 diff 为空）+ R2-B 组合互拆（7 组合面：F1×测试资产互洽/F2×风险族五位置/F3×演进预留/F4×测试零耦合/F5×上游形态/F6×feature 一致性/交叉引用 7 组全相符）+ 单快评 7/7 通过（附两措辞建议已吸收）。零 P0/P1。
 
 ---
 
@@ -1080,10 +1096,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 | 2026-10-23 | v2.0.0 | **dev-story 全 Task 实施完成（Task 0-7）**：判定核心（矩阵 36 格+派生锚）/448·449 四件套/白名单真源（ceo_agent.yaml 23 名）/IsolationGuardService+契约/双接线（入口 fail-closed + 工具位全量预检）+ 回归面 12 构造点/安全四件套 + 21 探针 100% 拦截 + 7 辅/集成六场景（P95·通过率·并发 500/500）/验证器 A-D/验收 20 场景全绿；每 Task 独立 TDD 红绿变异（累计变异实证 17 处全红→还原绿）；全量回归 13098 passed（36 failed 全部 pre-existing 环境型——基线 d68bc496 复现证实）；domain 94%/application 90%/安全专项 96%；文档同步（architecture.md §5+§13/deferred-work 终态）；Status → review |
 | 2026-10-24 | v2.1.0 | **专项裁撤（用户裁定）**：探针套件归入集成测试范畴（tests/security → tests/integration/test_integration_isolation_security.py，复用 real_redis/CI 既有挂载面）+ security marker 不注册（pyproject 恢复原状）+ CI 覆盖率专项 step 与 Makefile test-security target 裁撤（ci.yaml 本 Story 改动归零）——D-2 安全覆盖率独立口径推翻（执行面由四层门禁兜底）+ DC-8 修订 + AC-6.4 改写为归位断言与裁撤钉子；探针 28 用例/隔离域集成 44/验收 20 全绿复验 |
 | 2026-10-24 | v2.1.1 | **代码审查 Round 1**（四视角调研[领域层/应用层/测试判别力实跑 157 passed + 双变异红/一致性对标] + 双评审员[完备性/风险可行性]——零 P0，P1×2 + P2×3 + P3 若干，修复 6 项）：**R1-F1（P1）故事规范面裁撤对齐 ~30 处**（v2.1.0 裁撤只写了变更日志未改正文——AC-6 Then/AC-6.4/基建契约节/DC-8[备选 a)c) 双反转注记]/DC-10/D-1/D-2/风险 #6 失效注记/覆盖率节/验证要求/追溯矩阵/范围边界/项目结构/File List 双向对账[补列探针终态路径 + value_objects/__init__ + 5-3 回归面 4 文件 + sprint-status.yaml]/覆盖率锚）；**R1-F2（P2）风险 #8 TOCTOU 登记**（判定-执行时间窗升档方向 fail-open——与 #7 主体轴正交注记，归 V1）；**R1-F3（P2）decide_tool_access 签名收紧 tuple[str,...]**（裸 str 子串匹配防御 + 删孤儿 Collection import）；**R1-F4（P2/P3）「6 个含半角空格」→5 个勘误**（R3-3 自引入——GE-麦肯锡矩阵是连字符归特殊字符族；yaml 注释 + 故事三处）；**R1-F5（P3）execute 预检 agent_uuid 下标化**（去 state.get 空串默认——ValueError 隐式破口，schemas 必填键 KeyError 诚实信号）+ 预检 IO 措辞勘误三处（「零 IO 无性能代价」→「每名三次 IO，判定核心纯函数零 IO」——事实错误修正）；**R1-F6（P3）收尾场景「五目录」→「四目录」五处联动**（feature 注释/步骤 + @then 绑定 + 函数名 + docstring）。不修清单：探针 reason 精确断言（分层兜底）/场景⑤ exists 复核/Any 注解/预检逐名 IO |
+| 2026-10-24 | v2.1.2 | **代码审查 Round 2**（R2-A 传播核查 + R2-B 组合互拆双 Agent + 单快评 7/7——零 P0/P1，P2×1 + P3×6 落地）：R2-F1(P2) SDD 数据模型节 decide_tool_access 签名 Collection→tuple 与 R1-F3 后代码失配修正（唯一真源自证失实——F3×F1 组合漏网）+「白名单规模」矛盾删除；R2-F2 execute 注释「引擎收敛位 201 守卫」论据失实修正（201 是异常码且只拦键非法）；R2-F3 AC-6.4 三处声称对齐实际断言面；R2-F4 风险 #4 参数位措辞与 tuple 收紧原则对齐；R2-F5 deferred-work 补风险 #8 反向互链；R2-F6 收尾 docstring「含追加」失实删除；R2-F7 R1 台账两处计数勘误。Defer 新增 2（agent_id 惯用法分裂归 5-3 资产维护/ci.yaml 断言粒度）。R2-A 证实 R1 修复零游荡零遗漏零结构破坏 |
 
 ---
 
-**故事版本/Story Version:** v2.1.1
+**故事版本/Story Version:** v2.1.2
 **创建日期/Created:** 2026-10-23
 **最后更新/Last Updated:** 2026-10-23
 **更新说明/Description:**

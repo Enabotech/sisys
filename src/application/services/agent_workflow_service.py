@@ -232,8 +232,8 @@ class AgentWorkflowService:
         # [杜绝「前 N 步已执行、第 N+1 步才拒」的部分执行副作用]；449 先于工具存在性
         # [白名单外名不炸 ToolNotFound 而炸 449——判别锚，guard 不查注册表]；预检经
         # 守卫全链[每名含状态/实体/配置三次 IO]，判定核心纯函数零 IO）。state["agent_id"]
-        # 是 str 形态（schemas L67 必填——用例恒置键 + 引擎收敛位 201 守卫，缺键即
-        # KeyError 诚实契约信号）——进循环前 UUID 显式转换一次
+        # 是 str 形态（schemas L67 必填 + 用例恒置键——缺键即 KeyError 诚实契约
+        # 信号）——进循环前 UUID 显式转换一次
         agent_uuid = uuid.UUID(state["agent_id"])
         for _, preflight_tool_name, _ in plan.steps:
             if preflight_tool_name:

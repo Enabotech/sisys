@@ -1394,7 +1394,7 @@ def then_src_six_files_delivered(context: dict[str, Any]) -> None:
 
 @then("测试文件四目录齐备")
 def then_test_isolation_test_assets_complete(context: dict[str, Any]) -> None:
-    """unit（3 文件——含追加）/contracts（1）/integration（2——六场景 + 探针
+    """unit（3 文件）/contracts（1）/integration（2——六场景 + 探针
     套件）/acceptance（2）齐备（v2.1.0 专项裁撤——无独立 security 目录）。"""
     assert context["manifest_test_count"] == 8
     assert not context["manifest_missing"], f"测试文件缺失: {context['manifest_missing']}"
