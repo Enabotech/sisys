@@ -728,6 +728,14 @@ def when_resolve_components(event_loop, context: dict[str, Any]) -> None:
         resolved_service = resolver.resolve("strategic_archive_service")
         resolved_handler = resolver.resolve("archive_validity_handler")
         resolved_weight = resolver.resolve("staleness_weight_service")
+        # 自包含注册保证（CI 门禁修复 2026-10-24）：register_handlers 仅在
+        # bootstrap() 执行一次——同 worker 先前测试 clear_singleton() 驱逐
+        # SINGLETON 缓存后（5.x 验收场景级重建纪律），此处 resolve 得到全新
+        # handler/listener 实例且回调未挂（本地 xdist 分发恰好避开故 flaky、
+        # CI 稳定踩中）。空态补调生产同款 register_handlers()（与 bootstrap
+        # 单次注册语义等价——消除对全局 bootstrap 副作用的隐式跨测试依赖）
+        if not resolved_handler._event_listener.registered_event_types:
+            resolved_handler.register_handlers()
         context["resolved"] = {
             "handler": resolved_handler,
             "weight": resolved_weight,

@@ -1124,10 +1124,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 | 2026-10-24 | v2.1.2 | **代码审查 Round 2**（R2-A 传播核查 + R2-B 组合互拆双 Agent + 单快评 7/7——零 P0/P1，P2×1 + P3×6 落地）：R2-F1(P2) SDD 数据模型节 decide_tool_access 签名 Collection→tuple 与 R1-F3 后代码失配修正（唯一真源自证失实——F3×F1 组合漏网）+「白名单规模」矛盾删除；R2-F2 execute 注释「引擎收敛位 201 守卫」论据失实修正（201 是异常码且只拦键非法）；R2-F3 AC-6.4 三处声称对齐实际断言面；R2-F4 风险 #4 参数位措辞与 tuple 收紧原则对齐；R2-F5 deferred-work 补风险 #8 反向互链；R2-F6 收尾 docstring「含追加」失实删除；R2-F7 R1 台账两处计数勘误。Defer 新增 2（agent_id 惯用法分裂归 5-3 资产维护/ci.yaml 断言粒度）。R2-A 证实 R1 修复零游荡零遗漏零结构破坏 |
 | 2026-10-24 | v2.1.3 | **代码审查 Round 3**（单深度穷举推演五轴——零 P0/P1/P2，P3×6：4 落地 + 2 Defer）：176 格矩阵独立枚举 114/54/8 与文档定谳逐位一致 + 探针 21 条逐格落位核对零矛盾 + 证伪留痕 12 条；R3-F2 T-04 目录真实名守护红哨（test_t04_tool_name_in_catalog + 套件 docstring/验收 _EXPECTED_AUX_CASES/故事四处联动 7→8 条辅用例）；R3-F3 ProbeSpec 字段清单对齐七字段（R3 勘误：原规八字段含 reason）；R3-F4 依赖表锚勘正 L2860-2903；R3-F5 验证器白名单声称对齐三成员集；R3-F1/F6 Defer（畸形串 ValueError 窗口/半写键清理窗口） |
 | 2026-10-24 | v2.2.0 | **代码审查周期收敛（R4 纯验证 + R5 独立终审）——Status → done**：R4 七维度全 PASS（修复存续 10/10 + 全量分段 ~13114 passed/5.5 面 497 全绿 + 2 新失败均定谳非 5.5 面[SaaS 超时 + data_staleness flaky 三重复跑绿实证] + 门禁全过 + 零游离）；R5 终审五节全过（22 笔提交全归属/6/6 双向核验/49 passed 实跑/零 AI 署名/收敛判据全满足）；P4 残余三处随本提交清偿（L930/L470/L317 七→八辅用例口径——R3-F2 联动遗漏位）；周期累计 19 修复落地 + 9 Defer，零 P0/P1/P2/P3 残留 |
+| 2026-10-24 | v2.2.1 | **收敛后 CI 门禁紧急修复（用户反馈——4-6 R6 先例）**：data_staleness test_ac7 本地 flaky 三重绿但 CI（gw3）稳定红。根因实证：`register_handlers()` 仅在 `bootstrap()` 执行一次——同 worker 先前测试 `clear_singleton()`（5.x 验收场景级重建纪律）驱逐 SINGLETON 缓存后，resolve 产生全新 handler/listener 且回调未挂（最小 Python 复现：清后回调 `[]`）；本地 xdist 分发恰好避开污染 worker 故 flaky、CI 分发稳定踩中。修复：test_ac7 `when_resolve_components` 自包含化——空态补调生产同款 `register_handlers()`（消除对全局 bootstrap 副作用的隐式跨测试依赖；非 5.5 面资产，Story 3-12 维护态修正）。验证：单文件 13 绿 + 确定性污染序列修复实证 PASS + 全验收 1203 passed 零失败（此前偶发失败消除）+ ruff 绿 |
 
 ---
 
-**故事版本/Story Version:** v2.2.0
+**故事版本/Story Version:** v2.2.1
 **创建日期/Created:** 2026-10-23
 **最后更新/Last Updated:** 2026-10-23
 **更新说明/Description:**
