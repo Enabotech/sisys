@@ -1,8 +1,8 @@
 """跨 Agent 穿透探针安全套件（Story 5.5 — Agent 三重硬隔离强制执行验证）。
 
 安全审计资产: 21 条穿透探针矩阵（PROBE_MATRIX 单真源常量——穷举枚举断言
-非采样置信）+ 7 条辅助用例（对照 4 + 透传 2 + 纯函数直调 1——不计入拦截率
-分子分母，OWASP 授权回归正负用例并存惯例）。
+非采样置信）+ 8 条辅助用例（对照 4 + 透传 2 + 纯函数直调 1 + 目录真实名
+守护 1——不计入拦截率分子分母，OWASP 授权回归正负用例并存惯例）。
 
 探针矩阵审计表（与 PROBE_MATRIX 逐条对应——id 即矩阵编号）:
 
@@ -538,3 +538,12 @@ def test_pure_decide_l1_forward_and_invariants() -> None:
         from src.domain.value_objects.isolation_access import IsolationAccessDecision
 
         IsolationAccessDecision(allowed=True, violation=IsolationViolationKind.ACCESS_VIOLATION, reason="矛盾")
+
+
+def test_t04_tool_name_in_catalog() -> None:
+    """目录真实名守护: T-04 探针名必须真实存在于 TOOL_CATALOG（R3-F2——把
+    「TOOL_CATALOG 真实存在名」从文档属性升级为程序属性，目录改名/删名即红）。"""
+    from src.domain.entities.strategic_tool_catalog import TOOL_CATALOG
+
+    t04 = next(p for p in PROBE_MATRIX if p.id == "T-04")
+    assert t04.tool_name in {t.name for t in TOOL_CATALOG}, "T-04 探针名不在 TOOL_CATALOG（目录演化未同步探针）"

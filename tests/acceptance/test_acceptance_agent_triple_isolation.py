@@ -95,7 +95,7 @@ _EXPECTED_PROBES: tuple[tuple[str, str], ...] = (
     ("D-10", "EXCEPTION_449"),
 )
 
-# 安全套件 7 条辅助用例函数名（对照 4 + 透传 2 + 纯函数直调 1——不计拦截率分子分母）
+# 安全套件 8 条辅助用例函数名（对照 4 + 透传 2 + 纯函数直调 1 + 目录真实名守护 1——不计拦截率分子分母）
 _EXPECTED_AUX_CASES: tuple[str, ...] = (
     "test_allow_self_private_resource_read",
     "test_allow_blackboard_read_l4",
@@ -104,6 +104,7 @@ _EXPECTED_AUX_CASES: tuple[str, ...] = (
     "test_passthrough_443_random_uuid",
     "test_passthrough_447_isolation_key_missing",
     "test_pure_decide_l1_forward_and_invariants",
+    "test_t04_tool_name_in_catalog",
 )
 
 # 文件名不含 "redis" 关键词，acceptance conftest 自动 marker 不生效——显式声明；
