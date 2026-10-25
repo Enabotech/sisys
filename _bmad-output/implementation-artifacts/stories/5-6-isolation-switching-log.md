@@ -841,6 +841,10 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 23 | **R3-F3** teardown 漏 `reset_session(token)`：AC-2.3「不设 ContextVar session」依赖同文件前序 set_session 场景完整复位——泄漏时 get_session 返回僵尸 session 抛 SessionClosedError（非 RuntimeError）不走 fallback，AC-2.3 前提被静默破坏 | P2 | teardown 双面清理与隔离约束两处补 reset_session(token)（ContextVar 完整复位——AC-2.3 前提硬依赖，PG 模板 L98-100 token 形态） |
 | 24 | **R3-F4~F8（P3 批量）**：AC-1.2 log_id/approval_chain 非 tuple 场景须 dataclass 直构造注入非法值（from_event 自铸合法值——与 DC-1 唯一构造通道的张力注记）；242 context 形态未钉死（{字段名: 值} vs {entity,field} 两先例并存——钉 isolation_state 形态）；ORM→实体映射丢弃 created_at 列形态未定义（实体八字段 vs ORM 九列不对称）；第六依赖属性名未对称钉死；offset==total 空页边界未测 | P3 | 逐处落地：直构造注入注记（生产通道唯一性不受影响）+ context 形态钉死 + 映射形态定义（数据模型/Task 2 绿两处显式 + AC-4 列定义支撑——R4 验证口径勘误）+ `_audit_service` 对称钉死 + 空页边界补测；18 场景三轴终推演 17✅1❌（AC-2.3 因 F1/F3 双因——修复后可达）+ 7 项证伪留痕（caplog 可观测/单门控正确/quantiles[18]=P95/IntegrityError 无需 pgcode/resolve 级联惰性/委托缓存不要求集成先跑/18 计数无漂移） |
 
+### 🏁 循环审查收敛声明（Round 5 独立终审——2026-10-25）
+
+> Story 5.6 文档审查周期经 1 轮基线对标（v1.0.1/v1.0.2）与 4 轮循环审查（R1 五视角调研+三视角审查 / R2 回归核查+组合交互 / R3 单深度推演 / R4 纯验证）收敛于 v1.2.2，四轮提交（151d8996 / 3967673c / 685eb4fe / 6cbd24f5）全部仅触及本 Story 文件，无游离变更。周期累计发现并修复 **P1×7**（R1×5 + R2×1 + R3×1）、**P2×17**、P3 批量 20+，另留 13 项证伪不成立留痕与 24 行修复台账。R5 终审（不轻信自报）对 10 项关键修复做「Story 记录 vs 文档现实 vs 代码现实」双向取证全部属实且行号精确（含构造点 14 处逐字命中、outbox cleanup 30 天零接线、StorageError 包装先例 redis L94、RLS rolsuper 语义、session_factory 端口名等）；独立快扫五维（AC↔Task 完整性 / 18 场景 BDD 自洽 / OD 承接方 13-4·9-3·9-4·9-5 双源可达 / 覆盖率门禁四档一致 / 硬约束合规）全部通过；留项台账无未核销无归宿项。终态质量判定：**零 P0/P1 残留**（仅一项保守方向的 RLS 探测冗余观察项——owner 在 FORCE 下实际不绕过，多 skip 不误红，无需处理）。**本 Story 可进入 dev-story 实施。**
+
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 **审查日期:** （待代码审查）
@@ -880,10 +884,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 2026-10-25 | v1.1.1 | **循环文档审查 Round 2**（D1 回归核查视角 + D2 组合交互推演双审查，发现 P1×1 + P2×1 + P3×10，6 项疑点证伪留痕，见「文档审查修复」表 #18-#20）：①R2-A（R1-M 自引入）OD-4 created_at 裁剪与 AC-4 列集互斥——定谳 created_at 保留非差异项（行创建审计列对齐 audit_log 先例，与 switch_timestamp 语义分工）；②R2-B（R1-F 自引入）「config load 440 已留日志」与钉死顺序矛盾——AC-2 Then 补 config load + DC-2/风险 #1 改写「440 零副作用干净拒绝，退出误报窗口」；③R2-C~L P3 批量：验收 8 处五文件计数/回归面清单补 3 文件（两处）/old_value .value 形态（降级静默丢失防呆）/残句/CLI 行定谳/第五依赖属性名 `self._isolation_switch_log_repository` 钉死 + _DummyResolver 补 resolve_optional（debate_session 先例）/AC-2.4 检索面钉死（直查表双过滤）/DC-11 补 session_factory 捕获注记/AC-2.3 精化 Redis 单门控/0.8 补 CLI 裁剪切分说明 |
 | 2026-10-25 | v1.2.0 | **循环文档审查 Round 3**（单深度推演——18 场景三轴终推演/断言可满足性设置点核对/数学完备性/R2 修复深化，发现 P1×1 + P2×2 + P3×5，7 项证伪留痕，见「文档审查修复」表 #21-#24）：①R3-F1 StorageError 包装链无设置点（P1）——outbox/audit 模板均不包装 SQLAlchemy 异常，照抄实现下 AC-2.3 断言必红且红错位至 Task 4；四处补「except SQLAlchemyError → raise StorageError from exc」必做增量（redis L94 先例 PG 版）；②R3-F2 分页造数矛盾（5 条 vs 统一 ≥6 条）——独立造数明示 + 空页边界补测；③R3-F3 teardown 漏 reset_session（AC-2.3 前提被 ContextVar 泄漏静默破坏）——两处补 token 复位；④R3-F4~F8：直构造注入注记/242 context 形态钉死/created_at 映射形态三处定义/_audit_service 对称钉死/四维归集成分工。18 场景三轴推演 17✅ + AC-2.3（F1/F3 修复后可达） |
 | 2026-10-25 | v1.2.1 | **循环文档审查 Round 4 纯验证轮**（锚点存续核验 + R3 修复传播 + 计数终验算 + 台账对照——**75 锚点 74 精确 + 1 偏移 + 0 失实，零台账错账，R2/R3 全部修复存续，全部计数验算通过**）：两项记录级留项随本轮清偿——①postgresql_adapter `from None` 行号偏移勘误（L53-59 → L60-64）；②修复表 #24 created_at 映射「三处定义」口径勘误（两处显式 + AC-4 列定义支撑）。验证声明：v1.2.0 声明存续性与精确性成立 |
+| 2026-10-25 | v1.2.2 | **循环文档审查 Round 5 独立终审收敛**（不轻信自报——五节取证：周期闭合[4 提交无游离]/关键修复双向取证[10/10 属实行号精确]/独立快扫五维全过/留项台账零未核销/收敛判据判定）：**零 P0/P1 残留**，收敛声明入 Story（见「循环审查收敛声明」节）——周期累计 P1×7 + P2×17 + P3 批量 20+ + 13 项证伪留痕；**本 Story 可进入 dev-story 实施** |
 
 ---
 
-**故事版本/Story Version:** v1.2.1
+**故事版本/Story Version:** v1.2.2
 **创建日期/Created:** 2026-10-25
 **最后更新/Last Updated:** 2026-10-25
 **更新说明/Description:**
@@ -894,3 +899,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - v1.1.1: 循环文档审查 Round 2（回归核查+组合交互——R1 修复自引入 P1×1[created_at 互斥]+P2×1[440 已留日志矛盾]+P3×10；6 项疑点证伪留痕）
 - v1.2.0: 循环文档审查 Round 3（单深度推演——P1×1[StorageError 包装链断言可满足性断层]+P2×2[分页造数矛盾/reset_session 泄漏]+P3×5；18 场景三轴 17✅+AC-2.3 修复后可达；7 项证伪留痕）
 - v1.2.1: 循环文档审查 Round 4 纯验证轮（75 锚点 74 精确+1 偏移+0 失实，零台账错账，全部修复存续，计数验算通过；两项记录级留项随轮清偿）
+- v1.2.2: 循环文档审查 Round 5 独立终审收敛（五节取证全过，零 P0/P1 残留，收敛声明入 Story——可进入 dev-story）
