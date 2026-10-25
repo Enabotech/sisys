@@ -1771,7 +1771,7 @@ src/domain/
 │   ├── document_service.py                                # 文档处理服务接口
 │   ├── rag_service.py                                     # RAG 检索服务接口
 │   ├── tool_service.py                                    # 工具箱服务接口
-│   ├── agent_service.py                                   # Agent 协作服务接口
+│   ├── agent_service.py                                   # Agent 协作服务接口 ⭐（MVP 落位注记 Story 5.1 D-7 闭环[2026-10-25 偏离声明审查]: 实例化编排落 application/use_cases/agent_instantiation.py——编排仓储读写与事件发布属应用编排关注点，领域行为已内聚 Agent 实体本身[validate/状态机守卫]，独立领域服务 MVP 维持不建。下沉触发条件[2026-10-25 审定——三条信号**同时满足**方可立项评估，缺一即维持现状]：①该逻辑跨两个以上聚合协作 ②纯领域计算零 IO ③领域语言中有独立概念名[领域专家会在需求中谈论它]——满足时**首选 VO/纯函数归宿**[isolation_access.py 判定矩阵先例]，仅当需多聚合状态输入且纯函数签名不可表达时才建领域服务；候选触发面 = Epic 9 多 Agent 协作[9-1 任务分解 / 9-2 协作依赖图拓扑 / 9-6 SYS 裁决五维评分]）
 │   ├── planning_service.py                                # 规划服务接口（BLM/BEM）
 │   ├── routing_service.py                                 # UDMR 路由服务接口 ⭐
 │   ├── isolation_service.py                               # EIP 隔离服务接口 ⭐（MVP 落位注记 Story 5.4: 实际落位 application/ports/isolation_management.py——隔离管理需编排仓储读写与事件发布属应用编排关注点，纯策略表已留 domain/value_objects/isolation_policy.py——偏离声明 D-2；Story 5.5 三重隔离守卫落位 application/ports/isolation_guard.py——IsolationGuardPort 三方法守卫[PEP]，判定消费 domain 纯函数矩阵）
@@ -2563,7 +2563,7 @@ buckets/
 |---------|---------|---------|
 | 多模态文档解析 | DocumentService | `src/domain/services/document_service.py` |
 | RAG 索引构建 | RAGService | `src/domain/services/rag_service.py` |
-| Agent 协作分析 | AgentService | `src/domain/services/agent_service.py` |
+| Agent 协作分析 | AgentService | `src/domain/services/agent_service.py`（MVP 未建——落位注记见 §13.2 目录树 agent_service.py 行） |
 | 战略规划生成 | PlanningService | `src/domain/services/planning_service.py` |
 | UDMR 路由 | RoutingService | `src/domain/services/routing_service.py` |
 | EIP 隔离 | IsolationService | `src/domain/services/isolation_service.py` |
