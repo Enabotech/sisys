@@ -34,7 +34,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 | CLI `isolation-logs` 检索命令 | ✅ interfaces/cli（R4 接口层适配） | — |
 | worm_ref 字段预留（nullable） | ✅ | — |
 | CLI `set-isolation` `--approval-chain` 参数扩展 | ❌ 不做（既有 CLI 仅 --agent-id/--level/--reason 三参数；MVP 唯一触发通道是用户显式请求，空审批链是真实事实记录——六字段完整记录空集，非字段缺失） | V1 审批工作流（多级审批需求立项时随 CLI 参数与服务通道联动扩展） |
-| 规划 DDL 差异项（tenant_id 列/trigger_type NOT NULL/单数表名/created_at/worm_storage_ref——arch-appendix L9753-9768） | ❌ 不做（OD-4——命名与列集对齐事件 payload SSOT + 同域 audit_log 先例） | V1 多租户/多通道立项时随迁移扩展（tenant_id 随多租户、trigger_type 随 OD-3 联动） |
+| 规划 DDL 差异项（tenant_id 列/trigger_type NOT NULL/单数表名/worm_storage_ref——arch-appendix L9753-9768） | ❌ 不做（OD-4——命名与列集对齐事件 payload SSOT + 同域 audit_log 先例；created_at **保留**非差异项——行创建审计列对齐 audit_log 先例，与 switch_timestamp 语义分工：切换时刻 vs 入库时刻） | V1 多租户/多通道立项时随迁移扩展（tenant_id 随多租户、trigger_type 随 OD-3 联动） |
 | MinIO WORM 24h 归档管线（§8.5） | ❌ 不做（OD-1——DC-7） | V1 合规归档管线（与 1.10 WORMManager 未接线现状对齐） |
 | 「切换后协作状态」独立字段（or.md 一.2.(9)） | ❌ 不做（OD-2——to_level 即协作状态语义） | V1 多 Agent 协作组 |
 | trigger_type 枚举字段（SYS 命令/关键词频率/任务依赖/用户请求四类） | ❌ 不做（OD-3——MVP 仅用户请求单通道，事件无 type 字段） | V1（FR-AC-09 多通道时随事件 payload 扩展联动） |
@@ -49,7 +49,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 | OD-1 | MinIO WORM 24h 归档管线不在本 Story 实施；`worm_ref` 字段预留（nullable，默认 None） | architecture.md §8.5 L814（IsolationLevelSwitched 切换后 24 小时内归档 MinIO WORM 7 年）、§5.3 L693、or.md 一.5.[6].(3) L125 | epics AC（L1680-1692）未要求 WORM（字段完整+多维检索+持久化）；1.10 WORMManager 同为未接线现状（WORMManager 实例存在于组合根 L406-411，但 audit_service lambda 未注入 worm_manager → `AuditServiceImpl._worm_manager = None`，archive 的 WORM 路径不触发）；防篡改由 PG RLS deny UPDATE/DELETE 等效承载（DC-4）。归 V1 合规归档管线——**承接方 = Story 13-4（sox-compliance-404，V1）**；**补偿控制差距显式登记（四注）**：①RLS 可被 superuser/BYPASSRLS 属性绕过、②PG 备份/导出不受 RLS 约束、③无 7 年保留期限策略、④**TRUNCATE/DROP/REGRANT 不走 RLS**——业界标准做法是 DDL owner 与应用运行角色分离 + 应用角色仅 GRANT INSERT/SELECT（权限级撤销比 RLS deny 更硬），随 13-4 落地；另随 13-4 评估两项：gap-free 序列/链式防篡改（UUID4 主键无序不防间隙——SEC 17a-4 口径通常要求连续序列或 hash-chain，audit_log 单行 SHA-256 checksum 是非链式先例）与表分区（7 年保留 + 高追加量下按 switch_timestamp range 分区是归档管线前置设计约束——立项输入而非届时发现）——监管级 WORM（SEC 17a-4 / ISO 27001 口径）需 MinIO Object Lock COMPLIANCE 管线；**Task 0.8 随 deferred-work.md 登记**（gap 四要素：描述/触发条件/归宿/承接方链接） |
 | OD-2 | 「切换后协作状态」不设独立字段 | or.md 一.2.(9) L30（七属性含切换后协作状态） | architecture.md §9 L833 实体定稿字段无此项——`target_level`（§9 名 to_level，命名映射见 OD-4）即协作状态语义（等级=协作模式映射，§5.1 四级表）；MVP 单 Agent 无协作态可记。V1 多 Agent 协作组立项时随需扩展——**承接方 = Story 9-4（联合分析组创建）/ 9-5（公共黑板中间结论交换）**；**Task 0.8 随 deferred-work.md 登记** |
 | OD-3 | `trigger_type` 枚举字段不设（SYS 命令/关键词频率/任务依赖/用户请求四类触发源类型化） | or.md 一.2.(9) L30（触发原因括注四类）、core-domain-design §17.3.3 伪码 L1259（trigger_type） | MVP 唯一触发通道为用户显式请求（5-4 既定），`IsolationLevelSwitched` 事件仅 `trigger_reason` 自由文本无 type 字段——单通道下枚举仅一值（YAGNI）；architecture.md L833 定稿字段亦为单 `trigger` 字段。V1 FR-AC-09 多通道立项时随事件 payload 扩展联动（本 Story 实体加字段为非破坏演进）——**承接方 = Story 9-3（dynamic-isolation-level-adjustment，FR-AC-09）**；**Task 0.8 随 deferred-work.md 登记** |
-| OD-4 | 实体字段命名与规划权威面映射：`previous_level/target_level/trigger_reason`（非 §9 的 from_level/to_level/trigger）+ 表名复数 `isolation_switch_logs`（非 arch-appendix DDL 单数 `isolation_switch_log`）+ 不落 `tenant_id` 列/`created_at` 双时间戳（以 switch_timestamp 单钟）+ `worm_ref`（非 worm_storage_ref） | architecture.md §9 L833（from_level/to_level/trigger）、arch-appendix.md L9753-9768（规划 DDL：单数表名 + tenant_id NOT NULL + tenant 索引 + trigger_type VARCHAR(50) NOT NULL + 无 approval_chain 列 + created_at + worm_storage_ref） | 命名跟随**事件 payload 六字段 SSOT**（5-4 交付——本 Story 数据源契约，from_event 零加工映射）+ core-domain-design §17.3.3 伪码 L1254-1260 同名（previous_level/target_level/trigger_reason）——两套规划命名中事件契约与伪码一致且是活代码；表名复数对齐 5.x 新表惯例（sandbox_sessions/tool_executions/tool_chains）；tenant_id 对齐同域 audit_log 先例（无租户列——isolation/audit 域 Redis 键与表均无租户维度，document 域 tenant_id 是文档 Row-Level Isolation 特例）；approval_chain 是 FR-AC-06 六要素之一不可裁（arch-appendix DDL 漏列属规划缺陷）；trigger_type 归 OD-3。**触发条件 = V1 多租户立项（tenant_id）或多通道立项（trigger_type）时随 alembic 新迁移扩展**（已合入迁移禁改，加列走 ALTER）；**承接方 = 多租户专项（tenant_id，随 13-x 合规管线族评估）+ Story 9-3（trigger_type，OD-3 联动）**；**Task 0.8 随 deferred-work.md 登记** |
+| OD-4 | 实体字段命名与规划权威面映射：`previous_level/target_level/trigger_reason`（非 §9 的 from_level/to_level/trigger）+ 表名复数 `isolation_switch_logs`（非 arch-appendix DDL 单数 `isolation_switch_log`）+ 不落 `tenant_id` 列 + `worm_ref`（非 worm_storage_ref）；created_at **保留**（server_default NOW() 行创建审计列——对齐 audit_log 同域先例；与 switch_timestamp 语义分工：切换时刻 vs 入库时刻，非双时间戳冗余） | architecture.md §9 L833（from_level/to_level/trigger）、arch-appendix.md L9753-9768（规划 DDL：单数表名 + tenant_id NOT NULL + tenant 索引 + trigger_type VARCHAR(50) NOT NULL + 无 approval_chain 列 + worm_storage_ref） | 命名跟随**事件 payload 六字段 SSOT**（5-4 交付——本 Story 数据源契约，from_event 零加工映射）+ core-domain-design §17.3.3 伪码 L1254-1260 同名（previous_level/target_level/trigger_reason）——两套规划命名中事件契约与伪码一致且是活代码；表名复数对齐 5.x 新表惯例（sandbox_sessions/tool_executions/tool_chains）；tenant_id 对齐同域 audit_log 先例（无租户列——isolation/audit 域 Redis 键与表均无租户维度，document 域 tenant_id 是文档 Row-Level Isolation 特例）；approval_chain 是 FR-AC-06 六要素之一不可裁（arch-appendix DDL 漏列属规划缺陷）；trigger_type 归 OD-3。**触发条件 = V1 多租户立项（tenant_id）或多通道立项（trigger_type）时随 alembic 新迁移扩展**（已合入迁移禁改，加列走 ALTER）；**承接方 = 多租户专项（tenant_id，随 13-x 合规管线族评估）+ Story 9-3（trigger_type，OD-3 联动）**；**Task 0.8 随 deferred-work.md 登记** |
 
 > 优先级双锚说明（非偏离）：prd.md L1842 将 FR-AC-06 定级 P0（功能等级），epics_v1.0.md L1442 执行优先级 P1-6（执行序——依赖 5.4/5.5 完成后执行）。两者不矛盾：功能等级遵 prd，执行序遵 epics。
 
@@ -84,7 +84,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 |------|---------|---------|
 | `IsolationLevelSwitched` 事件（六字段 payload） | `src/domain/events/isolation_events.py` L17-50 | **直接复用，零改动**——from_event 映射唯一源（5-5 L36「事件 payload 是 5.6 数据源契约」） |
 | `IsolationLevel` 枚举（L4_HARD/L3_SOFT/L2_COLLAB/L1_FUSED） | `src/domain/events/enums.py` L39-45 | **直接复用**——等级 SSOT（禁新建） |
-| `switch_isolation_level` 切换通道（守卫序/no-op/TTL 重置/事件发布容错——5-4 DC-10） | `src/application/services/isolation_management_service.py` L112-177 | **扩展**——第五/六依赖注入 + audit-first 日志写入插位（L141 no-op return 之后、L146 Redis save 之前）。⚠️ **既有事件构造块（现 L148-155，位于 Redis save 之后）须随插位整体上移至 Redis save 之前**——from_event 消费该事件对象；数据流安全（六字段输入在 no-op 检查后全部就绪，与 Redis save 无依赖）；上移后顺序 = no-op → 构造事件 → from_event → config load（只读）→ log save → Redis save → publish → audit 联动（只读前置最小化误报窗口）+ audit 联动（方法尾部） |
+| `switch_isolation_level` 切换通道（守卫序/no-op/TTL 重置/事件发布容错——5-4 DC-10） | `src/application/services/isolation_management_service.py` L112-177 | **扩展**——第五/六依赖注入 + audit-first 日志写入插位（L141 no-op return 之后、L146 Redis save 之前）。⚠️ **既有事件构造块（现 L148-155，位于 Redis save 之后）须随插位整体上移至 Redis save 之前**——from_event 消费该事件对象；数据流安全（六字段输入在 no-op 检查后全部就绪，与 Redis save 无依赖）；上移后顺序 = no-op → 构造事件 → from_event → config load（只读）→ log save → Redis save → publish → audit 联动（方法尾部；只读前置最小化误报窗口） |
 | `IsolationManagementServicePort` / `IsolationSwitchResult` | `src/application/ports/isolation_management.py` | **扩展**——docstring 更新（ Raises/审计语义）；IsolationSwitchResult **不扩展**（log 不进返回值——调用方经检索面自查，YAGNI） |
 | `AuditServicePort.record` + `AuditServiceImpl` | `src/domain/ports/audit_service.py` L52-60 + `src/infrastructure/security/audit_service_impl.py` | **直接复用**——联动审计通道（组合根 resolve_optional 注入先例 L2201） |
 | `AuditActionType` 枚举 | `src/domain/events/audit_events.py` L31-72 | **扩展**——追加 isolation 组 `ISOLATION_SWITCH = "isolation:switch"`（第 8 组，DC-9） |
@@ -135,14 +135,14 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 
 **Given** 真实 Agent（真实 Redis 构造，默认 L4）+ 真实 PG（isolation_switch_logs 表已迁移）
 **When** 调用 `switch_isolation_level(agent_id, target_level, trigger_reason, approval_chain)`（set-isolation 等价服务链）
-**Then** **audit-first 顺序**（DC-2）：443→447→446 守卫 → no-op 检查（同等级 **零日志**——`log_repository.save` 零调用）→ 构造事件 → `IsolationSwitchLog.from_event` → **`log_repository.save(log)`（失败上抛 = 切换被拒——无审计痕迹的切换不允许发生）** → Redis 状态写（既有）→ 事件发布（既有 5-4 DC-10 容错）→ `audit_service.record` 联动（**可选依赖 + 失败降级** `logger.warning` 不回滚——DC-6，PersistentNoteTaker 先例）
-**And** 日志落库六字段与 PG 行逐项一致（检索面取回断言）；审批链非空时（`approval_chain=("合规负责人",)`）完整持久化 JSONB；**日志写失败路径**（注入坏连接仓储实例 → StorageError 上抛 → 切换被拒：Redis `current_level` 未变、零事件发布——fail-closed 审计语义）；audit 联动记录写入 `audit_log` 表（actor=`agent:{agent_id}`、action_type=`isolation:switch`、old_value=`{"level": previous}`、new_value 含 level/reason/approval_chain、correlation_id=str(event.event_id)）
+**Then** **audit-first 顺序**（DC-2）：443→447→446 守卫 → no-op 检查（同等级 **零日志**——`log_repository.save` 零调用）→ 构造事件 → `IsolationSwitchLog.from_event` → config load（既有只读——TTL 真源）→ **`log_repository.save(log)`（失败上抛 = 切换被拒——无审计痕迹的切换不允许发生）** → Redis 状态写（既有）→ 事件发布（既有 5-4 DC-10 容错）→ `audit_service.record` 联动（**可选依赖 + 失败降级** `logger.warning` 不回滚——DC-6，PersistentNoteTaker 先例）
+**And** 日志落库六字段与 PG 行逐项一致（检索面取回断言）；审批链非空时（`approval_chain=("合规负责人",)`）完整持久化 JSONB；**日志写失败路径**（注入坏连接仓储实例 → StorageError 上抛 → 切换被拒：Redis `current_level` 未变、零事件发布——fail-closed 审计语义）；audit 联动记录写入 `audit_log` 表（actor=`agent:{agent_id}`、action_type=`isolation:switch`、old_value=`{"level": previous_level.value}`——**.value 字符串形态（JSONB 序列化，传枚举对象会触发降级静默丢失）**、new_value 含 level/reason/approval_chain、correlation_id=str(event.event_id)）
 
 **验证标准/Validation Criteria:**
 - [ ] 真实链切换 → PG 检索取回 → 六字段逐项断言（含 approval_chain JSONB roundtrip）
 - [ ] no-op 零日志：同等级二次调用 → `search(agent_id=...)` total 不变 + save 零调用计数断言（AsyncMock calls——单测面）
 - [ ] audit-first 顺序断言：坏仓储（真实 `PostgreSQLIsolationSwitchLogRepository` 注入指向不可达端口的 session_factory——真实类真实代码仅环境参数坏，非 mock，合规）→ `pytest.raises(StorageError)` + Redis get 回等级未变 + `_RecordingEventPublisher` 零事件。⚠️ **构造前提：本场景不设 ContextVar session（禁 set_session）**——双模式是 get_session 优先，若设了测试 session 会命中好 session 永不触发 StorageError（僵尸场景）；不设则 get_session 抛 RuntimeError → 走坏 factory → 连接失败；坏端点用 `127.0.0.1:1` 类保留端口（connection refused 立即失败，禁不可路由 IP 拖 connect_timeout）
-- [ ] audit 联动：真实 audit_service（PG 可用）→ audit_log 表检索 action_type=`isolation:switch` 一条 + correlation_id 匹配；降级：audit_service 抛 AuditError（单测 AsyncMock side_effect）→ 切换仍成功 + logger.warning（caplog 断言）
+- [ ] audit 联动：真实 audit_service（PG 可用）→ audit_log 表检索 **（测试 session 直查 audit_log 表，action_type + correlation_id 双过滤 SQL——AuditSearchCriteria 无 correlation_id 字段，走 audit_repo.search 需客户端按 items[].correlation_id 匹配，直查表更直接）**action_type=`isolation:switch` 一条 + correlation_id 匹配；降级：audit_service 抛 AuditError（单测 AsyncMock side_effect）→ 切换仍成功 + logger.warning（caplog 断言）
 - [ ] 守卫序零回归：443（随机 UUID）/447（删隔离键）路径 **零日志写入**（守卫先于日志位——443/447 拒绝时 save 零调用）
 
 ### AC-3: 多维检索
@@ -191,7 +191,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 **Given** 实体、仓储、接线、CLI 全部交付
 **When** 验证接线与合规
 **Then** 新端口 `isolation_switch_log_repository`（**SINGLETON——5-4 DC-7 新增面政策：新端口从源头避免被 SINGLETON isolation_management_service 捕获形成新 captive；同域先例 isolation_repository L2874 亦 SINGLETON；仓储无状态（session 每调用 ContextVar/fallback 现取），SINGLETON 无共享态风险**）经组合根注册且 resolve 可达（PortSpec 全参数：v1.0.0 / `IsolationSwitchLogRepository` / lambda 注入 session_factory / module / owner=platform / tags=("agent","isolation","audit")）；`IsolationManagementService` lambda 扩展第五依赖 `resolver.resolve("isolation_switch_log_repository")` + 第六依赖 `resolver.resolve_optional("audit_service")`（接线完整）；CLI `isolation-logs` 子命令（--agent-id/--level/--start/--end/--limit/--offset，Typer argparse 形态对齐 set-isolation 先例——agent_cli 用 argparse subparsers）输出多行摘要；domain 零外部依赖（isolation_switch_log.py AST 扫描——仅标准库 + 同层 events/exceptions import）；组合根外零实例化（PostgreSQLIsolationSwitchLogRepository 仅组合根与测试文件）；`AuditActionType.ISOLATION_SWITCH` 值 `"isolation:switch"` 注册
-**And** 5-4/5-5 回归面零破坏：`IsolationManagementService` 构造签名扩展（四依赖 → 六依赖）的**全仓构造点全量同步**（实测基准 **14 处 = src 1 + tests 13**：组合根 lambda（composition_root L2893）/ 单测工厂（test_isolation_management_service L155）/ 集成三链（test_integration_agent_isolation L105 / triple L102 / isolation_security L337）/ 验收六链（test_acceptance_agent_isolation L172·L491·L908 / triple L212 / workflow L284·L1182 / **agent_instantiation L219 / agent_profile_loading L233——易漏**）/ 契约一处（**test_port_contract_agent_instantiation_use_case L60——该契约测试构造真实服务作依赖，非 isolation_management 契约本身**）；isolation_management 契约测试的 _DummyResolver 是依赖分发需补两分发但不构造服务——Task 3 全仓 grep 登记苦役先例，实施时以 grep 实际清单为准）；5-4 验收（`test_acceptance_agent_isolation`）+ 5-5 验收/探针（`test_acceptance_agent_triple_isolation` / `test_integration_isolation_security`）全量回归绿
+**And** 5-4/5-5 回归面零破坏：`IsolationManagementService` 构造签名扩展（四依赖 → 六依赖）的**全仓构造点全量同步**（实测基准 **14 处 = src 1 + tests 13**：组合根 lambda（composition_root L2893）/ 单测工厂（test_isolation_management_service L155）/ 集成三链（test_integration_agent_isolation L105 / triple L102 / isolation_security L337）/ 验收 8 处五文件（test_acceptance_agent_isolation L172·L491·L908 / triple L212 / workflow L284·L1182 / **agent_instantiation L219 / agent_profile_loading L233——易漏**）/ 契约一处（**test_port_contract_agent_instantiation_use_case L60——该契约测试构造真实服务作依赖，非 isolation_management 契约本身**）；isolation_management 契约测试的 _DummyResolver 是依赖分发需补两分发但不构造服务——Task 3 全仓 grep 登记苦役先例，实施时以 grep 实际清单为准）；5-4 验收（`test_acceptance_agent_isolation`）+ 5-5 验收/探针（`test_acceptance_agent_triple_isolation` / `test_integration_isolation_security`）全量回归绿
 
 **验证标准/Validation Criteria:**
 - [ ] 组合根注册 + resolve + isinstance + lifetime==SINGLETON 断言（5-4 AC-6.1 同款）
@@ -231,10 +231,10 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
   - `async def save(self, log: IsolationSwitchLog) -> None`——追加写入（日志只增不改——RLS 保证）。Raises 契约：`StorageError`（EXCEPTION_103——PG 连接/写入故障）
   - `async def search(self, query: IsolationSwitchLogQuery) -> IsolationSwitchLogSearchResult`——多维检索。Raises 契约：`StorageError`
 - [ ] `IsolationManagementService` 构造签名扩展（**R2 应用层具体应用端口组合注入 R1 基础端口**——5-4 四依赖先例延伸）：
-  - 第五依赖 `isolation_switch_log_repository: IsolationSwitchLogRepository`（**必填——弃 None 容忍**：审计日志可被静默跳过是合规缺口，5-5 守卫必填先例同哲学；回归面全量同步一次到位）
+  - 第五依赖 `isolation_switch_log_repository: IsolationSwitchLogRepository`（**必填——弃 None 容忍**：审计日志可被静默跳过是合规缺口，5-5 守卫必填先例同哲学；回归面全量同步一次到位；私有属性名 = `self._isolation_switch_log_repository`——`_` + 参数名，对齐既有四属性惯例 L71-74，接线内省锚断言该属性）
   - 第六依赖 `audit_service: AuditServicePort | None = None`（**可选**——联动审计是增值索引非 SSOT；resolve_optional + 失败降级，DC-6）
 - [ ] 组合根注册元数据：`isolation_switch_log_repository`：v1.0.0 / `IsolationSwitchLogRepository` / `PostgreSQLIsolationSwitchLogRepository`（lambda 注入 `session_factory=resolver.resolve("session_factory")`——组合根实际端口名已定谳为 **`session_factory`**（composition_root L232 注册，outbox lambda L621 同款消费；全仓无 `pg_session_factory` 端口））/ module=src.infrastructure.storage.postgresql.repository.isolation_switch_log_repository / **SINGLETON**（DC-11——5-4 DC-7 新增面政策 + 同域 isolation_repository L2874 先例）/ owner=platform / tags=("agent", "isolation", "audit")
-- [ ] **既有端口消费方变更（契约变更登记 ×1）**：`isolation_management_service` lambda 扩展两依赖（契约测试 impl 维度与组合根同步——`test_port_contract_isolation_management_service.py` _DummyResolver 补两分发）
+- [ ] **既有端口消费方变更（契约变更登记 ×1）**：`isolation_management_service` lambda 扩展两依赖（契约测试 impl 维度与组合根同步——`test_port_contract_isolation_management_service.py` _DummyResolver 补两分发 **+ 补 `resolve_optional` 方法**：lambda 将调用 `resolver.resolve_optional("audit_service")` 而 Dummy 现仅定义 `resolve`——不补则维度 9b/10/11 的 `spec.impl(_DummyResolver())` 必 AttributeError；带 resolve_optional 的 Dummy 先例 = test_port_contract_debate_session_repository.py L31）
 - [ ] 端口契约测试一份（`tests/contracts/test_port_contract_isolation_switch_log_repository.py`，11 维度 + `_DummyResolver`）
 - [ ] **禁止**在服务文件本地定义 Protocol/Port 抽象；**禁止**新建语义重复端口（审计联动复用 audit_service——禁新建 isolation_audit_service；通用审计检索复用 1.10 audit search——本端口是隔离域专属日志非通用审计）
 
@@ -273,7 +273,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 - [ ] 场景组织：AC 注释横幅分组（带层级标注）+ 全场景逐一 `@scenario` 显式绑定（多行字面量路径 + 场景绑定与步骤交替排列——5-4/5-5 R6 改造后形态，禁 `scenarios()` 批量绑定与 then-pass 占位）；场景名 `AC-x.y - 中文描述`（feature 与 .py 逐字一致）；**禁 Background 背景块门控**（PG 模板形态已废弃——服务依赖场景各自步骤化门控）
 - [ ] 18 场景规划（终态 = Task 0 编写 17 + Task 6 追加收尾 1；三属性分档表 Task 0.6 定稿落 docstring）：
   - AC-1 ×2（端口级，无服务依赖，脱离门控）：from_event 六字段映射与审计字段完整 / 实体不变量（242 五场景参数化）
-  - AC-2 ×4（服务级，真实 Redis+PG 双门控）：切换成功六字段落库 / no-op 零日志新增 / audit-first 拒绝路径（坏仓储→StorageError→切换被拒 Redis 未变零事件——**本场景不设 ContextVar session（走 fallback）+ 坏端点 127.0.0.1:1 快速失败，见 AC-2 验证标准前提**）/ audit 联动记录（audit_log 表 isolation:switch 一条 + correlation_id 匹配）
+  - AC-2 ×4（服务级；AC-2.1/2.2/2.4 真实 Redis+PG 双门控，AC-2.3 **Redis 单门控**——断言面全在 Redis/事件侧对好 PG 零依赖，坏端点 127.0.0.1:1 即被测面）：切换成功六字段落库 / no-op 零日志新增 / audit-first 拒绝路径（坏仓储→StorageError→切换被拒 Redis 未变零事件——**本场景不设 ContextVar session（走 fallback）+ 坏端点 127.0.0.1:1 快速失败，见 AC-2 验证标准前提**）/ audit 联动记录（audit_log 表 isolation:switch 一条 + correlation_id 匹配）
   - AC-3 ×3（服务级，真实 PG 门控）：按 AGENT 检索 / 按时间范围+隔离等级组合检索（level 双向命中）/ 分页与排序（total/offset/limit + 最新在前）
   - AC-4 ×2（真实 PG 门控）：RLS 篡改拒绝（UPDATE/DELETE 0 行——绕过环境 skip）+ CheckConstraint 拒 no-op 直插 / worm_ref 预留与表结构（ORM `__table_args__` 断言）
   - AC-5 ×2（委托集成计时）：写 P95<50ms（委托 helper）/ 检索 P95<500ms + 成功率 20/20
@@ -329,12 +329,12 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 | TDD 单元测试 | IsolationManagementService 审计接线 | audit-first 顺序/no-op 零日志/443·447 零日志/audit 联动+降级/坏仓储拒绝（AsyncMock spec 端口——单测 Mock 端口合规）+ 存量构造点同步 | `tests/unit/application/services/test_isolation_management_service.py`（追加） | Task 3 |
 | TDD 单元测试 | PG 仓储逻辑面 | **save/search 双模式分派**（两方法各：ContextVar 命中→add+flush/查询；未命中→session_factory fallback——CLI 检索可达性前提）/search 条件构建（mock session/AsyncMock——薄单测，真实 PG 断言归集成） | `tests/unit/infrastructure/storage/postgresql/test_isolation_switch_log_repository.py` | Task 2 |
 | TDD 契约测试 | isolation_switch_log_repository | 11 维度 + _DummyResolver | `tests/contracts/test_port_contract_isolation_switch_log_repository.py` | Task 2 |
-| TDD 契约测试 | isolation_management_service（存量） | impl 维度与 lambda 同步（_DummyResolver 补两分发） | `tests/contracts/test_port_contract_isolation_management_service.py`（追加） | Task 3 |
+| TDD 契约测试 | isolation_management_service（存量） | impl 维度与 lambda 同步（_DummyResolver 补两分发 + 补 resolve_optional 方法——debate_session L31 先例） | `tests/contracts/test_port_contract_isolation_management_service.py`（追加） | Task 3 |
 | TDD 单元测试 | AuditActionType 扩展 | ISOLATION_SWITCH 枚举值注册 | `tests/unit/domain/events/audit_events/test_audit_events.py`（追加） | Task 3 |
 | TDD 验收测试 | Gherkin + BDD | 17 场景 Task 0 编写（收尾 Task 6 追加成 18 终态）；各 Task 转绿——AC-1 随 Task 1、AC-2 随 Task 3、AC-3 随 Task 2/4、AC-4 随 Task 4、AC-5 随 Task 4、AC-6 随 Task 3/5 | `test_acceptance_isolation_switch_log.feature/.py` | Task 0-6 |
 | 集成测试 | 全链（真实 Redis+PG） | 切换→日志落库六字段/检索矩阵/RLS+CheckConstraint/P95 双指标/成功率 20/20/no-op 零新增/audit-first 拒绝真实链 | `tests/integration/test_integration_isolation_switch_log.py` | Task 4 |
 | SDD 架构验证 | 六边形约束 | domain 零外部依赖/组合根外零实例化/端口方向/接线静态锚 | `tests/unit/architecture/test_arch_isolation_switch_log.py` | Task 5 |
-| CLI 单元测试 | isolation-logs 命令 | 参数解析/level 校验/输出形态/空结果（对齐 5-4 CLI 测试先例——grep `test_agent_cli` 或 `test_*cli*` 定位既有 CLI 测试文件追加） | 既有 CLI 测试文件（追加） | Task 3 |
+| CLI 单元测试 | isolation-logs 命令 | 参数解析/level 校验/输出形态/空结果（对齐 5-4 CLI 测试先例——追加于 `tests/unit/interfaces/cli/test_agent_cli.py`，monkeypatch 三件套 + 进程内 main(argv) + capsys；同步 L78-83 帮助文本漂移锁五子命令清单扩展） | `tests/unit/interfaces/cli/test_agent_cli.py`（追加） | Task 3 |
 
 ---
 
@@ -408,7 +408,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 - [ ] Subtask 0.5: 定义 migration 015 契约——列/索引五（含 previous_level——level 双向命中 or_ 两臂索引化）/CheckConstraint/RLS 四策略 + FORCE + downgrade 对称（AC-4 节）
 - [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_isolation_switch_log.feature`（17 场景）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + Redis/PG 双门控 + 双面清理）+ **17 场景三属性分档表**定稿（docstring）
 - [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
-- [ ] Subtask 0.8: 移交留项与偏离声明处置落盘（deferred-work.md：#7 竞态注记追加 + R1-DF2 5.6 注记——Task 0 评估表；**偏离声明 OD-1/OD-2/OD-3/OD-4 四项同步登记**——OD-1 WORM gap 链接 Story 13-4（SOX）承接方 + RLS 补偿控制差距四注（BYPASSRLS 绕过/备份导出不受约束/无保留期限/**TRUNCATE·DROP 不走 RLS——业界标准是 DDL owner 与应用角色分离 + 应用角色仅 GRANT INSERT/SELECT，归 13-4 落地**）/ OD-2 链接 9-4·9-5 协作组 / OD-3 链接 9-3（FR-AC-09）/ OD-4 命名映射与 DDL 分歧链接多租户专项 + 9-3——gap 四要素齐备：描述/触发条件/归宿/承接方链接）
+- [ ] Subtask 0.8: 移交留项与偏离声明处置落盘（deferred-work.md：#7 竞态注记追加 + R1-DF2 5.6 注记——Task 0 评估表；**偏离声明 OD-1/OD-2/OD-3/OD-4 四项同步登记**——OD-1 WORM gap 链接 Story 13-4（SOX）承接方 + RLS 补偿控制差距四注（BYPASSRLS 绕过/备份导出不受约束/无保留期限/**TRUNCATE·DROP 不走 RLS——业界标准是 DDL owner 与应用角色分离 + 应用角色仅 GRANT INSERT/SELECT，归 13-4 落地**）/ OD-2 链接 9-4·9-5 协作组 / OD-3 链接 9-3（FR-AC-09）/ OD-4 命名映射与 DDL 分歧链接多租户专项 + 9-3——gap 四要素齐备：描述/触发条件/归宿/承接方链接；注：CLI --approval-chain 裁剪属范围边界非规划偏离（规划对 set-isolation 参数集零约束），不进台账）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义；验收测试红阶段确认；链路接线断言清单 L1-L5 定义
@@ -506,7 +506,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴→🟢 | 全仓 grep `IsolationManagementService(` 构造点逐一登记修补（**实测基准 14 处**，见 AC-6.4 清单）：组合根 lambda（L2893）/ 单测工厂 / 集成三链（agent_isolation / triple / isolation_security）/ 验收六链（agent_isolation ×3 / triple / workflow ×2 / **agent_instantiation / agent_profile_loading——易漏两链**）/ 契约一处（test_port_contract_agent_instantiation_use_case L60）；另有 isolation_management 契约测试 _DummyResolver 补两依赖分发（依赖分发面非构造点）——**实施时以 grep 实际清单为准逐一修补并登记**；5-4/5-5 存量测试全量回归绿 |
+| 🔴→🟢 | 全仓 grep `IsolationManagementService(` 构造点逐一登记修补（**实测基准 14 处**，见 AC-6.4 清单）：组合根 lambda（L2893）/ 单测工厂 / 集成三链（agent_isolation / triple / isolation_security）/ 验收 8 处五文件（agent_isolation ×3 / triple / workflow ×2 / **agent_instantiation / agent_profile_loading——易漏**）/ 契约一处（test_port_contract_agent_instantiation_use_case L60）；另有 isolation_management 契约测试 _DummyResolver 补两依赖分发（依赖分发面非构造点）——**实施时以 grep 实际清单为准逐一修补并登记**；5-4/5-5 存量测试全量回归绿 |
 
 - [ ] Subtask 3.1: 🔴 红 — 服务接线失败测试（顺序/零调用计数/降级/参数）
 - [ ] Subtask 3.2: 🟢 绿 — 五/六依赖 + audit-first 插位 + 联动
@@ -593,7 +593,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 **DC-2 写入链路——audit-first 同步内嵌（vs 事件订阅异步消费）**
 - 选定：`switch_isolation_level` 内嵌同步写（构造事件 → from_event → **log save（失败上抛=切换被拒）** → Redis save → 事件发布 → audit 联动）
 - 论证：①审计不丢要求——同步写最可靠，失败即拒绝切换（无审计痕迹的切换不允许发生）；②reliable 事件**不能**经 `DualChannelEventBus.subscribe` 订阅（dual_channel_event_bus.py L82-83 抛 InvalidStateError），消费需 RabbitMQ 消费侧/Outbox 轮询基建——**归 5.7**（5-4 L284「接线归消费方 Story 立项时决定」）；③Outbox 表已存在事件持久化落点（event_outbox）但为投递中间态非审计载体——`cleanup_old_published_records` 默认保留 **30 天**且**全仓零调用接线**（无 Prefect flow/定时任务，published 行实际无限累积）、archived 是重试耗尽的状态迁移非时间驱动——**中间态生命周期无保证，更不可作审计存储**；④simplicity first——内嵌 4 行核心逻辑 vs 消费者+幂等+重试一套基建
-- 顺序论证（audit-first vs state-first）：state-first 在日志失败时丢审计（合规红线）；audit-first 在「日志写成功+Redis 写失败」窗口产生未生效切换的日志记录（误报）——**两害相权：审计合规宁可多记不可漏记**，误报窗口登记风险 #1（PG 可用而 Redis 故障的极窄窗口，StorageError 上抛调用方可见切换失败）。**插位细则**：既有事件构造块（现 L148-155，位于 Redis save 之后）随插位整体上移至 Redis save 之前；只读操作前置（构造事件 → from_event → config load 只读 → log save → Redis save → publish → audit）最小化误报窗口——config load（AgentConfigError 440）失败时已留日志属风险 #1 邻接变体，同样登记
+- 顺序论证（audit-first vs state-first）：state-first 在日志失败时丢审计（合规红线）；audit-first 在「日志写成功+Redis 写失败」窗口产生未生效切换的日志记录（误报）——**两害相权：审计合规宁可多记不可漏记**，误报窗口登记风险 #1（PG 可用而 Redis 故障的极窄窗口，StorageError 上抛调用方可见切换失败）。**插位细则**：既有事件构造块（现 L148-155，位于 Redis save 之后）随插位整体上移至 Redis save 之前；只读操作前置（构造事件 → from_event → config load 只读 → log save → Redis save → publish → audit）最小化误报窗口——config load（AgentConfigError 440）失败发生于 log save **之前**：零日志/零 Redis 写/零事件发布，无副作用泄漏（事件对象纯内存构造，state 内存态变异随本地对象丢弃）——440 路径是干净拒绝，已随只读前置**退出**误报窗口（原「440 已留日志」系插位前旧序残留，勘误）
 - 事务语义限定：HTTP 请求上下文（ContextVar session）下 log save 是 add+flush 不 commit——fail-closed 在 flush 失败时成立，但**持久性随外层请求事务**（请求回滚则日志与状态同回滚——与风险 #1 对称的反向窗口，当前 MVP 交付面仅 CLI fallback 独立 commit 故不可达）；Epic 7-2 REST 化立项时需评估请求事务边界（交接注记）
 - 备选：事件订阅 handler 异步写——弃（DC-2 论证②③）；装饰器包装服务——弃（组合根 lambda 复杂化+顺序不透明）
 
@@ -626,7 +626,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 
 **DC-10 CLI isolation-logs 检索命令**——MVP 检索交付面 = 端口 + CLI（REST 归 Epic 7-2；audit router 未挂 create_app 是 1.10 既有形态——本 Story 不扩大 REST 面）；argparse subparsers 对齐 5-4 先例；level 参数 CLI 层枚举转换守卫（服务不重复校验——5-4 DC-5 纪律）；set-isolation 不扩展 --approval-chain 参数（既有三参数形态保持——空审批链是 MVP 单用户请求通道的真实事实记录，见范围边界表）
 
-**DC-11 组合根生命周期——SINGLETON（新端口从源头避免 captive）**——5-4 DC-7 新增面政策：「新增端口直接 SINGLETON，新增面从源头避免 SINGLETON 服务捕获 SCOPED 依赖形成新 captive」（isolation_repository L2874 同款）；本端口将被 SINGLETON isolation_management_service 捕获——选 SINGLETON 则零 captive 零注记；仓储无状态（session 每调用 ContextVar/fallback 现取），SINGLETON 无共享态风险。备选 SCOPED（对齐 audit_repo L489 先例）——弃：audit_repo 的 SCOPED 是 1.10 存量形态（audit_service SINGLETON 捕获它已成既有 captive），新增面不应复制该形态
+**DC-11 组合根生命周期——SINGLETON（新端口从源头避免 captive）**——5-4 DC-7 新增面政策：「新增端口直接 SINGLETON，新增面从源头避免 SINGLETON 服务捕获 SCOPED 依赖形成新 captive」（isolation_repository L2874 同款）；本端口将被 SINGLETON isolation_management_service 捕获——选 SINGLETON 则该捕获零 captive 零注记；仓储无状态（session 每调用 ContextVar/fallback 现取），SINGLETON 无共享态风险。注记：本仓储 lambda 自身捕获 `resolver.resolve("session_factory")` 而 session_factory 注册未指定 lifetime（PortSpec 默认 SCOPED）——SINGLETON→SCOPED 捕获是 outbox_repo（L611-625）存量同款形态，sessionmaker 无状态引擎惰性连接，无实害（对标本 DC 时勿将「零 captive」误读为捕获链全零）。备选 SCOPED（对齐 audit_repo L489 先例）——弃：audit_repo 的 SCOPED 是 1.10 存量形态（audit_service SINGLETON 捕获它已成既有 captive），新增面不应复制该形态
 
 **关键决策对照表（选中方案 vs 备选）：**
 
@@ -642,7 +642,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 
 | # | 风险 | 处置 |
 |---|------|------|
-| 1 | audit-first 误报窗口（日志写成功+Redis 写失败→记录未生效切换；邻接变体：config load 440 失败时已留日志——只读前置已最小化） | 登记窗口（PG 可用而 Redis 故障极窄）；StorageError 上抛调用方可见；V1 动态触发立项时评估补偿（延迟确认/状态回写）。**对称反向窗口**：HTTP 请求上下文下日志持久性随外层事务（请求回滚→日志与状态同回滚——MVP 仅 CLI fallback 独立 commit 故不可达；7-2 REST 化时评估，DC-2 交接注记） |
+| 1 | audit-first 误报窗口（日志写成功+Redis 写失败→记录未生效切换；config load 440 失败路径已随只读前置**退出**误报窗口——440 发生于 log save 之前，零日志零 Redis 写零事件的干净拒绝） | 登记窗口（PG 可用而 Redis 故障极窄）；StorageError 上抛调用方可见；V1 动态触发立项时评估补偿（延迟确认/状态回写）。**对称反向窗口**：HTTP 请求上下文下日志持久性随外层事务（请求回滚→日志与状态同回滚——MVP 仅 CLI fallback 独立 commit 故不可达；7-2 REST 化时评估，DC-2 交接注记） |
 | 2 | RLS 环境敏感（superuser/owner/BYPASSRLS 绕过→deny 断言 flaky——**探测必须含 rolsuper**：superuser 无论 FORCE 与否都绕过，漏探测会误判非绕过→UPDATE 实际成功→断言红而非 skip） | FORCE ROW LEVEL SECURITY + 测试动态探测（rolsuper OR rolbypassrls / owner 检查）→ 绕过环境 pytest.skip 动态跳过（合规纪律；本地/CI 默认 postgres superuser 下恒 skip 属预期——skip 分支 + 变异实证是 MVP 实证面） |
 | 3 | 构造签名扩展回归面遗漏（5-4/5-5 手动组装链漏补→存量红） | Task 3 循环 C 全仓 grep `IsolationManagementService(` 登记修补苦役先例；5-4/5-5 存量全量回归终验 |
 | 4 | PG 仓储 fallback 在测试中真写库（session_factory 注入生产 factory→集成测试污染） | 测试一律走请求 session 路径（set_session）；手动组装链注入测试 session_factory 或仅请求路径；验收 teardown rollback 复核 |
@@ -692,8 +692,9 @@ tests/
 ├── integration/test_integration_isolation_switch_log.py      # 新建（九场景+计时）
 ├── acceptance/test_acceptance_isolation_switch_log.feature   # 新建（17+收尾=18 场景）
 ├── acceptance/test_acceptance_isolation_switch_log.py        # 新建（BDD 步骤）
-└── （回归面同步：test_acceptance_agent_isolation/triple、test_integration_agent_isolation/
-    triple、isolation_security、agent_workflow、既有 CLI 测试——Task 3 grep 清单为准）
+└── （回归面同步：test_acceptance_agent_isolation/triple/workflow/instantiation/profile_loading、
+    test_integration_agent_isolation/triple/isolation_security、
+    test_port_contract_agent_instantiation_use_case、既有 CLI 测试 test_agent_cli——Task 3 grep 清单为准）
 
 docs/architecture/architecture.md              # 修改：§5 注记（5.6 交付）+ §13 目录树（Task 6）
 _bmad-output/implementation-artifacts/deferred-work.md  # 修改：#7/R1-DF2 注记（Task 0/6）
@@ -782,7 +783,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - `src/entrypoints/agent_cli.py`（isolation-logs 子命令 + 使用示例）
 - `src/composition_root.py`（新端口注册 + lambda 扩展）
 - 既有测试追加/同步：`test_isolation_management_service.py` / `test_audit_events.py` / `test_port_contract_isolation_management_service.py`（_DummyResolver）/ 既有 CLI 测试文件
-- 回归面同步（Task 3 grep 清单为准）：`test_acceptance_agent_isolation.py` / `test_acceptance_agent_triple_isolation.py` / `test_acceptance_agent_workflow.py` / `test_integration_agent_isolation.py` / `test_integration_agent_triple_isolation.py` / `test_integration_isolation_security.py`
+- 回归面同步（Task 3 grep 清单为准，14 处基准见 AC-6.4）：`test_acceptance_agent_isolation.py` / `test_acceptance_agent_triple_isolation.py` / `test_acceptance_agent_workflow.py` / `test_acceptance_agent_instantiation.py` / `test_acceptance_agent_profile_loading.py` / `test_integration_agent_isolation.py` / `test_integration_agent_triple_isolation.py` / `test_integration_isolation_security.py` / `test_port_contract_agent_instantiation_use_case.py`（+ isolation_management 契约 _DummyResolver 分发 + CLI 漂移锁）
 - `docs/architecture/architecture.md`（§5 注记 + §13 目录树）+ `deferred-work.md`（#7/R1-DF2 注记）+ `sprint-status.yaml`（5-6 状态流转）
 
 ---
@@ -832,6 +833,9 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 15 | **R1-L** DC-11 先例引用失准：5-4 DC-7 的操作性决策是「新增端口直接 SINGLETON 从源头避免 captive」（isolation_repository L2874 同款）——故事新建端口选 SCOPED 再注记无实害恰是该政策明确要避免的路径；audit_repo SCOPED 是 1.10 存量 captive 形态 | P2 | DC-11 翻转为 SINGLETON（5-4 DC-7 新增面政策 + 同域先例）；AC-6/L233/L308/L462/风险 #6 六处同步；captive 注记需求消失 |
 | 16 | **R1-M** 规划权威面分歧零登记：architecture.md §9 字段名（from_level/to_level/trigger）与故事实体命名差异、arch-appendix L9753-9768 规划 DDL（单数表名/tenant_id NOT NULL/trigger_type NOT NULL/无 approval_chain 列/worm_storage_ref）分歧未登记 | P2 | 新增 **OD-4**（命名映射 + DDL 分歧处置——跟随事件 payload SSOT + 伪码同名 + 同域 audit_log 无租户列先例；gap 四要素齐备）；or.md 章节编号修正（一.3.(8)→一.2.[3].(8)、二.5.(3)→一.5.[6].(3)）；「唯一出现于 docs」过强声明修正（arch-appendix/伪码均有出现） |
 | 17 | **R1-N** DC-10 同号错位（L84/L135 裸引 DC-10 指向 5-4 事件发布容错，与本文 DC-10 CLI 命令撞号）；CheckConstraint 场景归属错位（场景规划 vs 矩阵分属不同场景号）；audit search match_any count 缺陷防呆；fixture 名混淆（postgres_session 裸 session vs pg_session 事务隔离）；P95 裕量算术（12 倍实为 ~7 倍）+ 计时口径（不含 commit）；完成清单勾选矛盾；12 项 P3 记录级（Port/Adapter 行号、Subtask 6.1/6.2 命名、DC-3/DC-7 回指、新建十件口径、目录树 __init__、architecture.md 归属 Task 6、review 状态链、矩阵守卫序行、OD-1 区间/WORMManager 措辞/补偿差距第 4 注 TRUNCATE+gap-free+retention、actor 语义注记、CLI --approval-chain 裁剪登记、epics 文件名占位注记） | P2/P3 | 逐处修正（见 v1.1.0 变更行）；DC-10 两处补「5-4」前缀；CheckConstraint 归 AC-4.1 对齐；match_any/直调 get_session 两防呆注记；fixture 名修正；裕量改 7 倍+口径注；完成清单勾选；P3 逐项落地 |
+| 18 | **R2-A（R1-M 自引入）** OD-4「不落 created_at 双时间戳」与 AC-4 表结构 created_at 列（v1.0.2 既有，server_default NOW()）直接互斥——dev 二选一盲区且 AC-4.2「ORM↔migration 一致」断言两读法皆绿（分歧静默落库） | P1 | 定谳方向：created_at **保留**非差异项（行创建审计列对齐 audit_log 同域先例；与 switch_timestamp 语义分工：切换时刻 vs 入库时刻）——OD-4 行与范围边界差异项清单同步改写（剔除 created_at 出差异项） |
+| 19 | **R2-B（R1-F 自引入）** DC-2 尾句与风险 #1「config load 440 失败时已留日志属风险 #1 邻接变体」与 R1 钉死的顺序（config load 前置于 log save）矛盾——新顺序下 440 时零日志/零 Redis 写/零事件（干净拒绝，无副作用泄漏）；AC-2 Then 顺序链漏列 config load 使字面读法可反向实现出旧行为（440 时有日志 vs 无日志的可观察分歧） | P2 | AC-2 Then 顺序链补插「config load（既有只读——TTL 真源）」；DC-2 插位细则尾句与风险 #1 邻接变体改写为「440 路径零副作用干净拒绝，已随只读前置**退出**误报窗口（原句系插位前旧序残留，勘误）」 |
+| 20 | **R2-C~R2-L（P3 批量）**：验收链计数陈旧（六链实为 8 处五文件——两处）；目录树/File List 回归面清单缺 3 新发现文件（两处）；AC-2 old_value 简写未标 .value（JSONB 序列化传枚举对象会触发降级静默丢失——反向风险）；L87 句尾「audit 联动」重复残句；测试分类表 CLI 行 grep 对冲残留；第五依赖私有属性名未钉死（内省锚依赖）+ _DummyResolver 缺 resolve_optional 方法（lambda 扩展后维度 9b/10/11 必 AttributeError——debate_session L31 先例）；AC-2.4 检索面未钉死（AuditSearchCriteria 无 correlation_id 字段）；DC-11「零 captive」漏 session_factory SCOPED 默认捕获注记（outbox L611 存量同款）；AC-2.3 过度门控（断言面零好 PG 依赖——精化 Redis 单门控）；Subtask 0.8 补 CLI 裁剪不进台账切分说明 | P3 | 逐处落地（见 v1.1.1 变更行）；另 6 项组合疑点证伪不成立留痕（AC-2.3×门控正交/5-4 同款断言引用准确/AC-6.2 三面分层闭合/rolsuper 三处互恰/CLI 裁剪非规划偏离/构造点×验证器 B 两类两断言不相交） |
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -869,10 +873,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 2026-10-25 | v1.0.1 | **偏离声明同步动作对标审查修复**（Epic 5 全量 37 项审查之 5-6 面三项，见「文档审查修复」表）：①OD-1/OD-2/OD-3 补 deferred-work.md 登记动作（Subtask 0.8）+ 承接方链接（13-4 SOX / 9-4·9-5 / 9-3 FR-AC-09）+ OD-1 补 RLS 补偿控制差距三注（BYPASSRLS 绕过/备份导出不受约束/无保留期限——监管级 WORM 差距显式化）；②偏离声明编号 D-n→OD-n 全量重命名（与审查留项 D# 消歧——5-1 D-7 撞名实害先例；v1.0.0 行原文「D-1~D-3」随全量重命名同步为 OD 形态，历史指代关系由本行留痕）；③配套 architecture.md §13.2 agent_service.py 补 MVP 落位注记（5-1 D-7 回迁承诺闭环——审查问题②，非本 Story 文件内动作，此处登记联动关系） |
 | 2026-10-25 | v1.0.2 | architecture.md §13.2 agent_service.py 注记增强（v1.0.1③ 的延续，用户指示）——「V1 再议下沉」升级为**可判定触发条件**：三信号同时满足方可立项评估（①跨两个以上聚合协作 / ②纯领域计算零 IO / ③领域语言中有独立概念名），缺一即维持现状；满足时首选 VO/纯函数归宿（isolation_access.py 判定矩阵先例），仅当多聚合状态输入且纯函数签名不可表达时才建领域服务；候选触发面 = Epic 9 多 Agent 协作（9-1/9-2/9-6） |
 | 2026-10-25 | v1.1.0 | **循环文档审查 Round 1**（D1 五视角代码调研 + D2 三视角并行审查——一致性/正确性[规划锚点]/可行性[科学性推演]，发现 P1×5 + P2×14 + P3 批量，见「文档审查修复」表 R1-A~R1-N）：①R1-A DC-2 论证③改写（outbox cleanup 实为 30 天+零接线——「24h 清理」失实）；②R1-B save/search 双模式分派补全（CLI 检索可达性）；③R1-C AC-6.1 端到端锚→接线内省（消解与手动组装纪律互斥，五处同步）；④R1-D AC-2.3 构造前提（不设 ContextVar session + 127.0.0.1:1）；⑤R1-E AC-1 计数错账修正；⑥R1-F 事件构造块上移显式化（L148-155 位于 Redis save 之后）；⑦R1-G 构造点基准 14 处补全（3 遗漏文件）；⑧R1-H session_factory 端口名定谳；⑨R1-I CLI 帮助文本漂移锁联动；⑩R1-J RLS 探测补 rolsuper + 环境注记；⑪R1-K 索引四→五（previous_level——or_ 两臂索引化）；⑫R1-L DC-11 翻转 SINGLETON（5-4 DC-7 新增面政策，六处同步）；⑬R1-M 新增 OD-4（§9 命名映射 + arch-appendix DDL 分歧）+ or.md 章节编号修正；⑭R1-N 同号错位/场景归属/防呆注记/fixture 名/裕量算术/完成清单/P3 批量修正 |
+| 2026-10-25 | v1.1.1 | **循环文档审查 Round 2**（D1 回归核查视角 + D2 组合交互推演双审查，发现 P1×1 + P2×1 + P3×10，6 项疑点证伪留痕，见「文档审查修复」表 #18-#20）：①R2-A（R1-M 自引入）OD-4 created_at 裁剪与 AC-4 列集互斥——定谳 created_at 保留非差异项（行创建审计列对齐 audit_log 先例，与 switch_timestamp 语义分工）；②R2-B（R1-F 自引入）「config load 440 已留日志」与钉死顺序矛盾——AC-2 Then 补 config load + DC-2/风险 #1 改写「440 零副作用干净拒绝，退出误报窗口」；③R2-C~L P3 批量：验收 8 处五文件计数/回归面清单补 3 文件（两处）/old_value .value 形态（降级静默丢失防呆）/残句/CLI 行定谳/第五依赖属性名 `self._isolation_switch_log_repository` 钉死 + _DummyResolver 补 resolve_optional（debate_session 先例）/AC-2.4 检索面钉死（直查表双过滤）/DC-11 补 session_factory 捕获注记/AC-2.3 精化 Redis 单门控/0.8 补 CLI 裁剪切分说明 |
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.1.1
 **创建日期/Created:** 2026-10-25
 **最后更新/Last Updated:** 2026-10-25
 **更新说明/Description:**
@@ -880,3 +885,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - v1.0.1: 偏离声明同步动作对标审查修复（OD 登记/承接方链接/编号 OD-n 重命名）
 - v1.0.2: agent_service.py 下沉触发条件可判定化（三信号 + VO 优先 + Epic 9 候选触发面）
 - v1.1.0: 循环文档审查 Round 1（P1×5 + P2×14 + P3 批量——DC-2 论证事实修正/search 双模式/接线内省锚/AC-2.3 构造前提/AC-1 计数/事件构造上移/构造点 14 处/session_factory 定谳/漂移锁/rolsuper/索引五/DC-11 SINGLETON/OD-4/批量 P3）
+- v1.1.1: 循环文档审查 Round 2（回归核查+组合交互——R1 修复自引入 P1×1[created_at 互斥]+P2×1[440 已留日志矛盾]+P3×10；6 项疑点证伪留痕）
