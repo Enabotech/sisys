@@ -137,6 +137,7 @@
 
   场景: AC-6.2 - CLI 全链贯通
     假如 Redis 缓存服务可用
+    并且 PostgreSQL 服务可用且 isolation_switch_logs 表已迁移
     并且 已实例化一个 CEO Agent
     当 执行 CLI isolation-status 查询该 Agent
     那么 CLI 退出码为 0 且输出 L4 等级与硬隔离策略摘要

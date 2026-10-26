@@ -9,7 +9,7 @@
 | 场景 | 层级 | 服务依赖 | 断言面 |
 |------|------|---------|--------|
 | AC-1.1 from_event 六字段映射 | 端口级 | 无 | 字段完整性 |
-| AC-1.2 实体不变量与不可变形态 | 端口级 | 无 | 异常契约（242 五场景）|
+| AC-1.2 实体不变量与不可变形态 | 端口级 | 无 | 异常契约（242 六场景）|
 | AC-2.1 切换成功六字段落库 | 服务级 | Redis+PG | 字段完整性 + audit-first |
 | AC-2.2 no-op 零日志新增 | 服务级 | Redis+PG | 顺序与计数 |
 | AC-2.3 audit-first 拒绝路径 | 服务级 | Redis（单门控——断言面零好 PG 依赖） | 顺序与计数（fail-closed） |
@@ -414,7 +414,7 @@ def test_ac_1_1_from_event_six_field_mapping(context: dict[str, Any]) -> None:
     "AC-1.2 - 实体不变量与不可变形态",
 )
 def test_ac_1_2_entity_invariants(context: dict[str, Any]) -> None:
-    """AC-1.2: 242 五场景 + to_dict 序列化 + frozen 不可变."""
+    """AC-1.2: 242 六场景 + to_dict 序列化 + frozen 不可变."""
 
 
 @given("已构造真实切换事件 IsolationLevelSwitched（六字段 payload）")
@@ -493,9 +493,10 @@ def given_entity_channel_ready(context: dict[str, Any]) -> None:
     context["invalid_inputs"] = True
 
 
-@when("分别注入五类非法输入构造日志实体")
-def when_five_invalid_inputs(context: dict[str, Any]) -> None:
-    """五场景：agent_id 非 UUID / 枚举非实例 / previous==target / reason 空白 / chain 非 tuple·元素非 str."""
+@when("分别注入六类非法输入构造日志实体")
+def when_six_invalid_inputs(context: dict[str, Any]) -> None:
+    """六场景：agent_id/log_id 非 UUID / 枚举非实例 / previous==target / reason 空白 /
+    chain 非 tuple·元素非 str / switch_timestamp naive 或非 datetime（R1-F6 场景⑥）。"""
     from datetime import UTC, datetime
 
     from src.domain.entities.isolation_switch_log import IsolationSwitchLog
@@ -516,15 +517,18 @@ def when_five_invalid_inputs(context: dict[str, Any]) -> None:
     def _make(**overrides: Any) -> Any:
         return IsolationSwitchLog(**{**valid, **overrides})
 
-    cases: dict[str, Any] = {
-        "agent_id_non_uuid": lambda: _make(agent_id="not-a-uuid"),
-        "log_id_non_uuid": lambda: _make(log_id="not-a-uuid"),
-        "previous_non_enum": lambda: _make(previous_level="L4"),  # str,Enum 混入语义——isinstance 先行
-        "target_non_enum": lambda: _make(target_level="L3"),
-        "levels_equal": lambda: _make(target_level=IsolationLevel.L4_HARD),
-        "reason_blank": lambda: _make(trigger_reason="   "),
-        "chain_non_tuple": lambda: _make(approval_chain=["审批人"]),
-        "chain_element_blank": lambda: _make(approval_chain=("  ",)),
+    # (构造器, 期望 context 字段键)——逐字段键断言锚（R1-F16：非空即过的弱断言升级）
+    cases: dict[str, tuple[Any, str]] = {
+        "agent_id_non_uuid": (lambda: _make(agent_id="not-a-uuid"), "agent_id"),
+        "log_id_non_uuid": (lambda: _make(log_id="not-a-uuid"), "log_id"),
+        "previous_non_enum": (lambda: _make(previous_level="L4"), "previous_level"),  # str,Enum 混入语义——isinstance 先行
+        "target_non_enum": (lambda: _make(target_level="L3"), "target_level"),
+        "levels_equal": (lambda: _make(target_level=IsolationLevel.L4_HARD), "previous_level"),
+        "reason_blank": (lambda: _make(trigger_reason="   "), "trigger_reason"),
+        "chain_non_tuple": (lambda: _make(approval_chain=["审批人"]), "approval_chain"),
+        "chain_element_blank": (lambda: _make(approval_chain=("  ",)), "approval_chain"),
+        "switch_ts_naive": (lambda: _make(switch_timestamp=datetime(2026, 10, 25, 10, 0, 0)), "switch_timestamp"),
+        "switch_ts_non_datetime": (lambda: _make(switch_timestamp="2026-10-25T10:00:00+00:00"), "switch_timestamp"),
     }
     context["invalid_cases"] = cases
     # 合法基线（to_dict/frozen 断言用）
@@ -533,15 +537,15 @@ def when_five_invalid_inputs(context: dict[str, Any]) -> None:
 
 @then("每类输入抛 EntityValidationError 242 且 context 携带字段名")
 def then_entity_validation_error_242(context: dict[str, Any]) -> None:
-    """242 三段式断言（isinstance → code → context 字段名稳定可断言）."""
+    """242 三段式断言（isinstance → code → context 期望字段键逐一命中——R1-F16）。"""
     from src.domain.exceptions import EntityValidationError
 
-    for name, case in context["invalid_cases"].items():
+    for name, (case, expected_key) in context["invalid_cases"].items():
         try:
             case()
         except EntityValidationError as exc:
             assert exc.code == "EXCEPTION_242", f"{name}: code={exc.code}"
-            assert exc.context, f"{name}: context 为空"
+            assert expected_key in exc.context, f"{name}: context 缺期望键 {expected_key}（实际 {exc.context}）"
         except Exception as exc:  # 非 242 异常即断言失败
             pytest.fail(f"{name}: 抛出非 242 异常 {type(exc).__name__}")
         else:
@@ -826,7 +830,9 @@ def given_real_chain_with_audit(context: dict[str, Any]) -> None:
 
 @then("audit_log 表含 isolation:switch 记录一条且 correlation_id 匹配事件")
 def then_audit_log_record(context: dict[str, Any]) -> None:
-    """测试 session 直查 audit_log 表（action_type + correlation_id 双过滤 SQL）."""
+    """测试 session 直查 audit_log 表（action_type + correlation_id 双过滤 SQL——
+    R1-F9 强锚：双过滤合一查询 len==1，形态断言挂同一强锚，共用过滤键
+    action_type 的 rows[-1] 无序取行是潜伏 flaky 面）."""
     from sqlalchemy import text
 
     event = context["switch_result"].event
@@ -834,21 +840,14 @@ def then_audit_log_record(context: dict[str, Any]) -> None:
     rows = _run_async(
         context["_loop"],
         pg["session"].execute(
-            text("SELECT actor, action_type, old_value, new_value FROM audit_log WHERE action_type = :action"),
-            {"action": "isolation:switch"},
+            text(
+                "SELECT actor, action_type, old_value, new_value FROM audit_log "
+                "WHERE action_type = :action AND correlation_id = :cid"
+            ),
+            {"action": "isolation:switch", "cid": str(event.event_id)},
         ),
     ).fetchall()
-    assert len(rows) >= 1, "audit_log 表缺 isolation:switch 记录"
-    # correlation_id 匹配事件（AuditSearchCriteria 无 correlation_id 字段——直查表
-    # 按事件 event_id 过滤，比客户端 items 匹配更直接）
-    corr_rows = _run_async(
-        context["_loop"],
-        pg["session"].execute(
-            text("SELECT COUNT(*) FROM audit_log WHERE correlation_id = :cid"),
-            {"cid": str(event.event_id)},
-        ),
-    ).scalar()
-    assert corr_rows == 1, f"correlation_id={event.event_id} 应恰命中 1 条 audit_log 行"
+    assert len(rows) == 1, f"action_type+correlation_id 双过滤应恰命中 1 条（实际 {len(rows)}——event_id={event.event_id}）"
     context["audit_rows"] = rows
 
 
@@ -856,7 +855,7 @@ def then_audit_log_record(context: dict[str, Any]) -> None:
 def then_audit_value_shapes(context: dict[str, Any]) -> None:
     """联动载荷断言（old/new_value 的 level 为字符串——JSONB 序列化安全形态）."""
     rows = context["audit_rows"]
-    row = rows[-1]
+    row = rows[0]
     old_value, new_value = row[2], row[3]
     assert old_value == {"level": "L4"}
     assert new_value["level"] == "L3"
@@ -1047,7 +1046,7 @@ def then_level_previous_hit(context: dict[str, Any], level: str) -> None:
             )
         ),
     )
-    assert result.total >= 1, "level=L4 检索应命中 L4→L3 切换（previous 臂）"
+    assert result.total == 2, "level=L4 应命中 agent0 的 L4→L3 与 L4→L2 双行（previous 臂——R1-F17 精确计数）"
 
 
 @then("组合条件为 AND 语义")
@@ -1548,14 +1547,16 @@ def then_fifth_dependency_introspection(context: dict[str, Any]) -> None:
 
 @then("第六依赖 audit_service 可选注入可达")
 def then_sixth_dependency_optional(context: dict[str, Any]) -> None:
-    """可选注入断言（resolve_optional 可达——非 None 即真实 audit_service）."""
+    """可选注入断言（resolve_optional 可达——组合根 audit_service 无条件注册是
+    既定事实，直断非 None + isinstance：注册被移除时本步骤必须红而非静默通过，
+    R1-F9；原 if sixth is not None 条件分支使 None 静默漏过）."""
     from src.domain.ports.audit_service import AuditServicePort
     from src.domain.ports.resolver import get_resolver
 
     sixth = get_resolver().resolve_optional("audit_service")
-    if sixth is not None:
-        assert isinstance(sixth, AuditServicePort)
-    context["introspected_audit"] = sixth is not None
+    assert sixth is not None, "组合根已无条件注册 audit_service——resolve_optional 返回 None 说明注册被移除"
+    assert isinstance(sixth, AuditServicePort)
+    context["introspected_audit"] = True
 
 
 @given("切换日志已直构落库一条（fallback 独立会话 commit——生产 CLI 真实形态）")
@@ -1743,14 +1744,21 @@ def then_only_composition_root(context: dict[str, Any]) -> None:
 
 @then("CLI import 白名单合规（domain/application 合法，infrastructure 禁入）")
 def then_cli_import_whitelist(context: dict[str, Any]) -> None:
-    """端口方向断言（agent_cli 的 isolation-logs 面直消费仓储端口）."""
+    """端口方向断言（agent_cli 的 isolation-logs 面直消费仓储端口；ImportFrom
+    与 Import 双形态扫描——``import src.infrastructure...`` 直写形态对齐架构
+    验证器 C，R1-F18）."""
     import ast
 
     cli_path = SRC_DIR / "entrypoints" / "agent_cli.py"
     tree = ast.parse(cli_path.read_text(encoding="utf-8"))
     violations: list[str] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module:
+        if isinstance(node, ast.Import):
+            # import src.infrastructure... 直写形态（别名列表逐个核）
+            for alias in node.names:
+                if alias.name.startswith("src.infrastructure"):
+                    violations.append(alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module:
             if node.module.startswith("src.infrastructure"):
                 violations.append(node.module)
     assert violations == [], f"CLI 违规 import infrastructure: {violations}"
@@ -1788,8 +1796,13 @@ def then_event_dual_registration(context: dict[str, Any]) -> None:
 
     channels_path = REPO_ROOT / "configs" / "event_channels.yaml"
     data = yaml.safe_load(channels_path.read_text(encoding="utf-8"))
-    yaml_text = str(data)
-    assert "IsolationLevelSwitched" in yaml_text or "isolation_level_switched" in yaml_text
+    # 结构化导航断言（R1-F19：str(data) 子串匹配 + OR 双键是弱锚——任意残留
+    # 文本可过；navigate event_channels 映射键集合做键级精确命中）
+    events_section = data.get("event_channels", {})
+    registered_event_types = {str(key) for key in events_section}
+    assert "IsolationLevelSwitched" in registered_event_types, (
+        f"event_channels.yaml event_channels 节缺 IsolationLevelSwitched 键（实际键集 {sorted(registered_event_types)}）"
+    )
     # DEFAULT_MAPPINGS: dict[str, ChannelMapping]——event_type 字段即映射键
     assert "IsolationLevelSwitched" in ChannelRouter.DEFAULT_MAPPINGS
 

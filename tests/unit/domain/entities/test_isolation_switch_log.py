@@ -4,12 +4,12 @@
 - from_event 工厂: 六字段零加工映射（approval_chain list→tuple 冻结拷贝）/
   switch_timestamp 取事件 switch_timestamp（单钟纪律——非 event.timestamp）/
   log_id 自铸 UUID4 / worm_ref 默认 None（OD-1 预留）
-- __post_init__ 不变量五场景（242——context 形态 {字段名: 实际值/类型}，对齐
+- __post_init__ 不变量六场景（242——context 形态 {字段名: 实际值/类型}，对齐
   isolation_state 先例）: agent_id/log_id 非 UUID 实例拒；previous_level/target_level
   非 IsolationLevel 枚举实例拒（双条件 isinstance 先行——str,Enum 混入语义
   hash 穿透教训 5-4 R3-F01）；previous_level == target_level 拒（切换语义不变量
   ——no-op 不得产生日志）；trigger_reason 非 str 或空白拒；approval_chain 非 tuple 拒
-  + 元素非 str 或空白串拒
+  + 元素非 str 或空白串拒；switch_timestamp 非 datetime 或 naive 拒（R1-F6 场景⑥）
   注: log_id/approval_chain 两场景的非法值经 dataclass 直构造注入（from_event
   自铸合法值无法产出非法输入——测试专用通道，生产构造通道唯一性 DC-1 不受影响）
 - to_dict: 全字段可序列化（UUID→str / Enum→value / datetime→ISO 8601 / tuple→list）
@@ -123,9 +123,29 @@ class TestFromEventFactory:
         log2 = IsolationSwitchLog.from_event(event)
         assert log1.log_id != log2.log_id
 
+    def test_from_event_str_approval_chain_rejected(self) -> None:
+        """str 型 approval_chain → 242（str 爆裂防御——``tuple("审批人")`` 会
+        爆裂成单字符序列造成审计数据永久损坏，R1-F1 from_event 面）。"""
+        event = _make_event()
+        object.__setattr__(event, "approval_chain", "合规负责人,安全官")
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLog.from_event(event)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "approval_chain" in exc_info.value.context
+
+    def test_from_event_tuple_approval_chain_rejected(self) -> None:
+        """tuple 型 approval_chain → 242（事件 payload 契约为 list——tuple 虽
+        语义安全仍拒：from_event 只接受事件契约形态，R1-F1）。"""
+        event = _make_event()
+        object.__setattr__(event, "approval_chain", ("合规负责人",))
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLog.from_event(event)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "approval_chain" in exc_info.value.context
+
 
 class TestEntityInvariants:
-    """__post_init__ 不变量五场景（242 三段式: isinstance → code → context）。"""
+    """__post_init__ 不变量六场景（242 三段式: isinstance → code → context）。"""
 
     def test_agent_id_non_uuid_rejected(self) -> None:
         """场景①: agent_id 非 UUID 实例 → 242（context 携带 agent_id）。"""
@@ -209,6 +229,26 @@ class TestEntityInvariants:
         assert exc_info.value.code == "EXCEPTION_242"
         assert "approval_chain" in exc_info.value.context
 
+    def test_switch_timestamp_naive_rejected(self) -> None:
+        """场景⑥: naive datetime（无 tzinfo）→ 242（审计时间戳必须时区明确——
+        跨时区部署下解读歧义，R1-F6）。"""
+        kwargs = _valid_kwargs()
+        kwargs["switch_timestamp"] = datetime(2026, 10, 25, 10, 0, 0)  # naive
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLog(**kwargs)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "switch_timestamp" in exc_info.value.context
+
+    def test_switch_timestamp_non_datetime_rejected(self) -> None:
+        """场景⑥: 非 datetime 实例（ISO 字符串）→ 242（to_dict 的 isoformat
+        前提——字符串输入在序列化面抛裸 AttributeError，R1-F6）。"""
+        kwargs = _valid_kwargs()
+        kwargs["switch_timestamp"] = "2026-10-25T10:00:00+00:00"
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLog(**kwargs)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "switch_timestamp" in exc_info.value.context
+
     def test_approval_chain_non_str_element_rejected(self) -> None:
         """场景⑤: approval_chain 元素非 str → 242。"""
         kwargs = _valid_kwargs()
@@ -261,7 +301,10 @@ class TestFrozenImmutability:
             setattr(log, "trigger_reason", "篡改尝试")
 
     def test_is_frozen_dataclass(self) -> None:
-        """dataclasses.is_dataclass(frozen=True) 形态断言。"""
+        """frozen 形态断言（``__dataclass_params__.frozen`` 直查——is_dataclass
+        对非 frozen dataclass 同真，原弱断言恒真，R1-F15；getattr 动态访问——
+        dataclass 内部属性不在类型存根，静态直查会炸 attr-defined）。"""
         assert dataclasses.is_dataclass(IsolationSwitchLog)
-        log = IsolationSwitchLog.from_event(_make_event())
-        assert not hasattr(log, "__dict__") or log.__dict__.get("trigger_reason") is not None
+        params = getattr(IsolationSwitchLog, "__dataclass_params__", None)
+        assert params is not None, "非 dataclass 形态（__dataclass_params__ 缺失）"
+        assert params.frozen is True

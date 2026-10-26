@@ -299,6 +299,23 @@ class TestSwitchIsolationLevel:
         mocks["isolation_repo"].save.assert_not_awaited()
         mocks["publisher"].publish.assert_not_awaited()
 
+    async def test_str_approval_chain_rejected_242(self) -> None:
+        """str 型 approval_chain → 242 入口守卫（str 是 Sequence 合法子类型但
+        ``list("审批人")`` 会爆裂成单字符序列——审计数据永久损坏防线，
+        R1-F1 服务层入口面；插位 no-op 后事件构造前——零仓储写零发布）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        state = _make_state(IsolationLevel.L4_HARD)
+        service, mocks = _make_service(agent=_make_agent(), state=state)
+        bad_chain: Any = "合规负责人,安全官"  # str 形态（dict/starred 注入面之外的可读直陈）
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "原因", bad_chain)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "approval_chain" in exc_info.value.context
+        mocks["isolation_repo"].save.assert_not_awaited()
+        mocks["log_repo"].save.assert_not_awaited()
+        mocks["publisher"].publish.assert_not_awaited()
+
     async def test_noop_zero_side_effects(self) -> None:
         """同等级 no-op: switched=False + event=None + save/publish/config 零调用。"""
         state = _make_state(IsolationLevel.L4_HARD)

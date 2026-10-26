@@ -1106,3 +1106,33 @@ class TestIsolationLogsCommand:
         exit_code = agent_cli.main(["isolation-logs"])
         assert exit_code == 1
         assert "EXCEPTION_103" in capsys.readouterr().err
+
+    def test_inverted_time_window_exits_nonzero(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """反转时间窗（start > end）→ Query 242 拒绝（R1-F21 传导链——
+        Query 构造已上移 bootstrap 前，输入错误不触发端口注册表初始化）。"""
+        repo = _StubIsolationSwitchLogRepository()
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(
+            [
+                "isolation-logs",
+                "--start",
+                "2026-10-26T00:00:00+00:00",
+                "--end",
+                "2026-10-25T00:00:00+00:00",
+            ]
+        )
+        assert exit_code == 1
+        assert "EXCEPTION_242" in capsys.readouterr().err
+        assert repo.search_calls == []  # Query 守卫先于检索
+
+    def test_zero_limit_exits_nonzero(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """limit=0 越界 → Query 242 拒绝（分页下限——CLI 传参面传导，
+        Query 层守卫单测之外的组装面验证）。"""
+        repo = _StubIsolationSwitchLogRepository()
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(["isolation-logs", "--limit", "0"])
+        assert exit_code == 1
+        assert "EXCEPTION_242" in capsys.readouterr().err
+        assert repo.search_calls == []

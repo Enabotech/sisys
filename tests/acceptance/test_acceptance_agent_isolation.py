@@ -357,6 +357,53 @@ def given_redis_service_available(context: dict[str, Any]) -> None:
         pytest.skip(f"Redis not available: {exc}")
 
 
+@given("PostgreSQL 服务可用且 isolation_switch_logs 表已迁移")
+def given_pg_and_switch_log_table_available(context: dict[str, Any]) -> None:
+    """PG 门控（Story 5.6 回归面义务——set-isolation 经组合根真实六依赖链
+    audit-first 写 isolation_switch_logs，fallback 独立会话 commit）。
+
+    动态 skip（连接失败/表缺失——migration 015 未跑环境），禁写死
+    @pytest.mark.skip；只探测不跑 alembic（5-4 无 PG 迁移职责，表由全局
+    migration 链保证——PG 在而表不在属环境驱动 skip）。
+    """
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from src.infrastructure.config.postgresql import PostgreSQLConfig
+    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+    from tests.environments import get_test_env
+
+    env = get_test_env().postgres
+    manager = PostgreSQLManager(
+        PostgreSQLConfig(
+            host=env.host,
+            port=env.port,
+            database=env.database,
+            username=env.username,
+            password=env.password,
+        )
+    )
+    session = AsyncSession(manager.get_async_engine())
+    try:
+        row = _run_async(
+            context["_loop"],
+            session.execute(
+                text(
+                    "SELECT COUNT(*) FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name = 'isolation_switch_logs'"
+                )
+            ),
+        ).scalar()
+    except Exception as exc:
+        pytest.skip(f"PostgreSQL not available: {exc}")
+    else:
+        if not row:
+            pytest.skip("isolation_switch_logs 表未迁移（migration 015 未执行）")
+    finally:
+        _run_async(context["_loop"], session.close())
+        _run_async(context["_loop"], manager.get_async_engine().dispose())
+
+
 @scenario(
     "test_acceptance_agent_isolation.feature",
     "AC-2.1 - 实例化即 L4 硬隔离持久化",
@@ -1087,9 +1134,67 @@ def when_cli_set_isolation(context: dict[str, Any], level: str, reason: str, cap
 
 @then("CLI 退出码为 0 且输出切换摘要 L4 到 L3")
 def then_cli_exit0_switch_summary(context: dict[str, Any]) -> None:
-    """set-isolation 切换摘要（previous -> target）。"""
+    """set-isolation 切换摘要（previous -> target）+ 日志行自包含清理。
+
+    Story 5.6 回归面义务: set-isolation 成功路径经组合根真实六依赖链 audit-first
+    写 isolation_switch_logs（fallback 独立会话 commit——非测试事务，需本场景
+    自行清理）。log_id 在服务内 from_event 自铸不可知——按 agent_id 粒度清理
+    （场景恰一次成功切换恰一行）；superuser 连接绕过 RLS deny DELETE，非
+    superuser 环境容忍残留并注记（追加型审计表，5-6 AC-6.2 同款取舍）。
+    """
+    import logging
+
     assert context["cli_exit_code"] == 0
     assert "L4 -> L3" in context["cli_captured"].out, "切换摘要须含 L4 -> L3"
+
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from src.infrastructure.config.postgresql import PostgreSQLConfig
+    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+    from tests.environments import get_test_env
+
+    env = get_test_env().postgres
+    manager = PostgreSQLManager(
+        PostgreSQLConfig(
+            host=env.host,
+            port=env.port,
+            database=env.database,
+            username=env.username,
+            password=env.password,
+        )
+    )
+    session = AsyncSession(manager.get_async_engine())
+    try:
+        probe = _run_async(
+            context["_loop"],
+            session.execute(text("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")),
+        ).fetchone()
+        if not (probe and probe[0]):
+            logging.getLogger(__name__).warning(
+                "非 superuser 连接无法清理 set-isolation 日志行（RLS deny DELETE）——容忍残留: agent_id=%s",
+                context["agent_id"],
+            )
+            return
+        _run_async(
+            context["_loop"],
+            session.execute(
+                text("DELETE FROM isolation_switch_logs WHERE agent_id = :aid"),
+                {"aid": str(context["agent_id"])},
+            ),
+        )
+        _run_async(context["_loop"], session.commit())
+        remain = _run_async(
+            context["_loop"],
+            session.execute(
+                text("SELECT COUNT(*) FROM isolation_switch_logs WHERE agent_id = :aid"),
+                {"aid": str(context["agent_id"])},
+            ),
+        ).scalar()
+        assert remain == 0, f"set-isolation 日志行清理后仍有残留 {remain} 行（agent_id={context['agent_id']}）"
+    finally:
+        _run_async(context["_loop"], session.close())
+        _run_async(context["_loop"], manager.get_async_engine().dispose())
 
 
 @then("CLI 退出码为 0 且输出 L3 等级")

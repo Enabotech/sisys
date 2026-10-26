@@ -654,7 +654,9 @@ UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本�
 > 六字段零加工映射——事件 payload SSOT）+ 切换链 audit-first 同步内嵌写（DC-2——
 > 日志先于 Redis 状态写，日志失败=切换被拒 fail-closed；no-op 零日志）+ PG
 > `isolation_switch_logs` 表（migration 015——RLS ENABLE+FORCE+deny UPDATE/DELETE
-> 四策略 + CheckConstraint previous≠target 双层防篡改 + 索引五）+ 多维检索
+> 四策略 + CheckConstraint previous≠target 双层防篡改 + 索引五；migration 016 加固
+> ——值域 CHECK 全枚举域 + deny 策略 AS RESTRICTIVE[permissive OR 合并会消解 deny]）
+> + 多维检索
 > （`IsolationSwitchLogQuery` 按 AGENT/时间闭区间/等级双向命中 + 分页——CLI
 > `isolation-logs` 检索面）+ `AuditService.record` 联动（`isolation:switch` 动作类型
 > 第 8 组、可选注入 + 失败降级）+ 组合根 `isolation_switch_log_repository` SINGLETON
@@ -1766,7 +1768,7 @@ src/domain/
 │   ├── checkpoint.py                                      # 检查点实体（双模式恢复）
 │   ├── strategic_archive.py                               # 战略档案实体（六层存储）
 │   ├── routing_log.py                                     # 路由决策日志实体 ⭐
-│   └── isolation_log.py                                   # 隔离切换日志实体 ⭐（Story 5.6 交付——实际落位 isolation_switch_log.py：IsolationSwitchLog frozen 八字段[from_event 六字段零加工映射/242 不变量五场景/worm_ref OD-1 预留]）
+│   └── isolation_log.py                                   # 隔离切换日志实体 ⭐（Story 5.6 交付——实际落位 isolation_switch_log.py：IsolationSwitchLog frozen 八字段[from_event 六字段零加工映射/242 不变量六场景/worm_ref OD-1 预留]）
 │
 ├── value_objects/                                         # 值对象集合
 │   ├── embedding.py                                       # 嵌入向量值对象

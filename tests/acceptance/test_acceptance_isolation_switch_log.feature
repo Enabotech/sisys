@@ -20,7 +20,7 @@
 
   场景: AC-1.2 - 实体不变量与不可变形态
     假如 实体构造通道已就绪
-    当 分别注入五类非法输入构造日志实体
+    当 分别注入六类非法输入构造日志实体
     那么 每类输入抛 EntityValidationError 242 且 context 携带字段名
     并且 to_dict 全字段可序列化（UUID→str/Enum→value/datetime→ISO 8601/tuple→list）
     并且 frozen 赋值被拒绝（日志不可变性）

@@ -380,3 +380,29 @@ class TestOrmToEntityMapping:
         assert model.approval_chain == ["审批人", "安全官"]  # tuple → list（JSONB）
         assert model.switch_timestamp == log.switch_timestamp
         assert model.worm_ref is None
+
+    def test_to_entity_out_of_domain_level_wrapped_242(self) -> None:
+        """越域等级值（'L9'——直插脏行）→ EntityValidationError 242 而非裸
+        ``ValueError`` 穿透（单条脏行毒化整页检索的异常体系合规修复，
+        R1-F4——对齐 DomainEvent.from_dict 畸形 payload 包装先例）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        model = _make_model()
+        model.previous_level = "L9"
+        with pytest.raises(EntityValidationError) as exc_info:
+            PostgreSQLIsolationSwitchLogRepository._to_entity(model)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert exc_info.value.context["previous_level"] == "L9"
+        assert isinstance(exc_info.value.__cause__, ValueError)
+
+    def test_to_entity_out_of_domain_target_wrapped_242(self) -> None:
+        """越域 target_level 同款包装（两列独立防线——修一列漏同族列是
+        「修一处漏同类处」高发形态，逐列独立用例）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        model = _make_model()
+        model.target_level = "L0"
+        with pytest.raises(EntityValidationError) as exc_info:
+            PostgreSQLIsolationSwitchLogRepository._to_entity(model)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert exc_info.value.context["target_level"] == "L0"
