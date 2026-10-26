@@ -165,12 +165,12 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 **Given** isolation_switch_logs 表经 alembic 015 创建（含 RLS）
 **When** 验证表结构与防篡改约束
 **Then** **表结构**：`log_id` UUID PK + `agent_id` UUID + `previous_level`/`target_level` String(20) + `trigger_reason` Text + `approval_chain` JSONB + `switch_timestamp` DateTime(tz) + `worm_ref` String(500) nullable + `created_at` DateTime(tz) server_default NOW()；**索引五**：agent_id / switch_timestamp / previous_level / target_level / (agent_id, switch_timestamp) 组合——previous_level 单列与 target_level 对称（level 双向命中 or_ 两臂皆可索引化——PG BitmapOr 可达，生产单维 level 检索 P95<500ms 的结构性前提；单侧索引会使该维度退化为全表扫描）；**CheckConstraint** `previous_level != target_level`（DB 层拒绝 no-op 日志——实体不变量 DB 投影）+ **值域 CHECK** `previous_level/target_level IN ('L1','L2','L3','L4')`（**R1-F4/migration 016**——对齐 IsolationLevel 全枚举域非 MVP 白名单[保 V2 单点开放承诺]，防直插越域脏行毒化检索面；ORM `__table_args__` 同名镜像）；**RLS 四策略**：INSERT/SELECT 放行（WITH CHECK true / USING true）+ deny UPDATE + deny DELETE（**AS RESTRICTIVE——migration 016 加固**：permissive 策略间 OR 合并会使未来误加的放行策略消解 deny，RESTRICTIVE AND 否决是 deny 语义标准形态；DELETE policy 仅 USING 子句）；**FORCE ROW LEVEL SECURITY**（DC-4——owner 连接不绕过）
-**And** 篡改拒绝实证：非绕过连接（前置探测 **`rolsuper OR rolbypassrls`**——绕过环境 `pytest.skip` 动态跳过并注明；**R1-F7/dev 后裁定取代（d6ea8892）**：原「表 owner 关系」探测把 FORCE 下实际受约束的 owner 误归绕过环境——实测 FORCE=on 时 owner UPDATE 影响 0 行（受约束）、FORCE=off 时绕过，owner 已从 skip 集移除；**superuser 环境不再 skip**：事务内 CREATE ROLE+GRANT+SET ROLE 临时降权真实断言[本地/CI 默认 postgres superuser 下 UPDATE/DELETE 0 行真实执行——27 passed 0 skipped]，角色随测试事务 rollback 自动回收；仅「非 superuser 且 rolbypassrls」属性形态维持动态 skip[唯一残余——需预置非绕过应用角色]）下 `UPDATE ... SET target_level=...` 与 `DELETE` 均影响 0 行；CheckConstraint 实证：直插 previous==target 行 → `IntegrityError`；值域 CHECK 实证（migration 016）：直插 `previous_level='L9'` 行 → `IntegrityError`（R1-F4）
+**And** 篡改拒绝实证：非绕过连接（前置探测 **`rolsuper OR rolbypassrls`**——绕过环境 `pytest.skip` 动态跳过并注明；**R1-F7/dev 后裁定取代（d6ea8892）**：原「表 owner 关系」探测把 FORCE 下实际受约束的 owner 误归绕过环境——实测 FORCE=on 时 owner UPDATE 影响 0 行（受约束）、FORCE=off 时绕过；**superuser 环境不再 skip**：事务内 CREATE ROLE+GRANT+SET ROLE 临时降权真实断言[本地/CI 默认 postgres superuser 下 UPDATE/DELETE 0 行真实执行——27 passed 0 skipped]，角色随测试事务 rollback 自动回收；**残余 skip 面（R2 勘误）= 非 superuser 且（rolbypassrls 或 owner）**——owner 在 FORCE 下实际受约束，属无 CREATE ROLE 权限无法降权的保守 skip 而非绕过事实；需预置非绕过应用角色消除）下 `UPDATE ... SET target_level=...` 与 `DELETE` 均影响 0 行；CheckConstraint 实证：直插 previous==target 行 → `IntegrityError`；值域 CHECK 实证（migration 016）：直插 `previous_level='L9'` 行 → `IntegrityError`（R1-F4）；**RESTRICTIVE 终态钉死（R2-F1）**：pg_policies 双 deny 策略 `permissive == 'RESTRICTIVE'` 断言（兜底路径 ensure 同款升级——count>=4 但 permissive deny 触发自愈重建）
 
 **验证标准/Validation Criteria:**
 - [ ] migration upgrade/downgrade 对称（015 down 先 drop 索引后 drop 表 + DROP POLICY 清单完整；**016 对称：RESTRICTIVE→permissive 还原 + DROP 值域约束**）
 - [ ] ORM 模型与 migration 列/索引/约束一致（模型 `__table_args__` 断言——值域 CHECK 双侧同名镜像）
-- [ ] RLS UPDATE/DELETE 影响 0 行断言（superuser 环境 SET ROLE 降权真实断言；非 superuser bypassrls 属性形态动态 skip）
+- [ ] RLS UPDATE/DELETE 影响 0 行断言（superuser 环境 SET ROLE 降权真实断言；非 superuser 且（rolbypassrls 或 owner）属性形态动态 skip——保守 skip 面（owner 在 FORCE 下实际受约束，R2 勘误补全））
 - [ ] CheckConstraint IntegrityError 断言（session.rollback 复位）
 - [ ] worm_ref 预留断言：实体默认 None + 列 nullable + 检索 roundtrip None 保持（OD-1 登记面）
 
@@ -362,7 +362,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 - [ ] **手动组装纪律**：验收/集成禁 `resolve("isolation_management_service")` 发真实命令——SINGLETON 跨 function-scope 循环复用死连接 + 其 PG 依赖生命周期不可控；一律场景级客户端手动组装（IsolationManagementService + 双 Redis 仓储 + PG 日志仓储[测试 session 注入] + 真实/降级 audit_service 全真实链——`_assemble_real_chain` 形态扩展）；resolve 仅 AC-6.1 接线断言且禁发命令
 - [ ] **audit 联动验收面**：真实 audit_service（PG session 同事务——audit_log 写入同 rollback 回收）；降级场景归单测（AsyncMock side_effect AuditError——验收禁 mock，降级是异常注入面）
 - [ ] **计时场景**：新 `xdist_group("isolation-switch-log-perf")` 串行 + benchmark 场景级标记；`SWITCH_LOG_WRITE_P95_LIMIT_SECONDS = 0.05` / `SWITCH_LOG_SEARCH_P95_LIMIT_SECONDS = 0.5` 常量单源（集成定义/验收共享 import）
-- [ ] **RLS 环境敏感**：deny 断言前置探测连接角色（**`rolsuper OR rolbypassrls`** 或表 owner 绕过——superuser 无论 FORCE 与否都绕过 RLS，探测漏 rolsuper 会误判为非绕过 → UPDATE 实际成功 → 断言红而非 skip）→ 绕过环境 `pytest.skip` 动态跳过（禁写死 skip；⚠️ 本地/CI 默认 `postgres` superuser 连接下本场景恒 skip——绿色路径依赖非 superuser 应用角色环境）
+- [ ] **RLS 环境敏感**：deny 断言前置探测连接角色（**`rolsuper OR rolbypassrls`** 或表 owner 保守 skip）→ 绕过环境 `pytest.skip` 动态跳过（禁写死 skip；**R2 勘误：dev 后 d6ea8892 SET ROLE 降权已使 superuser 环境真实断言——原「本地/CI 默认 postgres superuser 下恒 skip」表述过时**；残余 skip 面 = 非 superuser 且[rolbypassrls 或 owner]——owner 在 FORCE 下实际受约束，属无 CREATE ROLE 权限的保守 skip）
 - [ ] BDD 步骤禁 `@pytest.mark.asyncio`；步骤函数同步 def + `_run_async` 调度
 - [ ] 本 Story 计时组与 5-4（agent-isolation-perf）/5-5（agent-triple-isolation-perf）xdist_group 名互异不冲突
 
@@ -644,7 +644,7 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 | # | 风险 | 处置 |
 |---|------|------|
 | 1 | audit-first 误报窗口（日志写成功+Redis 写失败→记录未生效切换；config load 440 失败路径已随只读前置**退出**误报窗口——440 发生于 log save 之前，零日志零 Redis 写零事件的干净拒绝） | 登记窗口（PG 可用而 Redis 故障极窄）；StorageError 上抛调用方可见；V1 动态触发立项时评估补偿（延迟确认/状态回写）。**对称反向窗口**：HTTP 请求上下文下日志持久性随外层事务（请求回滚→日志与状态同回滚——MVP 仅 CLI fallback 独立 commit 故不可达；7-2 REST 化时评估，DC-2 交接注记） |
-| 2 | RLS 环境敏感（superuser/owner/BYPASSRLS 绕过→deny 断言 flaky——**探测必须含 rolsuper**：superuser 无论 FORCE 与否都绕过，漏探测会误判非绕过→UPDATE 实际成功→断言红而非 skip） | FORCE ROW LEVEL SECURITY + 测试动态探测（rolsuper OR rolbypassrls——**owner 已移出探测集，R1-F7 取代**：FORCE=on 下 owner 实测受约束[UPDATE 0 行]，原 owner 检查把可断言环境误归绕过）→ 绕过环境 pytest.skip 动态跳过（合规纪律）；**dev 后升级（d6ea8892）**：superuser 环境事务内 SET ROLE 临时降权真实断言（本地/CI 默认 postgres 下零 skip——27 passed），仅非 superuser bypassrls 属性形态维持动态 skip |
+| 2 | RLS 环境敏感（superuser/owner/BYPASSRLS 绕过→deny 断言 flaky——**探测必须含 rolsuper**：superuser 无论 FORCE 与否都绕过，漏探测会误判非绕过→UPDATE 实际成功→断言红而非 skip） | FORCE ROW LEVEL SECURITY + 测试动态探测（rolsuper OR rolbypassrls；**R1-F7 定谳**：FORCE=on 下 owner 实测受约束[UPDATE 0 行]——owner 探测保留但语义为「无 CREATE ROLE 权限的保守 skip」而非绕过事实）→ 绕过环境 pytest.skip 动态跳过（合规纪律）；**dev 后升级（d6ea8892）**：superuser 环境事务内 SET ROLE 临时降权真实断言（本地/CI 默认 postgres 下零 skip——27 passed）；**残余 skip 面（R2 勘误）= 非 superuser 且（rolbypassrls 或 owner）** |
 | 3 | 构造签名扩展回归面遗漏（5-4/5-5 手动组装链漏补→存量红） | Task 3 循环 C 全仓 grep `IsolationManagementService(` 登记修补苦役先例；5-4/5-5 存量全量回归终验 |
 | 4 | PG 仓储 fallback 在测试中真写库（session_factory 注入生产 factory→集成测试污染） | 测试一律走请求 session 路径（set_session）；手动组装链注入测试 session_factory 或仅请求路径；验收 teardown rollback 复核 |
 | 5 | 并发切换日志乱序（5-4 风险 #7 延伸——日志序=事件序同竞态窗口） | MVP CLI 单发不可达；deferred-work #7 追加 5.6 注记（Task 0.8） |
@@ -766,7 +766,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - `deploy/postgresql/alembic/versions/015_isolation_switch_logs.py` — migration 015（表 + 索引五 + CheckConstraint + RLS 四策略 + FORCE + downgrade 对称）
 - `deploy/postgresql/alembic/versions/016_isolation_switch_log_domain_guard.py` — migration 016（**代码审查 R1-F4**：值域 CHECK 全枚举域 + deny 策略 RESTRICTIVE 化 DROP+CREATE 对称升降级）
 - `tests/unit/domain/entities/test_isolation_switch_log.py` — 实体单测（21 用例）
-- `tests/unit/domain/ports/test_isolation_switch_log_repository_port.py` — 端口/Query/Result 单测（16 用例）
+- `tests/unit/domain/ports/test_isolation_switch_log_repository_port.py` — 端口/Query/Result 单测（dev 期 16 用例——R1 后 22：+6 Query 守卫；R2 勘误口径）
 - `tests/unit/infrastructure/storage/postgresql/test_isolation_switch_log_repository.py` — 仓储薄单测（19 用例——双模式/包装链/条件构建/映射）
 - `tests/contracts/test_port_contract_isolation_switch_log_repository.py` — 端口契约 11 维度（12 用例）
 - `tests/integration/test_integration_isolation_switch_log.py` — 集成九场景 + 委托计时三 helper + 双 P95 常量单源
@@ -883,8 +883,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | R1-F3 | P1 | 5-4 验收「AC-6.2 CLI 全链」被 5.6 引入**未申报 PG 依赖**（audit-first 日志写 fallback commit——无 PG/015 表环境由绿变红且无 skip 通道）+ **commit 残留**（自包含纪律违规；非 superuser 环境无法清理） | ✅ .feature Given 补「PostgreSQL 服务可用且 isolation_switch_logs 表已迁移」+ py 门控 step（asyncpg+表存在动态 skip，只探测不跑 alembic）+ 切换成功后 agent_id 粒度清理（log_id 服务内自铸不可知——适配差异；superuser DELETE+COUNT 复核，非 superuser 容忍残留注记） |
 | R1-F4 | P2 | 值域 CHECK 缺失 + `_to_entity` 裸 `ValueError` 穿透异常体系——单条脏行毒化整页检索（RLS INSERT WITH CHECK(true) 放行任意字符串） | ✅ migration 016（值域 CHECK `IN ('L1','L2','L3','L4')` 全枚举域——对齐枚举非 MVP 白名单保 V2 单点开放承诺 + deny 策略 `AS RESTRICTIVE`[DROP+CREATE——ALTER POLICY 不支持改属性，评审员①实测]）+ `_to_entity` try/except→242 包装（DomainEvent.from_dict 先例）+ ORM `__table_args__` 同名镜像；015→016→downgrade→re-upgrade 全链实测 + 'L9' 拦截/合法值不误伤/no-op 仍拦行为四验 |
 | R1-F5 | P2 | Query 四维参数零类型守卫——level 裸 str 经 hash 穿透深入 PG 实现以 `AttributeError` 逃逸统一异常体系（5-4 R3-F01 教训未延伸到 Query 侧）；start>end 反转窗静默空结果 | ✅ Query `__post_init__` 补六类守卫（agent_id/level isinstance + datetime+tzinfo + start<=end）全 242；Story 数据模型节 SSOT 同步 |
-| R1-F6 | P2 | switch_timestamp 不变量缺位：naive datetime / 字符串全放行——审计时区歧义（不同部署时区解读不一致） | ✅ 实体场景⑥（isinstance+tzinfo）242；「五场景」→「六场景」11 活性位全量联动（实体/单测/验收/feature/architecture.md/Story 7 处）；历史区 L848/L910 禁改保留 |
-| R1-F7 | P2 | RLS 探测把表 owner 误归「绕过环境」——**实测定谳**（测试 PG 专用角色）：FORCE=on 时 owner UPDATE **0 行受约束**、FORCE=off 时绕过——FORCE 增量零活断言且 owner 环境误 skip | ⚠️ **被并行会话取代（d6ea8892，超集方案）**：SET ROLE 降权实证——superuser 环境事务内 CREATE ROLE+GRANT+SET ROLE 真实断言（本地 27 passed 0 skipped）；本轮方案（仅删 owner 探测）撤销不落码；Story L167/L646/风险 #2 表述已按新形态更新 |
+| R1-F6 | P2 | switch_timestamp 不变量缺位：naive datetime / 字符串全放行——审计时区歧义（不同部署时区解读不一致） | ✅ 实体场景⑥（isinstance+tzinfo）242；「五场景」→「六场景」联动（R2 勘误口径：Story 内 8 活性位为主口径，全仓字样级以 grep 逐文件复核为准；历史区两处五场景表述行不改写——行号随编辑漂移以 grep 定位为准） |
+| R1-F7 | P2 | RLS 探测把表 owner 误归「绕过环境」——**实测定谳**（测试 PG 专用角色）：FORCE=on 时 owner UPDATE **0 行受约束**、FORCE=off 时绕过——FORCE 增量零活断言且 owner 环境误 skip | ⚠️ **被并行会话取代（d6ea8892——R2 勘误：两方案互有高低非超集**：d6ea8892 覆盖 superuser[SET ROLE 降权真实断言，本地 27 passed 0 skipped] 但 owner 环境 skip；F7 原方案覆盖非 superuser owner 直连断言但 superuser 仍 skip）——本轮方案撤销不落码；真实残余 skip 集 = 非 superuser 且（rolbypassrls 或 owner）；Story L167/L173/L365/风险 #2 表述已按新形态更新（R2 勘误含 L365「superuser 恒 skip」过时句） |
 | R1-F8 | P2 | `create_all` 兜底路径建表零 RLS（alembic 失败静默降级全绿——002「migration 从未成功应用却全绿」教训结构性重演） | ⚠️ **被并行会话工作区改动取代**：ORM `after_create` 钩子（create_all 建表同步执行 RLS DDL）+ 集成测试 pg_policies 探测幂等补建；本轮 fail-loud 断言方案撤销不落码 |
 | R1-F9 | P2 | AC-2.4 audit 断言锚弱（`>=1` + 无序 `rows[-1]`，共用过滤键 action_type 潜伏 flaky）；AC-6.1 `if sixth is not None` None 分支静默通过（audit_service 从组合根消失不报警） | ✅ AC-2.4 改 correlation_id 双过滤 SQL + `len==1` + `rows[0]` 断形态（对齐集成④）；AC-6.1 直断 `sixth is not None and isinstance(...)` |
 | R1-F10 | P2 | audit 联动在唯一 MVP 运行通道（CLI set-isolation）下**结构性 100% 降级**且每次成功切换必 WARNING（audit_repo 无 fallback → CLI 无 session → AuditError → 降级）——DC-6 联动目标运行面零可达 + 告警噪声 | 📋 deferred-work R1-DF1 登记（audit_repo 补 session_factory fallback 动 1-10 交付面超本周期 Surgical 范围——承接方 7-2 REST 化/13-x 合规专项） |
@@ -894,11 +894,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 
 #### 已修复 Patch（Round 1 落码清单）
 
-- [x] F1/F5/F6/F12/F24 生产代码：`isolation_management_service.py`（签名收紧+str 拦截+reason 单源+Raises）/ `isolation_switch_log.py` 实体（from_event 非 list 拦截+场景⑥）/ `isolation_switch_log_repository.py` 端口（Query 六守卫）/ `isolation_switch_log_repository.py` 仓储（_to_entity 包装+log_id 次级键）/ `isolation_management.py` 端口（Raises）/ `session_context.py`（clear_session）/ `agent_cli.py`（Query 构造上移）/ `models/isolation_switch_log.py`（值域 CHECK 镜像+Text 对齐）
+- [x] F1/F5/F6/F12/F13/F20 生产代码：`isolation_management_service.py`（签名收紧+str 拦截+reason 单源+Raises）/ `isolation_switch_log.py` 实体（from_event 非 list 拦截+场景⑥）/ `isolation_switch_log_repository.py` 端口（Query 六守卫）/ `isolation_switch_log_repository.py` 仓储（_to_entity 包装+log_id 次级键）/ `isolation_management.py` 端口（Raises）/ `session_context.py`（clear_session）/ `agent_cli.py`（Query 构造上移）/ `models/isolation_switch_log.py`（值域 CHECK 镜像+Text 对齐）
 - [x] F4 migration 016（值域 CHECK + RESTRICTIVE DROP+CREATE 对称升降级）
 - [x] F2/F9/F16/F17/F18 测试强化：集成场景③自愈 / AC-2.4 强锚 / AC-6.1 直断 / AC-1.2 context 键断言+六类 / AC-3.2 ==2 / AC-6.3 双形态 / yaml 结构化
 - [x] F3 回归面治理：5-4 .feature Given + PG 门控 step + agent_id 粒度清理
-- [x] 新增单测 16 个（实体 4+端口 6+服务 1+仓储 2+CLI 2+验收 case 2）；文档联动：Story 五→六场景 8 活性位 / AC-4 016 注记 / 风险 #2 / OD-4 勘误 / architecture.md L1769
+- [x] 新增单测 15 个（实体 4+端口 6+服务 1+仓储 2+CLI 2——R2 勘误：原记 16 系算术笔误；另验收 cases dict 条目 8→10）；文档联动：Story 五→六场景 8 活性位 / AC-4 016 注记 / 风险 #2 / OD-4 勘误 / architecture.md L1769
 - [x] 门禁：ruff 全过 / mypy 零错误 / 相关面全绿（验收 18+18 / 集成 9 / 单测增量）+ 016 迁移四验
 
 #### 已推迟 Defer（Round 1 → deferred-work.md 登记）
@@ -914,8 +914,24 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 
 #### 并行会话协同记录（Round 1 特殊事项）
 
-- [x] d6ea8892（RLS SET ROLE 降权实证）与本轮 F7 方案重叠——**并行方案为超集**（superuser 环境也真实断言），本轮 F7 撤销；R5 终审「owner 无需处理」观察项与 dev 裁定「owner 子查询限定 public schema」两条历史结论由 d6ea8892+本轮表述更新**显式取代**（本节留痕，L848/L910 历史区不改写）
+- [x] d6ea8892（RLS SET ROLE 降权实证）与本轮 F7 方案重叠——**两方案互有高低非超集**（R2 勘误：d6ea8892 覆盖 superuser 降权断言但 owner 环境 skip；F7 覆盖非 superuser owner 直连但 superuser skip），本轮 F7 撤销；R5 终审「owner 无需处理」观察项与 dev 裁定「owner 子查询限定 public schema」两条历史结论由 d6ea8892+本轮表述更新**显式取代**（本节留痕，历史区两处五场景表述行不改写——R2 终算行号见勘误注记）
 - [x] 并行会话工作区改动（ORM after_create 钩子 + 集成/验收 pg_policies 幂等补建 + conftest 单行）= B-P2-3 修复，与本轮 F8 目标一致形态不同（幂等补建 vs fail-loud，前者更兼容 CI 冷启动）——F8 撤销认可并行形态
+
+#### Round 2 审查发现（2026-10-26——回归核查 + 传播完备性双视角）
+
+**审查模式**：R2-A 回归核查（R1 修复 × 三问：自身正确/组合正确/同族遗漏）+ R2-B 传播完备性（台账声称 vs diff 取证逐项对账）+ C3 单评审员门禁（有条件通过→5 项清单吸收）。发现 **P2×3 + P3×9**（零 P0/P1）；全量回归 13254 passed + 18 failed 甄别闭环（17 rebase 时序伪影[全量运行中 rebase 改写工作区——隔离复跑 20+1 passed 全绿实证] + OCR benchmark 预存环境项[隔离复跑仍红、改动面零交集、多周期先例]）。
+
+| # | 分级 | 发现 | 处置 |
+|---|------|------|------|
+| R2-F1 | P2 | 016 RESTRICTIVE deny 未传播至 create_all 兜底路径三个同族位点（after_create 钩子/集成 ensure/验收 ensure 均 permissive 形态）且零测试钉死 polpermissive 形态——R1 修复 × 并行修复组合破口（双 Agent 印证） | ✅ 三处 DDL 补 `AS RESTRICTIVE` + 三处注释「015 同款」→「015+016 终态同款」+ ensure 的 count>=4 早退分支扩形态核验（permissive deny 触发自愈重建）+ 集成场景⑥/验收 AC-4.1 双侧钉死 `permissive=='RESTRICTIVE'` 断言（pg_policies 列名实库定谳为 `permissive` text 非评审批注的 polpermissive） |
+| R2-F2 | P2 | AC-1.1 存量恒真式（`!= or ==` 在首行等式代入后恒真——beb1bd93 存量，D 视角漏网） | ✅ 删除恒真行，单锚 L464（固定 switch_ts vs now 双钟分离——判别力论证入 docstring） |
+| R2-F3 | P2 | Story 对 d6ea8892 新形态转述失实四处（L167「仅 bypassrls 残余」/L173 漏 owner/L365「superuser 恒 skip」过时/L647「owner 已移出探测集」）+ 超集措辞过强 + skip 消息「owner 属性绕过」失实两文件 | ✅ 四处勘误 + 「互有高低非超集」定谳 + skip 消息改「保守 skip 面」如实措辞 |
+| R2-F4 | P3 | 台账勘误五项：单测 16→15（算术笔误第 4 次复发）/ 五→六口径互斥（11/7/8）/ F 编号撞号（F19 双用+错位链+幽灵 F24）/ L848/L910 行号自引漂移 / L769 端口计数过时 | ✅ 全部勘误（F 编号 8 处代码注释按汇总表顺位修正——他 Story 同名编号禁触甄别先行；行号引用改「grep 定位为准」防自腐） |
+| R2-F5 | P3 | 仓储单测取「首个 CheckConstraint」双约束并存后判别力为零 + ORM 值域 CHECK 零钉死 | ✅ `_by_name` 按名定位双断言（not_noop != 语义 + level_domain 全枚举域） |
+| R2-F6 | P3 | clear_session 零测试覆盖（R1-F2 修「假守卫」引入「未验证守卫」——对称性讽刺） | ✅ 新建 `test_session_context.py` 3 用例（clear 复原/clear 后 RuntimeError/clear 幂等） |
+| R2-F7 | P3 | 服务尾部 INFO 日志仍用原始 trigger_reason（F12 同族第 4 投影遗留） | ✅ 改 `state.last_trigger_reason` 单源 |
+| R2-F9 | P3 | 资源管理两处（_ensure_alembic_migration 兜底引擎不 dispose + AC-6.2 seed manager 不 dispose——同文件三种纪律并存） | ✅ 各补一行 dispose（AC-2.3 维持撤项——autouse `_cleanup_bad_engine` 覆盖实证） |
+| R2-F8 | P3·登记 | 清理挂 then 步中途断言失败不执行 + 非 superuser 环境每运行净增 1 行 | 📋 deferred-work R2-DF1（清理 try/finally 化属测试基建改进；非 superuser 容忍残留已由 R1-F3 显式接受） |
 
 ---
 
@@ -941,11 +957,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 2026-10-25 | v1.2.1 | **循环文档审查 Round 4 纯验证轮**（锚点存续核验 + R3 修复传播 + 计数终验算 + 台账对照——**75 锚点 74 精确 + 1 偏移 + 0 失实，零台账错账，R2/R3 全部修复存续，全部计数验算通过**）：两项记录级留项随本轮清偿——①postgresql_adapter `from None` 行号偏移勘误（L53-59 → L60-64）；②修复表 #24 created_at 映射「三处定义」口径勘误（两处显式 + AC-4 列定义支撑）。验证声明：v1.2.0 声明存续性与精确性成立 |
 | 2026-10-25 | v1.2.2 | **循环文档审查 Round 5 独立终审收敛**（不轻信自报——五节取证：周期闭合[4 提交无游离]/关键修复双向取证[10/10 属实行号精确]/独立快扫五维全过/留项台账零未核销/收敛判据判定）：**零 P0/P1 残留**，收敛声明入 Story（见「循环审查收敛声明」节）——周期累计 P1×7 + P2×17 + P3 批量 20+ + 13 项证伪留痕；**本 Story 可进入 dev-story 实施** |
 | 2026-10-25 | v1.3.0 | **dev-story 实施完成**（Task 0-6 全勾选，Status → review）：Task 0 SDD 规范 + Gherkin 17 场景红阶段确认[17 failed/0 skipped] + deferred-work 三处登记；Task 1 实体[frozen+from_event+242 五场景，21 单测]；Task 2 端口+ORM+migration 015[RLS 四策略+FORCE 升降级对称]+仓储[双模式+SQLAlchemyError/**OSError** 包装链]+契约 11 维度+SINGLETON 注册；Task 3 五/六依赖+audit-first 插位[事件构造块上移]+AuditActionType 第 8 组+CLI isolation-logs+**14 处构造点全量同步**；Task 4 集成九场景+P95 双指标[写 ~7ms/检索 ~2ms]+成功率 20/20+RLS 非 superuser 拦截实证[UPDATE 0/DELETE 0]；Task 5 架构验证器 A/B/C；Task 6 收尾 18 场景[17 passed+1 RLS skip 属预期]。**两条 dev 阶段实施裁定**：①AC-6.2 CLI 形态经跨循环实验证伪（asyncio.run 新循环 vs ContextVar session 绑定冲突），改生产真实形态[fallback commit + superuser 清理]；②StorageError 包装链扩 OSError 面（asyncpg connect 阶段 ConnectionRefused 穿透 SQLAlchemy 包装——实测发现，故事 R3-F1 预判的 OperationalError 与实测形态不同） |
-| 2026-10-26 | v1.4.0 | **循环代码审查 Round 1**（四视角并行调研 + C3 双评审员门禁[科学性/组合交互] + 复评「优秀」——发现 P1×3 + P2×9 + P3×24，改判/证伪 6 项，见「代码审查发现」节）：**P1 修复**——①str 型 approval_chain 爆裂三层防线（服务入口+from_event 非 list+签名收紧，RLS deny UPDATE 下永久损坏防御）；②集成场景③恒真断言改 clear_session 条件自愈（session_context 新增免 Token 复位 API）；③5-4 验收 CLI 场景 PG 门控+agent_id 粒度清理（回归面治理从「构造点同步」扩展到「运行面副作用同步」）。**P2**——migration 016（值域 CHECK 全枚举域+deny RESTRICTIVE 化，stamp 015 单步验证四验）+ Query 六守卫 + 实体场景⑥（五→六 11 活性位联动）+ AC-2.4/6.1 断言锚强化 + F7/F8 被并行会话超集方案取代（d6ea8892 SET ROLE 降权实证 + after_create 钩子）。**P3×10 落码**（reason 单源/log_id 次级键/frozen 直查/context 逐键/==2/Import 双形态/yaml 结构化/Text 对齐/Query 上移+CLI 边界单测）。**deferred-work +4**（R1-DF1 audit fallback/DF2 冗余索引/DF3 RuntimeError 契约/DF4 租户谓词）+ OD-5 验收替身偏离声明 + OD-4 论证勘误。门禁：ruff 全过/mypy 零错误/验收 18+18/集成 9[0 skip]/单测 9614 |
+| 2026-10-26 | v1.4.0 | **循环代码审查 Round 1**（四视角并行调研 + C3 双评审员门禁[科学性/组合交互] + 复评「优秀」——发现 P1×3 + P2×9 + P3×24，改判/证伪 6 项，见「代码审查发现」节）：**P1 修复**——①str 型 approval_chain 爆裂三层防线（服务入口+from_event 非 list+签名收紧，RLS deny UPDATE 下永久损坏防御）；②集成场景③恒真断言改 clear_session 条件自愈（session_context 新增免 Token 复位 API）；③5-4 验收 CLI 场景 PG 门控+agent_id 粒度清理（回归面治理从「构造点同步」扩展到「运行面副作用同步」）。**P2**——migration 016（值域 CHECK 全枚举域+deny RESTRICTIVE 化，stamp 015 单步验证四验）+ Query 六守卫 + 实体场景⑥（五→六联动——Story 8 活性位主口径）+ AC-2.4/6.1 断言锚强化 + F7/F8 由并行会话方案承接（d6ea8892 SET ROLE 降权实证 + after_create 钩子——R2 勘误：互有高低非超集）。**P3×10 落码**（reason 单源/log_id 次级键/frozen 直查/context 逐键/==2/Import 双形态/yaml 结构化/Text 对齐/Query 上移+CLI 边界单测）。**deferred-work +4**（R1-DF1 audit fallback/DF2 冗余索引/DF3 RuntimeError 契约/DF4 租户谓词）+ OD-5 验收替身偏离声明 + OD-4 论证勘误。门禁：ruff 全过/mypy 零错误/验收 18+18/集成 9[0 skip]/单测 9614 |
+
+| 2026-10-26 | v1.4.1 | **循环代码审查 Round 2 回归核查轮**（R2-A 回归核查 + R2-B 传播完备性双视角 + C3 单评审门禁——P2×3 + P3×9，见「Round 2 审查发现」节）：**P2**——①RESTRICTIVE 兜底传播缺口三处同族位点（after_create/双 ensure 补 AS RESTRICTIVE + ensure 形态核验自愈 + 双侧 permissive=='RESTRICTIVE' 钉死断言——R1×并行修复组合破口）；②AC-1.1 存量恒真式删除（D 视角漏网）；③owner skip 集转述失实四处勘误 + 「互有高低非超集」定谳。**P3 落码**——单测计数 16→15 勘误（第 4 次算术笔误复发）/ F 编号 8 处按汇总表顺位修正（他 Story 同名编号禁触甄别先行）/ CheckConstraint 按名定位双断言 / clear_session 3 用例补测 / INFO 第 4 投影单源 / 两处 dispose。**全量回归甄别闭环**：13254 passed + 18 failed = 17 rebase 时序伪影（隔离复跑全绿）+ OCR 预存。**deferred +1**（R2-DF1 清理 try/finally 化） |
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.4.1
 **创建日期/Created:** 2026-10-25
 **最后更新/Last Updated:** 2026-10-26
 **更新说明/Description:**
@@ -957,3 +975,6 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - v1.2.0: 循环文档审查 Round 3（单深度推演——P1×1[StorageError 包装链断言可满足性断层]+P2×2[分页造数矛盾/reset_session 泄漏]+P3×5；18 场景三轴 17✅+AC-2.3 修复后可达；7 项证伪留痕）
 - v1.2.1: 循环文档审查 Round 4 纯验证轮（75 锚点 74 精确+1 偏移+0 失实，零台账错账，全部修复存续，计数验算通过；两项记录级留项随轮清偿）
 - v1.2.2: 循环文档审查 Round 5 独立终审收敛（五节取证全过，零 P0/P1 残留，收敛声明入 Story——可进入 dev-story）
+- v1.3.0: dev-story 实施完成（Task 0-6 全交付，Status → review——详版见变更日志表）
+- v1.4.0: 循环代码审查 Round 1（P1×3 + P2×9 + P3×24——详版见变更日志表）
+- v1.4.1: 循环代码审查 Round 2 回归核查轮（P2×3 + P3×9 + 台账勘误——详版见变更日志表）

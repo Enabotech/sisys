@@ -226,3 +226,9 @@
 - 【R1-DF2·P3】`ix_isolation_switch_logs_agent` 单列索引被组合索引 `ix_isolation_switch_logs_agent_ts` 最左前缀完全覆盖——纯冗余写税（审计表高追加量场景每行多维护一棵 B-tree）；另 previous/target 单列索引基数仅 4 值，大表上选择性差，「BitmapOr 可达」主张在大表下不必然成立（PG 优化器可能弃用）。002 audit_log 先例同款沿袭 — 核销触发：V1 表分区评估时（OD-1 承接方 13-4 立项输入）一并复查索引集；已合入 015 禁改，删索引走新迁移
 - 【R1-DF3·P3】PG 仓储无 factory 且无 ContextVar session 时 RuntimeError 裸上抛 vs 端口契约声明 `Raises: StorageError`——`test_save_without_factory_reraises_runtime_error` 单测钉死为有意设计（「配置缺失显式失败」，outbox L80 先例同款）；组合根恒注入 factory 生产近不可达；改契约（RuntimeError→StorageError 103）语义存疑（wiring error ≠ 连接故障）且需翻转既有单测。代码审查 C3 双评审员分歧，主会话裁决维持有意设计 — 核销触发：存储层异常码专项（与 5-4 R1-DF2 同锚——语义分化可观测性一并定夺）
 - 【R1-DF4·P2】isolation_switch_logs 检索面租户谓词缺失——`IsolationSwitchLogQuery` 无租户维度（全字段 None=全量分页合法）+ RLS SELECT `USING(true)` 全放行 + CLI `isolation-logs --agent-id` 可缺省：多租户部署下任意操作员可逐页拉取全部租户的切换审计（trigger_reason 自由文本）。MVP 单租户不可达；OD-4 已裁 tenant_id 列归 V1 多租户专项 — 核销触发：V1 多租户立项（tenant_id 加列 + 检索面租户谓词 + RLS SELECT 策略收窄三联动——13-x 合规管线族）；本项是 OD-4 的检索面补充登记
+
+## Deferred from: code review of 5-6-isolation-switching-log Round 2 (2026-10-26)
+
+> 审查台账见 Story 5-6「Round 2 审查发现」节（回归核查 + 传播完备性双视角——P2×3 + P3×9，落码 8 项 + 登记 1 项本段）。
+
+- 【R2-DF1·P3】验收测试场景级清理挂 then 步——中途断言失败时清理不执行 + 非 superuser 环境每运行净增 1 行 — `test_acceptance_isolation_switch_log.py` AC-6.2（造数经 fallback commit 落真行，清理挂最后 then 步——`cli_exit_code==0` 断言失败即跳过清理，无场景级 teardown 兜底）与 `test_acceptance_agent_isolation.py` AC-6.2（R1-F3 清理同款形态）两处。非 superuser 容忍残留已由 R1-F3 显式接受（追加型审计表取舍），但「断言失败跳过清理」形态可改进：清理 try/finally 化或迁移到 context fixture teardown（场景级钩子） — 核销触发：5-6 资产下次维护或测试基建 teardown 专项（与 5-2 R1-DF4 同族——bootstrap/teardown 分层评估时一并）

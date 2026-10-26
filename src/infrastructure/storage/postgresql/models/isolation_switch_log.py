@@ -128,10 +128,12 @@ _RLS_CREATE_PATH_STATEMENTS = (
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR UPDATE USING (false) WITH CHECK (false)
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR DELETE USING (false)
     """,
 )
@@ -139,7 +141,9 @@ _RLS_CREATE_PATH_STATEMENTS = (
 
 @event.listens_for(IsolationSwitchLogModel.__table__, "after_create")
 def _apply_rls_on_create_all(target: Any, connection: Any, **kwargs: Any) -> None:
-    """create_all 建表时同步应用 RLS 四策略 + FORCE（与 migration 015 同款）."""
+    """create_all 建表时同步应用 RLS 四策略 + FORCE（与 migration 015+016 终态同款——
+    deny 策略 AS RESTRICTIVE，R2-F1：permissive deny 与 016 终态漂移会使未来
+    permissive 放行策略经 OR 合并消解 deny）."""
     for statement in _RLS_CREATE_PATH_STATEMENTS:
         connection.exec_driver_sql(statement)
 

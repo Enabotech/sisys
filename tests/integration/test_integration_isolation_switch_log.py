@@ -349,9 +349,10 @@ async def sample_success_rate(redis_client: Any) -> dict[str, Any]:
     return result
 
 
-#: RLS 就位 ensure 的幂等 DDL（与 migration 015 同款四策略 + ENABLE + FORCE——
-#: DROP IF EXISTS 后 CREATE，重复执行安全；策略 DDL 事务性——随测试事务
-#: rollback 回收，不污染目标库）
+#: RLS 就位 ensure 的幂等 DDL（与 migration 015+016 终态同款四策略 + ENABLE +
+#: FORCE——deny 策略 AS RESTRICTIVE（R2-F1：permissive deny 与 016 终态漂移，
+#: 未来 permissive 放行策略经 OR 合并会消解 deny）；DROP IF EXISTS 后 CREATE，
+#: 重复执行安全；策略 DDL 事务性——随测试事务 rollback 回收，不污染目标库）
 _RLS_ENSURE_STATEMENTS = (
     "ALTER TABLE isolation_switch_logs ENABLE ROW LEVEL SECURITY",
     "ALTER TABLE isolation_switch_logs FORCE ROW LEVEL SECURITY",
@@ -369,10 +370,12 @@ _RLS_ENSURE_STATEMENTS = (
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR UPDATE USING (false) WITH CHECK (false)
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR DELETE USING (false)
     """,
 )
@@ -398,7 +401,19 @@ async def _ensure_rls_policies(session: Any) -> bool:
         )
     ).scalar_one()
     if count >= 4:
-        return False
+        # 形态核验（R2-F1）：count>=4 不等于形态正确——permissive deny（015 款漂移态）
+        # 需补建升级为 RESTRICTIVE（016 终态），ensure 自愈而非放行
+        deny_form = (
+            await session.execute(
+                text(
+                    "SELECT permissive FROM pg_policies "
+                    "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
+                    "AND policyname = 'isolation_switch_logs_deny_update'"
+                )
+            )
+        ).scalar_one_or_none()
+        if deny_form == "RESTRICTIVE":
+            return False
     for statement in _RLS_ENSURE_STATEMENTS:
         await session.execute(text(statement))
     return True
@@ -722,8 +737,9 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
         if bypass or is_owner:
             if not is_super:
                 pytest.skip(
-                    "RLS deny 断言需非绕过连接（bypassrls/owner 属性绕过 RLS 且非 "
-                    "superuser 无 CREATE ROLE 权限无法临时降权——需预置非绕过应用角色）"
+                    "RLS deny 断言需非绕过连接（当前角色 rolbypassrls 属性绕过 RLS 或"
+                    "为表 owner 的保守 skip 面——owner 在 FORCE 下实际受约束但无 "
+                    "CREATE ROLE 权限无法临时降权——需预置非绕过应用角色）"
                 )
             probe_role = f"rls_probe_{uuid.uuid4().hex[:8]}"
             await pg_session.execute(text(f"CREATE ROLE \"{probe_role}\" LOGIN PASSWORD '{uuid.uuid4().hex}'"))
@@ -753,6 +769,21 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
             )
         ).rowcount
         assert deleted == 0, "DELETE 应被 RLS deny（0 行）"
+        # RESTRICTIVE 终态钉死（R2-F1）：deny 策略被还原为 permissive 时本断言红
+        # ——permissive deny 经 OR 合并可被未来放行策略消解（016 防御的威胁模型）
+        deny_forms = (
+            await pg_session.execute(
+                text(
+                    "SELECT policyname, permissive FROM pg_policies "
+                    "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
+                    "AND policyname IN ('isolation_switch_logs_deny_update', 'isolation_switch_logs_deny_delete')"
+                )
+            )
+        ).fetchall()
+        assert {name: form for name, form in deny_forms} == {
+            "isolation_switch_logs_deny_update": "RESTRICTIVE",
+            "isolation_switch_logs_deny_delete": "RESTRICTIVE",
+        }, f"deny 策略必须为 RESTRICTIVE 终态（实际 {deny_forms}——migration 016 漂移）"
         if probe_role is not None:
             await pg_session.execute(text("RESET ROLE"))  # 会话级复位（角色随事务回收）
     finally:

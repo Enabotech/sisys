@@ -775,7 +775,7 @@ def _run_isolation_logs_cli(
     """
     # 多守卫（先于 bootstrap——输入错误无需初始化端口注册表；Query 构造（242
     # 守卫：反转时间窗/越界分页等）同属输入校验面——纯 dataclass 构造零依赖，
-    # 上移保持守卫序原则，R1-F21）
+    # 上移保持守卫序原则，R1-F20）
     try:
         agent_id = _parse_optional_agent_uuid(agent_id_raw)
         level = _parse_isolation_level(level_raw) if level_raw is not None else None

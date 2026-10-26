@@ -266,7 +266,7 @@ class IsolationManagementService(IsolationManagementServicePort):
             agent_id,
             previous_level.value,
             target_level.value,
-            trigger_reason,
+            state.last_trigger_reason,  # strip 后单源（第 4 投影与事件/日志/audit 一致——R2-F7）
         )
         return IsolationSwitchResult(switched=True, state=state, event=event)
 

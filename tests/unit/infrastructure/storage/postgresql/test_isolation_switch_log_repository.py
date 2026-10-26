@@ -108,20 +108,38 @@ class TestModelTableArgs:
 
     def test_check_constraint_noop_rejected(self) -> None:
         """CheckConstraint: previous_level != target_level（DB 层拒绝 no-op 日志——
-        实体不变量的 DB 投影，双层防线）。"""
-        from sqlalchemy import CheckConstraint as SACheckConstraint
+        实体不变量的 DB 投影，双层防线；按约束名定位——R2-F5：两约束并存后取
+        「首个 CheckConstraint」的形态判别力为零，删任一约束该断言仍绿）。"""
         from sqlalchemy import Table
 
         table = IsolationSwitchLogModel.__table__
         assert isinstance(table, Table)  # declarative __table__ 运行时窄化（FromClause → Table）
-        constraint: SACheckConstraint | None = None
-        for candidate in table.constraints:
-            if isinstance(candidate, SACheckConstraint):
-                constraint = candidate
-                break
-        assert constraint is not None
+        constraint = self._by_name(table, "ck_isolation_switch_logs_not_noop")
         assert "previous_level" in str(constraint.sqltext)
         assert "target_level" in str(constraint.sqltext)
+        assert "!=" in str(constraint.sqltext), "no-op 拒绝语义（!= 比较）"
+
+    def test_check_constraint_level_domain_mirror(self) -> None:
+        """CheckConstraint: 等级值域镜像（migration 016 同名——ORM 侧 create_all 兜底
+        路径防线，R2-F5 补位：全文件此前零钉死该约束在位）。"""
+        from sqlalchemy import Table
+
+        table = IsolationSwitchLogModel.__table__
+        assert isinstance(table, Table)
+        constraint = self._by_name(table, "ck_isolation_switch_logs_level_domain")
+        sqltext = str(constraint.sqltext)
+        for level_value in ("L1", "L2", "L3", "L4"):
+            assert level_value in sqltext, f"值域缺 {level_value}（全枚举域——V2 单点开放承诺）"
+
+    @staticmethod
+    def _by_name(table: Any, name: str) -> Any:
+        """按约束名定位 CheckConstraint（双约束并存的精确锚——R2-F5）."""
+        from sqlalchemy import CheckConstraint as SACheckConstraint
+
+        for candidate in table.constraints:
+            if isinstance(candidate, SACheckConstraint) and candidate.name == name:
+                return candidate
+        raise AssertionError(f"约束 {name} 不在 __table_args__（ORM/migration 镜像漂移）")
 
     def test_worm_ref_nullable(self) -> None:
         """worm_ref nullable（OD-1 预留）."""

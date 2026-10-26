@@ -266,6 +266,7 @@ def _ensure_alembic_migration(context: dict[str, Any]) -> None:
                 )
             )
             Base.metadata.create_all(engine.get_sync_engine())
+            engine.get_sync_engine().dispose()  # R2-F9：兜底引擎即弃（防累积压迫 max_connections）
         except Exception as e:  # 兜底失败唯一出口是 skip（门控纪律）
             pytest.skip(f"Failed to create schema: {e}")
     _migration_run = True
@@ -458,11 +459,15 @@ def then_six_fields_mapped(context: dict[str, Any]) -> None:
 
 @then("switch_timestamp 取事件 switch_timestamp（单钟纪律）")
 def then_switch_timestamp_single_clock(context: dict[str, Any]) -> None:
-    """时间戳取事件 switch_timestamp 而非 event.timestamp（事件时刻=状态变更时刻）."""
+    """时间戳取事件 switch_timestamp 而非 event.timestamp（事件时刻=状态变更时刻）.
+
+    单锚判别力论证（R2-F2）：fixture 的 switch_ts 为固定时刻而 event.timestamp
+    默认 now——两钟必然分离，实现误取 event.timestamp 时本断言必红；原第二行
+    ``!= or ==`` 在首行等式代入后恒真（beb1bd93 存量恒真式，已删）。
+    """
     log = context["log"]
     event = context["event"]
     assert log.switch_timestamp == event.switch_timestamp
-    assert log.switch_timestamp != event.timestamp or event.switch_timestamp == event.timestamp
 
 
 @then("approval_chain 为不可变 tuple 形态（list 冻结拷贝）")
@@ -517,7 +522,7 @@ def when_six_invalid_inputs(context: dict[str, Any]) -> None:
     def _make(**overrides: Any) -> Any:
         return IsolationSwitchLog(**{**valid, **overrides})
 
-    # (构造器, 期望 context 字段键)——逐字段键断言锚（R1-F16：非空即过的弱断言升级）
+    # (构造器, 期望 context 字段键)——逐字段键断言锚（R1-F15：非空即过的弱断言升级）
     cases: dict[str, tuple[Any, str]] = {
         "agent_id_non_uuid": (lambda: _make(agent_id="not-a-uuid"), "agent_id"),
         "log_id_non_uuid": (lambda: _make(log_id="not-a-uuid"), "log_id"),
@@ -537,7 +542,7 @@ def when_six_invalid_inputs(context: dict[str, Any]) -> None:
 
 @then("每类输入抛 EntityValidationError 242 且 context 携带字段名")
 def then_entity_validation_error_242(context: dict[str, Any]) -> None:
-    """242 三段式断言（isinstance → code → context 期望字段键逐一命中——R1-F16）。"""
+    """242 三段式断言（isinstance → code → context 期望字段键逐一命中——R1-F15）。"""
     from src.domain.exceptions import EntityValidationError
 
     for name, (case, expected_key) in context["invalid_cases"].items():
@@ -1046,7 +1051,7 @@ def then_level_previous_hit(context: dict[str, Any], level: str) -> None:
             )
         ),
     )
-    assert result.total == 2, "level=L4 应命中 agent0 的 L4→L3 与 L4→L2 双行（previous 臂——R1-F17 精确计数）"
+    assert result.total == 2, "level=L4 应命中 agent0 的 L4→L3 与 L4→L2 双行（previous 臂——R1-F16 精确计数）"
 
 
 @then("组合条件为 AND 语义")
@@ -1157,8 +1162,9 @@ def given_one_log_persisted(context: dict[str, Any]) -> None:
     context["log_repository"] = repo
 
 
-#: RLS 就位 ensure 的幂等 DDL（与集成侧同款——migration 015 四策略 + ENABLE +
-#: FORCE；DROP IF EXISTS 后 CREATE 重复安全；策略 DDL 事务性随测试事务回收）
+#: RLS 就位 ensure 的幂等 DDL（与集成侧同款——migration 015+016 终态四策略 +
+#: ENABLE + FORCE，deny 策略 AS RESTRICTIVE（R2-F1 与 016 终态对齐）；DROP IF
+#: EXISTS 后 CREATE 重复安全；策略 DDL 事务性随测试事务回收）
 _RLS_ENSURE_STATEMENTS = (
     "ALTER TABLE isolation_switch_logs ENABLE ROW LEVEL SECURITY",
     "ALTER TABLE isolation_switch_logs FORCE ROW LEVEL SECURITY",
@@ -1176,10 +1182,12 @@ _RLS_ENSURE_STATEMENTS = (
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR UPDATE USING (false) WITH CHECK (false)
     """,
     """
     CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    AS RESTRICTIVE
     FOR DELETE USING (false)
     """,
 )
@@ -1187,7 +1195,8 @@ _RLS_ENSURE_STATEMENTS = (
 
 def _ensure_rls_policies(context: dict[str, Any]) -> None:
     """RLS 策略就位保障（create_all 兜底建表路径不建 RLS——CI 超时兜底后
-    SET ROLE 断言失真形态；探测 pg_policies 缺失时幂等补建）."""
+    SET ROLE 断言失真形态；探测 pg_policies 缺失时幂等补建；count>=4 时
+    形态核验——permissive deny 补建升级为 RESTRICTIVE，R2-F1）."""
     from sqlalchemy import text
 
     pg = _ensure_pg_session(context)
@@ -1198,7 +1207,19 @@ def _ensure_rls_policies(context: dict[str, Any]) -> None:
         ),
     ).scalar_one()
     if count >= 4:
-        return
+        # 形态核验（R2-F1）：permissive deny（015 款漂移态）需补建升级 016 终态
+        deny_form = _run_async(
+            context["_loop"],
+            pg["session"].execute(
+                text(
+                    "SELECT permissive FROM pg_policies "
+                    "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
+                    "AND policyname = 'isolation_switch_logs_deny_update'"
+                )
+            ),
+        ).scalar_one_or_none()
+        if deny_form == "RESTRICTIVE":
+            return
     for statement in _RLS_ENSURE_STATEMENTS:
         _run_async(context["_loop"], pg["session"].execute(text(statement)))
 
@@ -1243,9 +1264,10 @@ def given_non_bypass_role(context: dict[str, Any]) -> None:
     if not (bypass or is_owner):
         return  # 分支①: 非绕过直连——直接走断言
     if not is_super:
-        pytest.skip(  # 分支③: 非 superuser 的 bypassrls/owner 绕过（无 CREATE ROLE 权限）
-            "RLS deny 断言需非绕过连接（当前角色 bypassrls/owner 属性绕过 RLS 且非 "
-            "superuser 无 CREATE ROLE 权限无法临时降权——需预置非绕过应用角色）"
+        pytest.skip(  # 分支③: 非 superuser 的 bypassrls/owner 保守 skip（无 CREATE ROLE 权限）
+            "RLS deny 断言需非绕过连接（当前角色 rolbypassrls 属性绕过 RLS 或为表 "
+            "owner 的保守 skip 面——owner 在 FORCE 下实际受约束但无 CREATE ROLE "
+            "权限无法临时降权——需预置非绕过应用角色）"
         )
     # 分支②: superuser 临时降权（SET ROLE 后同 session 连接的 UPDATE/DELETE 受
     # FORCE RLS 约束——真实断言；角色经测试事务 rollback 自动回收）
@@ -1304,8 +1326,26 @@ def when_try_delete_log(context: dict[str, Any]) -> None:
 
 @then("影响 0 行（deny DELETE）")
 def then_delete_zero_rows(context: dict[str, Any]) -> None:
-    """deny DELETE 断言."""
+    """deny DELETE 断言 + RESTRICTIVE 终态钉死（R2-F1——对称集成侧：deny 被
+    还原为 permissive 时红，permissive deny 可被未来放行策略 OR 合并消解）。"""
+    from sqlalchemy import text
+
     assert context["delete_rowcount"] == 0, "DELETE 应被 RLS deny（0 行受影响）"
+    pg = _ensure_pg_session(context)
+    deny_forms = _run_async(
+        context["_loop"],
+        pg["session"].execute(
+            text(
+                "SELECT policyname, permissive FROM pg_policies "
+                "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
+                "AND policyname IN ('isolation_switch_logs_deny_update', 'isolation_switch_logs_deny_delete')"
+            )
+        ),
+    ).fetchall()
+    assert {name: form for name, form in deny_forms} == {
+        "isolation_switch_logs_deny_update": "RESTRICTIVE",
+        "isolation_switch_logs_deny_delete": "RESTRICTIVE",
+    }, f"deny 策略必须为 RESTRICTIVE 终态（实际 {deny_forms}——migration 016 漂移）"
 
 
 @when("直插 previous_level 等于 target_level 行")
@@ -1612,6 +1652,8 @@ def given_cli_seed_log(context: dict[str, Any]) -> None:
     ).fetchone()
     _run_async(context["_loop"], probe_session.close())
     context["cli_superuser"] = bool(row[0]) if row else False
+    # R2-F9：seed manager 引擎即弃（后续清理步骤自建 manager——对照同款 dispose 惯例）
+    _run_async(context["_loop"], manager.get_async_engine().dispose())
 
 
 @when("进程内执行 isolation-logs 命令（CLI fallback 全链）")
@@ -1746,7 +1788,7 @@ def then_only_composition_root(context: dict[str, Any]) -> None:
 def then_cli_import_whitelist(context: dict[str, Any]) -> None:
     """端口方向断言（agent_cli 的 isolation-logs 面直消费仓储端口；ImportFrom
     与 Import 双形态扫描——``import src.infrastructure...`` 直写形态对齐架构
-    验证器 C，R1-F18）."""
+    验证器 C，R1-F17）."""
     import ast
 
     cli_path = SRC_DIR / "entrypoints" / "agent_cli.py"
@@ -1796,7 +1838,7 @@ def then_event_dual_registration(context: dict[str, Any]) -> None:
 
     channels_path = REPO_ROOT / "configs" / "event_channels.yaml"
     data = yaml.safe_load(channels_path.read_text(encoding="utf-8"))
-    # 结构化导航断言（R1-F19：str(data) 子串匹配 + OR 双键是弱锚——任意残留
+    # 结构化导航断言（R1-F18：str(data) 子串匹配 + OR 双键是弱锚——任意残留
     # 文本可过；navigate event_channels 映射键集合做键级精确命中）
     events_section = data.get("event_channels", {})
     registered_event_types = {str(key) for key in events_section}

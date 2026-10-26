@@ -1110,7 +1110,7 @@ class TestIsolationLogsCommand:
     def test_inverted_time_window_exits_nonzero(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """反转时间窗（start > end）→ Query 242 拒绝（R1-F21 传导链——
+        """反转时间窗（start > end）→ Query 242 拒绝（R1-F20 传导链——
         Query 构造已上移 bootstrap 前，输入错误不触发端口注册表初始化）。"""
         repo = _StubIsolationSwitchLogRepository()
         _patch_isolation_logs_entry(monkeypatch, repo)

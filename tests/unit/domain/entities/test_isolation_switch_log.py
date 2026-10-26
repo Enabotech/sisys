@@ -302,7 +302,7 @@ class TestFrozenImmutability:
 
     def test_is_frozen_dataclass(self) -> None:
         """frozen 形态断言（``__dataclass_params__.frozen`` 直查——is_dataclass
-        对非 frozen dataclass 同真，原弱断言恒真，R1-F15；getattr 动态访问——
+        对非 frozen dataclass 同真，原弱断言恒真，R1-F14；getattr 动态访问——
         dataclass 内部属性不在类型存根，静态直查会炸 attr-defined）。"""
         assert dataclasses.is_dataclass(IsolationSwitchLog)
         params = getattr(IsolationSwitchLog, "__dataclass_params__", None)
