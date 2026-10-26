@@ -1,6 +1,6 @@
 # Story 5.6: 隔离切换日志记录
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -712,7 +712,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - **手动组装纪律**——resolve SCOPED/SINGLETON 钉住全局 Resolver 跨循环死连接；验收/集成一律场景级客户端手动组装；resolve 仅接线断言
 - **委托计时模式**——模块级单槽缓存 helper + 同名 xdist_group 同 worker 缓存命中；验收/集成共享采样禁双跑
 - **必填 vs 可选依赖的语义分界**——守卫可被绕过是安全缺口→必填（5-5）；降级不破坏主链→可选+容错（PersistentNoteTaker 先例）——本 Story 第五必填/第六可选（DC-6）
-- **专项裁撤裁定**（v2.1.0 用户裁定）——「总是搞专项很不合适，应该放到集成测试或验收测试范畴。marker 非必要也不要新增」——本 Story 零新 marker、零新目录、零 CI 专项（pyproject/Makefile/ci.yaml 对本 Story 改动归零）
+- **专项裁撤裁定**（v2.1.0 用户裁定）——「总是搞专项很不合适，应该放到集成测试或验收测试范畴。marker 非必要也不要新增」——本 Story 零新 marker、零新目录、零 CI 专项（pyproject/Makefile 对本 Story 改动归零；ci.yaml 唯一关联改动 = d6ea8892 三条 pytest 命令追加 -rs 的 skip 可见化——非专项属测试可观测性配套，R5 终审补记）
 - **审计断言三段式**（isinstance→code→context）与计数断言（恰一次/零次）是变异可红的前提
 
 **应用到本故事/Applied to This Story:**
@@ -773,6 +773,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - `tests/unit/architecture/test_arch_isolation_switch_log.py` — 架构验证器 A/B/C（7 用例）
 - `tests/acceptance/test_acceptance_isolation_switch_log.feature` — Gherkin 18 场景（17 + 收尾）
 - `tests/acceptance/test_acceptance_isolation_switch_log.py` — BDD 步骤实现（@scenario 全显式绑定 + 双面清理 + 委托计时）
+- `tests/unit/infrastructure/storage/postgresql/test_session_context.py` — session_context 单测（clear_session 3 用例——R2-F6 补测，R5 终审补入 File List）
 
 > 注：测试文件命名遵循仓内既有惯例（`test_arch_*` / `test_integration_*` 前缀形态），与 epics L1709-1710 的占位名（`test_isolation_switch_log.py` / `test_isolation_switch_log_integration.py`）不同——属规划占位名与仓内惯例的正常偏差，随 OD-4 一并知悉。
 
@@ -872,7 +873,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 **审查日期:** 2026-10-26（Round 1）
-**审查模式:** 四视角并行调研（A 领域正确性 / B 基础设施与数据安全 / C 应用编排与接线 / D 测试判别力与运行面）+ C3 双评审员（科学性与业界对标 + 组合交互与传播完备性）+ 复评门禁——发现 **P1×3 + P2×9 + P3×24**（去重裁决后），改判/证伪 5 项；零 P0
+**审查模式:** 四视角并行调研（A 领域正确性 / B 基础设施与数据安全 / C 应用编排与接线 / D 测试判别力与运行面）+ C3 双评审员（科学性与业界对标 + 组合交互与传播完备性）+ 复评门禁——发现 **P1×3 + P2×9 + P3×24**（去重裁决后），改判/证伪 6 项（R5 勘误——原记 5 系计数微差）；零 P0
 
 #### 审查发现汇总（Round 1）
 
@@ -947,6 +948,18 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 
 **五轴定谳摘要**：三路径 RLS 终态矩阵对齐闭合（alembic 015+016 / after_create / ensure 全收敛 INSERT/SELECT permissive + deny RESTRICTIVE）；审计链时间线七节点 + 故障注入双分支全部良定义（残留旧态→重切重记录与「宁可多记」一致；键缺失→447 恢复通道良定义）；分页数学正确（total 独立计数同构条件、空页边界、log_id 次级全序）；六异常声明全可达 + 脏行检索 fail-loud（[242] exit 1 零部分数据）。
 
+### 🏁 代码审查周期收敛声明（Round 5 独立终审——2026-10-27）
+
+Story 5.6 代码审查周期自 dev-story 基线 beb1bd93（v1.3.0）起，经 R1 四视角调研+双评审（914bc011 + 632f7bc5 并行协同，v1.4.0）、R2 回归核查+传播完备（526eba9c，v1.4.1）、R3 单深度推演（e9a843bd，v1.4.2）、R4 纯验证（零改动）收敛于 v1.4.2。周期 8 提交中 3 笔为 CI bot build 豁免（af858d46/854029ea/8924a72c），其余 5 笔（含 d6ea8892/632f7bc5 两笔并行协同——前者 RLS SET ROLE 降权实证、后者 R1 生产代码修复+ORM after_create 钩子+migration 016+conftest timeout 单行）全部内容级归属本 Story 台账，工作区干净，无游离代码变更。
+
+周期累计发现并修复 **P1×3**（str 爆裂三层防线 / 集成恒真断言 / 5-4 回归面 PG 门控与清理）、**P2×13**（R1×9 + R2×3 + R3×1）、**P3×37** 批量落码，改判/证伪 6 项留痕；登记 deferred 5 项（R1-DF1~DF4 + R2-DF1）与偏离声明 OD-5，全部具备明确核销触发器与承接方（13-4 / 9-3 / 9-4·9-5 / 多租户专项 / 7-2·13-x / 存储层异常码专项 / 5-6 资产维护），无僵尸项。
+
+R5 终审（不轻信自报）六节取证：8 项关键修复「台账声称 vs 代码现实」双向取证 **8/8 属实且行号精确**；门禁独立复跑全绿——ruff 全过、mypy 697 文件零错误、单测 **9625 passed**、本故事面（验收×2 + 集成 + 契约×2 + 架构）**76 passed 0 skipped**（真实 Redis 6380 + PG 5433，RLS SET ROLE 降权真实断言）；红线三条 Story 变更面零命中。**零 P0/P1 残留。**
+
+R4 移交三项记录级留项随本声明清偿：①**红线预存债口径定谳**——全仓 18 处 noqa/type:ignore 均为预存（conftest 3 处 2026-04 blame 实证），本 Story 变更面零新增，预存债全局清偿不属本周期 Surgical 面；②**改判计数勘误**——R1 节首以 6 项为准（原记 5 系计数微差，改判行/变更日志/deferred-work 三处一致）；③**计数粒度注记**——测试计数以门禁终态实跑为准（单测 9625 / 本故事面 76）。终审另披露 5 项 P3 记录级观察（端口 Raises docstring 未随 R3 白名单同步[已随收敛提交清偿]、ci.yaml -rs 改动未入台账[已补记 L715]、L715「ci.yaml 归零」表述过时[已修正]、632f7bc5 SHA 零引用[本声明补位]、test_session_context.py 未入 File List[已补入]），均不阻断收敛。
+
+五层验收全绿 + 审查周期收敛 + DoD 完成，**Status: review → done**。
+
 ---
 
 ### 下一步 Next Steps
@@ -975,10 +988,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 
 | 2026-10-26 | v1.4.1 | **循环代码审查 Round 2 回归核查轮**（R2-A 回归核查 + R2-B 传播完备性双视角 + C3 单评审门禁——P2×3 + P3×9，见「Round 2 审查发现」节）：**P2**——①RESTRICTIVE 兜底传播缺口三处同族位点（after_create/双 ensure 补 AS RESTRICTIVE + ensure 形态核验自愈 + 双侧 permissive=='RESTRICTIVE' 钉死断言——R1×并行修复组合破口）；②AC-1.1 存量恒真式删除（D 视角漏网）；③owner skip 集转述失实四处勘误 + 「互有高低非超集」定谳。**P3 落码**——单测计数 16→15 勘误（第 4 次算术笔误复发）/ F 编号 8 处按汇总表顺位修正（他 Story 同名编号禁触甄别先行）/ CheckConstraint 按名定位双断言 / clear_session 3 用例补测 / INFO 第 4 投影单源 / 两处 dispose。**全量回归甄别闭环**：13254 passed + 18 failed = 17 rebase 时序伪影（隔离复跑全绿）+ OCR 预存。**deferred +1**（R2-DF1 清理 try/finally 化） |
 | 2026-10-27 | v1.4.2 | **循环代码审查 Round 3 单深度推演轮**（五轴推演 + 经验定谳——P2×1 + P3×4 + 证伪留痕 6，见「Round 3 审查发现」节）：①P2 approval_chain 入口守卫收紧 tuple/list 白名单（None 裸 TypeError/dict 静默取键丢值/bytes 爆裂/int 四形态全封——R1-F1 漏网面）；②Query 分页字段补 isinstance(int) 守卫（bool 显式拒——R1-F5 哲学贯彻）；③双侧 ensure 扩双 deny 列核验（自愈承诺 100% 兑现）；④ORM 值域断言改 IsolationLevel 同源派生（枚举扩展防漂移锚）。五轴定谳：RESTRICTIVE 三路径矩阵闭合/审计时间线七节点+故障双分支良定义/分页数学正确/六异常全可达/脏行 fail-loud |
+| 2026-10-27 | v1.4.3 | **循环代码审查 Round 4 纯验证 + Round 5 独立终审收敛**（R4 零改动三总判定全过[存续 20+ 锚点/门禁 9625 全绿/台账一致]，3 记录级留项移交；R5 六节取证[周期闭合/8 项双向取证 8 属实/门禁独立复跑全绿含本故事面 76 passed 0 skipped/留项无僵尸/文档-仓库一致/**零 P0/P1 残留**]——收敛声明入 Story，见「代码审查周期收敛声明」节）。收敛清偿 8 项 P3 记录级：端口 Raises docstring 随 R3 白名单同步 / 改判计数 5→6 勘误 / ci.yaml -rs 补记 + L715 表述修正 / 632f7bc5 SHA 补位 / test_session_context.py 入 File List / R4 三项口径定谳（红线预存债/计数粒度注记）。**Status: review → done** |
 
 ---
 
-**故事版本/Story Version:** v1.4.2
+**故事版本/Story Version:** v1.4.3
 **创建日期/Created:** 2026-10-25
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
@@ -994,3 +1008,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - v1.4.0: 循环代码审查 Round 1（P1×3 + P2×9 + P3×24——详版见变更日志表）
 - v1.4.1: 循环代码审查 Round 2 回归核查轮（P2×3 + P3×9 + 台账勘误——详版见变更日志表）
 - v1.4.2: 循环代码审查 Round 3 单深度推演轮（P2×1 + P3×4 + 证伪留痕 6——详版见变更日志表）
+- v1.4.3: 循环代码审查 Round 4 纯验证 + Round 5 独立终审收敛（零 P0/P1 残留，收敛声明入 Story，Status → done——详版见变更日志表）

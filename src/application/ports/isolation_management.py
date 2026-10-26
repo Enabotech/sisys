@@ -123,10 +123,10 @@ class IsolationManagementServicePort(Protocol):
             AgentNotFoundError: Agent 不存在（EXCEPTION_443）
             IsolationStateNotInitializedError: 隔离状态缺失（EXCEPTION_447）
             IsolationLevelNotSupportedError: 等级非法（EXCEPTION_446——实体 switch_to）
-            EntityValidationError: trigger_reason 空/空白 或 approval_chain 为 str
-                形态（EXCEPTION_242——实体不变量透传 + 入口形态守卫：str 是
-                ``Sequence[str]`` 合法子类型但语义为单审批人字符串，经 ``list()``
-                会爆裂成单字符序列造成审计数据永久损坏，R1-F1）
+            EntityValidationError: trigger_reason 空/空白 或 approval_chain 非
+                tuple/list 形态（EXCEPTION_242——白名单守卫：str 经 ``list()``
+                爆裂成单字符序列、dict 静默取键丢值、None/非可迭代抛裸
+                TypeError——R1-F1 + R3-F1 审计数据损坏防线）
             AgentConfigError: 配置加载失败/TTL 越界（EXCEPTION_440）
             StorageError: 存储故障（EXCEPTION_103）
         """
