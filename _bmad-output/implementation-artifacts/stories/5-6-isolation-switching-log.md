@@ -933,6 +933,20 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | R2-F9 | P3 | 资源管理两处（_ensure_alembic_migration 兜底引擎不 dispose + AC-6.2 seed manager 不 dispose——同文件三种纪律并存） | ✅ 各补一行 dispose（AC-2.3 维持撤项——autouse `_cleanup_bad_engine` 覆盖实证） |
 | R2-F8 | P3·登记 | 清理挂 then 步中途断言失败不执行 + 非 superuser 环境每运行净增 1 行 | 📋 deferred-work R2-DF1（清理 try/finally 化属测试基建改进；非 superuser 容忍残留已由 R1-F3 显式接受） |
 
+#### Round 3 审查发现（2026-10-27——单深度推演轮）
+
+**审查模式**：五轴推演（RESTRICTIVE 传播链闭合性 / F1 拦截链全输入域枚举 / 审计链全生命周期时间线 / Query 守卫数学核验 / 异常契约全路径可达性）+ 经验定谳。发现 **P2×1 + P3×4**（零 P0/P1）+ **证伪不成立留痕 6 项**（440-TTL 构造期校验前置成立/ensure DDL 同事务可见/SET ROLE 下 pg_policies 可见/bytes 闭环/风险 #1 下一跳良定义双分支/六守卫无跨字耦合）。
+
+| # | 分级 | 发现 | 处置 |
+|---|------|------|------|
+| R3-F1 | P2 | `approval_chain=None`/非可迭代 → `list(None)` **裸 TypeError 逃逸异常体系**——R1-F1 漏网面（str/bytes/int 元素均被拦，非可迭代无一层拦；CLI 不可达，程序化面可达且出口无 [code]） | ✅ 入口守卫收紧为 **tuple/list 白名单**（白名单外全部 242：str 爆裂/None TypeError/dict 静默取键丢值/bytes 逐字节/int——R3-F1+F2 一并封堵）+ docstring 契约更新 + 4 形态参数化单测 |
+| R3-F2 | P3 | dict 输入静默通过全链落库（审批人被替换为键、值丢弃——审计语义损坏无报错） | ✅ 随 R3-F1 白名单封堵（参数化用例含 dict 形态） |
+| R3-F3 | P3 | Query offset/limit 非 int → 比较运算裸 TypeError（同 `__post_init__` 内 agent_id/level/datetime 有 isinstance 守卫而分页双字段独缺——R1-F5 哲学未贯彻到位） | ✅ 分页字段补 isinstance(int)（bool 显式拒）+ 3 单测 |
+| R3-F4 | P3 | `_ensure_rls_policies` 形态核验只查 deny_update 一列——deny_delete 单独漂移时 early-return 不自愈，钉死断言以「migration 016 漂移」假红呈现（自愈承诺只兑现 50%） | ✅ 双侧 ensure 扩双列核验（双 deny 策略 RESTRICTIVE 才早退） |
+| R3-F5 | P3 | 枚举成员扩展向防漂移锚缺位——ORM 测试硬编码 ('L1'..'L4') 不从 IsolationLevel 派生，扩展成员无测试红、写路径首红是误导性 StorageError 103（V2 开放 L1 的既定承诺本身成立） | ✅ 期望集改为从 IsolationLevel 枚举派生（同源派生锚——扩展即红，红因明确） |
+
+**五轴定谳摘要**：三路径 RLS 终态矩阵对齐闭合（alembic 015+016 / after_create / ensure 全收敛 INSERT/SELECT permissive + deny RESTRICTIVE）；审计链时间线七节点 + 故障注入双分支全部良定义（残留旧态→重切重记录与「宁可多记」一致；键缺失→447 恢复通道良定义）；分页数学正确（total 独立计数同构条件、空页边界、log_id 次级全序）；六异常声明全可达 + 脏行检索 fail-loud（[242] exit 1 零部分数据）。
+
 ---
 
 ### 下一步 Next Steps
@@ -960,12 +974,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 | 2026-10-26 | v1.4.0 | **循环代码审查 Round 1**（四视角并行调研 + C3 双评审员门禁[科学性/组合交互] + 复评「优秀」——发现 P1×3 + P2×9 + P3×24，改判/证伪 6 项，见「代码审查发现」节）：**P1 修复**——①str 型 approval_chain 爆裂三层防线（服务入口+from_event 非 list+签名收紧，RLS deny UPDATE 下永久损坏防御）；②集成场景③恒真断言改 clear_session 条件自愈（session_context 新增免 Token 复位 API）；③5-4 验收 CLI 场景 PG 门控+agent_id 粒度清理（回归面治理从「构造点同步」扩展到「运行面副作用同步」）。**P2**——migration 016（值域 CHECK 全枚举域+deny RESTRICTIVE 化，stamp 015 单步验证四验）+ Query 六守卫 + 实体场景⑥（五→六联动——Story 8 活性位主口径）+ AC-2.4/6.1 断言锚强化 + F7/F8 由并行会话方案承接（d6ea8892 SET ROLE 降权实证 + after_create 钩子——R2 勘误：互有高低非超集）。**P3×10 落码**（reason 单源/log_id 次级键/frozen 直查/context 逐键/==2/Import 双形态/yaml 结构化/Text 对齐/Query 上移+CLI 边界单测）。**deferred-work +4**（R1-DF1 audit fallback/DF2 冗余索引/DF3 RuntimeError 契约/DF4 租户谓词）+ OD-5 验收替身偏离声明 + OD-4 论证勘误。门禁：ruff 全过/mypy 零错误/验收 18+18/集成 9[0 skip]/单测 9614 |
 
 | 2026-10-26 | v1.4.1 | **循环代码审查 Round 2 回归核查轮**（R2-A 回归核查 + R2-B 传播完备性双视角 + C3 单评审门禁——P2×3 + P3×9，见「Round 2 审查发现」节）：**P2**——①RESTRICTIVE 兜底传播缺口三处同族位点（after_create/双 ensure 补 AS RESTRICTIVE + ensure 形态核验自愈 + 双侧 permissive=='RESTRICTIVE' 钉死断言——R1×并行修复组合破口）；②AC-1.1 存量恒真式删除（D 视角漏网）；③owner skip 集转述失实四处勘误 + 「互有高低非超集」定谳。**P3 落码**——单测计数 16→15 勘误（第 4 次算术笔误复发）/ F 编号 8 处按汇总表顺位修正（他 Story 同名编号禁触甄别先行）/ CheckConstraint 按名定位双断言 / clear_session 3 用例补测 / INFO 第 4 投影单源 / 两处 dispose。**全量回归甄别闭环**：13254 passed + 18 failed = 17 rebase 时序伪影（隔离复跑全绿）+ OCR 预存。**deferred +1**（R2-DF1 清理 try/finally 化） |
+| 2026-10-27 | v1.4.2 | **循环代码审查 Round 3 单深度推演轮**（五轴推演 + 经验定谳——P2×1 + P3×4 + 证伪留痕 6，见「Round 3 审查发现」节）：①P2 approval_chain 入口守卫收紧 tuple/list 白名单（None 裸 TypeError/dict 静默取键丢值/bytes 爆裂/int 四形态全封——R1-F1 漏网面）；②Query 分页字段补 isinstance(int) 守卫（bool 显式拒——R1-F5 哲学贯彻）；③双侧 ensure 扩双 deny 列核验（自愈承诺 100% 兑现）；④ORM 值域断言改 IsolationLevel 同源派生（枚举扩展防漂移锚）。五轴定谳：RESTRICTIVE 三路径矩阵闭合/审计时间线七节点+故障双分支良定义/分页数学正确/六异常全可达/脏行 fail-loud |
 
 ---
 
-**故事版本/Story Version:** v1.4.1
+**故事版本/Story Version:** v1.4.2
 **创建日期/Created:** 2026-10-25
-**最后更新/Last Updated:** 2026-10-26
+**最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.0.1: 偏离声明同步动作对标审查修复（OD 登记/承接方链接/编号 OD-n 重命名）
@@ -978,3 +993,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-6 状态�
 - v1.3.0: dev-story 实施完成（Task 0-6 全交付，Status → review——详版见变更日志表）
 - v1.4.0: 循环代码审查 Round 1（P1×3 + P2×9 + P3×24——详版见变更日志表）
 - v1.4.1: 循环代码审查 Round 2 回归核查轮（P2×3 + P3×9 + 台账勘误——详版见变更日志表）
+- v1.4.2: 循环代码审查 Round 3 单深度推演轮（P2×1 + P3×4 + 证伪留痕 6——详版见变更日志表）

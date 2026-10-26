@@ -97,6 +97,32 @@ class TestIsolationSwitchLogQueryGuards:
             IsolationSwitchLogQuery(offset=-1)
         assert exc_info.value.code == "EXCEPTION_242"
 
+    def test_non_int_offset_rejected(self) -> None:
+        """offset 非 int（str）→ 242（R3-F3：比较运算对非 int 抛裸 TypeError——
+        与同 __post_init__ 的 isinstance 先行哲学对齐）。"""
+        bad: dict[str, Any] = {"offset": "5"}
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLogQuery(**bad)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "offset" in exc_info.value.context
+
+    def test_none_limit_rejected(self) -> None:
+        """limit=None → 242（非 int 形态——同 R3-F3）。"""
+        bad: dict[str, Any] = {"limit": None}
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLogQuery(**bad)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "limit" in exc_info.value.context
+
+    def test_bool_offset_rejected(self) -> None:
+        """offset=True（bool 是 int 子类）→ 242（显式拒——bool 传分页位是
+        调用 bug 形态，合法 UUID 字符串同拒的严格类型面哲学）。"""
+        bad: dict[str, Any] = {"offset": True}
+        with pytest.raises(EntityValidationError) as exc_info:
+            IsolationSwitchLogQuery(**bad)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "offset" in exc_info.value.context
+
     def test_zero_limit_rejected(self) -> None:
         """limit<=0 → 242（limit=0 形态）。"""
         with pytest.raises(EntityValidationError) as exc_info:

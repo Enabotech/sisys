@@ -316,6 +316,31 @@ class TestSwitchIsolationLevel:
         mocks["log_repo"].save.assert_not_awaited()
         mocks["publisher"].publish.assert_not_awaited()
 
+    @pytest.mark.parametrize(
+        ("bad_chain", "label"),
+        [
+            (None, "None 非可迭代——list() 裸 TypeError 逃逸面"),
+            ({"alice": 1, "bob": 2}, "dict 静默取键丢值——审计语义损坏面"),
+            (b"abc", "bytes 逐字节爆裂面"),
+            (5, "int 非可迭代面"),
+        ],
+    )
+    async def test_non_sequence_approval_chain_rejected_242(self, bad_chain: Any, label: str) -> None:
+        """tuple/list 白名单外形态 → 242（R3-F1：str 守卫收紧为白名单——None
+        裸 TypeError / dict 静默 keys / bytes 爆裂 / int TypeError 四类输入域
+        枚举逐项锚定，全链拦截零裸异常）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        state = _make_state(IsolationLevel.L4_HARD)
+        service, mocks = _make_service(agent=_make_agent(), state=state)
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "原因", bad_chain)
+        assert exc_info.value.code == "EXCEPTION_242", label
+        assert "approval_chain" in exc_info.value.context
+        mocks["isolation_repo"].save.assert_not_awaited()
+        mocks["log_repo"].save.assert_not_awaited()
+        mocks["publisher"].publish.assert_not_awaited()
+
     async def test_noop_zero_side_effects(self) -> None:
         """同等级 no-op: switched=False + event=None + save/publish/config 零调用。"""
         state = _make_state(IsolationLevel.L4_HARD)

@@ -65,6 +65,15 @@ class IsolationSwitchLogQuery:
 
     def __post_init__(self) -> None:
         """查询参数守卫（242——分页边界 + 类型/时区/区间拒绝）。"""
+        # 分页字段类型守卫（R3-F3：比较运算对非 int 抛裸 TypeError——同 __post_init__
+        # 内 agent_id/level/datetime 的 isinstance 先行哲学对齐）
+        for field_name in ("offset", "limit"):
+            value = getattr(self, field_name)
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise EntityValidationError(
+                    message=f"{field_name} 必须为 int（实际类型 {type(value).__name__}——bool 亦拒）",
+                    context={field_name: str(value)},
+                )
         if self.offset < 0:
             raise EntityValidationError(
                 message="offset 不能为负",

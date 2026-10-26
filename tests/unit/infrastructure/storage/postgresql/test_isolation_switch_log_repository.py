@@ -121,15 +121,23 @@ class TestModelTableArgs:
 
     def test_check_constraint_level_domain_mirror(self) -> None:
         """CheckConstraint: 等级值域镜像（migration 016 同名——ORM 侧 create_all 兜底
-        路径防线，R2-F5 补位：全文件此前零钉死该约束在位）。"""
+        路径防线，R2-F5 补位：全文件此前零钉死该约束在位；R3-F5 期望集从
+        ``IsolationLevel`` 枚举派生——枚举成员扩展时本断言先红，防漂移锚从
+        硬编码清单升级为同源派生，写路径首红不再是误导性 StorageError 103）。"""
         from sqlalchemy import Table
+
+        from src.domain.events.enums import IsolationLevel
 
         table = IsolationSwitchLogModel.__table__
         assert isinstance(table, Table)
         constraint = self._by_name(table, "ck_isolation_switch_logs_level_domain")
         sqltext = str(constraint.sqltext)
-        for level_value in ("L1", "L2", "L3", "L4"):
-            assert level_value in sqltext, f"值域缺 {level_value}（全枚举域——V2 单点开放承诺）"
+        enum_values = {member.value for member in IsolationLevel}
+        for level_value in enum_values:
+            assert level_value in sqltext, (
+                f"值域缺 {level_value}（IsolationLevel 全枚举域 {sorted(enum_values)}——"
+                "枚举扩展后须同步 migration CHECK 与 ORM 镜像）"
+            )
 
     @staticmethod
     def _by_name(table: Any, name: str) -> Any:

@@ -401,18 +401,21 @@ async def _ensure_rls_policies(session: Any) -> bool:
         )
     ).scalar_one()
     if count >= 4:
-        # 形态核验（R2-F1）：count>=4 不等于形态正确——permissive deny（015 款漂移态）
-        # 需补建升级为 RESTRICTIVE（016 终态），ensure 自愈而非放行
-        deny_form = (
+        # 形态核验（R2-F1 + R3-F4：双 deny 策略都查——只查一列时 deny_delete 单独
+        # 漂移会 early-return 不自愈，钉死断言以假红呈现违背「自愈而非放行」承诺）
+        deny_forms = (
             await session.execute(
                 text(
-                    "SELECT permissive FROM pg_policies "
+                    "SELECT policyname, permissive FROM pg_policies "
                     "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
-                    "AND policyname = 'isolation_switch_logs_deny_update'"
+                    "AND policyname IN ('isolation_switch_logs_deny_update', 'isolation_switch_logs_deny_delete')"
                 )
             )
-        ).scalar_one_or_none()
-        if deny_form == "RESTRICTIVE":
+        ).fetchall()
+        if {name: form for name, form in deny_forms} == {
+            "isolation_switch_logs_deny_update": "RESTRICTIVE",
+            "isolation_switch_logs_deny_delete": "RESTRICTIVE",
+        }:
             return False
     for statement in _RLS_ENSURE_STATEMENTS:
         await session.execute(text(statement))

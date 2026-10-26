@@ -1207,18 +1207,22 @@ def _ensure_rls_policies(context: dict[str, Any]) -> None:
         ),
     ).scalar_one()
     if count >= 4:
-        # 形态核验（R2-F1）：permissive deny（015 款漂移态）需补建升级 016 终态
-        deny_form = _run_async(
+        # 形态核验（R2-F1 + R3-F4：双 deny 策略都查——单列核验时 deny_delete 漂移
+        # 不自愈，钉死断言假红呈现）
+        deny_forms = _run_async(
             context["_loop"],
             pg["session"].execute(
                 text(
-                    "SELECT permissive FROM pg_policies "
+                    "SELECT policyname, permissive FROM pg_policies "
                     "WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs' "
-                    "AND policyname = 'isolation_switch_logs_deny_update'"
+                    "AND policyname IN ('isolation_switch_logs_deny_update', 'isolation_switch_logs_deny_delete')"
                 )
             ),
-        ).scalar_one_or_none()
-        if deny_form == "RESTRICTIVE":
+        ).fetchall()
+        if {name: form for name, form in deny_forms} == {
+            "isolation_switch_logs_deny_update": "RESTRICTIVE",
+            "isolation_switch_logs_deny_delete": "RESTRICTIVE",
+        }:
             return
     for statement in _RLS_ENSURE_STATEMENTS:
         _run_async(context["_loop"], pg["session"].execute(text(statement)))

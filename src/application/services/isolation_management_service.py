@@ -163,17 +163,18 @@ class IsolationManagementService(IsolationManagementServicePort):
         （主日志 SSOT 已落盘）。
 
         Args:
-            approval_chain: 审批链（tuple/list 形态——str 一律拒：str 是
-                ``Sequence[str]`` 合法子类型但语义为单审批人字符串，经
-                ``list()`` 会爆裂成单字符序列造成审计数据永久损坏，
-                5-6 R1-F1 双层防御的服务层入口面）。
+            approval_chain: 审批链（**tuple/list 白名单形态**——白名单外全部
+                242 拒绝：str 经 ``list()`` 爆裂成单字符序列造成审计数据永久
+                损坏、dict 会被静默替换为键列表（值丢弃）、None/非可迭代使
+                ``list()`` 抛裸 TypeError 逃逸异常体系——R1-F1 + R3-F1 入口
+                守卫面）。
 
         Raises:
             AgentNotFoundError: Agent 不存在（EXCEPTION_443）
             IsolationStateNotInitializedError: 隔离状态缺失（EXCEPTION_447）
             IsolationLevelNotSupportedError: 等级非法（EXCEPTION_446——实体 switch_to）
-            EntityValidationError: trigger_reason 空/空白 或 approval_chain 为
-                str 形态（EXCEPTION_242——实体不变量透传 + 入口形态守卫）
+            EntityValidationError: trigger_reason 空/空白 或 approval_chain 非
+                tuple/list 形态（EXCEPTION_242——实体不变量透传 + 入口形态守卫）
             AgentConfigError: 配置加载失败/TTL 越界（EXCEPTION_440——零日志零
                 Redis 写零事件的干净拒绝）
             StorageError: 存储/日志故障（EXCEPTION_103——日志 save 失败上抛 =
@@ -196,10 +197,16 @@ class IsolationManagementService(IsolationManagementServicePort):
 
         # approval_chain 形态守卫（5-6 R1-F1 服务层入口面——插位与事件构造同位：
         # 守卫序 443→447→no-op 后、状态变异前置校验；str 是 Sequence 合法子类型
-        # 但 list("审批人") 会爆裂成单字符序列——审计数据永久损坏防线）
-        if isinstance(approval_chain, str):
+        # 但 list("审批人") 会爆裂成单字符序列——审计数据永久损坏防线；
+        # R3-F1 收紧为 tuple/list 白名单：None/非可迭代会使 list() 抛裸 TypeError
+        # 逃逸异常体系、dict 会被静默替换为键列表（值丢弃）——白名单外的全部
+        # 形态（str/bytes/None/int/dict/set/generator）入口拒绝 242）
+        if not isinstance(approval_chain, (tuple, list)):
             raise EntityValidationError(
-                message="approval_chain 不能为字符串（单审批人请传单元素序列，字符串会被逐字符爆裂）",
+                message=(
+                    f"approval_chain 必须为 tuple/list 序列形态（实际类型 {type(approval_chain).__name__}——"
+                    "str 会逐字符爆裂、dict 会静默取键丢值、None/非可迭代抛裸 TypeError）"
+                ),
                 context={"approval_chain": str(approval_chain)},
             )
 
