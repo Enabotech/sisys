@@ -2875,11 +2875,15 @@ def bootstrap() -> None:
         owner="platform",
         tags=("redis", "agent", "isolation"),
     )
-    # IsolationManagementService — EIP 隔离管理服务（R2 组合端口四依赖:
+    # IsolationManagementService — EIP 隔离管理服务（R2 组合端口六依赖:
     # isolation_repository + agent_repository[443 守卫] + event_publisher +
-    # agent_config_loader[switch 重置 TTL 真源——R1-F01]；SINGLETON——无状态服务，
-    # 新捕获关系登记（DC-7）: 本 SINGLETON 捕获存量 SCOPED agent_repository——
-    # 无实害（无状态仓储 + clear_scoped 未接线环境下 SCOPED≡SINGLETON））
+    # agent_config_loader[switch 重置 TTL 真源——R1-F01] + isolation_switch_log_
+    # repository[Story 5.6 第五依赖必填——audit-first 切换日志 PG 仓储] +
+    # audit_service[Story 5.6 第六依赖可选——resolve_optional 联动审计 + 失败
+    # 降级，DC-6；PersistentNoteTaker L2201 先例]；SINGLETON——无状态服务，
+    # 捕获关系注记（5-4 DC-7 + 5.6 DC-11）: 捕获存量 SCOPED agent_repository
+    # 无实害（无状态仓储）；新捕获 SINGLETON isolation_switch_log_repository
+    # 与 SINGLETON audit_service 零 captive）
     register_port(
         name="isolation_management_service",
         version="v1.0.0",
@@ -2895,6 +2899,8 @@ def bootstrap() -> None:
             agent_repository=resolver.resolve("agent_repository"),
             event_publisher=resolver.resolve("event_publisher"),
             agent_config_loader=resolver.resolve("agent_config_loader"),
+            isolation_switch_log_repository=resolver.resolve("isolation_switch_log_repository"),
+            audit_service=resolver.resolve_optional("audit_service"),
         ),
         module="src.application.services.isolation_management_service",
         lifetime=Lifetime.SINGLETON,
@@ -2927,6 +2933,32 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("agent", "isolation", "security"),
+    )
+    # IsolationSwitchLogRepository — 隔离切换日志仓储端口（Story 5.6 — FR-AC-06
+    # 审计留痕面；R1 领域层基础端口，PG 实现 isolation_switch_logs 表——双模式
+    # session: 请求 ContextVar 优先 + session_factory fallback 独立会话 commit
+    # [DC-5，outbox 4-7 修复形态]；SINGLETON——DC-11 新增面政策（5-4 DC-7）：
+    # 新端口从源头避免被 SINGLETON isolation_management_service 捕获形成新
+    # captive；同域先例 isolation_repository 亦 SINGLETON；仓储无状态（session
+    # 每调用 ContextVar/fallback 现取），SINGLETON 无共享态风险；防篡改由表级
+    # RLS deny UPDATE/DELETE + FORCE + CheckConstraint 承载——migration 015）
+    register_port(
+        name="isolation_switch_log_repository",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.ports.isolation_switch_log_repository",
+            fromlist=["IsolationSwitchLogRepository"],
+        ).IsolationSwitchLogRepository,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.postgresql.repository.isolation_switch_log_repository",
+            fromlist=["PostgreSQLIsolationSwitchLogRepository"],
+        ).PostgreSQLIsolationSwitchLogRepository(
+            session_factory=resolver.resolve("session_factory"),
+        ),
+        module="src.infrastructure.storage.postgresql.repository.isolation_switch_log_repository",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "isolation", "audit"),
     )
 
     # === 事件处理器注册（register_handlers）===

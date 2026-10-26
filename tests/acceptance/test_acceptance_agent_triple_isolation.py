@@ -147,6 +147,23 @@ def _run_async(event_loop: asyncio.AbstractEventLoop, coro: Coroutine[Any, Any, 
     return event_loop.run_until_complete(coro)
 
 
+class _StubIsolationSwitchLogRepository:
+    """手写 duck-typing 日志仓储替身（直接实现 IsolationSwitchLogRepository 端口
+    契约——Story 5.6 回归面：5-5 验收断言锚是三重隔离判定，日志仓储以零 IO
+    替身注入保持原断言语义；真实 PG 日志链归 5.6 验收文件）。"""
+
+    def __init__(self) -> None:
+        self.saved_logs: list[Any] = []
+
+    async def save(self, log: Any) -> None:
+        self.saved_logs.append(log)
+
+    async def search(self, query: Any) -> Any:
+        from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogSearchResult
+
+        return IsolationSwitchLogSearchResult(items=(), total=0, offset=query.offset, limit=query.limit)
+
+
 @pytest.fixture
 def context(
     event_loop: asyncio.AbstractEventLoop,
@@ -214,6 +231,8 @@ def _assemble_guard_chain(context: dict[str, Any]) -> None:
         agent_repository=agent_repository,
         event_publisher=recorder,
         agent_config_loader=resolve("agent_config_loader"),
+        isolation_switch_log_repository=_StubIsolationSwitchLogRepository(),
+        audit_service=None,
     )
 
     from src.application.services.isolation_guard_service import IsolationGuardService

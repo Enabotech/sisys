@@ -30,9 +30,12 @@ from src.domain.ports.registry import Lifetime
 class _DummyResolver:
     """测试用最小 Resolver 占位符。
 
-    isolation_management_service 工厂注入四依赖（isolation_repository/
-    agent_repository/event_publisher/agent_config_loader——R1-F01 TTL 真源通道）
-    ——全部以零 IO 替身提供（契约维度仅验证实例化与方法面，不触真实连接）。
+    isolation_management_service 工厂注入六依赖（isolation_repository/
+    agent_repository/event_publisher/agent_config_loader[R1-F01 TTL 真源通道]/
+    isolation_switch_log_repository[Story 5.6 第五依赖——PG 仓储构造器
+    session_factory=None 合法默认] + audit_service[第六依赖可选——
+    resolve_optional 通道，debate_session L31 先例]）——全部以零 IO 替身提供
+    （契约维度仅验证实例化与方法面，不触真实连接）。
     """
 
     def resolve(self, name: str) -> Any:
@@ -40,6 +43,9 @@ class _DummyResolver:
 
         from src.infrastructure.agent_orch.yaml_agent_config_loader import YamlAgentConfigLoader
         from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+        from src.infrastructure.storage.postgresql.repository.isolation_switch_log_repository import (
+            PostgreSQLIsolationSwitchLogRepository,
+        )
         from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
         from src.infrastructure.storage.redis.redis_agent_repository import RedisAgentRepository
         from src.infrastructure.storage.redis.redis_isolation_repository import RedisIsolationRepository
@@ -54,7 +60,13 @@ class _DummyResolver:
             return InMemoryEventBus()
         if name == "agent_config_loader":
             return YamlAgentConfigLoader()
+        if name == "isolation_switch_log_repository":
+            return PostgreSQLIsolationSwitchLogRepository(session_factory=None)
         raise KeyError(f"未注册的端口: {name}")
+
+    def resolve_optional(self, name: str) -> Any:
+        """可选依赖通道（Story 5.6 第六依赖 audit_service——lambda 消费形态）。"""
+        return None
 
 
 class TestIsolationManagementServicePortContract:

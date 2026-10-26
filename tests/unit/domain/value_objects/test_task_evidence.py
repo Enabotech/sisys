@@ -18,13 +18,14 @@ Run with:
 from __future__ import annotations
 
 import hashlib
+from typing import Any
 
 import pytest
 
 from src.domain.exceptions import EntityValidationError
 
 
-def _make_evidence(**kwargs):
+def _make_evidence(**kwargs: Any) -> Any:
     """工厂：构造合法任务级证据包值对象（可覆盖任意字段）。
 
     Story 5-3 新模块延迟 import 纪律——模块顶部 import 会使收集期整文件炸。

@@ -649,8 +649,17 @@ UDMR（Unified Dynamic Model Routing）是实现**云端路由占比 80%、本�
 > 默认 + 用户显式请求切换通道（CLI `set-isolation`）+ `IsolationLevelSwitched` 事件发布。
 > 触发条件 MVP 仅「用户请求」通道（SYS 命令/关键词频率/任务依赖归 V1——FR-AC-09）；
 > 自动恢复（§5.3）归 V1；~~三重隔离的运行时强制拦截归 Story 5.5~~（**已交付——Story 5.5
-> 三重硬隔离保证**，见下方注记）；`IsolationSwitchLog`
-> 切换日志归 Story 5.6。异常契约: 446 `IsolationLevelNotSupportedError`（422）/
+> 三重硬隔离保证**，见下方注记）；~~`IsolationSwitchLog` 切换日志归 Story 5.6~~
+> （**已交付——Story 5.6 审计留痕面**：`IsolationSwitchLog` frozen 实体（from_event
+> 六字段零加工映射——事件 payload SSOT）+ 切换链 audit-first 同步内嵌写（DC-2——
+> 日志先于 Redis 状态写，日志失败=切换被拒 fail-closed；no-op 零日志）+ PG
+> `isolation_switch_logs` 表（migration 015——RLS ENABLE+FORCE+deny UPDATE/DELETE
+> 四策略 + CheckConstraint previous≠target 双层防篡改 + 索引五）+ 多维检索
+> （`IsolationSwitchLogQuery` 按 AGENT/时间闭区间/等级双向命中 + 分页——CLI
+> `isolation-logs` 检索面）+ `AuditService.record` 联动（`isolation:switch` 动作类型
+> 第 8 组、可选注入 + 失败降级）+ 组合根 `isolation_switch_log_repository` SINGLETON
+> 注册。WORM 24h 归档管线归 V1（OD-1——`worm_ref` 字段预留，承接方 Story 13-4））。
+> 异常契约: 446 `IsolationLevelNotSupportedError`（422）/
 > 447 `IsolationStateNotInitializedError`（404）。
 
 > **三重隔离运行时强制执行注记（Story 5.5 — Agent 三重硬隔离保证）**：三重隔离
@@ -1757,7 +1766,7 @@ src/domain/
 │   ├── checkpoint.py                                      # 检查点实体（双模式恢复）
 │   ├── strategic_archive.py                               # 战略档案实体（六层存储）
 │   ├── routing_log.py                                     # 路由决策日志实体 ⭐
-│   └── isolation_log.py                                   # 隔离切换日志实体 ⭐
+│   └── isolation_log.py                                   # 隔离切换日志实体 ⭐（Story 5.6 交付——实际落位 isolation_switch_log.py：IsolationSwitchLog frozen 八字段[from_event 六字段零加工映射/242 不变量五场景/worm_ref OD-1 预留]）
 │
 ├── value_objects/                                         # 值对象集合
 │   ├── embedding.py                                       # 嵌入向量值对象
@@ -1786,7 +1795,7 @@ src/domain/
 │   ├── plan_repository.py                                 # 规划仓储接口
 │   ├── checkpoint_repository.py                           # Checkpoint 仓储接口
 │   ├── routing_log_repository.py                          # 路由日志仓储接口 ⭐
-│   ├── isolation_log_repository.py                        # 隔离日志仓储接口 ⭐（归 Story 5.6）
+│   ├── isolation_log_repository.py                        # 隔离日志仓储接口 ⭐（Story 5.6 交付——实际落位 isolation_switch_log_repository.py：IsolationSwitchLogRepository save/search 两方法 + IsolationSwitchLogQuery 四维检索[agent_id/时间闭区间/等级双向命中]+分页 + IsolationSwitchLogSearchResult 强类型；PG 实现双模式 session[请求 ContextVar 优先+factory fallback——CLI 检索可达]）
 │   ├── isolation_repository.py                           # EIP 隔离状态仓储接口 ⭐（Story 5.4 交付——键空间 sisys:isolation:{agent_id}）
 │   └── archive_repository.py                              # 档案仓储接口
 │

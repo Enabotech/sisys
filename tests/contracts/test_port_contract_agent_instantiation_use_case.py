@@ -24,6 +24,22 @@ from src.application.use_cases.agent_instantiation import InstantiateAgentUseCas
 from src.domain.ports.registry import Lifetime
 
 
+class _StubIsolationSwitchLogRepository:
+    """手写 duck-typing 日志仓储替身（直接实现 IsolationSwitchLogRepository
+    端口契约——Story 5.6 五依赖注入；契约场景零 IO 不触 PG）。"""
+
+    def __init__(self) -> None:
+        self.saved_logs: list[Any] = []
+
+    async def save(self, log: Any) -> None:
+        self.saved_logs.append(log)
+
+    async def search(self, query: Any) -> Any:
+        from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogSearchResult
+
+        return IsolationSwitchLogSearchResult(items=(), total=0, offset=query.offset, limit=query.limit)
+
+
 class _DummyResolver:
     """测试用最小 Resolver 占位符。
 
@@ -62,6 +78,10 @@ class _DummyResolver:
                 agent_repository=self.resolve("agent_repository"),
                 event_publisher=self.resolve("event_publisher"),
                 agent_config_loader=self.resolve("agent_config_loader"),
+                # Story 5.6 五/六依赖：日志仓储以零 IO 手写替身注入（真实类构造
+                # 亦零 IO——契约场景不触 PG）；audit_service 可选 None 零联动
+                isolation_switch_log_repository=_StubIsolationSwitchLogRepository(),
+                audit_service=None,
             )
         raise KeyError(f"未注册的端口: {name}")
 

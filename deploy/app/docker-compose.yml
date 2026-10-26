@@ -230,7 +230,11 @@ services:
   #   数据卷持久化后续无需重建
   # ===========================================================================
   redis-test:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    # 对齐 dev redis 镜像（Redis Stack——语义缓存依赖 RediSearch FT.* 向量检索
+    # 命令；纯 Redis 7.2.5 无 search 模块会导致 test 端口下语义缓存套件全红——
+    # 2026-10-25 修正，dev 环境已在更早迭代切换 redis-stack-server）
+    # image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis-stack-server:7.2.0-v20
     container_name: sisys-test-redis
     profiles: ["test"]
     restart: unless-stopped

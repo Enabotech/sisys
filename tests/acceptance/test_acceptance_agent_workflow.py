@@ -143,6 +143,23 @@ def _run_async(event_loop: asyncio.AbstractEventLoop, coro: Coroutine[Any, Any, 
     return event_loop.run_until_complete(coro)
 
 
+class _StubIsolationSwitchLogRepository:
+    """手写 duck-typing 日志仓储替身（直接实现 IsolationSwitchLogRepository 端口
+    契约——Story 5.6 回归面：5-3 验收断言锚是工作流链路，日志仓储以零 IO
+    替身注入保持原断言语义；真实 PG 日志链归 5.6 验收文件）。"""
+
+    def __init__(self) -> None:
+        self.saved_logs: list[Any] = []
+
+    async def save(self, log: Any) -> None:
+        self.saved_logs.append(log)
+
+    async def search(self, query: Any) -> Any:
+        from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogSearchResult
+
+        return IsolationSwitchLogSearchResult(items=(), total=0, offset=query.offset, limit=query.limit)
+
+
 class _RecordingEventBus:
     """记录发布事件的发布器（事件捕获锚点——R3-F4 引擎构造注入位）。
 
@@ -286,6 +303,8 @@ def _make_real_guard_chain(context: dict[str, Any]) -> Any:
         agent_repository=agent_repository,
         event_publisher=InMemoryEventBus(),
         agent_config_loader=resolve("agent_config_loader"),
+        isolation_switch_log_repository=_StubIsolationSwitchLogRepository(),
+        audit_service=None,
     )
     guard = IsolationGuardService(
         isolation_management_service=isolation_service,
@@ -1184,6 +1203,8 @@ def given_cli_env_with_fake_llm_overridden(context: dict[str, Any]) -> None:
         agent_repository=repository,
         event_publisher=InMemoryEventBus(),
         agent_config_loader=resolve("agent_config_loader"),
+        isolation_switch_log_repository=_StubIsolationSwitchLogRepository(),
+        audit_service=None,
     )
     instantiate_use_case = InstantiateAgentUseCase(
         config_loader=resolve("agent_config_loader"),

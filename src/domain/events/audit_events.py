@@ -71,6 +71,9 @@ class AuditActionType(str, Enum):
     SYSTEM_INIT = "system:init"
     SYSTEM_SHUTDOWN = "system:shutdown"
 
+    # Isolation events - 隔离事件（Story 5.6——隔离切换审计联动 DC-9）
+    ISOLATION_SWITCH = "isolation:switch"
+
 
 @dataclass(frozen=True)
 class AuditEvent(DomainEvent):

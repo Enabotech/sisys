@@ -65,6 +65,7 @@ import asyncio
 import logging
 import sys
 import uuid as uuid_module
+from datetime import datetime
 
 from src.application.ports.isolation_management import (
     IsolationManagementServicePort,
@@ -79,6 +80,11 @@ from src.domain.exceptions import (
     DomainError,
     IsolationLevelNotSupportedError,
     ValidationError,
+)
+from src.domain.ports.isolation_switch_log_repository import (
+    IsolationSwitchLogQuery,
+    IsolationSwitchLogRepository,
+    IsolationSwitchLogSearchResult,
 )
 from src.domain.ports.resolver import get_resolver, resolve
 
@@ -220,7 +226,8 @@ def build_parser() -> argparse.ArgumentParser:
             "示例: sisys-agent instantiate --role ceo | sisys-agent load-profile --agent-id <uuid> | "
             "sisys-agent run-task --agent-id <uuid> --task <文本> | "
             "sisys-agent isolation-status --agent-id <uuid> | "
-            "sisys-agent set-isolation --agent-id <uuid> --level L3 --reason <文本>"
+            "sisys-agent set-isolation --agent-id <uuid> --level L3 --reason <文本> | "
+            "sisys-agent isolation-logs --agent-id <uuid> [--level L3] [--start <ISO>] [--end <ISO>]"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -317,6 +324,62 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="REASON",
         help='切换原因（非空——用户显式请求语义必填，如 "任务需要软隔离"）',
+    )
+    isolation_logs = subparsers.add_parser(
+        "isolation-logs",
+        help="检索 Agent 隔离切换日志（FR-AC-06 审计留痕——按 AGENT/时间/等级多维 + 分页）",
+    )
+    isolation_logs.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=False,
+        default=None,
+        metavar="AGENT_ID",
+        help="按 Agent 实例 UUID 精确过滤（可选——缺省检索全部 Agent）",
+    )
+    isolation_logs.add_argument(
+        "-l",
+        "--level",
+        type=str,
+        required=False,
+        default=None,
+        metavar="LEVEL",
+        help='按隔离等级过滤（可选 "L4"/"L3"/"L2"——原等级或目标等级任一命中即返回）',
+    )
+    isolation_logs.add_argument(
+        "--start",
+        type=str,
+        required=False,
+        default=None,
+        metavar="ISO8601",
+        help="切换时间闭区间下界（可选 ISO 8601，如 2026-10-25T00:00:00+00:00）",
+    )
+    isolation_logs.add_argument(
+        "--end",
+        type=str,
+        required=False,
+        default=None,
+        metavar="ISO8601",
+        help="切换时间闭区间上界（可选 ISO 8601）",
+    )
+    isolation_logs.add_argument(
+        "-n",
+        "--limit",
+        type=int,
+        required=False,
+        default=50,
+        metavar="N",
+        help="分页上限（默认 50，上限 500）",
+    )
+    isolation_logs.add_argument(
+        "-o",
+        "--offset",
+        type=int,
+        required=False,
+        default=0,
+        metavar="N",
+        help="分页偏移（默认 0）",
     )
     return parser
 
@@ -652,6 +715,132 @@ async def _switch_isolation_level(
         await _close_connection_pools()
 
 
+def _parse_optional_agent_uuid(agent_id_raw: str | None) -> uuid_module.UUID | None:
+    """可选 --agent-id 解析（None 直通——isolation-logs 全量检索形态）.
+
+    Raises:
+        ValidationError: 非法 UUID 字符串（EXCEPTION_201）
+    """
+    if agent_id_raw is None:
+        return None
+    return _parse_agent_uuid(agent_id_raw)
+
+
+def _parse_optional_iso_datetime(raw: str | None, option_name: str) -> datetime | None:
+    """可选 ISO 8601 时间参数解析（None 直通；非法格式 → ValidationError 201）.
+
+    Args:
+        raw: --start/--end 原始字符串
+        option_name: 参数名（错误消息定位）
+
+    Raises:
+        ValidationError: 非法 ISO 8601 格式（EXCEPTION_201）
+    """
+    if raw is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError as error:
+        raise ValidationError(
+            message=f"{option_name} 必须为 ISO 8601 格式（实际值 {raw!r}，如 2026-10-25T00:00:00+00:00）",
+        ) from error
+    if parsed.tzinfo is None:
+        raise ValidationError(
+            message=f"{option_name} 必须携带时区（实际值 {raw!r}——裸时间会产生本地时区歧义）",
+        )
+    return parsed
+
+
+def _run_isolation_logs_cli(
+    agent_id_raw: str | None,
+    level_raw: str | None,
+    start_raw: str | None,
+    end_raw: str | None,
+    limit: int,
+    offset: int,
+) -> int:
+    """isolation-logs 子命令执行（守卫 → bootstrap → 检索 → 摘要输出——Story 5.6）.
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串（可选）
+        level_raw: --level 原始字符串（可选——CLI 层枚举转换守卫）
+        start_raw: --start 原始字符串（可选 ISO 8601）
+        end_raw: --end 原始字符串（可选 ISO 8601）
+        limit: 分页上限
+        offset: 分页偏移
+
+    Returns:
+        退出码（0=成功（含空结果），1=业务异常——446/201/103）
+    """
+    # 多守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    try:
+        agent_id = _parse_optional_agent_uuid(agent_id_raw)
+        level = _parse_isolation_level(level_raw) if level_raw is not None else None
+        start_time = _parse_optional_iso_datetime(start_raw, "--start")
+        end_time = _parse_optional_iso_datetime(end_raw, "--end")
+    except (ValidationError, IsolationLevelNotSupportedError) as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        repo = resolve("isolation_switch_log_repository")
+        query = IsolationSwitchLogQuery(
+            agent_id=agent_id,
+            start_time=start_time,
+            end_time=end_time,
+            level=level,
+            offset=offset,
+            limit=limit,
+        )
+        result = asyncio.run(_search_isolation_logs(repo, query))
+        _print_isolation_logs_summary(result)
+        logger.info("隔离切换日志检索完成: total=%s offset=%d limit=%d", result.total, offset, limit)
+        return 0
+    except DomainError as error:
+        logger.error("隔离切换日志检索失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("隔离切换日志检索异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _search_isolation_logs(
+    repo: IsolationSwitchLogRepository, query: IsolationSwitchLogQuery
+) -> IsolationSwitchLogSearchResult:
+    """检索隔离切换日志并清理已打开的连接池（fallback 独立会话触达 PG）。"""
+    try:
+        return await repo.search(query)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_isolation_logs_summary(result: object) -> None:
+    """输出切换日志检索摘要（空结果单行 / 多行条目 + 尾行总数——stdout）."""
+    items = getattr(result, "items")
+    total = getattr(result, "total")
+    offset = getattr(result, "offset")
+    if not items:
+        print("无隔离切换日志记录")
+        return
+    for log in items:
+        log_id_short = str(getattr(log, "log_id"))[:8]
+        previous_value = getattr(log, "previous_level").value
+        target_value = getattr(log, "target_level").value
+        switch_ts = getattr(log, "switch_timestamp").isoformat()
+        reason = getattr(log, "trigger_reason")
+        reason_display = reason if len(reason) <= 40 else f"{reason[:40]}..."
+        chain = getattr(log, "approval_chain")
+        chain_display = " → ".join(chain) if chain else "-"
+        print(
+            f"[{log_id_short}] {previous_value} -> {target_value} | {switch_ts} | "
+            f"原因: {reason_display} | 审批链: {chain_display}"
+        )
+    print(f"共 {total} 条（显示 {len(items)} 条，offset={offset}）")
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 主入口
 
@@ -678,6 +867,15 @@ def main(argv: list[str] | None = None) -> int:
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":
         return _run_set_isolation_cli(args.agent_id, args.level, args.reason)
+    if args.command == "isolation-logs":
+        return _run_isolation_logs_cli(
+            args.agent_id,
+            args.level,
+            args.start,
+            args.end,
+            args.limit,
+            args.offset,
+        )
     return _run_instantiate_cli(args.role)
 
 

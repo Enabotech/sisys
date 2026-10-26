@@ -86,9 +86,12 @@ class _RecordingEventPublisher:
 
 def _assemble_chain(redis_client: Any, config_loader: Any = None) -> dict[str, Any]:
     """手动组装守卫真实链（guard + isolation_service + instantiate 用例 + 双仓储）。"""
+    from unittest.mock import AsyncMock
+
     from src.application.services.isolation_guard_service import IsolationGuardService
     from src.application.services.isolation_management_service import IsolationManagementService
     from src.application.use_cases.agent_instantiation import InstantiateAgentUseCase
+    from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogRepository
     from src.domain.ports.resolver import resolve
     from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
     from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
@@ -104,6 +107,10 @@ def _assemble_chain(redis_client: Any, config_loader: Any = None) -> dict[str, A
         agent_repository=agent_repository,
         event_publisher=recorder,
         agent_config_loader=effective_loader,
+        # Story 5.6 五/六依赖：5-5 回归面断言锚是三重隔离判定——日志仓储以
+        # AsyncMock(spec=端口) 替身注入（真实 PG 日志链归 5.6 集成文件）
+        isolation_switch_log_repository=AsyncMock(spec=IsolationSwitchLogRepository),
+        audit_service=None,
     )
     guard = IsolationGuardService(
         isolation_management_service=isolation_service,

@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -33,17 +33,22 @@ from src.application.ports.isolation_management import (
 from src.application.services.isolation_management_service import IsolationManagementService
 from src.domain.entities.agent import Agent, AgentRole
 from src.domain.entities.isolation_state import IsolationState
+from src.domain.entities.isolation_switch_log import IsolationSwitchLog
+from src.domain.events.audit_events import AuditActionType
 from src.domain.events.enums import IsolationLevel
 from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.exceptions import (
     AgentNotFoundError,
+    AuditError,
     IsolationLevelNotSupportedError,
     IsolationStateNotInitializedError,
     StorageError,
 )
 from src.domain.ports.agent_repository import AgentRepository
+from src.domain.ports.audit_service import AuditServicePort
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.isolation_repository import IsolationRepository
+from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogRepository
 
 AGENT_ID = uuid.uuid4()
 NOW = datetime(2026, 10, 22, 8, 0, 0, tzinfo=UTC)
@@ -97,6 +102,9 @@ def _make_service(
     publish_error: Exception | None = None,
     publish_result: PublishResult | None = None,
     state_ttl: int = 777,
+    log_save_error: Exception | None = None,
+    audit_error: Exception | None = None,
+    audit_service_mode: str = "default",
 ) -> tuple[IsolationManagementService, dict[str, Any]]:
     """四替身组装工厂（AsyncMock spec 端口 + side_effect 闭包记录 calls 序列）。
 
@@ -152,17 +160,44 @@ def _make_service(
 
     config_loader.load = AsyncMock(side_effect=_load)
 
+    log_repo = AsyncMock(spec=IsolationSwitchLogRepository)
+
+    async def _log_save(log: Any) -> None:
+        calls.append("log.save")
+        if log_save_error is not None:
+            raise log_save_error
+
+    log_repo.save = AsyncMock(side_effect=_log_save)
+
+    audit_service: Any
+    if audit_service_mode == "none":
+        audit_service = None
+    else:
+        audit_service = AsyncMock(spec=AuditServicePort)
+
+        async def _record(**kwargs: Any) -> Any:
+            calls.append("audit.record")
+            if audit_error is not None:
+                raise audit_error
+            return MagicMock()
+
+        audit_service.record = AsyncMock(side_effect=_record)
+
     service = IsolationManagementService(
         isolation_repository=isolation_repo,
         agent_repository=agent_repo,
         event_publisher=publisher,
         agent_config_loader=config_loader,
+        isolation_switch_log_repository=log_repo,
+        audit_service=audit_service,
     )
     return service, {
         "isolation_repo": isolation_repo,
         "agent_repo": agent_repo,
         "publisher": publisher,
         "config_loader": config_loader,
+        "log_repo": log_repo,
+        "audit_service": audit_service,
         "calls": calls,
     }
 
@@ -372,3 +407,126 @@ class TestServiceContract:
         result = IsolationSwitchResult(switched=False, state=_make_state(), event=None)
         assert result.switched is False
         assert result.event is None
+
+
+class TestAuditFirstLogging:
+    """audit-first 日志写入链（Story 5.6 — AC-2：顺序/零调用计数/降级/联动参数）."""
+
+    async def _switch_success(self, **factory_kwargs: Any) -> tuple[Any, dict[str, Any]]:
+        """合法切换辅助（L4→L3——audit-first 断言基线）。"""
+        service, mocks = _make_service(agent=_make_agent(), state=_make_state(), **factory_kwargs)
+        result = await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "审计验证")
+        return result, mocks
+
+    async def test_audit_first_log_save_precedes_redis_save(self) -> None:
+        """audit-first 顺序（DC-2）: 守卫 → 构造事件 → config load（只读）→
+        log.save → Redis iso.save → publish → audit.record——日志先于状态写
+        （fail-closed：无审计痕迹的切换不允许发生）。"""
+        _, mocks = await self._switch_success()
+        calls = mocks["calls"]
+        assert calls.index("log.save") < calls.index("iso.save"), f"audit-first 违例——log.save 应先于 iso.save: {calls}"
+        assert calls.index("config.load") < calls.index("log.save"), f"只读前置违例——config.load 应先于 log.save: {calls}"
+        assert calls == [
+            "agent.get",
+            "iso.get",
+            "config.load",
+            "log.save",
+            "iso.save",
+            "publish",
+            "audit.record",
+        ], f"全链调用序不符: {calls}"
+
+    async def test_log_saved_from_event_six_fields(self) -> None:
+        """日志实体经 from_event 构造（事件 payload SSOT——save 收到实体六字段完整）。"""
+        result, mocks = await self._switch_success()
+        log = mocks["log_repo"].save.await_args.args[0]
+        assert isinstance(log, IsolationSwitchLog)
+        event = result.event
+        assert log.agent_id == event.agent_id
+        assert log.previous_level == event.previous_level
+        assert log.target_level == event.target_level
+        assert log.trigger_reason == event.trigger_reason
+        assert log.approval_chain == ()
+        assert log.switch_timestamp == event.switch_timestamp
+
+    async def test_noop_zero_log_saves(self) -> None:
+        """no-op 零日志: 同等级二次调用 log.save 零调用（幂等——日志不重复记）。"""
+        service, mocks = _make_service(agent=_make_agent(), state=_make_state())
+        first = await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "首次")
+        assert first.switched is True
+        assert mocks["log_repo"].save.await_count == 1
+        second = await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "重复")
+        assert second.switched is False
+        assert mocks["log_repo"].save.await_count == 1, "no-op 不得追加日志"
+
+    async def test_guard_443_zero_log_saves(self) -> None:
+        """443 守卫零日志: Agent 不存在 → log.save 零调用（守卫先于日志位）。"""
+        service, mocks = _make_service(agent=None, state=_make_state())
+        with pytest.raises(AgentNotFoundError):
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "443 面")
+        mocks["log_repo"].save.assert_not_awaited()
+
+    async def test_guard_447_zero_log_saves(self) -> None:
+        """447 守卫零日志: 隔离状态未初始化 → log.save 零调用。"""
+        service, mocks = _make_service(agent=_make_agent(), state=None)
+        with pytest.raises(IsolationStateNotInitializedError):
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "447 面")
+        mocks["log_repo"].save.assert_not_awaited()
+
+    async def test_log_save_failure_rejects_switch(self) -> None:
+        """fail-closed（AC-2.3）: log.save 抛 StorageError → 切换被拒——
+        零 Redis 状态写 + 零事件发布（无审计痕迹的切换不允许发生）。"""
+        service, mocks = _make_service(
+            agent=_make_agent(),
+            state=_make_state(),
+            log_save_error=StorageError("PG 不可达"),
+        )
+        with pytest.raises(StorageError):
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "故障注入")
+        assert "iso.save" not in mocks["calls"], "日志失败后不得写 Redis 状态"
+        assert "publish" not in mocks["calls"], "日志失败后不得发布事件"
+        assert "audit.record" not in mocks["calls"], "日志失败后不得联动 audit"
+        mocks["isolation_repo"].save.assert_not_awaited()
+
+    async def test_audit_linkage_record_params(self) -> None:
+        """audit 联动参数（DC-6/DC-9）: actor/action_type/old/new_value（.value
+        字符串形态）/correlation_id=事件 event_id。"""
+        result, mocks = await self._switch_success()
+        mocks["audit_service"].record.assert_awaited_once()
+        kwargs = mocks["audit_service"].record.await_args.kwargs
+        assert kwargs["actor"] == f"agent:{AGENT_ID}"
+        assert kwargs["action_type"] == AuditActionType.ISOLATION_SWITCH.value
+        assert kwargs["target_resource"] == f"agent:{AGENT_ID}"
+        assert kwargs["old_value"] == {"level": "L4"}
+        assert kwargs["new_value"]["level"] == "L3"
+        assert kwargs["new_value"]["reason"] == "审计验证"
+        assert kwargs["new_value"]["approval_chain"] == []
+        assert kwargs["correlation_id"] == str(result.event.event_id)
+
+    async def test_audit_linkage_failure_degrades(self, caplog: pytest.LogCaptureFixture) -> None:
+        """audit 联动降级（DC-6）: record 抛 AuditError → 切换仍成功 + logger.warning
+        （主日志 SSOT 已落盘，联动是增值索引——PersistentNoteTaker 先例）。"""
+        with caplog.at_level("WARNING"):
+            result, mocks = await self._switch_success(audit_error=AuditError("audit 故障"))
+        assert result.switched is True, "联动失败不得回滚切换"
+        assert "iso.save" in mocks["calls"]
+        assert any("联动审计" in record.message for record in caplog.records), "联动失败应 logger.warning 降级"
+
+    async def test_audit_service_none_skips_linkage(self) -> None:
+        """可选依赖 None 形态: 零联动调用（主链不受影响）。"""
+        result, mocks = await self._switch_success(audit_service_mode="none")
+        assert result.switched is True
+        assert "audit.record" not in mocks["calls"]
+
+    async def test_config_load_failure_zero_log_saves(self) -> None:
+        """440 干净拒绝: config load 失败（log.save 之前——只读前置）→ 零日志
+        零 Redis 写零事件（无副作用泄漏，误报窗口最小化——DC-2 插位细则）。"""
+        from src.domain.exceptions import AgentConfigError
+
+        service, mocks = _make_service(agent=_make_agent(), state=_make_state())
+        mocks["config_loader"].load = AsyncMock(side_effect=AgentConfigError("配置缺失"))
+        with pytest.raises(AgentConfigError):
+            await service.switch_isolation_level(AGENT_ID, IsolationLevel.L3_SOFT, "440 面")
+        mocks["log_repo"].save.assert_not_awaited()
+        assert "iso.save" not in mocks["calls"]
+        assert "publish" not in mocks["calls"]

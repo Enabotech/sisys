@@ -15,6 +15,7 @@ Run with:
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 
@@ -22,7 +23,7 @@ from src.domain.entities.agent import AgentRole
 from src.domain.exceptions import AgentProfileError
 
 
-def _make_profile(**kwargs):
+def _make_profile(**kwargs: Any) -> Any:
     """工厂：构造合法 CEO 档案值对象（可覆盖任意字段）。
 
     Story 5-2 新模块延迟 import 纪律——模块顶部 import 会使收集期整文件炸。

@@ -321,9 +321,12 @@ def _assemble_guard_chain(redis_client: Any, config_loader: Any = None) -> dict[
         组装链字典（guard/instantiate_use_case/isolation_service/agent_repository/
         recorder/config_loader）。
     """
+    from unittest.mock import AsyncMock
+
     from src.application.services.isolation_guard_service import IsolationGuardService
     from src.application.services.isolation_management_service import IsolationManagementService
     from src.application.use_cases.agent_instantiation import InstantiateAgentUseCase
+    from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogRepository
     from src.domain.ports.resolver import resolve
     from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
     from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
@@ -339,6 +342,10 @@ def _assemble_guard_chain(redis_client: Any, config_loader: Any = None) -> dict[
         agent_repository=agent_repository,
         event_publisher=recorder,
         agent_config_loader=effective_loader,
+        # Story 5.6 五/六依赖：探针断言锚是跨 Agent 穿透拦截——日志仓储以
+        # AsyncMock(spec=端口) 替身注入（真实 PG 日志链归 5.6 集成文件）
+        isolation_switch_log_repository=AsyncMock(spec=IsolationSwitchLogRepository),
+        audit_service=None,
     )
     guard = IsolationGuardService(
         isolation_management_service=isolation_service,

@@ -194,3 +194,9 @@ class TestAuditActionType:
         assert AuditActionType.CORRECTION_APPROVE.value == "correction:approve"
         assert AuditActionType.CORRECTION_REJECT.value == "correction:reject"
         assert AuditActionType.CORRECTION_APPLY.value == "correction:apply"
+
+    def test_isolation_action_types(self):
+        """Has isolation action types（Story 5.6——第 8 组隔离切换审计联动 DC-9）."""
+        from src.domain.events.audit_events import AuditActionType
+
+        assert AuditActionType.ISOLATION_SWITCH.value == "isolation:switch"

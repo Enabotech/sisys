@@ -112,7 +112,7 @@ class TestIsolationLevelSwitched:
         assert event.approval_chain == []
         assert event.switch_timestamp.tzinfo is not None
 
-    def test_required_fields_kw_only_missing_raises(self):
+    def test_required_fields_kw_only_missing_raises(self) -> None:
         """四核心必填字段缺任一 → TypeError（kw_only 必填——5-2 纪律先例）。"""
         from typing import Any
 

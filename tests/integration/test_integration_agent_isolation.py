@@ -91,8 +91,11 @@ def _assemble_real_chain(redis_client: Any, publisher: Any = None) -> dict[str, 
         组装字典（use_case/isolation_service/agent_repository/isolation_repository/
         recorder 四键）
     """
+    from unittest.mock import AsyncMock
+
     from src.application.services.isolation_management_service import IsolationManagementService
     from src.application.use_cases.agent_instantiation import InstantiateAgentUseCase
+    from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogRepository
     from src.domain.ports.resolver import resolve
     from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
     from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
@@ -102,11 +105,15 @@ def _assemble_real_chain(redis_client: Any, publisher: Any = None) -> dict[str, 
     agent_repository = RedisAgentRepository(adapter=RedisAdapter(redis_client=redis_client))
     isolation_repository = RedisIsolationRepository(adapter=RedisAdapter(redis_client=redis_client))
     recorder = publisher if publisher is not None else _RecordingEventPublisher()
+    # Story 5.6 五/六依赖：5-4 回归面断言锚是 Redis 隔离链——日志仓储以
+    # AsyncMock(spec=端口) 替身注入（Mock 工厂合规；真实 PG 日志链归 5.6 集成文件）
     isolation_service = IsolationManagementService(
         isolation_repository=isolation_repository,
         agent_repository=agent_repository,
         event_publisher=recorder,
         agent_config_loader=resolve("agent_config_loader"),
+        isolation_switch_log_repository=AsyncMock(spec=IsolationSwitchLogRepository),
+        audit_service=None,
     )
     use_case = InstantiateAgentUseCase(
         config_loader=resolve("agent_config_loader"),

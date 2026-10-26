@@ -18,6 +18,9 @@ from src.infrastructure.storage.postgresql.models.error_case import ErrorCaseMod
 from src.infrastructure.storage.postgresql.models.evolution_log_entry import (
     EvolutionLogEntryModel,
 )
+from src.infrastructure.storage.postgresql.models.isolation_switch_log import (
+    IsolationSwitchLogModel,
+)
 from src.infrastructure.storage.postgresql.models.login_attempt import LoginAttemptModel
 from src.infrastructure.storage.postgresql.models.memory import (
     MemoryChangeHistoryModel,
@@ -68,6 +71,7 @@ __all__ = [
     "ToolVersionModel",
     "SchemaValidationRecordModel",
     "SandboxSessionModel",
+    "IsolationSwitchLogModel",
     "user_roles_table",
     "role_permissions_table",
     "pg_registry",

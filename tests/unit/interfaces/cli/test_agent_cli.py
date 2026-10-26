@@ -76,10 +76,18 @@ class TestBuildParser:
     """parser 结构契约。"""
 
     def test_help_text_lists_all_registered_subcommands(self) -> None:
-        """帮助文本漂移锁：五子命令名均出现于帮助输出（R2-F03——两代子命令
-        加入未更新 description/epilog 的缺陷形态防复发）。"""
+        """帮助文本漂移锁：六子命令名均出现于帮助输出（R2-F03——两代子命令
+        加入未更新 description/epilog 的缺陷形态防复发；Story 5.6 扩展
+        isolation-logs 第六子命令）。"""
         help_text = agent_cli.build_parser().format_help()
-        for subcommand in ("instantiate", "load-profile", "run-task", "isolation-status", "set-isolation"):
+        for subcommand in (
+            "instantiate",
+            "load-profile",
+            "run-task",
+            "isolation-status",
+            "set-isolation",
+            "isolation-logs",
+        ):
             assert subcommand in help_text, f"帮助文本缺少子命令 {subcommand}（description/epilog 漂移）"
 
     def test_instantiate_with_role_ceo(self) -> None:
@@ -937,3 +945,164 @@ class TestIsolationSubcommandArgs:
             agent_cli.build_parser().parse_args(["set-isolation", "--agent-id", "x"])
         with pytest.raises(SystemExit):
             agent_cli.build_parser().parse_args(["set-isolation", "--agent-id", "x", "--level", "L3"])
+
+
+class _StubSwitchLog:
+    """isolation-logs 摘要输出所需日志属性面（对齐真实 IsolationSwitchLog）。"""
+
+    def __init__(self, previous: str = "L4", target: str = "L3", reason: str = "CLI 检索验证原因") -> None:
+        import uuid
+        from datetime import UTC, datetime
+
+        from src.domain.events.enums import IsolationLevel
+
+        self.log_id = uuid.UUID("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+        self.agent_id = uuid.UUID("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+        self.previous_level = IsolationLevel(previous)
+        self.target_level = IsolationLevel(target)
+        self.trigger_reason = reason
+        self.approval_chain = ("合规负责人",)
+        self.switch_timestamp = datetime(2026, 10, 25, 10, 0, 0, tzinfo=UTC)
+        self.worm_ref = None
+
+
+class _StubLogSearchResult:
+    """isolation-logs 检索结果属性面（items/total/offset）。"""
+
+    def __init__(self, items: tuple, total: int, offset: int = 0) -> None:
+        self.items = items
+        self.total = total
+        self.offset = offset
+
+
+class _StubIsolationSwitchLogRepository:
+    """isolation-logs 子命令 stub（search 可注入结果/异常；query 记录）。"""
+
+    def __init__(
+        self,
+        result: object | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.result = result if result is not None else _StubLogSearchResult((), 0)
+        self.error = error
+        self.search_calls: list[Any] = []
+
+    async def save(self, log: object) -> None:
+        return None
+
+    async def search(self, query: object) -> object:
+        self.search_calls.append(query)
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def _patch_isolation_logs_entry(monkeypatch: pytest.MonkeyPatch, repo: _StubIsolationSwitchLogRepository) -> None:
+    """isolation-logs 三件套注入（bootstrap/resolve/get_resolver——resolve 统一返回 stub）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: repo)
+    monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+
+
+class TestIsolationLogsCommand:
+    """isolation-logs 子命令（Story 5.6——参数契约/守卫/输出形态）。"""
+
+    def test_all_filter_args_parsed(self) -> None:
+        """六过滤参数全量解析（--agent-id/--level/--start/--end/--limit/--offset）。"""
+        args = agent_cli.build_parser().parse_args(
+            [
+                "isolation-logs",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L3",
+                "--start",
+                "2026-10-25T00:00:00+00:00",
+                "--end",
+                "2026-10-26T00:00:00+00:00",
+                "--limit",
+                "10",
+                "--offset",
+                "5",
+            ]
+        )
+        assert args.command == "isolation-logs"
+        assert args.agent_id == "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
+        assert args.level == "L3"
+        assert args.start == "2026-10-25T00:00:00+00:00"
+        assert args.end == "2026-10-26T00:00:00+00:00"
+        assert args.limit == 10
+        assert args.offset == 5
+
+    def test_all_filter_args_optional(self) -> None:
+        """六参数全可选（缺省全量检索——默认 limit 50 / offset 0）。"""
+        args = agent_cli.build_parser().parse_args(["isolation-logs"])
+        assert args.agent_id is None
+        assert args.level is None
+        assert args.start is None
+        assert args.end is None
+        assert args.limit == 50
+        assert args.offset == 0
+
+    def test_invalid_level_exits_nonzero(self, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+        """level 校验: 非法等级 → 446 退出码非 0 + 错误提示（CLI 层枚举转换守卫）。"""
+        repo = _StubIsolationSwitchLogRepository()
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(["isolation-logs", "--level", "L9"])
+        assert exit_code == 1
+        assert "EXCEPTION_446" in capsys.readouterr().err
+        assert repo.search_calls == []  # 守卫先于检索
+
+    def test_naive_datetime_rejected(self, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+        """时间校验: 裸时间（无时区）→ 201 退出码非 0。"""
+        repo = _StubIsolationSwitchLogRepository()
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(["isolation-logs", "--start", "2026-10-25T00:00:00"])
+        assert exit_code == 1
+        assert "EXCEPTION_201" in capsys.readouterr().err
+
+    def test_success_outputs_summary_lines(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """有结果: exit 0 + 多行摘要（等级行/原因/审批链）+ 尾行总数。"""
+        from src.domain.events.enums import IsolationLevel
+
+        log = _StubSwitchLog()
+        repo = _StubIsolationSwitchLogRepository(result=_StubLogSearchResult((log,), 1))
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(
+            [
+                "isolation-logs",
+                "--agent-id",
+                "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+                "--level",
+                "L3",
+            ]
+        )
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "L4 -> L3" in captured.out
+        assert "CLI 检索验证原因" in captured.out
+        assert "合规负责人" in captured.out
+        assert "共 1 条" in captured.out
+        # 查询参数正确组装（agent_id UUID 化 + level 枚举化）
+        query = repo.search_calls[0]
+        assert query.level is IsolationLevel.L3_SOFT
+
+    def test_empty_result_outputs_single_line(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """空结果: 「无隔离切换日志记录」单行 + exit 0。"""
+        repo = _StubIsolationSwitchLogRepository(result=_StubLogSearchResult((), 0))
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(["isolation-logs"])
+        assert exit_code == 0
+        assert "无隔离切换日志记录" in capsys.readouterr().out
+
+    def test_search_error_exits_nonzero(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """检索异常: StorageError → 103 退出码非 0。"""
+        from src.domain.exceptions import StorageError
+
+        repo = _StubIsolationSwitchLogRepository(error=StorageError("PG 不可达"))
+        _patch_isolation_logs_entry(monkeypatch, repo)
+        exit_code = agent_cli.main(["isolation-logs"])
+        assert exit_code == 1
+        assert "EXCEPTION_103" in capsys.readouterr().err
