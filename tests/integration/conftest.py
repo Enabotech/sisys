@@ -496,7 +496,7 @@ def ensure_alembic_migration(pg_config):
                 env={**os.environ, **env},
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=180,
             )
             if result.returncode == 0 or "already up to date" in result.stdout:
                 migration_success = True

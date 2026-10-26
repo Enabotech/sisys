@@ -46,7 +46,6 @@ SSOT 已在 isolation_switch_log_repository 落盘，audit_log 是联动索引
 from __future__ import annotations
 
 import logging
-from typing import Sequence
 from uuid import UUID
 
 from src.application.ports.agent_config_loader import AgentConfigLoader
@@ -59,7 +58,7 @@ from src.domain.entities.isolation_switch_log import IsolationSwitchLog
 from src.domain.events.audit_events import AuditActionType
 from src.domain.events.enums import IsolationLevel
 from src.domain.events.isolation_events import IsolationLevelSwitched
-from src.domain.exceptions import AgentNotFoundError, IsolationStateNotInitializedError
+from src.domain.exceptions import AgentNotFoundError, EntityValidationError, IsolationStateNotInitializedError
 from src.domain.ports.agent_repository import AgentRepository
 from src.domain.ports.audit_service import AuditServicePort
 from src.domain.ports.event_publisher import EventPublisher
@@ -152,21 +151,29 @@ class IsolationManagementService(IsolationManagementServicePort):
         agent_id: UUID,
         target_level: IsolationLevel,
         trigger_reason: str,
-        approval_chain: Sequence[str] = (),
+        approval_chain: tuple[str, ...] | list[str] = (),
     ) -> IsolationSwitchResult:
         """切换隔离等级（守卫序 443 → 447 → 446 实体内聚 + no-op 零副作用
         + audit-first 日志写入——Story 5.6 DC-2）
 
-        写入链顺序: no-op 检查 → 构造事件 → from_event → config load（只读）→
-        日志 save（失败上抛 = 切换被拒）→ Redis 状态写 → 事件发布（容错）→
-        audit 联动（可选 + 降级）。日志先于状态写（fail-closed——无审计痕迹的
-        切换不允许发生）；审计联动失败降级不回滚（主日志 SSOT 已落盘）。
+        写入链顺序: no-op 检查 → approval_chain 形态校验 → 构造事件 → from_event
+        → config load（只读）→ 日志 save（失败上抛 = 切换被拒）→ Redis 状态写
+        → 事件发布（容错）→ audit 联动（可选 + 降级）。日志先于状态写
+        （fail-closed——无审计痕迹的切换不允许发生）；审计联动失败降级不回滚
+        （主日志 SSOT 已落盘）。
+
+        Args:
+            approval_chain: 审批链（tuple/list 形态——str 一律拒：str 是
+                ``Sequence[str]`` 合法子类型但语义为单审批人字符串，经
+                ``list()`` 会爆裂成单字符序列造成审计数据永久损坏，
+                5-6 R1-F1 双层防御的服务层入口面）。
 
         Raises:
             AgentNotFoundError: Agent 不存在（EXCEPTION_443）
             IsolationStateNotInitializedError: 隔离状态缺失（EXCEPTION_447）
             IsolationLevelNotSupportedError: 等级非法（EXCEPTION_446——实体 switch_to）
-            EntityValidationError: trigger_reason 空/空白（EXCEPTION_242——实体不变量透传）
+            EntityValidationError: trigger_reason 空/空白 或 approval_chain 为
+                str 形态（EXCEPTION_242——实体不变量透传 + 入口形态守卫）
             AgentConfigError: 配置加载失败/TTL 越界（EXCEPTION_440——零日志零
                 Redis 写零事件的干净拒绝）
             StorageError: 存储/日志故障（EXCEPTION_103——日志 save 失败上抛 =
@@ -186,6 +193,15 @@ class IsolationManagementService(IsolationManagementServicePort):
             # 无限续期；Story 5.6: no-op 不得产生日志——审计留痕面与事件语义对齐）
             logger.info("隔离等级同等级 no-op: agent_id=%s level=%s", agent_id, target_level.value)
             return IsolationSwitchResult(switched=False, state=state, event=None)
+
+        # approval_chain 形态守卫（5-6 R1-F1 服务层入口面——插位与事件构造同位：
+        # 守卫序 443→447→no-op 后、状态变异前置校验；str 是 Sequence 合法子类型
+        # 但 list("审批人") 会爆裂成单字符序列——审计数据永久损坏防线）
+        if isinstance(approval_chain, str):
+            raise EntityValidationError(
+                message="approval_chain 不能为字符串（单审批人请传单元素序列，字符串会被逐字符爆裂）",
+                context={"approval_chain": str(approval_chain)},
+            )
 
         # 事件构造（audit-first 插位上移——Story 5.6: from_event 消费该事件对象；
         # 六字段输入在 no-op 检查后全部就绪，与 Redis save 无依赖）
@@ -238,7 +254,7 @@ class IsolationManagementService(IsolationManagementServicePort):
                     old_value={"level": previous_level.value},
                     new_value={
                         "level": target_level.value,
-                        "reason": trigger_reason,
+                        "reason": state.last_trigger_reason,  # strip 后单源（与事件/日志双投影一致——R1-F12 审计对账文本等值）
                         "approval_chain": list(approval_chain),
                     },
                     correlation_id=str(event.event_id),

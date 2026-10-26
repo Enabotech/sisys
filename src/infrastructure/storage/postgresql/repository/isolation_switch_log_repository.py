@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.entities.isolation_switch_log import IsolationSwitchLog
 from src.domain.events.enums import IsolationLevel
-from src.domain.exceptions import StorageError
+from src.domain.exceptions import EntityValidationError, StorageError
 from src.domain.ports.isolation_switch_log_repository import (
     IsolationSwitchLogQuery,
     IsolationSwitchLogRepository,
@@ -174,7 +174,13 @@ class PostgreSQLIsolationSwitchLogRepository(IsolationSwitchLogRepository):
             count_stmt = count_stmt.where(condition)
 
         total = (await session.execute(count_stmt)).scalar_one()
-        items_stmt = base.order_by(IsolationSwitchLogModel.switch_timestamp.desc()).offset(query.offset).limit(query.limit)
+        # 排序: switch_timestamp 降序 + log_id 次级键——同刻多行（微秒精度可同值）
+        # 在 offset 分页下无次级键会跨页重复/丢行（R1-F13 确定性分页）
+        items_stmt = (
+            base.order_by(IsolationSwitchLogModel.switch_timestamp.desc(), IsolationSwitchLogModel.log_id)
+            .offset(query.offset)
+            .limit(query.limit)
+        )
         models = (await session.execute(items_stmt)).scalars().all()
         return IsolationSwitchLogSearchResult(
             items=tuple(self._to_entity(model) for model in models),
@@ -200,12 +206,36 @@ class PostgreSQLIsolationSwitchLogRepository(IsolationSwitchLogRepository):
     @staticmethod
     def _to_entity(model: IsolationSwitchLogModel) -> IsolationSwitchLog:
         """ORM 模型 → 实体（等级 value→枚举 / 审批链 list→tuple / **丢弃 created_at**
-        ——实体八字段无 created_at，行创建审计列仅 DB 侧，检索投影不传）。"""
+        ——实体八字段无 created_at，行创建审计列仅 DB 侧，检索投影不传）。
+
+        Raises:
+            EntityValidationError: 等级列值不在 ``IsolationLevel`` 枚举域
+                （EXCEPTION_242——脏行（直插旁路写入越域值，migration 016 值域
+                CHECK 前的存量行）重建枚举的裸 ``ValueError`` 会穿透
+                ``(SQLAlchemyError, OSError)`` 包装链违反异常体系契约，且单条
+                脏行毒化整页检索——对齐 ``DomainEvent.from_dict`` 畸形 payload
+                包装先例，R1-F4）。
+        """
+        try:
+            previous_level = IsolationLevel(model.previous_level)
+            target_level = IsolationLevel(model.target_level)
+        except ValueError as exc:
+            raise EntityValidationError(
+                message=(
+                    f"日志行等级值越域（previous={model.previous_level!r} target={model.target_level!r}"
+                    "——不在 IsolationLevel 枚举域，疑似直插脏行）"
+                ),
+                context={
+                    "log_id": str(model.log_id),
+                    "previous_level": str(model.previous_level),
+                    "target_level": str(model.target_level),
+                },
+            ) from exc
         return IsolationSwitchLog(
             log_id=model.log_id,
             agent_id=model.agent_id,
-            previous_level=IsolationLevel(model.previous_level),
-            target_level=IsolationLevel(model.target_level),
+            previous_level=previous_level,
+            target_level=target_level,
             trigger_reason=model.trigger_reason,
             approval_chain=tuple(model.approval_chain),
             switch_timestamp=model.switch_timestamp,

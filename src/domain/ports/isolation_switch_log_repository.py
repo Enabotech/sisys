@@ -49,7 +49,11 @@ class IsolationSwitchLogQuery:
         limit: 分页上限（默认 50，上限 500——防失控全表拉取）。
 
     Raises:
-        EntityValidationError: offset<0 / limit<=0 / limit>500（EXCEPTION_242）。
+        EntityValidationError: offset<0 / limit<=0 / limit>500；agent_id 非 UUID
+            实例；level 非 ``IsolationLevel`` 枚举实例（str,Enum 混入语义 hash
+            穿透——isinstance 先行双条件，5-4 R3-F01 教训的 Query 侧延伸）；
+            start_time/end_time 非 datetime 实例或 naive；start_time > end_time
+            （EXCEPTION_242——全部边界拒绝）。
     """
 
     agent_id: uuid.UUID | None = None
@@ -60,7 +64,7 @@ class IsolationSwitchLogQuery:
     limit: int = 50
 
     def __post_init__(self) -> None:
-        """分页参数守卫（242——边界拒绝）。"""
+        """查询参数守卫（242——分页边界 + 类型/时区/区间拒绝）。"""
         if self.offset < 0:
             raise EntityValidationError(
                 message="offset 不能为负",
@@ -75,6 +79,30 @@ class IsolationSwitchLogQuery:
             raise EntityValidationError(
                 message="limit 不能超过 500（防失控全表拉取）",
                 context={"limit": self.limit},
+            )
+        if self.agent_id is not None and not isinstance(self.agent_id, uuid.UUID):
+            raise EntityValidationError(
+                message=f"agent_id 必须为 UUID 实例（实际类型 {type(self.agent_id).__name__}）",
+                context={"agent_id": str(self.agent_id)},
+            )
+        if self.level is not None and not isinstance(self.level, IsolationLevel):
+            # 双条件 isinstance 先行：裸 str "L4" 经 hash 穿透 ``in`` 判定后
+            # 深入 PG 实现以 AttributeError 逃逸异常体系（R1-F5）
+            raise EntityValidationError(
+                message=f"level 必须为 IsolationLevel 枚举实例（实际类型 {type(self.level).__name__}）",
+                context={"level": str(self.level)},
+            )
+        for field_name in ("start_time", "end_time"):
+            value = getattr(self, field_name)
+            if value is not None and (not isinstance(value, datetime) or value.tzinfo is None):
+                raise EntityValidationError(
+                    message=f"{field_name} 必须为带时区的 datetime 实例（naive 时间在跨时区部署下过滤语义歧义）",
+                    context={field_name: str(value)},
+                )
+        if self.start_time is not None and self.end_time is not None and self.start_time > self.end_time:
+            raise EntityValidationError(
+                message="start_time 不能晚于 end_time（反转时间窗以空结果静默呈现会与「该时段确无切换」不可区分）",
+                context={"start_time": str(self.start_time), "end_time": str(self.end_time)},
             )
 
 

@@ -96,6 +96,22 @@ def reset_session(token: Token) -> None:
     _session_ctx.reset(token)
 
 
+def clear_session() -> None:
+    """免 Token 清除当前上下文的 AsyncSession（置回未设置态）.
+
+    用于无法取得原 ``set_session`` Token 的防御性复位场景——如测试场景
+    探测到前序场景泄漏的 session（原 Token 在泄漏方手里不可得）时主动
+    消除僵尸前提（``set None`` 与「从未设置」在 ``get_session``/
+    ``get_session_optional`` 语义下等价——值域本就含 None）。
+
+    Usage::
+
+        if get_session_optional() is not None:
+            clear_session()  # 泄漏自愈，消除僵尸 session 干扰
+    """
+    _session_ctx.set(None)
+
+
 @asynccontextmanager
 async def session_context(
     session_factory: async_sessionmaker[AsyncSession],

@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, Index, String, text
+from sqlalchemy import CheckConstraint, DateTime, Index, String, Text, event, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,6 +54,12 @@ class IsolationSwitchLogModel(Base):
             "previous_level != target_level",
             name="ck_isolation_switch_logs_not_noop",
         ),
+        # CHECK: 等级值域对齐 IsolationLevel 全枚举域（migration 016 同名镜像——
+        # ORM/migration 双向一致；防直插越域脏行毒化检索面，R1-F4）
+        CheckConstraint(
+            "previous_level IN ('L1','L2','L3','L4') AND target_level IN ('L1','L2','L3','L4')",
+            name="ck_isolation_switch_logs_level_domain",
+        ),
         # 查询索引五（level 双向命中 or_ 两臂皆索引化）
         Index("ix_isolation_switch_logs_agent", "agent_id"),
         Index("ix_isolation_switch_logs_switch_ts", "switch_timestamp"),
@@ -65,7 +72,9 @@ class IsolationSwitchLogModel(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(UUID(), nullable=False)
     previous_level: Mapped[str] = mapped_column(String(20), nullable=False)
     target_level: Mapped[str] = mapped_column(String(20), nullable=False)
-    trigger_reason: Mapped[str] = mapped_column(String(), nullable=False)
+    # Text 对齐 migration 015（R1-F19——String 无长度与 Text 在 PG 等价但
+    # DDL 形态漂移 create_all 兜底路径）
+    trigger_reason: Mapped[str] = mapped_column(Text(), nullable=False)
     approval_chain: Mapped[list[str]] = mapped_column(JSONB(), nullable=False, default=list)
     switch_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     worm_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -94,6 +103,45 @@ class IsolationSwitchLogModel(Base):
         self.worm_ref = worm_ref
         if created_at is not None:
             self.created_at = created_at
+
+
+# =============================================================================
+# RLS 防篡改 DDL 的 create_all 路径对齐（after_create 钩子）
+# =============================================================================
+# 背景：ensure_alembic_migration 的 create_all 兜底路径（alembic 超时/失败时）
+# 只执行 ORM 元数据（表/索引/CheckConstraint），不执行 migration 015 的
+# op.execute RLS 语句——兜底建的表缺 RLS 策略，防篡改语义失真（CI 冷启动
+# 超时实测形态，2026-10-25）。after_create 使 create_all 建表时同步执行同款
+# RLS DDL，两条建表路径产出一致；对已存在的表（checkfirst 跳过）不触发，
+# alembic 正规路径不受影响。
+
+_RLS_CREATE_PATH_STATEMENTS = (
+    "ALTER TABLE isolation_switch_logs ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE isolation_switch_logs FORCE ROW LEVEL SECURITY",
+    """
+    CREATE POLICY isolation_switch_logs_insert ON isolation_switch_logs
+    FOR INSERT WITH CHECK (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_select ON isolation_switch_logs
+    FOR SELECT USING (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    FOR UPDATE USING (false) WITH CHECK (false)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    FOR DELETE USING (false)
+    """,
+)
+
+
+@event.listens_for(IsolationSwitchLogModel.__table__, "after_create")
+def _apply_rls_on_create_all(target: Any, connection: Any, **kwargs: Any) -> None:
+    """create_all 建表时同步应用 RLS 四策略 + FORCE（与 migration 015 同款）."""
+    for statement in _RLS_CREATE_PATH_STATEMENTS:
+        connection.exec_driver_sql(statement)
 
 
 __all__ = ["IsolationSwitchLogModel"]

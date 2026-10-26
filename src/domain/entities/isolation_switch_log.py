@@ -73,7 +73,20 @@ class IsolationSwitchLog:
 
         Returns:
             IsolationSwitchLog: 新建日志实体（log_id 自铸 UUID4、worm_ref=None）。
+
+        Raises:
+            EntityValidationError: approval_chain 非 list 形态（EXCEPTION_242——
+                str/tuple 等一律拒；事件 payload 契约为 list[str]，非 list 输入
+                经 ``tuple()`` 会将 str 爆裂成单字符序列——审计数据永久损坏
+                防御，5-6 R1-F1）。
         """
+        if not isinstance(event.approval_chain, list):
+            raise EntityValidationError(
+                message=(
+                    f"事件 approval_chain 必须为 list 形态（实际类型 {type(event.approval_chain).__name__}——str 爆裂防御）"
+                ),
+                context={"approval_chain": str(event.approval_chain)},
+            )
         return cls(
             log_id=uuid.uuid4(),
             agent_id=event.agent_id,
@@ -87,7 +100,7 @@ class IsolationSwitchLog:
     def __post_init__(self) -> None:
         """实体不变量校验（失败抛 ``EntityValidationError`` 242）.
 
-        五场景（context 形态 ``{字段名: 实际值}``——对齐 isolation_state 先例，
+        六场景（context 形态 ``{字段名: 实际值}``——对齐 isolation_state 先例，
         逐字段名稳定可断言）:
         ① agent_id / log_id 非 UUID 实例拒（合法 UUID 字符串同拒——isinstance 判定）；
         ② previous_level / target_level 非 ``IsolationLevel`` 枚举实例拒
@@ -96,7 +109,10 @@ class IsolationSwitchLog:
         ③ ``previous_level == target_level`` 拒（切换语义不变量——no-op 不得
           产生日志；与 PG CheckConstraint 构成双层防线）；
         ④ trigger_reason 非 str 或空白拒；
-        ⑤ approval_chain 非 tuple 拒 + 元素非 str 或空白串拒。
+        ⑤ approval_chain 非 tuple 拒 + 元素非 str 或空白串拒；
+        ⑥ switch_timestamp 非 ``datetime`` 实例或 naive（无 tzinfo）拒——审计
+          时间戳必须时区明确（timestamptz 列 + ``to_dict`` ISO 8601 带偏移的
+          实体侧前提；naive 输入在不同部署时区解读歧义，5-6 R1-F6）。
 
         Raises:
             EntityValidationError: 任一不变量不满足（EXCEPTION_242）。
@@ -142,6 +158,11 @@ class IsolationSwitchLog:
                     message="approval_chain 元素必须为非空字符串",
                     context={"approval_chain": str(self.approval_chain), "invalid_member": str(member)},
                 )
+        if not isinstance(self.switch_timestamp, datetime) or self.switch_timestamp.tzinfo is None:
+            raise EntityValidationError(
+                message="switch_timestamp 必须为带时区的 datetime 实例（naive 时间戳在跨时区部署下审计解读歧义）",
+                context={"switch_timestamp": str(self.switch_timestamp)},
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """全字段可序列化字典（对齐 audit_log.to_dict 序列化惯例）.

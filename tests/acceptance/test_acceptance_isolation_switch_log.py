@@ -1158,11 +1158,58 @@ def given_one_log_persisted(context: dict[str, Any]) -> None:
     context["log_repository"] = repo
 
 
+#: RLS 就位 ensure 的幂等 DDL（与集成侧同款——migration 015 四策略 + ENABLE +
+#: FORCE；DROP IF EXISTS 后 CREATE 重复安全；策略 DDL 事务性随测试事务回收）
+_RLS_ENSURE_STATEMENTS = (
+    "ALTER TABLE isolation_switch_logs ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE isolation_switch_logs FORCE ROW LEVEL SECURITY",
+    "DROP POLICY IF EXISTS isolation_switch_logs_insert ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_select ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_deny_update ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_deny_delete ON isolation_switch_logs",
+    """
+    CREATE POLICY isolation_switch_logs_insert ON isolation_switch_logs
+    FOR INSERT WITH CHECK (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_select ON isolation_switch_logs
+    FOR SELECT USING (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    FOR UPDATE USING (false) WITH CHECK (false)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    FOR DELETE USING (false)
+    """,
+)
+
+
+def _ensure_rls_policies(context: dict[str, Any]) -> None:
+    """RLS 策略就位保障（create_all 兜底建表路径不建 RLS——CI 超时兜底后
+    SET ROLE 断言失真形态；探测 pg_policies 缺失时幂等补建）."""
+    from sqlalchemy import text
+
+    pg = _ensure_pg_session(context)
+    count = _run_async(
+        context["_loop"],
+        pg["session"].execute(
+            text("SELECT COUNT(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs'")
+        ),
+    ).scalar_one()
+    if count >= 4:
+        return
+    for statement in _RLS_ENSURE_STATEMENTS:
+        _run_async(context["_loop"], pg["session"].execute(text(statement)))
+
+
 @given("已建立非绕过连接形态（非绕过直连或 superuser 临时降权 SET ROLE）")
 def given_non_bypass_role(context: dict[str, Any]) -> None:
     """RLS 非绕过形态保障（任一环境真实实证——不依赖非 superuser 应用角色预置）.
 
-    三分支:
+    前置 RLS 策略就位 ensure（create_all 兜底路径不建 RLS——CI 超时兜底后
+    SET ROLE 断言失真形态，2026-10-25 CI 实测定谳）。三分支:
     - 非绕过直连（非 superuser/非 bypassrls/非 owner）→ 直接走断言；
     - superuser（本地/CI 默认 postgres）→ 事务内 CREATE ROLE 临时降权角色 +
       GRANT + SET ROLE（PG 的 CREATE ROLE/GRANT 是事务性的——teardown rollback
@@ -1177,6 +1224,7 @@ def given_non_bypass_role(context: dict[str, Any]) -> None:
     """
     from sqlalchemy import text
 
+    _ensure_rls_policies(context)
     pg = _ensure_pg_session(context)
     probe = _run_async(
         context["_loop"],

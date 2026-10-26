@@ -78,6 +78,7 @@ from src.domain.events.enums import IsolationLevel
 from src.domain.exceptions import (
     AgentRoleNotSupportedError,
     DomainError,
+    EntityValidationError,
     IsolationLevelNotSupportedError,
     ValidationError,
 )
@@ -772,20 +773,14 @@ def _run_isolation_logs_cli(
     Returns:
         退出码（0=成功（含空结果），1=业务异常——446/201/103）
     """
-    # 多守卫（先于 bootstrap——输入错误无需初始化端口注册表）
+    # 多守卫（先于 bootstrap——输入错误无需初始化端口注册表；Query 构造（242
+    # 守卫：反转时间窗/越界分页等）同属输入校验面——纯 dataclass 构造零依赖，
+    # 上移保持守卫序原则，R1-F21）
     try:
         agent_id = _parse_optional_agent_uuid(agent_id_raw)
         level = _parse_isolation_level(level_raw) if level_raw is not None else None
         start_time = _parse_optional_iso_datetime(start_raw, "--start")
         end_time = _parse_optional_iso_datetime(end_raw, "--end")
-    except (ValidationError, IsolationLevelNotSupportedError) as error:
-        logger.error("%s", error)
-        print(f"[{error.code}] {error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        repo = resolve("isolation_switch_log_repository")
         query = IsolationSwitchLogQuery(
             agent_id=agent_id,
             start_time=start_time,
@@ -794,6 +789,14 @@ def _run_isolation_logs_cli(
             offset=offset,
             limit=limit,
         )
+    except (ValidationError, IsolationLevelNotSupportedError, EntityValidationError) as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        repo = resolve("isolation_switch_log_repository")
         result = asyncio.run(_search_isolation_logs(repo, query))
         _print_isolation_logs_summary(result)
         logger.info("隔离切换日志检索完成: total=%s offset=%d limit=%d", result.total, offset, limit)

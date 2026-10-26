@@ -349,6 +349,61 @@ async def sample_success_rate(redis_client: Any) -> dict[str, Any]:
     return result
 
 
+#: RLS 就位 ensure 的幂等 DDL（与 migration 015 同款四策略 + ENABLE + FORCE——
+#: DROP IF EXISTS 后 CREATE，重复执行安全；策略 DDL 事务性——随测试事务
+#: rollback 回收，不污染目标库）
+_RLS_ENSURE_STATEMENTS = (
+    "ALTER TABLE isolation_switch_logs ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE isolation_switch_logs FORCE ROW LEVEL SECURITY",
+    "DROP POLICY IF EXISTS isolation_switch_logs_insert ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_select ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_deny_update ON isolation_switch_logs",
+    "DROP POLICY IF EXISTS isolation_switch_logs_deny_delete ON isolation_switch_logs",
+    """
+    CREATE POLICY isolation_switch_logs_insert ON isolation_switch_logs
+    FOR INSERT WITH CHECK (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_select ON isolation_switch_logs
+    FOR SELECT USING (true)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_update ON isolation_switch_logs
+    FOR UPDATE USING (false) WITH CHECK (false)
+    """,
+    """
+    CREATE POLICY isolation_switch_logs_deny_delete ON isolation_switch_logs
+    FOR DELETE USING (false)
+    """,
+)
+
+
+async def _ensure_rls_policies(session: Any) -> bool:
+    """RLS 策略就位保障（ensure 语义——ensure_alembic_migration 同哲学）.
+
+    背景：create_all 兜底建表路径（alembic 超时/失败时）只建 ORM 元数据声明的
+    表/索引/CheckConstraint，**不建 RLS 策略**（op.execute 的 SQL 不在 metadata）
+    ——CI 冷启动超 60s 触发兜底后表无 RLS，SET ROLE 降权断言失真（UPDATE 1 行）。
+    本 ensure 探测 pg_policies 策略计数，缺失时幂等补建（DDL 事务性随测试事务
+    回收）——RLS deny 语义断言在任何建表路径下均有效。
+
+    Returns:
+        是否执行了补建（False=策略本就在位）。
+    """
+    from sqlalchemy import text
+
+    count = (
+        await session.execute(
+            text("SELECT COUNT(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'isolation_switch_logs'")
+        )
+    ).scalar_one()
+    if count >= 4:
+        return False
+    for statement in _RLS_ENSURE_STATEMENTS:
+        await session.execute(text(statement))
+    return True
+
+
 # ===================================================================
 # 九场景
 # ===================================================================
@@ -432,14 +487,18 @@ async def test_scenario_3_audit_first_fail_closed(real_redis: Any) -> None:
     127.0.0.1:1 connection refused → StorageError 包装 → Redis 未变 + 零事件）."""
     from src.domain.entities.agent import AgentRole
     from src.domain.exceptions import StorageError
-    from src.infrastructure.storage.postgresql.session_context import get_session_optional
+    from src.infrastructure.storage.postgresql.session_context import clear_session, get_session_optional
 
     bad_repo, bad_engine = _make_bad_log_repository()
     agent_ids: list[uuid.UUID] = []
     try:
         # 硬前提：本场景不设 ContextVar session（设了则坏仓储命中好 session
-        # 永不触发 StorageError——僵尸场景）
-        assert get_session_optional() is None or True  # 泄漏不阻断（reset 由场景① finally 保证）
+        # 永不触发 StorageError——僵尸场景）。原「assert ... or True」恒真式
+        # （R1-F2——声明的守卫实际不存在）改为泄漏自愈：探测到前序场景泄漏
+        # 的 session 时免 Token 主动清除（原 Token 在泄漏方手里不可得——
+        # clear_session 置 None 与未设置语义等价）
+        if get_session_optional() is not None:
+            clear_session()
 
         chain = _assemble_real_chain(real_redis, log_repository=bad_repo)
         instantiation = await chain["use_case"].execute(role=AgentRole.CEO)
@@ -639,9 +698,12 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
         assert not inserted, "no-op 直插应触发 CheckConstraint IntegrityError"
 
         # RLS 非绕过形态保障（与验收 AC-4.1 同款——任一环境真实实证）:
-        # 非绕过直连直接断言；superuser 经事务内 CREATE ROLE + GRANT + SET ROLE
-        # 临时降权（角色随测试事务 rollback 自动回收）；owner 子查询限定 public
-        # schema（多 schema 同名表 CardinalityViolation 干扰面）
+        # 前置 RLS 策略就位 ensure（create_all 兜底路径不建 RLS——CI 超时兜底
+        # 后 SET ROLE 断言失真形态，2026-10-25 CI 实测定谳）；非绕过直连直接
+        # 断言；superuser 经事务内 CREATE ROLE + GRANT + SET ROLE 临时降权
+        # （角色随测试事务 rollback 自动回收）；owner 子查询限定 public schema
+        # （多 schema 同名表 CardinalityViolation 干扰面）
+        await _ensure_rls_policies(pg_session)
         probe = (
             await pg_session.execute(
                 text(
