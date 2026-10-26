@@ -638,14 +638,16 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
             )
         assert not inserted, "no-op 直插应触发 CheckConstraint IntegrityError"
 
-        # RLS 探测（superuser 无论 FORCE 与否都绕过——含 rolsuper 防误判；
-        # owner 子查询限定 public schema——多 schema 同名表会使子查询多行炸
-        # CardinalityViolationError，与验收 AC-4.1 同款修复）
+        # RLS 非绕过形态保障（与验收 AC-4.1 同款——任一环境真实实证）:
+        # 非绕过直连直接断言；superuser 经事务内 CREATE ROLE + GRANT + SET ROLE
+        # 临时降权（角色随测试事务 rollback 自动回收）；owner 子查询限定 public
+        # schema（多 schema 同名表 CardinalityViolation 干扰面）
         probe = (
             await pg_session.execute(
                 text(
                     "SELECT (SELECT rolsuper OR rolbypassrls FROM pg_roles "
                     "WHERE rolname = current_user) AS bypass, "
+                    "(SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS is_super, "
                     "(SELECT pg_roles.rolname = current_user FROM pg_class "
                     "JOIN pg_roles ON pg_roles.oid = pg_class.relowner "
                     "WHERE pg_class.relname = 'isolation_switch_logs' "
@@ -653,11 +655,18 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
                 )
             )
         ).fetchone()
-        if probe[0] or probe[1]:
-            pytest.skip(
-                "RLS deny 断言需非绕过连接（rolsuper/rolbypassrls 或表 owner 绕过——"
-                "本地/CI 默认 postgres superuser 下恒 skip 属预期；断言活性由变异实证保证）"
-            )
+        bypass, is_super, is_owner = probe[0], probe[1], probe[2]
+        probe_role: str | None = None
+        if bypass or is_owner:
+            if not is_super:
+                pytest.skip(
+                    "RLS deny 断言需非绕过连接（bypassrls/owner 属性绕过 RLS 且非 "
+                    "superuser 无 CREATE ROLE 权限无法临时降权——需预置非绕过应用角色）"
+                )
+            probe_role = f"rls_probe_{uuid.uuid4().hex[:8]}"
+            await pg_session.execute(text(f"CREATE ROLE \"{probe_role}\" LOGIN PASSWORD '{uuid.uuid4().hex}'"))
+            await pg_session.execute(text(f'GRANT SELECT, INSERT, UPDATE, DELETE ON isolation_switch_logs TO "{probe_role}"'))
+            await pg_session.execute(text(f'SET ROLE "{probe_role}"'))
 
         # 变异锚注记：删 migration deny 行 → 此断言红（Task 4 变异实证）
         found = await repo.search(
@@ -682,6 +691,8 @@ async def test_scenario_6_rls_and_check_constraint(real_redis: Any, pg_session: 
             )
         ).rowcount
         assert deleted == 0, "DELETE 应被 RLS deny（0 行）"
+        if probe_role is not None:
+            await pg_session.execute(text("RESET ROLE"))  # 会话级复位（角色随事务回收）
     finally:
         reset_session(token)
 

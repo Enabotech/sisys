@@ -101,7 +101,7 @@
   场景: AC-4.1 - RLS 篡改拒绝
     假如 PostgreSQL 服务可用
     并且 真实切换日志已落库一条
-    并且 数据库连接角色为非绕过（rolsuper/rolbypassrls/owner 任一即跳过）
+    并且 已建立非绕过连接形态（非绕过直连或 superuser 临时降权 SET ROLE）
     当 尝试 UPDATE 修改日志行 target_level
     那么 影响 0 行（deny UPDATE）
     当 尝试 DELETE 删除日志行

@@ -244,7 +244,7 @@ jobs:
       - name: 运行单元测试
         run: |
           mkdir -p reports/coverage reports/pytest
-          poetry run pytest tests/unit \
+          poetry run pytest tests/unit -rs \
             --cov=src \
             --cov-report=xml:reports/coverage/coverage.xml \
             --cov-report=html:reports/coverage/coverage.html \
@@ -372,7 +372,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p reports/integration
-          poetry run pytest tests/integration tests/contracts \
+          poetry run pytest tests/integration tests/contracts -rs \
             --junitxml=reports/integration/integration-tests.xml \
             --html=reports/integration/integration-tests.html \
             --self-contained-html \
@@ -422,7 +422,7 @@ jobs:
       - name: 验收测试
         shell: bash
         run: |
-          poetry run pytest tests/acceptance \
+          poetry run pytest tests/acceptance -rs \
             --junitxml=reports/acceptance/acceptance-tests.xml \
             --html=reports/acceptance/acceptance-tests.html \
             --self-contained-html \

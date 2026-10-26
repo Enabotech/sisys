@@ -152,6 +152,14 @@ def context(
 
         reset_session(pg["token"])
         _run_async(event_loop, pg["session"].rollback())
+        if "_rls_probe_role" in ctx:
+            # RLS 降权探针双保险复位（角色本体已随事务 rollback 回收；RESET ROLE
+            # 防连接池归还会话的 SET ROLE 状态残留——engine dispose 已杜绝复用，
+            # 此处再显式复位）
+            from sqlalchemy import text
+
+            _run_async(event_loop, pg["session"].execute(text("RESET ROLE")))
+            ctx.pop("_rls_probe_role")
         _run_async(event_loop, pg["session"].close())
         _run_async(event_loop, pg["engine"].close())
         _run_async(event_loop, pg["engine"].get_async_engine().dispose())
@@ -1150,9 +1158,18 @@ def given_one_log_persisted(context: dict[str, Any]) -> None:
     context["log_repository"] = repo
 
 
-@given("数据库连接角色为非绕过（rolsuper/rolbypassrls/owner 任一即跳过）")
+@given("已建立非绕过连接形态（非绕过直连或 superuser 临时降权 SET ROLE）")
 def given_non_bypass_role(context: dict[str, Any]) -> None:
-    """RLS 环境探测（superuser 无论 FORCE 与否都绕过 RLS——漏 rolsuper 会误判）.
+    """RLS 非绕过形态保障（任一环境真实实证——不依赖非 superuser 应用角色预置）.
+
+    三分支:
+    - 非绕过直连（非 superuser/非 bypassrls/非 owner）→ 直接走断言；
+    - superuser（本地/CI 默认 postgres）→ 事务内 CREATE ROLE 临时降权角色 +
+      GRANT + SET ROLE（PG 的 CREATE ROLE/GRANT 是事务性的——teardown rollback
+      随测试事务自动回收，零残留；SET ROLE 后 current_user 非 owner 非
+      superuser → FORCE RLS 真实生效，UPDATE/DELETE 断言 0 行）；
+    - 非 superuser 且有 bypassrls/owner 属性（无 CREATE ROLE 权限且无法自建
+      降权角色）→ 动态 skip（唯一残余 skip 面——理论环境，常规部署不出现）。
 
     owner 子查询限定 public schema：全量运行时其他测试的隔离 schema（真实服务
     Schema 隔离模式）中也存在同名表——不限定的子查询返回多行触发
@@ -1167,6 +1184,7 @@ def given_non_bypass_role(context: dict[str, Any]) -> None:
             text(
                 "SELECT (SELECT rolsuper OR rolbypassrls FROM pg_roles "
                 "WHERE rolname = current_user) AS bypass, "
+                "(SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS is_super, "
                 "(SELECT pg_roles.rolname = current_user FROM pg_class "
                 "JOIN pg_roles ON pg_roles.oid = pg_class.relowner "
                 "WHERE pg_class.relname = 'isolation_switch_logs' "
@@ -1174,12 +1192,31 @@ def given_non_bypass_role(context: dict[str, Any]) -> None:
             )
         ),
     ).fetchone()
-    bypass, is_owner = probe[0], probe[1]
-    if bypass or is_owner:
-        pytest.skip(
-            "RLS deny 断言需非绕过连接（当前角色 rolsuper/rolbypassrls 或表 owner 绕过 RLS——"
-            "本地/CI 默认 postgres superuser 下本场景恒 skip 属预期；断言活性由变异实证保证）"
+    bypass, is_super, is_owner = probe[0], probe[1], probe[2]
+    if not (bypass or is_owner):
+        return  # 分支①: 非绕过直连——直接走断言
+    if not is_super:
+        pytest.skip(  # 分支③: 非 superuser 的 bypassrls/owner 绕过（无 CREATE ROLE 权限）
+            "RLS deny 断言需非绕过连接（当前角色 bypassrls/owner 属性绕过 RLS 且非 "
+            "superuser 无 CREATE ROLE 权限无法临时降权——需预置非绕过应用角色）"
         )
+    # 分支②: superuser 临时降权（SET ROLE 后同 session 连接的 UPDATE/DELETE 受
+    # FORCE RLS 约束——真实断言；角色经测试事务 rollback 自动回收）
+    probe_role = f"rls_probe_{uuid.uuid4().hex[:8]}"
+    probe_password = uuid.uuid4().hex
+    _run_async(
+        context["_loop"],
+        pg["session"].execute(text(f"CREATE ROLE \"{probe_role}\" LOGIN PASSWORD '{probe_password}'")),
+    )
+    _run_async(
+        context["_loop"],
+        pg["session"].execute(text(f'GRANT SELECT, INSERT, UPDATE, DELETE ON isolation_switch_logs TO "{probe_role}"')),
+    )
+    _run_async(
+        context["_loop"],
+        pg["session"].execute(text(f'SET ROLE "{probe_role}"')),
+    )
+    context["_rls_probe_role"] = probe_role
 
 
 @when("尝试 UPDATE 修改日志行 target_level")
