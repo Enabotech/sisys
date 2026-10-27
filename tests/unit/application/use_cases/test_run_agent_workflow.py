@@ -336,3 +336,101 @@ class TestIsolationGuardWiring:
         with pytest.raises(AgentRoleNotSupportedError):
             await use_case.execute(agent_id=uuid.uuid4(), task="任务")
         mocks["isolation_guard"].ensure_agent_executable.assert_not_awaited()
+
+
+# ===================================================================
+# Story 5.7 — execute 根 span 与 MVP 十项属性（@trace + 属性写入块）
+# ===================================================================
+
+
+class TestExecuteRootSpanAttributes:
+    """Story 5.7 — 根 span 自动创建 + MVP 十项业务属性逐键断言 + NoOp 基线等价。
+
+    测试通道（SSOT）：被装饰方法 span 只经全局 API 可观测——function-scope
+    autouse「双复位 → 注入 provider 经 initialize 全局 set → teardown 双复位」。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _tracing_global_channel(self) -> Any:
+        """装饰器链路测试通道（注入 provider 经 initialize——R2 传播补）。"""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from src.infrastructure.config.phoenix import PhoenixConfig
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = PhoenixTracer(
+            config=PhoenixConfig(enabled=True, project_name="sisys-agent", sampling_ratio=1.0),
+            tracer_provider=provider,
+        )
+        assert tracer.initialize() is True
+        self._exporter = exporter
+        yield exporter
+        PhoenixTracer.reset_for_testing()
+
+    def _assemble_with_real_profile(self) -> tuple[Any, dict[str, Any]]:
+        """装配链（profile stub 带真实计量值——Mock auto-attr 会炸 OTel set_attribute 类型校验）。"""
+        from types import SimpleNamespace
+
+        mocks = _make_mocks()
+        agent = mocks["repository"].get_by_id.return_value
+        profile_result = SimpleNamespace(
+            agent_id=agent.agent_id,
+            role=AgentRole.CEO,
+            profile=Mock(),
+            tools_l1=(Mock(), Mock(), Mock()),
+            startup_context_tokens=4321,
+        )
+        mocks["profile_use_case"].execute.return_value = profile_result
+        _wire_engine_success(mocks)
+        use_case = _make_use_case(mocks)
+        return use_case, {"agent": agent, "profile_result": profile_result, "mocks": mocks}
+
+    async def test_execute_root_span_with_ten_attributes(self) -> None:
+        """execute → agent_execution 根 span + MVP 十项属性逐键相等（数据源钉死——AC-3.1）。"""
+        from src.application.ports.agent_tracing import SpanAttributeKeys
+
+        use_case, materials = self._assemble_with_real_profile()
+        agent = materials["agent"]
+        profile_result = materials["profile_result"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1, "应恰有一个 agent_execution 根 span"
+        root = roots[0]
+        attributes = root.attributes
+        assert attributes is not None, "根 span 应有属性集"
+        assert attributes[SpanAttributeKeys.AGENT_ID] == str(agent.agent_id)
+        assert attributes[SpanAttributeKeys.AGENT_ROLE] == agent.role.value
+        assert attributes[SpanAttributeKeys.AGENT_NAME] == agent.name
+        assert attributes[SpanAttributeKeys.AGENT_STARTUP_CONTEXT_TOKENS] == profile_result.startup_context_tokens
+        assert attributes[SpanAttributeKeys.AGENT_ACTIVE_SKILL_COUNT] == len(profile_result.tools_l1) == 3
+        assert attributes[SpanAttributeKeys.WORKFLOW_STATUS] == result.workflow_status == "completed"
+        assert attributes[SpanAttributeKeys.WORKFLOW_RETRY_COUNT] == result.retry_count == 0
+        assert attributes[SpanAttributeKeys.WORKFLOW_EXECUTED_PHASES] == tuple(result.executed_phases)
+        assert attributes[SpanAttributeKeys.EVAL_CONFIDENCE] == result.evidence.confidence == 0.85
+        assert attributes[SpanAttributeKeys.EVIDENCE_INPUT_HASH] == result.evidence.input_hash == "a" * 64
+
+    async def test_execute_noop_baseline_matches_5_3(self) -> None:
+        """NoOp（全局未 set）下 execute 返回值与 5-3 基线一致（装饰器 overhead 仅一层函数调用）。"""
+        import opentelemetry.trace as otel_trace
+        from opentelemetry.trace import ProxyTracerProvider
+
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()  # NoOp 前提（前置双复位——R3-2 前提测试条款）
+        assert isinstance(otel_trace.get_tracer_provider(), ProxyTracerProvider)
+
+        use_case, _ = self._assemble_with_real_profile()
+        result = await use_case.execute(agent_id=uuid.uuid4(), task="分析任务")
+
+        assert result.workflow_status == "completed"
+        assert result.retry_count == 0
+        assert result.executed_phases == ("perceive", "plan", "execute", "verify", "package")
+        assert result.evidence.input_hash == "a" * 64

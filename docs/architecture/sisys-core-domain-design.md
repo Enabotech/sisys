@@ -1597,6 +1597,19 @@ class SAPMessage(BaseModel):
 
 **技术选型：** Phoenix (Arize) - 完全开源（Apache 2.0），LLM 原生可观测性平台
 
+> **Story 5.7 实现注记（OD-1 映射）**：本节下方伪码的 `from phoenix.tracing import
+> trace` 是 2023 年代已废弃旧 API（Phoenix 官方生态已迁移 OpenInference/OpenTelemetry，
+> 现入口为 `phoenix.otel.register`）。Story 5.7（FR-EV-01 追踪面）以仓内既有
+> opentelemetry ^1.21.0 实现同构语义落地：`PhoenixTracer(project_name="sisys-agent")`
+> → OTel Resource `service.name` 承载（Phoenix OTLP 接收端按 service.name 归项目）；
+> `@trace` 装饰器 → OTel 全局 API 手动插桩（`src/application/tracing.py`）；span 属性
+> `eval.hallucination_score`/`eval.context_relevance`/`drift.detected` 键常量注册于
+> `SpanAttributeKeys`（`src/application/ports/agent_tracing.py`——5.8/5.9 经此填值）。
+> 未引入 arize-phoenix 运行时依赖（依赖树钉 opentelemetry-sdk==1.45.0 强制升级仓内
+> OTel 栈威胁 1.3 事件总线集成——回归面不可控；Phoenix 官方客户端模式本就支持
+> 「任意 OTLP 导出 + Phoenix server 独立部署」）。OpenInference LLM span 语义约定
+> （llm.* 属性族）触发时由 Story 5.8 按需评估引入（deferred-work 登记）。
+
 ```python
 from phoenix.tracing import trace
 from phoenix.evals import llm_eval_binary_classifier

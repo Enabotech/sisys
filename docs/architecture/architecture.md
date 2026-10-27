@@ -2036,7 +2036,8 @@ src/infrastructure/
 │   ├── __init__.py
 │   ├── otel_config.py                                     # OpenTelemetry 配置
 │   ├── metrics.py                                         # Prometheus 指标
-│   └── business_metrics.py                                # 业务指标
+│   ├── business_metrics.py                                # 业务指标
+│   └── phoenix_tracer.py                                  # Phoenix 全链路追踪（Story 5.7——OTel SDK 实现）
 │
 ├── routing/                                               # 路由服务（已实现）
 │   ├── hash_router_impl.py                                # FNV-1a 一致性哈希路由
@@ -2631,6 +2632,15 @@ buckets/
 | 资源监控 | USE 指标（Utilization/Saturation/Errors） | Node Exporter |
 | 业务监控 | 决策采纳率、规划完成率、NPS、用户修正率 | 自定义指标 |
 | 漂移检测 | CUSUM 算法检测连续性能下降 | 滑动窗口 7 天 |
+
+> **Story 5.7 交付注记（FR-EV-01 追踪面）**：Agent 全链路追踪已落地——`PhoenixTracer`
+> （`src/infrastructure/monitoring/phoenix_tracer.py`，OTel SDK 原生实现：project_name
+> 经 OTel Resource `service.name` 承载，span 经 OTLP gRPC 指向独立部署的 Phoenix
+> server）+ `@trace` 装饰器（`src/application/tracing.py`，agent_execution 根 span +
+> agent.{phase} 六阶段子 span 树）+ `AgentTracingPort`/`SpanAttributeKeys` 常量注册表
+> （5.8 评估/5.9 漂移检测的 span 属性写入通道）+ `ExecutionContext.trace_id` run 级
+> 贯通。未引入 arize-phoenix 运行时依赖（实现口径见 sisys-core-domain-design §17.3.8
+> 实现注记）；评估指标面（eval.* 生产填值）归 Story 5.8、CUSUM 漂移检测归 5.9。
 
 ---
 

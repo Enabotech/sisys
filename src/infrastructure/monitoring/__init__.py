@@ -13,6 +13,7 @@ from .otel_config import (
     reset_for_testing,
     shutdown,
 )
+from .phoenix_tracer import PhoenixTracer
 
 __all__ = [
     "BatchExportConfig",
@@ -23,6 +24,7 @@ __all__ = [
     "MetricsAggregator",
     "OpenTelemetryTracer",
     "OtelConfig",
+    "PhoenixTracer",
     "init",
     "reset_for_testing",
     "shutdown",

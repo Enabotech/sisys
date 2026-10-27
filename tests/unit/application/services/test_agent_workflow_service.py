@@ -936,3 +936,89 @@ class TestToolAllowlistPreflight:
         asyncio.run(service.execute(state))
         guard.ensure_tool_access.assert_not_awaited()
         registry.get_tool.assert_not_called()
+
+
+# ===================================================================
+# Story 5.7 — 六阶段 @trace 装饰器 + trace_id 派生（5-3 预留位核销）
+# ===================================================================
+
+
+class TestStory57PhaseDecorators:
+    """Story 5.7 — 六方法装饰器在位（inspect 锚）+ execute 阶段 trace_id 与 span 一致。
+
+    trace_id 贯通依赖全局通道（真 span 前提）——fixture「双复位 → 注入 provider
+    经 initialize 全局 set → teardown 双复位」（SSOT 通道分派：装饰器链路测试
+    必须经 initialize 全局通道）。
+    """
+
+    def test_six_phase_methods_decorated(self) -> None:
+        """inspect 锚：六方法 __wrapped__ 在位 + __name__ 不变（纯附加装饰——静态面）。"""
+        from src.application.services.agent_workflow_service import AgentWorkflowService
+
+        for phase in ("perceive", "plan", "execute", "verify", "reflect", "package_evidence"):
+            method = getattr(AgentWorkflowService, phase)
+            assert hasattr(method, "__wrapped__"), f"六阶段方法 {phase} 应有 @trace 装饰器"
+            assert method.__name__ == phase
+
+    @pytest.fixture(autouse=True)
+    def _tracing_global_channel(self) -> Any:
+        """装饰器链路测试通道（注入 provider 经 initialize 全局 set）。"""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from src.infrastructure.config.phoenix import PhoenixConfig
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = PhoenixTracer(
+            config=PhoenixConfig(enabled=True, project_name="sisys-agent", sampling_ratio=1.0),
+            tracer_provider=provider,
+        )
+        assert tracer.initialize() is True
+        self._exporter = exporter
+        yield exporter
+        PhoenixTracer.reset_for_testing()
+
+    async def test_execute_phase_trace_id_matches_span(self) -> None:
+        """trace_id 贯通：ExecutionContext.trace_id == agent.execute span 的 trace hex（32 位小写）。"""
+        fake_llm = _make_fake_llm(plan_tool_names=("PESTEL 分析",))
+        registry, execution_service = _make_tool_mocks()
+        service = _make_service(fake_llm, registry, execution_service)
+
+        state = _make_state()
+        state["plan"] = await service.plan(state)
+        await service.execute(state)
+
+        captured = [call.args[2] for call in execution_service.execute.call_args_list]
+        assert captured, "链应含 ≥1 工具步（ExecutionContext 构造点前提）"
+        execute_spans = [s for s in self._exporter.get_finished_spans() if s.name == "agent.execute"]
+        assert execute_spans, "execute 阶段应产生 agent.execute 子 span"
+        expected_hex = format(execute_spans[0].context.trace_id, "032x")
+        assert {ctx.trace_id for ctx in captured} == {expected_hex}, (
+            f"ExecutionContext.trace_id 应为 {expected_hex}（与 span 同 trace），实际 { {ctx.trace_id for ctx in captured} }"
+        )
+
+    async def test_execute_phase_trace_id_all_zero_when_noop(self) -> None:
+        """NoOp 降级：全局未 set 时 trace_id 为全零 32 位 hex（INVALID_SPAN 的 trace_id==0 格式化形态）。"""
+        import opentelemetry.trace as otel_trace
+        from opentelemetry.trace import ProxyTracerProvider
+
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()  # NoOp 前提（前置双复位）
+        assert isinstance(otel_trace.get_tracer_provider(), ProxyTracerProvider)
+
+        fake_llm = _make_fake_llm(plan_tool_names=("PESTEL 分析",))
+        registry, execution_service = _make_tool_mocks()
+        service = _make_service(fake_llm, registry, execution_service)
+
+        state = _make_state()
+        state["plan"] = await service.plan(state)
+        await service.execute(state)
+
+        captured = [call.args[2] for call in execution_service.execute.call_args_list]
+        assert {ctx.trace_id for ctx in captured} == {"0" * 32}, "NoOp 链 trace_id 应为全零 32 位 hex"

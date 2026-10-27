@@ -5,6 +5,13 @@
 - 定义应用层特定方法
 """
 
+from src.application.ports.agent_tracing import (
+    AgentTracingPort,
+    SpanAttributeKeys,
+    SpanAttributeValue,
+    SpanHandle,
+    SpanNames,
+)
 from src.application.ports.compressor_service import CompressorService
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.application.ports.event_subscriber import EventSubscriber
@@ -19,6 +26,7 @@ from src.application.ports.session_cache_port import SessionCachePort
 from src.application.ports.text_extractor_service import TextExtractorService
 
 __all__ = [
+    "AgentTracingPort",
     "CompressorService",
     "DocumentStoragePort",
     "EventSubscriber",
@@ -30,5 +38,9 @@ __all__ = [
     "PublicBlackboard",
     "SemanticCache",
     "SessionCachePort",
+    "SpanAttributeKeys",
+    "SpanAttributeValue",
+    "SpanHandle",
+    "SpanNames",
     "TextExtractorService",
 ]

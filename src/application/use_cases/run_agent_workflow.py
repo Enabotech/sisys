@@ -36,8 +36,12 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+from opentelemetry.trace import get_current_span
+
+from src.application.ports.agent_tracing import SpanAttributeKeys, SpanNames
 from src.application.ports.agent_workflow import AgentWorkflowResult, AgentWorkflowServicePort
 from src.application.ports.isolation_guard import IsolationGuardPort
+from src.application.tracing import trace
 from src.application.use_cases.agent_instantiation import SUPPORTED_ROLES
 from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
 from src.domain.exceptions import AgentNotFoundError, AgentRoleNotSupportedError
@@ -83,8 +87,9 @@ class RunAgentWorkflowUseCase:
         self._workflow_service = agent_workflow_service
         self._isolation_guard = isolation_guard
 
+    @trace(SpanNames.AGENT_EXECUTION)
     async def execute(self, agent_id: UUID, task: str) -> AgentWorkflowResult:
-        """执行单 Agent 工作流（守卫 → 装配 → 图执行 → 结果组装）
+        """执行单 Agent 工作流（守卫 → 装配 → 图执行 → 结果组装）——agent_execution 根 span（Story 5.7）
 
         Args:
             agent_id: 目标 Agent 实例标识（instantiate 产出的实体 id）
@@ -154,13 +159,31 @@ class RunAgentWorkflowUseCase:
             evidence.status,
             final_state.get("executed_phases"),
         )
-        return AgentWorkflowResult(
+        result = AgentWorkflowResult(
             chain=chain,
             evidence=evidence,
             workflow_status=evidence.status,
             retry_count=final_state.get("retry_count", 0),
             executed_phases=tuple(final_state.get("executed_phases", ())),
         )
+        # Story 5.7 — 根 span MVP 十项业务属性写入（get_current_span 面；is_recording
+        # 守卫——NoOp/未启用时 span 空转零开销；数据源：agent 实体[role/name] +
+        # profile_result[startup_context_tokens + len(tools_l1) 派生 active_skill_count
+        # ——agent_events.py L83 同源口径] + result[status/retry_count/executed_phases]
+        # + result.evidence[confidence/input_hash]）
+        span = get_current_span()
+        if span.is_recording():
+            span.set_attribute(SpanAttributeKeys.AGENT_ID, str(agent_id))
+            span.set_attribute(SpanAttributeKeys.AGENT_ROLE, agent.role.value)
+            span.set_attribute(SpanAttributeKeys.AGENT_NAME, agent.name)
+            span.set_attribute(SpanAttributeKeys.AGENT_STARTUP_CONTEXT_TOKENS, profile_result.startup_context_tokens)
+            span.set_attribute(SpanAttributeKeys.AGENT_ACTIVE_SKILL_COUNT, len(profile_result.tools_l1))
+            span.set_attribute(SpanAttributeKeys.WORKFLOW_STATUS, result.workflow_status)
+            span.set_attribute(SpanAttributeKeys.WORKFLOW_RETRY_COUNT, result.retry_count)
+            span.set_attribute(SpanAttributeKeys.WORKFLOW_EXECUTED_PHASES, result.executed_phases)
+            span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE, result.evidence.confidence)
+            span.set_attribute(SpanAttributeKeys.EVIDENCE_INPUT_HASH, result.evidence.input_hash)
+        return result
 
 
 __all__ = ["RunAgentWorkflowUseCase"]

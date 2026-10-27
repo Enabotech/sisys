@@ -26,9 +26,9 @@ src/application/ports/agent_workflow.py——Task 0 规范唯一真源）；Lang
   tools_used←真实轨迹覆写禁 LLM 复述、reflection/constraints_check/
   final_answer←终局合成；VO 构造 242 捕获改写 445 携 missing_fields——异常
   契约三层次序②，数据断供自然走该路径）
-- ExecutionContext 构造注记：trace_id 默认空串——空串散列进同一版本桶
-  （tool_version_service 灰度路由语义），run 级 trace_id 归 5.7 追踪接入，
-  MVP 空串可接受
+- ExecutionContext 构造注记：trace_id = 当前 span trace hex（Story 5.7 已接入
+  ——get_current_span 32 位小写十六进制；NoOp 全零形态与空串散列进不同版本桶，
+  防呆注记见 5-7 故事 AC-3）
 """
 
 from __future__ import annotations
@@ -40,6 +40,9 @@ import logging
 import uuid
 from typing import Any
 
+from opentelemetry.trace import get_current_span
+
+from src.application.ports.agent_tracing import SpanNames
 from src.application.ports.agent_workflow import (
     ExecutionResult,
     PackageOutcome,
@@ -64,6 +67,7 @@ from src.application.services.agent_workflow_schemas import (
     ReflectionSchema,
     VerificationSchema,
 )
+from src.application.tracing import trace
 from src.domain.exceptions import (
     EntityValidationError,
     LLMAPIError,
@@ -159,8 +163,9 @@ class AgentWorkflowService:
     # 六阶段
     # ------------------------------------------------------------------
 
+    @trace(f"{SpanNames.PHASE_PREFIX}perceive")
     async def perceive(self, state: dict[str, Any]) -> PerceptionResult:
-        """感知阶段（任务上下文摘要）。
+        """感知阶段（任务上下文摘要）——agent.perceive 子 span（Story 5.7）。
 
         Args:
             state: 工作流状态（含 context）
@@ -175,8 +180,11 @@ class AgentWorkflowService:
         )
         return PerceptionResult(summary=schema.summary)
 
+    @trace(f"{SpanNames.PHASE_PREFIX}plan")
     async def plan(self, state: dict[str, Any]) -> PlanResult:
         """规划阶段（任务分解与工具匹配——重试轮回灌 revised_plan，R2-F4）。
+
+        span：agent.plan 子 span（Story 5.7）。
 
         Args:
             state: 工作流状态（含 context 与可选 reflection 产物）
@@ -195,8 +203,9 @@ class AgentWorkflowService:
         steps = tuple((step.description, step.tool_name, dict(step.arguments)) for step in schema.steps)
         return PlanResult(steps=steps, selected_tools=tuple(schema.selected_tools))
 
+    @trace(f"{SpanNames.PHASE_PREFIX}execute")
     async def execute(self, state: dict[str, Any]) -> ExecutionResult:
-        """执行阶段（阶段级聚合——按 plan 步骤逐步经工具执行服务）。
+        """执行阶段（阶段级聚合——按 plan 步骤逐步经工具执行服务）——agent.execute 子 span（Story 5.7）。
 
         每步原子循环映射（DC-8/DC-10）：Think 已由 plan 产物承载；Code/
         Execute 走 tool_execution_service.execute（装饰链承载 4-3 校验与
@@ -253,7 +262,12 @@ class AgentWorkflowService:
             )
             execution_context = ExecutionContext(
                 tenant_id=context.tenant_id,
-                trace_id="",  # run 级 trace_id 归 5.7 追踪接入（MVP 空串进同一版本桶）
+                # run 级 trace_id（Story 5.7 核销 5-3 预留位）：当前 agent.execute
+                # 子 span 上下文内派生（与根 span 同 trace）——工具执行层灰度路由
+                # 键与 span 同 trace 贯通；NoOp 时为全零 32 位 hex（INVALID_SPAN
+                # trace_id==0 的格式化形态——与空串散列进不同版本桶，防呆注记见
+                # 5-7 故事 AC-3：canary 活跃时 NoOp 流量路由可能翻转）
+                trace_id=format(get_current_span().get_span_context().trace_id, "032x"),
             )
             result = await self._tool_execution_service.execute(tool.tool_id, tool_call, execution_context)
             tool_trace.append(f"{tool.name}:{tool.version}")
@@ -270,8 +284,9 @@ class AgentWorkflowService:
             citations=tuple(citations),
         )
 
+    @trace(f"{SpanNames.PHASE_PREFIX}verify")
     async def verify(self, state: dict[str, Any]) -> VerificationResult:
-        """验证阶段（结构化检查——执行产物摘要入 prompt）。
+        """验证阶段（结构化检查——执行产物摘要入 prompt）——agent.verify 子 span（Story 5.7）。
 
         Args:
             state: 工作流状态（含 execution 聚合产物）
@@ -292,8 +307,9 @@ class AgentWorkflowService:
             rationale=schema.rationale,
         )
 
+    @trace(f"{SpanNames.PHASE_PREFIX}reflect")
     async def reflect(self, state: dict[str, Any]) -> ReflectionResult:
-        """反思阶段（验证失败依据入 prompt——错误分析与修正计划）。
+        """反思阶段（验证失败依据入 prompt——错误分析与修正计划）——agent.reflect 子 span（Story 5.7）。
 
         Args:
             state: 工作流状态（含 verification 失败产物）
@@ -314,8 +330,11 @@ class AgentWorkflowService:
             revised_plan=schema.revised_plan,
         )
 
+    @trace(f"{SpanNames.PHASE_PREFIX}package")
     async def package_evidence(self, state: dict[str, Any]) -> PackageOutcome:
         """证据打包阶段（终局思维链合成 + 九字段证据组装——DC-2）。
+
+        span：agent.package 子 span（Story 5.7——span 名末段对齐 executed_phases 枚举）。
 
         终局合成一次 structured_generate(ChainOfThoughtSchema)（prompt 携带
         各阶段产物摘要）；组装覆写：input_summary←perceive 产物、tools_used←

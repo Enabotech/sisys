@@ -2961,6 +2961,40 @@ def bootstrap() -> None:
         tags=("agent", "isolation", "audit"),
     )
 
+    # === Story 5.7 — Phoenix 全链路追踪（PhoenixTracer + @trace 装饰器 + agent_tracing 端口）===
+    # AgentTracingPort — Agent 评估可观测族（5.7 追踪/5.8 评估/5.9 漂移检测）应用
+    # 契约；OTel SDK 实现（OD-1 零新运行时依赖——project_name 经 Resource
+    # service.name 承载，span 经 OTLP gRPC 指向独立部署 Phoenix server）；
+    # SINGLETON——Epic 5 全家政策（isolation 四注册块连先例）+ PhoenixTracer
+    # 持 provider 单例语义天然 SINGLETON（initialize 实例闩幂等）；lambda 直构
+    # from_env（config 构造轻量零依赖——无需独立端口；⚠️ SINGLETON 实例 config
+    # 在首次 resolve 构造期定格——env 后置变更不经 resolve 传导，设计事实
+    # 见 5-7 DC-9）；enabled=false 默认 NoOp 零开销（DC-7 纯旁路哲学）
+    register_port(
+        name="agent_tracing",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_tracing",
+            fromlist=["AgentTracingPort"],
+        ).AgentTracingPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.monitoring.phoenix_tracer",
+            fromlist=["PhoenixTracer"],
+        ).PhoenixTracer(
+            config=__import__(
+                "src.infrastructure.config.phoenix",
+                fromlist=["PhoenixConfig"],
+            ).PhoenixConfig.from_env(),
+        ),
+        module="src.infrastructure.monitoring.phoenix_tracer",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "observability", "tracing"),
+    )
+    # Story 5.7 initialize 接线（enabled=false 默认 NoOp 零开销；配置错误
+    # warning 降级跳过不阻断主链启动——DC-7；独立可调用单元便于负路径直测）
+    _wire_agent_tracing()
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
@@ -2998,6 +3032,26 @@ def bootstrap() -> None:
                 asyncio.new_event_loop().run_until_complete(async_register())
             except Exception as e:
                 logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
+
+
+def _wire_agent_tracing() -> None:
+    """Story 5.7 — agent_tracing 端口 initialize 接线（独立可调用单元——负路径直测）。
+
+    try 罩住整段（resolve + isinstance + initialize——R2-6）：lambda 构造期
+    from_env 的 101 抛在 resolve 时发生，只包 initialize 罩不住；配置 typo 只
+    损失观测面不阻断主链启动（DC-7 旁路哲学——追踪连「拒绝主链」语义都没有）。
+    enabled=false 时 initialize 返回 False NoOp 零开销。
+    """
+    try:
+        from src.application.ports.agent_tracing import AgentTracingPort
+        from src.domain.exceptions import ConfigurationError
+        from src.domain.ports.resolver import get_resolver
+
+        tracer = get_resolver().resolve("agent_tracing")
+        if isinstance(tracer, AgentTracingPort):
+            tracer.initialize()
+    except ConfigurationError as error:
+        logger.warning("agent_tracing 初始化降级跳过（NoOp 态——追踪配置错误不阻断主链）: %s", error)
 
 
 async def shutdown() -> None:
