@@ -89,7 +89,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 | OTel SDK 三件套 | pyproject.toml L88-90（opentelemetry-api/sdk/exporter-otlp ^1.21.0，poetry.lock 实锁 1.44.0） | **直接复用——零新运行时依赖**（OD-1）；InMemorySpanExporter/SimpleSpanProcessor 由 opentelemetry-sdk 自带（测试零新依赖）——⚠️ R1 实测锁定的 1.44.0：`from opentelemetry.sdk.trace.export import InMemorySpanExporter` **失败**（包 `__init__` 已不再 re-export），正确路径 `from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter`（SimpleSpanProcessor 仍可从包级导入） |
 | `init()/shutdown()/reset_for_testing()` 生命周期三件套 | `src/infrastructure/monitoring/otel_config.py` L167/L277/L315-339（含 `trace._TRACER_PROVIDER = None` 内部状态复位——⚠️ R1 实测该单复位形态在锁定版 1.44.0 受 Once 闩锁约束不恢复 re-set） | **参考照抄（R2 校准）**——initialize/shutdown 同构照抄；**reset_for_testing 必须双复位（非照抄**：`trace._TRACER_PROVIDER = None` + `_TRACER_PROVIDER_SET_ONCE = Once()` 重建——见测试隔离约束节**）**；⚠️ 不改动 otel_config.py 本体（event-bus 域资产零侵入；「默认配置下唯一激活 setter」声明见 DC-5） |
 | `create_span` contextmanager + None 降级 | `src/infrastructure/monitoring/event_metrics.py` L227-273（`@contextmanager` + `trace.get_tracer(...)` + `start_as_current_span` + `set_attribute` 点分键 + 未启用 `yield None`[含 ImportError/Exception 双降级分支]） | **参考照抄**——PhoenixTracer.create_span 同构骨架（差异**四项**：attributes 参数化 + **tracer 双源解析**[注入 provider 优先经 `tracer_provider=` 参数——R2-1 钉死，None 降级判据是「无 tracer 来源」非「未 initialize」] + handle 返回 OTel Span 原生对象——duck-type SpanHandle 协议零包装层 + **构造器零全局副作用**[R3-13：event_metrics 模板构造器在 enabled 时调 init() set 全局——照抄陷阱；PhoenixTracer 构造器纯赋值，全局动作唯一在 initialize()]） |
-| `MetricsConfig.from_env()` 形态 | `src/infrastructure/config/metrics.py` L12-55（frozen dataclass + from_env + bool 三态解析） | **参考照抄**——PhoenixConfig（enabled/endpoint/project_name/sampling 四字段 + `__post_init__` 101 守卫） |
+| `MetricsConfig.from_env()` 形态 | `src/infrastructure/config/metrics.py` L12-55（普通 dataclass——frozen 为 PhoenixConfig 自设加严规格[R5 清偿] + from_env + bool 三态解析） | **参考照抄**——PhoenixConfig（enabled/endpoint/project_name/sampling 四字段 + `__post_init__` 101 守卫） |
 | `MetricsPort` / `CacheMetricsPort` 端口形态 | `src/application/ports/metrics_port.py` + `cache_metrics_port.py`（runtime_checkable Protocol + 方法 docstring + Raises 契约） | **参考照抄**——AgentTracingPort（SpanHandle 协议方法签名直接对齐 OTel Span 方法名——set_attribute/record_exception/set_status，duck-type 零包装） |
 | `SemanticCacheMiddleware` 装饰器/包装埋点范式 | `src/application/services/semantic_cache_middleware.py`（应用层包装器 + 端口注入 + 组合根装配） | **范式参照**——@trace 是其在方法装饰器维度的延伸（DC-4 论证静态装饰走 OTel 全局 API） |
 | 端口契约测试 11 维度 + `_DummyResolver` | `tests/contracts/test_port_contract_isolation_switch_log_repository.py`（113 行——PORT_NAME/EXPECTED_TAGS/REQUIRED_METHODS 类常量 + 11 维度[9 拆 9a/9b] + Dummy 分发） | **参考照抄**——test_port_contract_agent_tracing.py 同款结构 |
@@ -133,10 +133,10 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 **Given** PhoenixTracer 已 initialize（**测试链级场景统一通道**：场景级新 TracerProvider + SimpleSpanProcessor + InMemorySpanExporter 经 `PhoenixTracer(config=测试配置, tracer_provider=注入).initialize()`——initialize 履行全局 set 唯一职责，**场景 teardown 强制 reset_for_testing 双复位**（见测试隔离约束节——R1 实测 Once 闩锁）；工作流链 = 5-3 手工装配形态：Fake LLM[AsyncMock spec 端口按 Schema 身份分派] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase）
 **When** 调用 `RunAgentWorkflowUseCase.execute(agent_id, task)` 执行六阶段工作流
 **Then** **根 span `agent_execution`** 自动创建（@trace("agent_execution")——span 名 epics 钦定；span kind 默认 INTERNAL——进程内工作流正确形态）+ **六阶段子 span** `agent.perceive`/`agent.plan`/`agent.execute`/`agent.verify`/`agent.reflect`/`agent.package`（span 名对齐 `executed_phases` 枚举——**末阶段钉死 "package" 非 package_evidence**，5-3 谓词键对照表对齐）依执行序创建；**parent 链**：六子 span 的 parent 均为 agent_execution 根（同进程 async 上下文传播——OTel contextvars 机制；R1 主会话探针实证：嵌套 + asyncio 并发子任务 parent 链全部正确挂根）；**重试轮**：verify→reflect→plan 循环再入时 `agent.plan`/`agent.execute`/`agent.verify`/`agent.reflect` 多实例均合法（重试环是 plan→execute→verify→reflect 四方法再入——图条件边 `_route_after_verify`/`_route_after_reflect`；span 序列 == executed_phases 序列——一致性断言）
-**And** **异常路径**：被装饰方法抛 DomainError 时 span 记录 `Status ERROR` + `record_exception`（异常事件），随后**原样上抛**（追踪零吞异常——装饰器不改异常语义；链级注入 Fake LLM 抛 LLMError 时经 `_structured_call` 包装后实际透传的是 `AgentWorkflowError`(444)——断言按 444 包装异常写，5-3 既有断言零回归）；**未启用降级**：全局 provider 未 set（NoOp tracer——NoOp 判据是全局 provider 状态而非 enabled 配置）时零 span 产生 + 主链行为与 5-3 完全一致（装饰器 overhead 仅一层函数调用）；装饰器 `functools.wraps` 保签名（`__name__`/`__doc__` 保留——mypy ParamSpec 泛型签名不窄化）
+**And** **异常路径**：被装饰方法抛 DomainError 时 span 记录 `Status ERROR` + `record_exception`（异常事件），随后**原样上抛**（追踪零吞异常——装饰器不改异常语义；链级注入 Fake LLM 抛 LLMAPIError 时经 `_structured_call` 包装后实际透传的是 `AgentWorkflowError`(444)——断言按 444 包装异常写，5-3 既有断言零回归）；**未启用降级**：全局 provider 未 set（NoOp tracer——NoOp 判据是全局 provider 状态而非 enabled 配置）时零 span 产生 + 主链行为与 5-3 完全一致（装饰器 overhead 仅一层函数调用）；装饰器 `functools.wraps` 保签名（`__name__`/`__doc__` 保留——mypy ParamSpec 泛型签名不窄化）
 
 **验证标准/Validation Criteria:**
-- [ ] InMemory exporter 取 span 列表：根 span 名 == "agent_execution" + 六子 span 名集合断言（**链形态钉 fail-once**——R3-9：happy 链仅 5 个阶段 span 使六名集合断言不可满足；fail-once 链含全部六阶段名 + plan/verify/reflect 再入）+ 执行序断言（perceive→plan→execute→verify→reflect→plan→verify→package）
+- [ ] InMemory exporter 取 span 列表：根 span 名 == "agent_execution" + 六子 span 名集合断言（**链形态钉 fail-once**——R3-9：happy 链仅 5 个阶段 span 使六名集合断言不可满足；fail-once 链含全部六阶段名 + plan/execute/verify/reflect 再入）+ 执行序断言（perceive→plan→execute→verify→reflect→plan→**execute→**verify→package——R5 清偿：9 阶段序列，第二轮 plan→execute→verify 线性边，与「根+9 阶段=10 span」自洽）
 - [ ] parent 链断言（每子 span.parent.span_id == 根 span.context.span_id——ReadableSpan 自身 id 在 `.context`；根 parent 为空）
 - [ ] 重试轮 span 序列 == executed_phases 终态序列（同源一致）
 - [ ] 异常路径：注入 Fake LLM 抛 **LLMAPIError**（R3-7 钉死注入类型——异常体系无 LLMError 类名；LLMConfigError/CancelledError 会被 `_structured_call` 透传不包装，选错则 444 断言必红；LLMAPIError 属 LLM 族包装为 AgentWorkflowError 444）→ span status ERROR + events 含 exception + `pytest.raises(AgentWorkflowError)` 断言 code 444（链级语义——包装异常透传，装饰器不改写）
@@ -726,7 +726,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - [x] 四视角并行代码调研（可观测性基础设施 / Agent 工作流 5.1-5.6 / 端口契约与注册 / 测试模板与基建——关键事实独立验证：OTel 依赖现状/otel_config 生命周期/create_span 降级先例/trace_id 预留位/AgentWorkflowResult 数据源/importlinter 边界/reset_for_testing 复位机制）
 - [x] Web 技术调研（arize-phoenix 20.26.1 版本/依赖树/`phoenix.tracing.trace` 旧 API 废弃/`phoenix.otel.register` 现代入口/OTel 全局单次设置约束 #8639——OD-1 事实依据）
 - [x] 状态设置为 `ready-for-dev`
-- [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-9 设计决策 + OD-1~OD-4 偏离声明 + 风险七项）
+- [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-9 设计决策 + OD-1~OD-4 偏离声明 + 风险七项——R1 审查后增补 #8/#9 现为九项，见风险登记表）
 - [x] 项目结构对齐统一规范
 
 ### 文件清单 File List
@@ -830,7 +830,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | R3-5 | AC-1.1 双路径均调 initialize 但 SSOT initialize-调用者枚举漏本场景（括号枚举仅 AC-1.2/AC-4.1）——按字面漏 teardown 击穿 AC-1.2 前提 | P2 | SSOT 枚举补 AC-1.1 |
 | R3-6 | Task 2 模块级 initialize fixture × NoOp 用例中途双复位互拆：NoOp 清全局后模块 fixture 不重建，靠列序（后续恰为静态断言）侥幸闭合——序耦合未文档化 | P2 | NoOp 用例钉「finally 重新 initialize 重建全局」义务（或列模块尾 + 后续仅静态断言注记） |
 | R3-7 | AC-2.2 注入异常类型未钉：异常体系无 LLMError 类名——LLMConfigError/CancelledError 被 `_structured_call` 透传不包装，选错则 444 断言必红 | P2 | 注入类型钉死 **LLMAPIError**（LLM 族→444 包装） |
-| R3-8 | P95「≈P97」标签不准（exclusive [18] 实测 [1..20]→19.95——是 P95 估计量贴次大样本形态非 P97）；AC-2.1 链形态未钉（happy 链仅 5 阶段 span 使六名集合断言不可满足）；Task 0.7 红形态未钉；Task 5.1「既有防线」残留；AST 清单漏 ports/__init__.py；继承清单差异项漏「构造器零全局副作用」（event_metrics 模板构造器 enabled 时 init 全局——照抄陷阱）；AC-4.3「纯附加声明」断言面未具体化 | P3 | 逐项收敛七处（口径标签/链形态钉 fail-once/红形态「14 failed 非 collection error」/新建防线措辞/清单补全/差异四项/构造签名不变断言） |
+| R3-8 | P95「≈P97」标签不准（exclusive [18] 实测 [1..20]→19.95——是 P95 估计量贴次大样本形态非 P97）；AC-2.1 链形态未钉（happy 链仅 5 阶段 span 使六名集合断言不可满足）；Task 0.7 红形态未钉；Task 5.1「既有防线」残留；AST 清单漏 ports/__init__.py；继承清单差异项漏「构造器零全局副作用」（event_metrics 模板构造器 enabled 时 init 全局——照抄陷阱）；AC-4.3「纯附加声明」断言面未具体化 | P3 | 逐项收敛七处（**子项编号映射[R5 清偿]**：R3-9=链形态/AC-2.1 L139、R3-10=红形态 L378、R3-11=既有防线措辞 L517、R3-12=AST 清单 L517、R3-13=构造器零全局副作用 L91、R3-14=构造签名断言 L517；P95 口径标签已直接修于 AC-5 无独立标签） |
 
 ---
 
@@ -868,16 +868,36 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 |------|------|---------|
 | 2026-10-27 | v1.0.0 | 创建故事文件（四视角并行调研：可观测性基础设施/Agent 工作流/端口契约/测试模板 + Web 技术调研；9 项关键架构决策 DC-1~DC-9 + 4 项偏离声明 OD-1~OD-4 + 风险七项；OTel SDK 原生实现零新依赖[OD-1——phoenix.tracing 旧 API 废弃 + OTel 栈升级回归风险]；AgentTracingPort + duck-type SpanHandle[DC-2]；@trace 装饰器 OTel 全局 API + NoOp 降级[DC-3]；两级 span 树纯附加接入零构造点回归[DC-4]；OTel 全局状态唯一 setter + 测试注入通道[DC-5]；eval/drift 常量注册+通道口径[OD-2]；5-6 事件消费基建移交裁定归 5.11[OD-4]；5-3 移交三项处置[trace_id 核销/AgentDecided 不接线/R1-DF2 顺延]） |
 | 2026-10-27 | v1.1.0 | 文档审查周期 Round 1（D1 四视角调研 + D2 三审查员[正确性可行性/一致性/科学性业界对标] + 主会话 OTel 探针实证；处置 P0×1 + P1×8 + P2×11 + P3 批量 21 项——详见 Docs Review Fixes 表 R1-1~R1-21。核心：①span 可观测机制自相矛盾 P0——链级场景统一 initialize 全局通道 + 组件级纯注入分派；②OTel 1.44.0 Once 闩锁实证——reset 双复位形态（变量+Once 重建）替代单复位先例；③SpanHandle 两方法化（set_status 静默 no-op 实测）+ 行为断言纪律；④AC-3 数据源逐项钉死（active_skill_count 派生/input_hash·confidence 归 evidence/元断言子集式/全零桶实测修正）；⑤AC-5 确定性延迟 + k 轮中位数；⑥sampling 变量裁决 PHOENIX_TRACES_SAMPLER_ARG；⑦eval.confidence 键名收敛（OpenInference llm.* 前缀族避让）；⑧initialize 唯一全局通道 + 已 set 检测 + bootstrap 配置错误降级；⑨DC-3 应用插桩定位修正 + prd 伪引证删除 + 行号锚批量校准） |
-| 2026-10-27 | v1.2.0 | 文档审查周期 Round 2（回归核查 + 组合交互双审查员；处置 P0×1 + P1×5 + P2×3 + P3×4——R2-1~R2-12。核心：①create_span tracer 双源解析 P0——注入 provider 优先[tracer_provider= 参数]，None 降级判据改「无 tracer 来源」，解 R1-1 注入通道与 initialize 守卫互拆；②复位义务正交条款——凡 initialize 测试一律双复位（含组件级）+ autouse 兜底；③AC-4.1 enabled 传导改场景内直构（SINGLETON config 构造期定格）；④NoOp 观察哨钉读法丙（注入通道观察哨 + proxy 态前提断言）；⑤AC-5.2 块序钉死 + traced 正向锚（幂等闩假绿窗口封堵）；⑥try 罩住整段接线（resolve 构造期 101）；⑦R1 传播漏网 12 处落位[Task 3 双行/SSOT 枚举/继承清单/三组残留/DC-9 行号等]） |
+| 2026-10-27 | v1.2.0 | 文档审查周期 Round 2（回归核查 + 组合交互双审查员；处置 P0×1 + P1×5 + P2×3 + P3×4——R2-1~R2-12。核心：①create_span tracer 双源解析 P0——注入 provider 优先[tracer_provider= 参数]，None 降级判据改「无 tracer 来源」，解 R1-1 注入通道与 initialize 守卫互拆；②复位义务正交条款——凡 initialize 测试一律双复位（含组件级）+ autouse 兜底；③AC-4.1 enabled 传导改场景内直构（SINGLETON config 构造期定格）；④NoOp 观察哨钉读法丙（注入通道观察哨 + proxy 态前提断言）；⑤AC-5.2 块序钉死 + traced 正向锚（幂等闩假绿窗口封堵）；⑥try 罩住整段接线（resolve 构造期 101）；⑦R1 传播漏网 12 处落位[Task 3 双行/SSOT 枚举/继承清单/三组残留/DC-9 行号等]；**分级口径注（R5 清偿）**：台账 12 行，单行分级 P0×1+P1×3+P2×3+P3×4=11 项，R2-12 批量行折算 P1×2——合计 13 项与本行计数自洽） |
 | 2026-10-27 | v1.3.0 | 文档审查周期 Round 3 深度推演（单审查员：15 场景三轴推演 + 7 文件全局状态时间线 + 数学完备性 + 红阶段可达性 + 契约维度适配，全部带推演链条与本机实证[OTel 1.44.0/langgraph 1.2.9/pytest-bdd 8.1.0]；零 P0——R1/R2 关键修复独立复核成立 + LangGraph ainvoke parent 链引擎级实证；处置 P1×2 + P2×5 + P3×7——R3-1~R3-8。核心：①AC-5.2 分母重标——execute 阶段无 LLM 调用（枚举定谳），perf 链形态钉 fail-once[7×20ms/10 span/预算 1.4ms]，span 开销实测 3.1μs 级重标；②前提测试条款——TestInitTracing 全局泄漏点名 + function-scope autouse；③AC-4.1 接线提取 _wire_agent_tracing() 消负路径假绿；④契约 Dummy 裁决单选项；⑤AC-2.2 注入类型钉 LLMAPIError；⑥Task 2 NoOp 重建义务；⑦七处 P3 收敛） |
+| 2026-10-27 | v1.3.1 | 文档审查周期收敛（R4 纯验证零修复[41 行台账全落位 + 30 锚点全存续 + src/ 零漂移实证] + R5 独立终审[周期闭合核对 + 10 项核心修复三向取证成立 + 全文快扫 4 项 P3 + 门禁确认]；收敛清偿 6 项 P3：L136 LLMError→LLMAPIError/L139 执行序补第二个 execute[9 阶段]/L92 frozen 残留/L729 风险计数注/v1.2.0 分级口径注/R3 子项编号映射注；R5-N3[L95 文件名缺后缀]经主会话 grep 定谳为**误报**不修留痕；收敛声明入 Story 见下方——Status 保持 ready-for-dev） |
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-27
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查周期 Round 1 修订（P0×1 + P1×8 + P2×11 + P3 批量——span 可观测机制 SSOT 重写/Once 闩锁双复位/SpanHandle 两方法化/AC-3·AC-5 口径重钉，详见 Docs Review Fixes）
-- v1.2.0: 文档审查周期 Round 2 修订（P0×1 + P1×5 + P2×3 + P3×4——create_span 双源解析/复位义务正交/AC-4.1 直构口径/观察哨读法丙/AC-5.2 块序/R1 传播漏网 12 处，详见 Docs Review Fixes R2-1~R2-12）
+- v1.2.0: 文档审查周期 Round 2 修订（P0×1 + P1×5[含 R2-12 折算] + P2×3 + P3×4——create_span 双源解析/复位义务正交/AC-4.1 直构口径/观察哨读法丙/AC-5.2 块序/R1 传播漏网 12 处，详见 Docs Review Fixes R2-1~R2-12）
 - v1.3.0: 文档审查周期 Round 3 深度推演修订（P1×2 + P2×5 + P3 批量——15 场景三轴推演/7 文件时间线/数学完备性[structured 次数枚举定谳 execute 无 LLM]/LangGraph ainvoke parent 链引擎级实证；perf 链形态钉 fail-once[7×20ms/10 span/预算 1.4ms 实测重标]/前提测试条款[已知泄漏源点名]/AC-4.1 接线提取/契约 Dummy 单选项/AC-2.2 注入类型钉 LLMAPIError，详见 Docs Review Fixes R3-1~R3-8）
+- v1.3.1: 文档审查周期收敛（R4 纯验证 + R5 独立终审；10 项核心修复三向取证成立；收敛清偿 6 项 P3 + 1 项误报留痕；收敛声明见下——Status 保持 ready-for-dev）
+
+---
+
+### 🏁 文档审查周期收敛声明（R1-R5，2026-10-27）
+
+**周期概述**：本 Story 文档自 v1.0.0 创建后经五轮独立审查循环：R1 四视角调研 + 三审查员交叉（41 项发现）→ R2 回归核查 + 组合交互双审查员（12 行台账）→ R3 单审查员深度推演（15 场景三轴 + 7 文件全局状态时间线 + 数学完备性，8 行台账）→ R4 纯验证零修复（41 行台账全落位 + 30 锚点全存续 + src/ 零漂移实证，3 项 P3 记录级）→ R5 独立终审（周期闭合核对 + 10 项核心修复三向取证 + 全文独立快扫 + 门禁确认）。
+
+**轮次投入与产出**：R1（c4337017，v1.1.0）/ R2（32cc9d60，v1.2.0）/ R3（f1a6d408，v1.3.0）三轮修订均只触碰本 Story 文件（并行会话 OCR 提交 3b11b235 已甄别不在本周期）；R4/R5 为验证轮零独立提交。周期内 src/ 与依赖配置零改动。
+
+**最终分级统计**：周期累计修复 **P0×2**（R1-1 span 可观测机制 SSOT、R2-1 create_span 双源解析）+ **P1×15**（R1×8 + R2×5[含 R2-12 折算 P1×2] + R3×2）+ **P2×19**（R1×11 + R2×3 + R3×5）+ **P3 批量**（R1×21 行约 24 处 + R2×4 + R3×7 合一 + R4×3 + R5×4 记录级）。
+
+**关键实证**（R5 三向取证成立）：OTel 1.44.0 Once 闩锁与双复位形态（`_TRACER_PROVIDER_SET_ONCE` L519/L553）；`get_tracer` 的 `tracer_provider=` 双源形参（L527）；`Span.set_status` 联合类型 + isinstance 分支（bool 静默 no-op——SpanHandle 两方法化依据）；InMemorySpanExporter 子模块导入路径；LangGraph ainvoke parent 链引擎级挂根；fail-once 链形态（`_structured_call` 五调用点 + execute 零 LLM 调用 → 7 次 structured/10 span）；三项数据源（len(tools_l1) 派生/result.evidence 字段）；TestInitTracing 全局泄漏源。
+
+**零残留声明**：全部 P0/P1/P2 已修复并经 R5 独立三向取证核实。残留 P3 已随 v1.3.1 收敛提交全部清偿（6 项实修：L136 LLMError→LLMAPIError / L139 执行序补第二个 execute / L92 frozen 残留 / L729 风险计数注 / v1.2.0 分级口径注 / R3 子项编号映射注；1 项误报留痕：R5-N3[L95 文件名]经主会话 grep 定谳实际正确）——**零残留**。
+
+**Status 判定**：`ready-for-dev` 保持——文档已达可实施收敛态，无 P1 及以上阻断项；dev agent 自 Task 0 至 Task 6 依文实施无未定义行为。
+
+**终审签署**：Round 5 独立终审员（Claude Code glm-5.3），2026-10-27，基于 git 考古 + 正文通读 + 仓库/依赖源码独立取证。
