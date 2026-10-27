@@ -23,6 +23,21 @@ import pytest
 from tests.environments import get_test_env
 
 
+def _restore_environ_snapshot(snapshot: dict[str, str]) -> None:
+    """按快照恢复 os.environ（删除新增键 + 还原改动键——对任意写入分支免疫）。
+
+    恢复逻辑单一真源：文件级 autouse fixture 的 teardown 与残留锁用例的
+    用例内手动恢复共享本函数（R9-F01 提取——用例内验证恢复行为无需等待
+    teardown，且两处形态永不漂移）。
+    """
+    for key in list(os.environ):
+        if key not in snapshot:
+            del os.environ[key]
+    for key, value in snapshot.items():
+        if os.environ.get(key) != value:
+            os.environ[key] = value
+
+
 @pytest.fixture(autouse=True)
 def _environ_snapshot_restore() -> Generator[None, None, None]:
     """os.environ 全量快照恢复（文件级 autouse——对任意写入分支免疫）。
@@ -38,12 +53,7 @@ def _environ_snapshot_restore() -> Generator[None, None, None]:
     """
     snapshot = dict(os.environ)
     yield
-    for key in list(os.environ):
-        if key not in snapshot:
-            del os.environ[key]
-    for key, value in snapshot.items():
-        if os.environ.get(key) != value:
-            os.environ[key] = value
+    _restore_environ_snapshot(snapshot)
 
 
 # litellm load_dotenv 注入形态的 dev 端口污染集（.env 同款键值）。
@@ -182,34 +192,71 @@ class TestCiEnvKeepsPortOverrideSemantics:
         assert config.redis.host == "host.docker.internal", "CI_CONFIG 预设 host 选择锁定"
         assert config.redis.port == 6390, "CI 形态下端口 env 覆盖应保留（门控不得误扩到 CI）"
 
-    def test_ci_case_leaves_no_host_pollution_for_successors(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """CI 用例（上一用例）跑完后，同进程后续测试的 ambient 解析 host 不被污染。
+    def test_ci_sync_writes_restored_and_local_parse_not_breaking(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CI 形态解析的 sync 写入面被快照恢复回收，后续 local 形态解析不被击穿。
 
-        回归锁（R6-F01——文件内定义序保证本用例在 CI 用例后执行）：CI 用例的
-        _sync_config_to_environ setdefault 写入面（QDRANT_HOST/NEO4J_HOST 等
-        host.docker.internal 全套）若残留，后续 get_test_env 的 Layer 3 会以
-        残留值覆盖 TEST_CONFIG 的 localhost、生产 from_env 直读同中招——
-        全量跑 Qdrant DNS/Neo4j resolve 失败族的根因形态。
+        回归锁（R6-F01；R9-F01 重构为单用例自含——原「跨用例检查上一用例
+        残留」形态在 xdist loadgroup 下同文件用例可跨 worker 乱序，文件内
+        定义序不构成执行序保证）：CI 分支的 _sync_config_to_environ
+        setdefault 写入面（QDRANT_HOST/NEO4J_HOST 等 host.docker.internal
+        全套）若不被快照恢复回收，后续 get_test_env 的 Layer 3 会以残留值
+        覆盖 TEST_CONFIG 的 localhost、生产 from_env 直读同中招——全量跑
+        Qdrant DNS/Neo4j resolve 失败族的根因形态。
 
-        环境条件化（R8-F01）：本用例锁定的是**本地形态**污染（基线环境不含
-        host.docker.internal 键——R6-F01 爆发环境）；CI job 容器自带全套
-        host.docker.internal 预设键（合法基线，CI_CONFIG 本就指向宿主网络）
-        ——该形态下「值不变」是环境基线而非污染，动态 skip。
+        环境无关化（R9-F01，取代 R8-F01 的 skip 逃避）：CI 进程自带 host 键
+        （get_test_env 首次 CI 解析的 setdefault 进程级残留——CI_CONFIG 指向
+        宿主网络的合法基线）使「值 != host.docker.internal」**绝对形态**断言
+        在 CI 恒红。污染的正确定义是**相对基线的增量变化**而非绝对值——
+        单用例内三段断言在本地/CI 同一路径真实执行：
+
+        ① 驱动 + 恢复：CI 形态解析（含恢复活性探针**直接写**——非 monkeypatch
+          面，快照恢复是其唯一回收通道）后，手动调用与 autouse fixture 同源
+          的 ``_restore_environ_snapshot``（teardown 行为的单一真源）；
+        ② 恢复有效性双锚：探针键被删除（R6-F01 修复行为「删除新增键」的
+          直接锁）+ os.environ 相对驱动前快照零净漂移（判增量不判绝对值
+          ——CI 进程残留 host 键是合法基线，不在断言面）；
+        ③ 净环境 local 形态解析：host 类键清空（delenv 屏蔽本地/CI 基线
+          差异——含 CI 进程残留）后，local+test-ports 解析的 host 恒
+          localhost（残留击穿面的端到端锚）。
         """
-        if any(
-            os.environ.get(key) == "host.docker.internal"
-            for key in ("QDRANT_HOST", "POSTGRES_HOST", "NEO4J_HOST", "RABBITMQ_HOST")
-        ):
-            pytest.skip("CI 环境自带 host.docker.internal 全套预设键（合法基线）——本地形态污染锁不适用")
+        from tests.environments import reset_test_env
 
+        snapshot = dict(os.environ)
+        # 驱动：恢复活性探针（直接写——唯一回收通道是被测的快照恢复）+ CI 形态解析
+        os.environ["SISYS_ENV_RESTORE_PROBE"] = "ci-case-probe"
+        monkeypatch.setenv("SISYS_TEST_ENV", "ci")
+        monkeypatch.setenv("SISYS_USE_TEST_PORTS", "true")
+        config = get_test_env()
+        assert config.env.value == "ci", "驱动有效性自证（CI 形态解析已发生）"
+
+        # 恢复（与 autouse fixture teardown 同源——被测行为本体）
+        _restore_environ_snapshot(snapshot)
+
+        # ② 恢复有效性双锚
+        assert "SISYS_ENV_RESTORE_PROBE" not in os.environ, (
+            "恢复活性探针残留——快照恢复未删除新增键（R6-F01 回归：CI 分支 sync setdefault 写入面将同样残留，毒害后续测试）"
+        )
+        drifted = {
+            key: (snapshot.get(key), os.environ.get(key))
+            for key in set(snapshot) | set(os.environ)
+            if snapshot.get(key) != os.environ.get(key)
+        }
+        assert not drifted, f"CI 形态解析的写入面未恢复（相对驱动前快照净漂移）: {drifted}"
+
+        # ③ 净环境 local 形态解析（delenv 屏蔽两环境基线差异——teardown 自动恢复）
+        reset_test_env()  # 清单例——第二次解析不受 CI 形态单例遮蔽
+        for key in (
+            "REDIS_HOST",
+            "POSTGRES_HOST",
+            "QDRANT_HOST",
+            "NEO4J_HOST",
+            "RABBITMQ_HOST",
+            "MINIO_HOST",
+            "MINIO_ENDPOINT",
+        ):
+            monkeypatch.delenv(key, raising=False)
         _anchor_local_env(monkeypatch)
         monkeypatch.setenv("SISYS_USE_TEST_PORTS", "1")
-
-        # 上一 CI 用例残留检查（快照恢复 fixture 生效则零残留）
-        for key in ("QDRANT_HOST", "NEO4J_HOST", "POSTGRES_HOST", "RABBITMQ_HOST", "MINIO_ENDPOINT"):
-            assert os.environ.get(key) != "host.docker.internal", (
-                f"{key} 残留 host.docker.internal——CI 用例 sync 写入面未恢复，后续测试 host 将被打到不存在的域名"
-            )
 
         config = get_test_env()
         assert config.qdrant.host == "localhost", "TEST_CONFIG 的 qdrant.host 不得被残留 env 覆盖"
