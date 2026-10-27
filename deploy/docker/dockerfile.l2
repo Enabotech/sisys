@@ -45,6 +45,18 @@ FROM base AS ci
 
 USER root
 
+# OCR 运行库（opencv-python——rapidocr 硬依赖的 cv2 需要 libGL/libglib）：
+# 缺失时 CI 容器 from rapidocr import RapidOCR 抛 ImportError 使 OCR 集成/
+# 验收测试整体 skip（2026-10-27 根因实测定谳——libGL.so.1: cannot open
+# shared object file）。装在 L2 ci stage 而非 L1：CI 直接消费 l2-latest，
+# 单点重建分钟级生效；L1 apt 层变更会级联重编 Python 工具链并使本镜像
+# poetry install 全量层缓存失效（整链小时级），为两包运行库不值
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
 # 从 dependencies 阶段复制虚拟环境
 COPY --from=dependencies ${APP_HOME}/.venv ${APP_HOME}/.venv
 

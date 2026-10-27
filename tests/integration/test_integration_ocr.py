@@ -25,14 +25,15 @@ from src.domain.value_objects.parsed_document import ParsedDocument, ParsedEleme
 # ===================================================================
 
 
-def _ocr_adapter_available() -> bool:
-    """检查本地 RapidOCR 引擎是否可用"""
+def _ocr_adapter_unavailable_reason() -> str | None:
+    """检查本地 RapidOCR 引擎是否可用（不可用时返回根因消息——R9 诊断性：
+    原探测吞掉 ImportError 消息，系统库缺失（如 libGL.so.1）这类环境根因
+    只显示「RapidOCR 不可用」，排查被迫重走容器实测）"""
     try:
         from rapidocr import RapidOCR  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+    except ImportError as exc:
+        return f"rapidocr import 失败: {exc}"
+    return None
 
 
 def _create_temp_file(content: str = "test", suffix: str = ".pdf") -> str:
@@ -106,8 +107,9 @@ class TestRapidOCRAdapterIntegration:
     @pytest.mark.asyncio
     async def test_image_ocr(self) -> None:
         """RapidOCR 识别图像"""
-        if not _ocr_adapter_available():
-            pytest.skip("RapidOCR 不可用")
+        reason = _ocr_adapter_unavailable_reason()
+        if reason is not None:
+            pytest.skip(f"RapidOCR 不可用: {reason}")
 
         from PIL import Image
 
@@ -135,8 +137,9 @@ class TestOCRServiceIntegration:
     @pytest.mark.asyncio
     async def test_apply_ocr_with_real_engine(self) -> None:
         """_apply_ocr() 使用真实 RapidOCR 引擎"""
-        if not _ocr_adapter_available():
-            pytest.skip("RapidOCR 不可用")
+        reason = _ocr_adapter_unavailable_reason()
+        if reason is not None:
+            pytest.skip(f"RapidOCR 不可用: {reason}")
 
         from unittest.mock import MagicMock
 

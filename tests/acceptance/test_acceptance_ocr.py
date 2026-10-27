@@ -122,7 +122,10 @@ def _apply_real_ocr(file_path: str, event_loop: asyncio.AbstractEventLoop) -> Pa
     try:
         results = event_loop.run_until_complete(adapter.recognize(file_path))
     except OCRConnectionError as exc:
-        raise RuntimeError("RapidOCR 模型不可用") from exc
+        # 带根因消息（R9 诊断性：adapter 延迟 import 的 ImportError 被包成
+        # OCRConnectionError——系统库缺失等环境根因须随 skip 透出，禁只报
+        # 「模型不可用」遮蔽排查方向）
+        raise RuntimeError(f"RapidOCR 模型不可用: {exc.message}（cause: {exc.cause}）") from exc
 
     page_map = {result.page_number: result for result in results}
     pages: list[ParsedPage] = []
