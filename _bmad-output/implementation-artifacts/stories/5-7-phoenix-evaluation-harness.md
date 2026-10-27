@@ -87,8 +87,8 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 | 组件 | 文件路径 | 复用方式 |
 |------|---------|---------|
 | OTel SDK 三件套 | pyproject.toml L88-90（opentelemetry-api/sdk/exporter-otlp ^1.21.0，poetry.lock 实锁 1.44.0） | **直接复用——零新运行时依赖**（OD-1）；InMemorySpanExporter/SimpleSpanProcessor 由 opentelemetry-sdk 自带（测试零新依赖）——⚠️ R1 实测锁定的 1.44.0：`from opentelemetry.sdk.trace.export import InMemorySpanExporter` **失败**（包 `__init__` 已不再 re-export），正确路径 `from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter`（SimpleSpanProcessor 仍可从包级导入） |
-| `init()/shutdown()/reset_for_testing()` 生命周期三件套 | `src/infrastructure/monitoring/otel_config.py` L167/L277/L315-339（含 `trace._TRACER_PROVIDER = None` 内部状态复位——OTel 全局单次设置约束的测试解法） | **参考照抄**——PhoenixTracer.initialize/shutdown/reset_for_testing 同构（⚠️ **不改动 otel_config.py 本体**——event-bus 域资产零侵入；5.7 成为全局 TracerProvider 唯一 setter 的声明见 DC-6） |
-| `create_span` contextmanager + None 降级 | `src/infrastructure/monitoring/event_metrics.py` L227-273（`@contextmanager` + `trace.get_tracer(...)` + `start_as_current_span` + `set_attribute` 点分键 + 未启用 `yield None`[含 ImportError/Exception 双降级分支]） | **参考照抄**——PhoenixTracer.create_span 同构骨架（差异：attributes 参数化 + initialize 状态守卫 + handle 返回 OTel Span 原生对象——duck-type SpanHandle 协议零包装层） |
+| `init()/shutdown()/reset_for_testing()` 生命周期三件套 | `src/infrastructure/monitoring/otel_config.py` L167/L277/L315-339（含 `trace._TRACER_PROVIDER = None` 内部状态复位——⚠️ R1 实测该单复位形态在锁定版 1.44.0 受 Once 闩锁约束不恢复 re-set） | **参考照抄（R2 校准）**——initialize/shutdown 同构照抄；**reset_for_testing 必须双复位（非照抄**：`trace._TRACER_PROVIDER = None` + `_TRACER_PROVIDER_SET_ONCE = Once()` 重建——见测试隔离约束节**）**；⚠️ 不改动 otel_config.py 本体（event-bus 域资产零侵入；「默认配置下唯一激活 setter」声明见 DC-5） |
+| `create_span` contextmanager + None 降级 | `src/infrastructure/monitoring/event_metrics.py` L227-273（`@contextmanager` + `trace.get_tracer(...)` + `start_as_current_span` + `set_attribute` 点分键 + 未启用 `yield None`[含 ImportError/Exception 双降级分支]） | **参考照抄**——PhoenixTracer.create_span 同构骨架（差异**三项**：attributes 参数化 + **tracer 双源解析**[注入 provider 优先经 `tracer_provider=` 参数——R2-1 钉死，None 降级判据是「无 tracer 来源」非「未 initialize」] + handle 返回 OTel Span 原生对象——duck-type SpanHandle 协议零包装层） |
 | `MetricsConfig.from_env()` 形态 | `src/infrastructure/config/metrics.py` L12-55（frozen dataclass + from_env + bool 三态解析） | **参考照抄**——PhoenixConfig（enabled/endpoint/project_name/sampling 四字段 + `__post_init__` 101 守卫） |
 | `MetricsPort` / `CacheMetricsPort` 端口形态 | `src/application/ports/metrics_port.py` + `cache_metrics_port.py`（runtime_checkable Protocol + 方法 docstring + Raises 契约） | **参考照抄**——AgentTracingPort（SpanHandle 协议方法签名直接对齐 OTel Span 方法名——set_attribute/record_exception/set_status，duck-type 零包装） |
 | `SemanticCacheMiddleware` 装饰器/包装埋点范式 | `src/application/services/semantic_cache_middleware.py`（应用层包装器 + 端口注入 + 组合根装配） | **范式参照**——@trace 是其在方法装饰器维度的延伸（DC-4 论证静态装饰走 OTel 全局 API） |
@@ -119,14 +119,14 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 **Given** PhoenixConfig 环境契约（`PHOENIX_TRACING_ENABLED` 默认 false / `PHOENIX_OTLP_ENDPOINT` 默认 `http://localhost:4317`[gRPC 协议钉死——对齐 otel_config L213-218 生产形态，http 4318 形态不做；未设时 fallback `OTEL_EXPORTER_OTLP_ENDPOINT`，**空串视为未设**（`os.getenv(...) or` 形态——.env 空值样例/compose 注入空串不触发 101）] / `PHOENIX_PROJECT_NAME` 默认 `"sisys-agent"`——epics 钦定值 / `PHOENIX_TRACES_SAMPLER_ARG` 默认 1.0——**Phoenix 专属采样变量**，与 event-bus 栈的 `OTEL_TRACES_SAMPLER_ARG`（.env.example 样例 0.1）互不干扰，仅变量命名取其惯例）
 **When** 构造 `PhoenixTracer(config=PhoenixConfig(project_name="sisys-agent"), tracer_provider=<注入 TracerProvider>)` 并调用 `initialize()`
 **Then** Resource 携带 `service.name == "sisys-agent"`（Phoenix OTLP 接收端按 service.name 归项目——OD-1 映射）+ `telemetry.sdk...` 标准 Resource 属性；TracerProvider 配置 `TraceIdRatioBased(sampling_ratio)` + SpanProcessor（生产 BatchSpanProcessor + OTLPSpanExporter[**gRPC exporter**]；**测试注入 SimpleSpanProcessor + InMemorySpanExporter——同步导出零外联**）；`initialize()` 幂等（二次调用返回 True 零重复装配）且 enabled=false 时**不装配不设全局**（返回 False——NoOp 天然降级）；initialize 开头检测全局已 set（`get_tracer_provider()` 非 proxy 态）时 logger.warning 显式提示并返回既有状态——杜绝静默双 setter（OTel 二次 set 仅告警不抛）
-**And** PhoenixConfig `__post_init__` 101 守卫：enabled 非 bool 拒；project_name 空/空白拒；endpoint 空/非 http(s) 前缀拒；sampling_ratio 非数值或 ∉(0,1] 拒（上下界含 1.0 全采样、不含 0——0 采样等价禁用应走 enabled=false）；`from_env()` 四变量解析（bool 三态 `in ("true","1","yes")` 对齐 MetricsConfig 惯例）；`create_span` 在未 initialize 时 `yield None`（零开销降级——event_metrics L227 同款语义，显式消费方 None 分支契约）
+**And** PhoenixConfig `__post_init__` 101 守卫：enabled 非 bool 拒；project_name 空/空白拒；endpoint 空/非 http(s) 前缀拒；sampling_ratio 非数值或 ∉(0,1] 拒（上下界含 1.0 全采样、不含 0——0 采样等价禁用应走 enabled=false）；`from_env()` 四变量解析（bool 三态 `in ("true","1","yes")` 对齐 MetricsConfig 惯例）；`create_span` 在**无可用 tracer 来源**（未注入 provider 且未 initialize——R2-1 双源解析判据）时 `yield None`（零开销降级，显式消费方 None 分支契约）
 
 **验证标准/Validation Criteria:**
-- [ ] project_name → Resource service.name 断言（注入 provider 后 `resource.attributes["service.name"] == "sisys-agent"`）
-- [ ] initialize 幂等（**行为断言**：同 provider 注入两次 initialize → 产 1 个 span 后 exporter 恰收 1 个——重复装配 processor 会收 2 个；不用 `_active_span_processor` 内部属性）+ enabled=false 不装配（全局 provider 保持未 set + 返回 False）+ 已 set 检测 warning 路径
+- [ ] project_name → Resource service.name 断言（**双路径拆分**——R2-7：自建路径[未注入]断言 PhoenixTracer 构造的 provider 的 `resource.attributes["service.name"]` 与 sampler；注入路径断言 initialize 后全局 == 注入实例 + processor 挂载 + create_span 产 span 到注入 exporter——注入 provider 的 resource 由测试构造，对其断言是夹具恒真）
+- [ ] initialize 幂等（**行为断言**：同 provider 注入两次 initialize → 产 1 个 span 后 exporter 恰收 1 个——重复装配 processor 会收 2 个；不用 `_active_span_processor` 内部属性；**实例闩判据**：同实例再入静默 True）+ enabled=false 不装配（全局 provider 保持未 set + 返回 False）+ 外来 set 检测 warning 路径（第二 PhoenixTracer 实例构造）
 - [ ] PhoenixConfig 101 守卫五场景参数化（isinstance→code→context 三段式）
 - [ ] from_env 四变量（含 OTEL_EXPORTER_OTLP_ENDPOINT fallback 链 + 默认值矩阵 + **空串视为未设用例**——set-but-empty 不落 101）
-- [ ] create_span 未初始化 yield None 降级断言
+- [ ] create_span 降级双态断言：无注入且未 initialize 的实例 yield None；**注入 provider 未 initialize 的实例产真 span**（双源解析——注入通道可观测性，R2-1）
 
 ### AC-2: @trace 装饰器自动 span（agent_execution 根 + 六阶段子树）
 
@@ -140,7 +140,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 - [ ] parent 链断言（每子 span.parent.span_id == 根 span.context.span_id——ReadableSpan 自身 id 在 `.context`；根 parent 为空）
 - [ ] 重试轮 span 序列 == executed_phases 终态序列（同源一致）
 - [ ] 异常路径：注入 Fake LLM 抛 LLMError → span status ERROR + events 含 exception + `pytest.raises(AgentWorkflowError)` 断言 code 444（链级语义——包装异常透传，装饰器不改写）
-- [ ] NoOp 降级（**观察哨形态防恒真**）：模块级观察哨 provider+exporter 保持 set，记录 span 计数 → teardown reset 全局 → 跑链 → 断言观察哨 exporter 计数不变 + 主链返回值与 5-3 基线一致
+- [ ] NoOp 降级（**观察哨形态——R2-4 钉死读法丙**：前置 reset 双复位确保全局未 set[`get_tracer_provider()` proxy 态断言钉死前提] → **注入通道观察哨**[PhoenixTracer(tracer_provider=观察哨 provider) 不 initialize——守护「不经全局的旁路泄漏」] → 跑链 → 断言观察哨 exporter 计数不变 + 主链返回值与 5-3 基线一致；⚠️ 禁「模块级全局观察哨」形态——全局 set 后装饰器非 NoOp 态且与链级前置 reset 协议互拆）
 - [ ] functools.wraps 签名保留断言（六阶段方法 __name__ 不变——5-3 存量单测兼容前提）
 
 ### AC-3: span 属性契约与 trace_id 贯通
@@ -161,12 +161,12 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 **Given** 端口、实现、装饰器、接入全部交付
 **When** 验证接线与合规
-**Then** 新端口 `agent_tracing`（**SINGLETON——Epic 5 全家政策**[isolation_repository L2860/isolation_management L2887/isolation_guard L2917/isolation_switch_log_repository L2945 四注册块连先例——行号统一引 register_port 起始行；PhoenixTracer 持 provider 单例语义天然 SINGLETON，无 SCOPED 捕获面]）经组合根 `# === Story 5.7 ===` 区段注册且 resolve 可达（PortSpec：v1.0.0 / `AgentTracingPort` / lambda 注入 `PhoenixConfig.from_env()` / module=src.infrastructure.monitoring.phoenix_tracer / owner=platform / tags=("agent","observability","tracing")）；bootstrap 内**显式调用 initialize 接线**（resolve → isinstance → **try: `initialize()` except ConfigurationError → logger.warning + 跳过（NoOp 态）**——配置 typo 只损失观测面不阻断主链启动，兑现 DC-7 旁路哲学；enabled=false 时 NoOp 零开销，「唯一生产可达 TracerProvider setter」声明见 DC-5）；`.env.example` 可观测性区追加 PHOENIX_* 三变量
+**Then** 新端口 `agent_tracing`（**SINGLETON——Epic 5 全家政策**[isolation_repository L2860/isolation_management L2887/isolation_guard L2917/isolation_switch_log_repository L2945 四注册块连先例——行号统一引 register_port 起始行；PhoenixTracer 持 provider 单例语义天然 SINGLETON，无 SCOPED 捕获面]）经组合根 `# === Story 5.7 ===` 区段注册且 resolve 可达（PortSpec：v1.0.0 / `AgentTracingPort` / lambda 注入 `PhoenixConfig.from_env()` / module=src.infrastructure.monitoring.phoenix_tracer / owner=platform / tags=("agent","observability","tracing")）；bootstrap 内**显式调用 initialize 接线**（**try: resolve → isinstance → `initialize()` 整段包入 except ConfigurationError → logger.warning + 跳过（NoOp 态）**——R2-6：try 必须罩住 resolve——lambda 构造期 from_env 的 101 抛在 resolve 时发生，只包 initialize 罩不住；配置 typo 只损失观测面不阻断主链启动，兑现 DC-7 旁路哲学；enabled=false 时 NoOp 零开销，「默认配置下唯一激活 TracerProvider setter」声明见 DC-5）；`.env.example` 可观测性区追加 PHOENIX_* 三变量
 **And** 架构合规：application 层第三方 import 白名单（application/tracing.py + ports/agent_tracing.py + run_agent_workflow.py + agent_workflow_service.py 允许 `opentelemetry`——**本 Story 新建 application 第三方白名单防线**（importlinter 只限层间方向不限第三方，既有 arch 测试仅扫 domain），黑名单取 domain 契约同款清单：禁止 pydantic/fastapi 等非白名单第三方）；`agent_tracing.py` 端口文件零第三方依赖（纯 Protocol + 常量——同层 metrics_port 形态）；组合根外零实例化（PhoenixTracer 实例化点仅 composition_root.py + tests/）；**domain 层零侵入**（本 Story domain 零新文件零改动——grep 断言 domain/ 无本 Story 触碰）；**5-3 回归零破坏**：装饰器接入是纯附加（零构造签名变化→**零构造点苦役**——与 5-6 对比的关键简化），5-3 全家存量测试（test_agent_workflow_service 单测 + 契约×3[service/use_case/engine] + 图/引擎单测×2 + 集成 + 验收——清单与 Task 3 循环 C 一致）全量回归绿
 
 **验证标准/Validation Criteria:**
 - [ ] 组合根注册 + resolve + isinstance + lifetime==SINGLETON 断言（5-6 AC-6.1 同款四件）
-- [ ] initialize 接线断言（resolve 后 initialize() 返回 bool + enabled 配置传导——注入测试 env 后全局 tracer provider 可用性；**场景显式绑定 monkeypatch 作用域 + teardown reset_for_testing 双复位义务**——测试进程经 conftest `_bootstrap_once` 全进程共享，全局 set 后不复位会击穿后续场景[见测试隔离约束节]；配置错误注入 → warning 降级不抛的负路径用例）
+- [ ] initialize 接线断言（**R2-3 直构口径**：enabled 传导断言经场景内**直构** `PhoenixTracer(config=PhoenixConfig.from_env())`（monkeypatch env 下）+ initialize 验证 lambda 同构语义——SINGLETON 实例 config 在 bootstrap 构造期定格，场景 env 注入不可经 resolve 传导[设计事实非缺陷]；组合根 resolve 四件[可达/isinstance/PortSpec/SINGLETON]保持无全局副作用形态断言；**场景显式绑定 monkeypatch 作用域 + teardown reset_for_testing 双复位义务**——测试进程经 conftest `_bootstrap_once` 全进程共享，全局 set 后不复位会击穿后续场景[见测试隔离约束节]；配置错误注入 → 直构触发 101 → warning 降级不抛的负路径用例）
 - [ ] AST 验证器 A：application 新增/触碰文件 import 白名单扫描（opentelemetry 允许；domain 目录零触碰断言）
 - [ ] AST 验证器 B：组合根外零实例化（src/ 扫描 PhoenixTracer( 构造点）
 - [ ] .env.example 三变量存在性断言（PHOENIX_TRACING_ENABLED/PHOENIX_OTLP_ENDPOINT/PHOENIX_PROJECT_NAME——sampling 专属变量 PHOENIX_TRACES_SAMPLER_ARG 不设样例行[默认 1.0]，注释说明）
@@ -181,7 +181,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 **验证标准/Validation Criteria:**
 - [ ] P95<5ms：常量单源（集成定义/验收 import）+ 委托缓存命中（验收 AC-5.1 不自跑采样）
-- [ ] 开销<1%：k 轮中位数双跑公式断言（同 worker 同链；t_untraced 基准值下限守卫——防链被意外加速导致分母失真，t_untraced ≥ 已知下限常量；Fake LLM 延迟常量单源定义）
+- [ ] 开销<1%：k 轮中位数双跑公式断言（同 worker 同链；**块序钉死**——先 t_untraced 块×5[全局未 set] → 一次性 initialize → t_traced 块×5，禁逐轮交错[幂等闩假绿窗口]；**正向锚**——t_traced 块结束 exporter span 计数 > 0；t_untraced 基准值下限守卫——防链被意外加速导致分母失真，t_untraced ≥ 已知下限常量；Fake LLM 延迟常量单源定义）
 - [ ] benchmark 场景级标记 + xdist_group 同组（与既有 11 组互异确认——全仓 grep 断言）
 - [ ] 采样禁双跑（委托缓存断言——5-6 同款）
 
@@ -210,8 +210,8 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 #### 统一端口定义注册与管理 (Port Contract)
 
 - [ ] `AgentTracingPort`（`src/application/ports/agent_tracing.py`，`@runtime_checkable Protocol`——**R2 具体应用端口**：追踪是 Agent 评估可观测族[5.7-5.9]的应用契约，同层先例 metrics_port/cache_metrics_port；**不设 domain 端口**——追踪非领域概念，domain 零依赖原则下 domain/ports 只承载业务基础能力）：
-  - `def create_span(self, name: str, attributes: dict[str, str | bool | int | float | tuple[str, ...]] | None = None) -> AbstractContextManager[SpanHandle | None]`——span 生命周期上下文（进入开 span + attributes 批量写入；退出 end）。Returns 契约：**已 initialize 时 yield SpanHandle（OTel Span 原生对象 duck-type）；未 initialize 时 yield None**（零开销降级——显式消费方判 None，event_metrics L227 同款语义）。Raises 契约：**零抛出**（追踪失败降级 logger.warning 绝不上抛——DC-7 可观测性附加哲学）
-  - `def initialize(self) -> bool`——配置全局 TracerProvider（幂等；enabled=false 返回 False 不装配）。Returns：是否实际启用
+  - `def create_span(self, name: str, attributes: dict[str, str | bool | int | float | tuple[str, ...]] | None = None) -> AbstractContextManager[SpanHandle | None]`——span 生命周期上下文（进入开 span + attributes 批量写入；退出 end）。**tracer 解析规则（R2-1 P0 钉死——双源解析）**：`trace.get_tracer("sisys.agent", tracer_provider=self._provider)`——**注入 provider 优先**（构造注入通道下无需 initialize 即产真 span）；未注入时走全局 API（initialize 已 set 后解析为真 tracer，否则 proxy→NoOp）。Returns 契约：**有可用 tracer 来源（已注入 provider 或已 initialize）时 yield SpanHandle（OTel Span 原生对象 duck-type）；无可用来源（未注入且未 initialize）时 yield None**（零开销降级——显式消费方判 None；⚠️ R2-1 教训：None 降级判据是「无 tracer 来源」而非「未 initialize」——若照抄 event_metrics 的 initialize 状态守卫，组件级注入通道下 create_span 永远 yield None，OD-2 三写入通道全部死锁）。Raises 契约：**零抛出**（追踪失败降级 logger.warning 绝不上抛——DC-7 可观测性附加哲学）
+  - `def initialize(self) -> bool`——配置全局 TracerProvider（幂等；enabled=false 返回 False 不装配）。**幂等判据 = 实例闩**（R2-9：同实例二次 initialize 静默返回 True 不告警；**外来 set 检测**——全局已非 proxy 态且非本实例所 set 时 logger.warning 显式提示）。Returns：是否实际启用
   - `def shutdown(self) -> None`——刷盘并释放（BatchSpanProcessor.force_flush + provider shutdown；atexit 注册——otel_config L303 先例）
 - [ ] `SpanHandle` 协议（同文件，`@runtime_checkable Protocol`——方法签名**逐名且逐参对齐 OTel Span 原生签名**（duck-type 零包装层，OTel Span 天然满足；R1-③ 实测教训：`set_status` 若用 bool 业务签名，OTel Span 原生 `set_status(Status|StatusCode)` 的 isinstance 分支对 bool **静默 no-op**——评估/漂移状态丢失且无告警，故 **set_status 不入协议**：协议消费方[5.8/5.9]只需 set_attribute/record_exception，status 置位唯一发生在 @trace wrapper 内部[OTel 原生 `set_status(StatusCode.ERROR)` 直接调用，span 对象在手]；签名兼容性实证：set_attribute(key, value) 与 record_exception(exception) 位置参数形态与 OTel 原生完全兼容[tuple ⊂ Sequence]）：
   - `def set_attribute(self, key: str, value: str | bool | int | float | tuple[str, ...]) -> None`
@@ -277,13 +277,13 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
   - 收尾 ×1：完成清单逐项确认（src + tests 四目录——5-6 收尾同款）
 - [ ] BDD 步骤约束：全部同步 `def` + `_run_async(context["_loop"], ...)`（禁 `@pytest.mark.asyncio`——context 数据丢失）；参数化步骤显式 `parsers.parse`；异常断言三段式（raises 捕获存 `context["caught"]` → then 断言 code + context——101 场景）；**span 断言锚（R1 P0 修正——SSOT 全文唯一口径）**：**装饰器/@trace 链路 span 只经全局 provider 可观测**（wrapper 走 `get_tracer` 全局 API——R1 探针实证：不经全局 set 时注入 provider 的 exporter **收不到任何装饰器 span**）——链级场景（AC-2×3/AC-3×2/AC-4.1/AC-5.2）统一通道 = 场景级新 `TracerProvider + SimpleSpanProcessor + InMemorySpanExporter` 经 `PhoenixTracer(config=测试配置, tracer_provider=注入).initialize()`（**initialize 履行全局 set 唯一职责**——测试不直接调 `trace.set_tracer_provider`）→ 断言 → **teardown 强制 `reset_for_testing()` 双复位**（`trace._TRACER_PROVIDER = None` + `trace._TRACER_PROVIDER_SET_ONCE = Once()`——R1 探针实证：锁定的 1.44.0 有 Once 闩锁，仅复位变量时同进程下一场景的 initialize 会被静默忽略[Arize-ai/phoenix#8639 教训 + 本仓实测]）；**组件级场景**（AC-1×3/AC-3.2——不经装饰器）可走纯构造注入通道（PhoenixTracer(tracer_provider=注入) 不 initialize、零全局触碰）；模块级单 provider 观察哨形态仅用于 NoOp 对比场景（见 AC-2 验证标准）
 - [ ] 显式 `pytestmark = [pytest.mark.acceptance, pytest.mark.xdist_group("phoenix-tracer-perf")]`（文件名不含服务关键词且零外部服务——无 redis/database marker；组名与集成计时场景逐字同组）+ 延迟 import 纪律
-- [ ] teardown：span 面零资源（provider.shutdown() + exporter 清空；无 Redis/PG 清理面——本 Story 自包含优势）；计时场景委托缓存防双跑
+- [ ] teardown：span 面零资源（provider.shutdown() + exporter 清空 + **链级/凡 initialize 场景 teardown `reset_for_testing()` 双复位**——见 BDD 约束与测试隔离 SSOT；无 Redis/PG 清理面——本 Story 自包含优势）；计时场景委托缓存防双跑
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
 - [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——ModuleNotFoundError/断言红为合法红）
 - [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_tracing` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec 元数据 + SINGLETON）②initialize 接线确认（bootstrap 显式调用 + enabled 配置传导 + 配置错误 warning 降级 + 唯一生产可达 setter 声明[DC-5]）③装饰器接线静态锚（六阶段方法 + execute 方法装饰器在位——AST/inspect 扫描）④trace_id 贯通锚（execute 阶段 trace_id 派生代码在位——5-3 预留位核销证据）⑤span→exporter 全链（链级场景经 initialize 全局通道后 InMemory exporter 能取到 agent_execution span——AC-2.1 场景承载）
+- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_tracing` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec 元数据 + SINGLETON）②initialize 接线确认（bootstrap 显式调用[整段 try 包] + enabled 配置传导[直构口径] + 配置错误 warning 降级 + 默认配置下唯一激活 setter 声明[DC-5]）③装饰器接线静态锚（六阶段方法 + execute 方法装饰器在位——AST/inspect 扫描）④trace_id 贯通锚（execute 阶段 trace_id 派生代码在位——5-3 预留位核销证据）⑤span→exporter 全链（链级场景经 initialize 全局通道后 InMemory exporter 能取到 agent_execution span——AC-2.1 场景承载）
 
 ---
 
@@ -327,9 +327,9 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 > 基线同模板。本 Story 特别注意：
 
-- [ ] **OTel 全局状态隔离（本 Story 特有最大坑面——R1 重写为 SSOT）**：OTel 全局 TracerProvider **每进程仅可设置一次**（二次 set 被静默忽略——Arize-ai/phoenix#8639 实证 + R1 主会话探针复证）；**⚠️ R1 探针关键发现：锁定的 OTel 1.44.0 全局 set 受 `Once` 闩锁（`trace._TRACER_PROVIDER_SET_ONCE`）约束——仅复位 `trace._TRACER_PROVIDER = None`（otel_config L315-339 先例形态）不恢复 re-set 能力，同进程后续 set 仍被忽略**；`PhoenixTracer.reset_for_testing()` 必须实现**双复位**（`trace._TRACER_PROVIDER = None` + `trace._TRACER_PROVIDER_SET_ONCE = Once()` 重建——R1 探针实证此形态 re-set 恢复工作；对内部属性访问带 getattr 守卫 + 版本兼容 try/except，同 otel_config 先例防御形态）——**该双复位形态是本 Story 对既有先例的必要增强，非照抄**（otel_config.reset_for_testing 单复位形态在 1.44.0 下是潜伏缺陷，既有 TestInitTracing 从未行使 re-set 语义故全绿掩盖——本 Story 不改 otel_config 本体[零侵入约束]，PhoenixTracer 自带正确形态）。通道分派：**组件级测试**（PhoenixTracer.create_span/契约/AC-1）默认纯构造注入（`PhoenixTracer(tracer_provider=注入)` 不 initialize、零全局触碰）；**装饰器链路测试**（test_tracing_decorator + 集成八场景 + 验收链级场景）必须经 `initialize()` 全局通道——模块级/场景级 fixture 模式：`reset_for_testing()` 双复位 → `PhoenixTracer(config=测试配置, tracer_provider=新 provider).initialize()` → 断言 → teardown `reset_for_testing()` 双复位；**严禁跨测试文件共享已 set 的全局 provider**（xdist 每 worker 独进程天然隔离，同进程多模块串行靠双复位）；**bootstrap 交叉污染防线**：测试进程经 conftest `_bootstrap_once` 全进程共享自动 bootstrap——AC-4.1 类「注入 PHOENIX_TRACING_ENABLED=true」场景必须 monkeypatch 作用域内 + teardown 双复位，否则全局 set 死击穿后续全部场景
+- [ ] **OTel 全局状态隔离（本 Story 特有最大坑面——R1 重写为 SSOT）**：OTel 全局 TracerProvider **每进程仅可设置一次**（二次 set 被静默忽略——Arize-ai/phoenix#8639 实证 + R1 主会话探针复证）；**⚠️ R1 探针关键发现：锁定的 OTel 1.44.0 全局 set 受 `Once` 闩锁（`trace._TRACER_PROVIDER_SET_ONCE`）约束——仅复位 `trace._TRACER_PROVIDER = None`（otel_config L315-339 先例形态）不恢复 re-set 能力，同进程后续 set 仍被忽略**；`PhoenixTracer.reset_for_testing()` 必须实现**双复位**（`trace._TRACER_PROVIDER = None` + `trace._TRACER_PROVIDER_SET_ONCE = Once()` 重建——R1 探针实证此形态 re-set 恢复工作；对内部属性访问带 getattr 守卫 + 版本兼容 try/except，同 otel_config 先例防御形态）——**该双复位形态是本 Story 对既有先例的必要增强，非照抄**（otel_config.reset_for_testing 单复位形态在 1.44.0 下是潜伏缺陷，既有 TestInitTracing 从未行使 re-set 语义故全绿掩盖——本 Story 不改 otel_config 本体[零侵入约束]，PhoenixTracer 自带正确形态）。通道分派：**组件级测试**（PhoenixTracer.create_span/契约/AC-1.1/AC-1.3/AC-3.2）默认纯构造注入（`PhoenixTracer(tracer_provider=注入)` 不 initialize、零全局触碰——**R2-1 双源解析下 create_span 经注入 provider 产真 span，无需 initialize**）；**装饰器链路测试**（test_tracing_decorator + test_run_agent_workflow 追加面 + test_agent_workflow_service 追加面 + 集成八场景 + 验收链级场景）必须经 `initialize()` 全局通道——模块级/场景级 fixture 模式：`reset_for_testing()` 双复位 → `PhoenixTracer(config=测试配置, tracer_provider=新 provider).initialize()` → 断言 → teardown `reset_for_testing()` 双复位；**R2-2 分派细则（复位义务与通道分类正交）**：凡调用 `initialize()` 的测试（含组件级——test_phoenix_tracer 的幂等/已 set 检测/initialized 态用例、验收 AC-1.2/AC-4.1）一律套用「前置 reset 双复位 → act → teardown reset 双复位」——通道分类只决定 provider 从哪来，**不豁免复位义务**；建议 test_phoenix_tracer.py 与验收文件采用**文件级 autouse 双复位 fixture** 兜底（纪律升级为机制——5-6 步骤化门控同哲学）；**R2-10 环境前提**：验收/集成进程 env 必须不带 `PHOENIX_TRACING_ENABLED=true`（session 级 `_bootstrap_once` 读真实进程 env——环境带 true 会在任何测试前全局 set，击穿全部「未 set」前提断言；场景级 monkeypatch.delenv 钉死）；**严禁跨测试文件共享已 set 的全局 provider**（xdist 每 worker 独进程天然隔离，同进程多模块串行靠双复位）；**bootstrap 交叉污染防线**：测试进程经 conftest `_bootstrap_once` 全进程共享自动 bootstrap——AC-4.1 类「注入 PHOENIX_TRACING_ENABLED=true」场景必须 monkeypatch 作用域内 + teardown 双复位，否则全局 set 死击穿后续全部场景
 - [ ] **本 Story 零外部服务依赖**：无 Redis/PG/Phoenix server/LLM API 硬依赖（span 面进程内自包含 + Fake LLM 手工装配——5-3 验收先例边界）；验收/集成**禁 OTLP 外联**（生产 OTLPSpanExporter 仅经组合根 lambda 形态断言覆盖——测试全用 InMemorySpanExporter 注入）
-- [ ] **pytest-xdist 计时组**：`xdist_group("phoenix-tracer-perf")` 与三组既有 perf 组名互异；`_PERF_CACHE` 委托缓存 + benchmark 场景级标记；P95 双常量单源（集成定义/验收 import）
+- [ ] **pytest-xdist 计时组**：`xdist_group("phoenix-tracer-perf")` 与既有 11 组 perf/计时组名互异（全仓 grep 断言）；`_PERF_CACHE` 委托缓存 + benchmark 场景级标记；P95 双常量单源（集成定义/验收 import）
 - [ ] **Fake LLM 手工装配边界**（5-3 先例口径）：`AsyncMock(spec=LLMClientPort)` + side_effect 按 response_schema 身份分派返回**真实 Schema 实例**（端口契约返回实例非 dict）；验收禁 mock 红线的豁免口径 = 外部 LLM API 不可验收强依赖（5-3 验收同款——豁免面仅 llm_client 一项，六阶段服务/图/用例全真实）
 - [ ] BDD 步骤禁 `@pytest.mark.asyncio`；步骤函数同步 def + `_run_async` 调度；模块级 event_loop fixture（≥10 验收文件惯例）
 - [ ] **5-3 存量回归**：装饰器纯附加改动后 5-3 全家（unit 单测×3[service/graph/engine] + 契约×3[service/use_case/engine] + integration + acceptance）全量回归绿——回归清单 Task 3 登记（与 5-6 十四构造点苦役对比：本 Story 零构造点，回归面仅为「行为不变」验证）
@@ -350,7 +350,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 | AC-2 | 异常路径 ERROR + re-raise | Task 2 | wrapper 异常分支 | test_tracing_decorator + 验收 AC-2.2 |
 | AC-2 | NoOp 降级零 span 主链等价 | Task 2/3 | 全局 API NoOp 语义 | 同上 + 验收 AC-2.3 |
 | AC-3 | MVP 十项属性真实链写入 | Task 3 | use case 属性写入块 | test_run_agent_workflow（追加）+ 验收 AC-3.1 |
-| AC-3 | eval/drift 键常量 + 通道能力 | Task 1/2 | SpanAttributeKeys + create_span | test_tracing_decorator + 验收 AC-3.2 |
+| AC-3 | eval/drift 键常量 + 通道能力 | Task 1/2 | SpanAttributeKeys + create_span | test_tracing_decorator（常量）+ test_phoenix_tracer（注入通道能力——R2-8 载体校准）+ 验收 AC-3.2 |
 | AC-3 | trace_id 贯通（5-3 预留位核销） | Task 3 | execute 阶段派生 | test_agent_workflow_service（追加）+ 验收 AC-3.3 |
 | AC-4 | 组合根接线 + initialize 传导 | Task 1 | 注册 + bootstrap 调用 | 契约测试 + 验收 AC-4.1 |
 | AC-4 | 架构静态扫描 + domain 零触碰 | Task 5 | 验证器 A/B/C | test_arch_* + 验收 AC-4.2 |
@@ -372,9 +372,9 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 - [ ] Subtask 0.1: 定义数据模型规范——PhoenixConfig（frozen 四字段 + 101 守卫五场景 + from_env fallback 链；本文件「数据模型」节为唯一真源）
 - [ ] Subtask 0.2: 定义端口契约——AgentTracingPort 三方法 + SpanHandle 两方法（set_attribute/record_exception——set_status 不入协议，见端口契约节 R1-③ 论证）+ SpanAttributeKeys/SpanNames 常量注册表 + 组合根注册元数据 + 装饰器契约（契约变更登记 ×1：use case/service 装饰器接入）
 - [ ] Subtask 0.3: 定义异常契约——零新异常复用清单（101 + 追踪运行面零抛降级）+ 零新增论证
-- [ ] Subtask 0.4: 定义 OTel 全局状态隔离策略——独立 provider 注入通道 + reset_for_testing 复位纪律（测试隔离约束节 SSOT）
+- [ ] Subtask 0.4: 定义 OTel 全局状态隔离策略——**通道分派（链级 initialize 全局通道/组件级注入通道——R2-1 双源解析）+ reset_for_testing 双复位纪律 + 复位义务正交条款**（测试隔离约束节 SSOT）
 - [ ] Subtask 0.5: 定义性能测量口径——P95 计时锚（create_span 全周期 ×10 属性）+ 开销公式（双跑对比 + t_untraced 基准下限守卫）+ 常量单源
-- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_phoenix_tracer.feature`（14 场景）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + 独立 provider 注入 + Fake LLM 手工装配链 fixture）+ **14 场景三属性分档表**定稿（docstring）
+- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_phoenix_tracer.feature`（14 场景）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + 通道分派 fixture[链级 initialize 全局通道/组件级注入] + Fake LLM 手工装配链 fixture）+ **14 场景三属性分档表**定稿（docstring）
 - [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）+ **deferred-work.md 登记**（OD-1 承接方 5.8 链接 / OD-2 归宿 5.8·5.9 / OD-4 承接方 5.11 + R1-DF2 锚位顺延注记——三条 OD 登记 gap 四要素齐备：描述/触发条件/归宿/承接方链接；AgentDecided 订阅决定为知悉登记不进 deferred-work[无 gap]）
 - [ ] Subtask 0.8: 移交留项处置落盘（前置依赖表三项逐一登记处置结果）
 
@@ -400,7 +400,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_phoenix_tracer.py`（实例化注入 provider → Resource service.name 断言 / initialize 幂等[**行为断言**：两次 initialize → 1 span → exporter 恰 1] + 已 set 检测 warning / enabled=false 返回 False 全局保持未 set / create_span initialized 态 yield handle + attributes 批量写入 / 未初始化 yield None / OTel 异常注入[坏 exporter processor]→warning 零上抛）+ `tests/unit/application/ports/`（如惯例存在）端口形态测试（SpanHandle 契约**行为断言**——set_attribute/record_exception 经 exporter 可观测；**禁 isinstance 假绿**[runtime_checkable 只查方法名]） |
+| 🔴 红 | 编写 `test_phoenix_tracer.py`（实例化注入 provider → Resource service.name 断言[双路径拆分——自建路径验 provider 构造/注入路径验 initialize 挂载] / initialize 幂等[**行为断言**：两次 initialize → 1 span → exporter 恰 1] + 已 set 检测 warning / enabled=false 返回 False 全局保持未 set / create_span 双源解析[**注入未 initialize 产真 span** + 无注入未 initialize yield None] / **reset_for_testing 双复位直接用例**[initialize → reset → 再 initialize → 新 provider exporter 可收 span——单复位突变此用例红，兼作变异锚，R2 补] / OTel 异常注入[坏 exporter processor]→warning 零上抛）+ `tests/unit/application/ports/`（如惯例存在）端口形态测试（SpanHandle 契约**行为断言**——set_attribute/record_exception 经 exporter 可观测；**禁 isinstance 假绿**[runtime_checkable 只查方法名]） |
 | 🟢 绿 | 实现 `src/application/ports/agent_tracing.py`（Port + SpanHandle + 常量注册表）+ `src/infrastructure/monitoring/phoenix_tracer.py`（initialize/shutdown/reset_for_testing/create_span——otel_config 生命周期 + event_metrics 降级双模板合成） |
 | 🟡 变异 | service.name 装配改硬编码错值→Resource 断言红；initialize 幂等守卫删除→二次 processor 翻倍红；create_span 未初始化分支删除→None 断言红；还原→绿 |
 | 🔄 重构 | docstring（Raises 零抛契约 + None 降级契约显式）+ `monitoring/__init__.py` 导出 + `application/ports` 导出 |
@@ -459,7 +459,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | `tests/unit/application/use_cases/test_run_agent_workflow.py` 追加：注入 provider 下 execute → agent_execution span 存在 + MVP 十项属性逐键断言（值与返回 Result/装配材料逐项相等——get_current_span 面）；NoOp 下 execute → 返回值与 5-3 既有断言一致（回归锚） |
+| 🔴 红 | `tests/unit/application/use_cases/test_run_agent_workflow.py` 追加：**经 initialize 全局通道**（模块级 fixture：reset 双复位 → initialize → teardown 双复位——被装饰方法 span 只经全局 API 可观测，R2 补传播）execute → agent_execution span 存在 + MVP 十项属性逐键断言（值与返回 Result/装配材料逐项相等——get_current_span 面）；NoOp 下 execute → 返回值与 5-3 既有断言一致（回归锚） |
 | 🟢 绿 | `run_agent_workflow.py`：`@trace(SpanNames.AGENT_EXECUTION)` + execute 体内属性写入块（span = get_current_span()；`if span.is_recording():` 守卫逐键 set——NoOp span 空转零开销；数据源：agent 实体[role/name]、profile_result[startup_context_tokens + **len(tools_l1) 派生 active_skill_count**]、result[status/retry_count/executed_phases]、**result.evidence[confidence/input_hash]**——见 AC-3 数据源钉死） |
 | 🟡 变异 | 属性键改错字→逐键断言红；is_recording 守卫删除→NoOp 面行为断言红（或开销面红）；还原→绿 |
 | 🔄 重构 | docstring（属性数据源对照表）+ ruff+mypy |
@@ -468,7 +468,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | `test_agent_workflow_service.py` 追加：六方法装饰器在位 inspect 锚（`__wrapped__` 存在 + span 名常量引用）；execute 阶段 ExecutionContext.trace_id == 当前 span trace_id hex（注入 provider + Fake LLM 链内捕获） |
+| 🔴 红 | `test_agent_workflow_service.py` 追加：六方法装饰器在位 inspect 锚（`__wrapped__` 存在 + span 名常量引用）；execute 阶段 ExecutionContext.trace_id == 当前 span trace_id hex（**经 initialize 全局通道** + Fake LLM 链内捕获——trace_id 非全零前提是真 span，依赖全局通道，R2 补传播） |
 | 🟢 绿 | `agent_workflow_service.py`：六装饰器行（`@trace(f"{SpanNames.PHASE_PREFIX}perceive")` 等六处——**span 名末段对齐 executed_phases 枚举：package 非 package_evidence**）+ L254-257 trace_id 派生（`format(get_current_span().get_span_context().trace_id, "032x")`——注释更新：5-3 预留位核销） |
 | 🟡 变异 | trace_id 派生改回空串→贯通断言红；某阶段装饰器删除→inspect 锚红；还原→绿 |
 | 🔄 重构 | 模块头 5.7 注释更新（L29-31 预留注记核销）+ ruff+mypy |
@@ -499,12 +499,12 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 > 性质说明：本 Task 对 Task 1-3 已交付链编写验证型测试（套件型豁免——红由 Task 0 前置，活性由变异保证）。
 
-- [ ] Subtask 4.1: 编写 `tests/integration/test_integration_phoenix_tracer.py`——Fake LLM 手工装配六阶段链（5-3 集成装配形态；**链级场景①②③④⑧ 经 initialize 全局通道**[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]，⑤ 组件级走注入通道；Fake LLM side_effect 注入 `asyncio.sleep(0.02)` 确定性延迟[AC-5 分母工程化]）：场景① 成功链 span 树（根 + 六子 + parent 链 + span 序列 == executed_phases）② 重试轮（Fake LLM 首轮 verify 失败 → plan/execute/verify/reflect 再入序列）③ 异常链（LLM 异常 → 根/子 span ERROR + 444 包装异常透传 + AgentDecided 不发布）④ NoOp 对比链（全局双复位后观察哨计数不变 + 双跑等价）⑤ eval/drift 通道写入实证（四键写入→exporter 断言）⑥ P95<5ms（`_PERF_CACHE` + warmup 1 + 20 采样 + create_span×10 属性全周期 + `SPAN_RECORD_P95_LIMIT_SECONDS=0.005` 常量）⑦ 开销<1%（k=5+5 轮中位数双跑公式 + t_untraced 基准下限守卫常量 + Fake 延迟常量单源）⑧ trace_id 贯通（span hex == ExecutionContext.trace_id——链含 ≥1 工具步）
+- [ ] Subtask 4.1: 编写 `tests/integration/test_integration_phoenix_tracer.py`——Fake LLM 手工装配六阶段链（5-3 集成装配形态；**通道分派（R2-5 补全）**：链级场景①②③④⑦⑧ 经 initialize 全局通道[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]，⑤⑥ 组件级走注入通道[create_span 双源解析——R2-1]；Fake LLM side_effect 注入 `asyncio.sleep(0.02)` 确定性延迟[AC-5 分母工程化]）：场景① 成功链 span 树（根 + 六子 + parent 链 + span 序列 == executed_phases）② 重试轮（Fake LLM 首轮 verify 失败 → plan/execute/verify/reflect 再入序列）③ 异常链（LLM 异常 → 根/子 span ERROR + 444 包装异常透传 + AgentDecided 不发布）④ NoOp 对比链（**读法丙**：全局双复位[proxy 态前提断言] + 注入通道观察哨计数不变 + 双跑等价）⑤ eval/drift 通道写入实证（四键写入→exporter 断言——注入通道）⑥ P95<5ms（`_PERF_CACHE` + warmup 1 + 20 采样 + create_span×10 属性全周期 + `SPAN_RECORD_P95_LIMIT_SECONDS=0.005` 常量——注入通道，create_span 真 span 前提）⑦ 开销<1%（**块序钉死 R2-5**：先 t_untraced 块[全局未 set]×5 → 一次性 initialize → t_traced 块×5 → teardown 双复位——禁逐轮交错[幂等闩使交错 reset→initialize 短路假绿]；公式取双块中位数 + t_untraced 基准下限守卫常量 + Fake 延迟常量单源 + **正向锚**[t_traced 块结束 exporter span 计数 > 0——防 traced 轮静默降级假绿]）⑧ trace_id 贯通（span hex == ExecutionContext.trace_id——链含 ≥1 工具步）
 - [ ] Subtask 4.2: 变异实证——span 名常量改错→场景①红；re-raise 删除→场景③红；P95 常量突变（0.005→0.000001）→场景⑥红；还原→绿
 - [ ] Subtask 4.3: 验收 AC-5×2 场景转绿（委托计时缓存命中验证）+ AC-2/AC-3 集成对应场景转绿
 
 **完成标准/Definition of Done:**
-- [ ] 集成八场景全绿；P95/开销双指标达标；计时组与三既有组不冲突；验收对应场景全绿
+- [ ] 集成八场景全绿；P95/开销双指标达标；计时组与既有 11 组不冲突；验收对应场景全绿
 
 ---
 
@@ -590,7 +590,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 - 备选：NoOp vs 无装饰器三方对比（弃——无装饰器形态仅 dev 分支可达，测它无生产意义）；单跑双跑（弃——噪声占优，假阴性 flaky）
 
 **DC-7 追踪失败降级哲学——纯旁路零影响主链**
-- 选定：create_span/装饰器/属性写入全部 catch OTel 异常 → logger.warning 降级，**绝不上抛绝不改主链行为**（含 initialize 失败——返回 False 降级 NoOp；**含配置构造期**——bootstrap 接线 `try: initialize() except ConfigurationError → warning + 跳过`，观测面 typo 不阻断主链启动[R1-③：lambda 内 from_env 裸抛会击穿 DC-7 承诺]）；与 5-6 audit 联动降级（5-6 DC-6）同哲学的更强形态：追踪连「拒绝主链」语义都没有
+- 选定：create_span/装饰器/属性写入全部 catch OTel 异常 → logger.warning 降级，**绝不上抛绝不改主链行为**（含 initialize 失败——返回 False 降级 NoOp；**含配置构造期**——bootstrap 接线 **`try: resolve + isinstance + initialize() 整段 except ConfigurationError → warning + 跳过`**[R2-6：try 罩住 resolve——lambda 构造期 from_env 的 101 在 resolve 时抛，只包 initialize 罩不住]，观测面 typo 不阻断主链启动[R1-③：lambda 内 from_env 裸抛会击穿 DC-7 承诺]）；与 5-6 audit 联动降级（5-6 DC-6）同哲学的更强形态：追踪连「拒绝主链」语义都没有
 - 论证：可观测性是附加面——追踪组件故障不应使 Agent 工作流失败（epics 追踪开销<1% 隐含「追踪不得引入故障面」）；主链可用性 > 可观测完整性
 - 备选：追踪失败上抛（弃——单点故障放大）；失败静默（弃——warning 日志是运维面最低可见性）
 
@@ -598,7 +598,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 - 101（PhoenixConfig 守卫）复用足够；追踪运行面零抛（DC-7）；无新业务规则失败面——异常契约四件套零改动（同 5-6 DC-8 论证形态）
 
 **DC-9 生命周期——SINGLETON（Epic 5 全家政策）**
-- agent_tracing SINGLETON（isolation 五连先例 L2874/L2887/L2917/L2945 + agent_workflow L2832；PhoenixTracer 持 provider 单例语义——initialize 幂等 + 全局唯一 setter 与 SINGLETON 生命周期自洽）；lambda 注入 `PhoenixConfig.from_env()`（config 构造轻量无依赖——无需独立端口）
+- agent_tracing SINGLETON（isolation 四注册块连先例 L2860/L2887/L2917/L2945[register_port 起始行——R2 校准] + agent_workflow_use_case L2832；PhoenixTracer 持 provider 单例语义——initialize 幂等[实例闩] + 默认配置下唯一激活 setter 与 SINGLETON 生命周期自洽）；lambda 注入 `PhoenixConfig.from_env()`（config 构造轻量无依赖——无需独立端口；⚠️ R2-3：SINGLETON 实例 config 在首次 resolve 构造期定格——env 后置变更不经 resolve 传导，设计事实）
 
 **关键决策对照表（选中方案 vs 备选）：**
 
@@ -622,7 +622,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 | 5 | BatchSpanProcessor 误入测试链（后台线程异步导出致断言时序 flaky） | 测试统一注入 SimpleSpanProcessor + InMemorySpanExporter（同步导出）；生产 Batch 仅经组合根 lambda 形态断言 |
 | 6 | mypy 对装饰器泛型签名窄化告警（ParamSpec 边界） | ParamSpec + TypeVar 标准形态 + 存量 mypy 宽松模式（disallow_untyped_defs=false）；实施时 ruff+mypy 门禁即验 |
 | 7 | metrics 端口 impl 指向不存在的 metrics_adapter.py（Agent 调研发现的存量缺口——bootstrap 静默跳过：resolve 失败被 bootstrap L2983 except Exception 捕获致 cost_metrics_handler 永不订阅） | **不碰**（1.19 存量缺陷非本 Story 面——5.7 不依赖 MetricsPort）；知悉登记：未来监控域维护 Story 修复（本 Story 不扩大范围） |
-| 8 | OTel 大版本升级（2.x SDK 架构变更）可能改内部全局状态形态——双复位直改私有属性是隐性断点 | ^1.21 约束（锁 1.44）内可控；reset 双复位实现带 getattr 守卫 + try/except 防御（同 otel_config 先例形态）；升级 Story 立项时复核 reset 私有属性访问（deferred 风险知悉，不登记 deferred-work——触发条件即 OTel 升级本身） |
+| 8 | OTel 大版本升级（2.x SDK 架构变更）可能改内部全局状态形态——双复位直改私有属性是隐性断点；R2-11：防御降级若静默化，#8639 类污染将以「测试莫名串扰」而非响亮红回归 | ^1.21 约束（锁 1.44）内可控；reset 双复位实现带 getattr 守卫 + try/except 防御（同 otel_config 先例形态）+ **降级路径必须 logger.warning（防御不等于静默——R2-11）**；升级 Story 立项时复核 reset 私有属性访问（deferred 风险知悉，不登记 deferred-work——触发条件即 OTel 升级本身） |
 | 9 | 测试进程 bootstrap 交叉污染（conftest `_bootstrap_once` 全进程共享——AC-4.1 注入 PHOENIX_TRACING_ENABLED=true 后全局 set 死，击穿后续场景） | AC-4.1 场景显式绑定 monkeypatch 作用域 + teardown 双复位义务（测试隔离约束节 SSOT 条款） |
 
 ### 项目结构说明 Project Structure
@@ -811,6 +811,18 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | R1-19 | 风险#1「AST/契约锁定 initialize 是 set 唯一生产调用点」不可落为断言（otel_config L252 双命中）且 Task 5 无此检查项 | P2 | 处置措辞校准（「默认配置下唯一激活 setter」+ 显式排除注记）；风险表 #1 重写 |
 | R1-20 | 行号漂移集合：六方法 L103（实为类声明行，方法 L162-317）/handler_names L2800-2809（实为 L2969-2978，结论不变）/.env.example L224-236（实 L225-237）/event_metrics L227-264（实 L227-273）/isolation 先例行号引用方式不一/契约模板 114 行（实 113） | P2 | 全部按实测校准（结论均不变，仅锚点精度）；「frozen dataclass/MetricsPort runtime_checkable」先例描述失实同步修正（frozen 是自设规格） |
 | R1-21 | 杂项一致性：prd 采样注释、DC 交叉引用错（DC-6→DC-5 ×2 处）、「既有防线」措辞（application 第三方防线实为新建）、测试六件漏 config 单测（七件）、契约×2/五文件族计数、接入两/三文件口径、src 五文件清单、集成覆盖率静默映射、perf 组枚举不全、Task 4 漏 AC-3、Task 0.7 括注歧义、SpanNames 缺席两处、File List 漏 ports/__init__.py、#8639 归属统一、OTLP 协议钉死、幂等断言内部属性、P95 口径注记、span kind 注记、DC-3 库插桩类比错位、R6 模板不含 event_loop fixture、追溯矩阵 AC-1 注记 | P2/P3 | 逐项收敛（约 24 处微修，各出现位联动——正文已全部落位） |
+| R2-1 | create_span 的 tracer 解析语义未定义——R1-1 组件级注入通道 × 端口「未 initialize yield None」契约 × event_metrics 同构模板（initialize 状态守卫 + 全局 API）三处互拆：注入 provider 不 initialize 时 create_span 永远 yield None，OD-2 三写入通道死锁，AC-3.2/Task 1 行为断言/场景⑥ P95 全红或恒空转 | P0 | 端口契约钉死**双源解析**：`trace.get_tracer(name, tracer_provider=self._provider)` 注入 provider 优先、未注入走全局；None 降级判据改「无可用 tracer 来源（未注入且未 initialize）」；AC-1/继承清单差异项/Task 1 用例联动 |
+| R2-2 | 双复位义务清单范围排除组件级 initialize 用例（AC-1.2/Task 1 幂等用例必然 set 全局但不在链级清单内）——泄漏击穿同文件后续「未 set」断言，无自动防线 | P1 | SSOT 补**复位义务正交条款**（凡调用 initialize 的测试一律前置+teardown 双复位，与通道分类无关）+ 文件级 autouse 双复位 fixture 兜底建议 |
+| R2-3 | AC-4.1 enabled 传导断言不可达——session 级 `_bootstrap_once` 缓存 SINGLETON 实例（config 构造期定格 enabled=False），场景内 monkeypatch 后 resolve 拿旧实例；负路径同样不可达 | P1 | enabled 传导断言改**场景内直构** `PhoenixTracer(config=PhoenixConfig.from_env())` 验证 lambda 同构语义；组合根 resolve 四件保持无全局副作用形态断言；SINGLETON config 定格入 DC-9 设计事实注记 |
+| R2-4 | AC-2.3 观察哨三读法不自洽（全局观察哨恒真/自败，与链级前置 reset 协议互拆） | P1 | 钉死**读法丙**：注入通道观察哨（不 initialize）+ 前置 reset 双复位（proxy 态前提断言）——守护「不经全局的旁路泄漏」；禁模块级全局观察哨形态 |
+| R2-5 | AC-5.2 块序未钉死——交错执行存在幂等闩假绿窗口（reset→再 initialize 短路→traced 轮实为 NoOp→开销≈0 假绿）；t_traced 缺正向 span 锚；Task 4 场景⑥⑦通道归类缺席 | P2 | 块序钉死（先 t_untraced×5 → 一次性 initialize → t_traced×5，禁交错）+ 正向锚（t_traced 块 exporter 计数 > 0）+ ⑥归注入通道/⑦归全局通道 |
+| R2-6 | R1-13 处置转写缺口——try 只包 initialize 不包 resolve，lambda 构造期 101 抛仍击穿 bootstrap 启动 | P2 | AC-4/DC-7 统一改「try: resolve + isinstance + initialize() 整段 except ConfigurationError」 |
+| R2-7 | AC-1 注入路径 Resource/sampler 断言空转——provider 的 resource/sampler 是构造期不可变项，注入 provider 的 resource 由测试构造（夹具恒真） | P2 | 验证标准**双路径拆分**：自建路径断言 PhoenixTracer 构造的 provider 属性；注入路径断言 initialize 挂载与 span 可观测 |
+| R2-8 | 追溯矩阵 AC-3.2 载体（test_tracing_decorator）与「组件级注入通道」分类互指两处；Task 2 DoD 认领与矩阵归属小冲突 | P3 | 矩阵载体校准（常量断言留 decorator 文件 + 通道能力归 test_phoenix_tracer——注入通道） |
+| R2-9 | initialize「幂等」与「已 set 检测 warning」判据重叠未定义（同实例再入 vs 外来 set 不可区分） | P3 | 端口契约补**实例闩语义**：同实例再入静默 True；外来 set（第二实例构造）warning |
+| R2-10 | 进程 env 带 PHOENIX_TRACING_ENABLED=true 时 session bootstrap 全局 set 击穿全部「未 set」前提断言（env 输入面前提未钉） | P3 | 测试隔离 SSOT 补环境前提条款（进程 env 禁带 true + 场景级 monkeypatch.delenv 钉死） |
+| R2-11 | 风险#8 防御降级静默化——getattr 守卫使 OTel 升级后双复位静默退化为单复位，#8639 类污染无红信号 | P3 | 处置补「降级路径必须 logger.warning（防御不等于静默）」下限 |
+| R2-12 | R1 修复传播漏网批量：Task 3 两处红行漏 initialize 通道（P0 修复第 7 同源位）+ SSOT 枚举漏两文件；继承清单 L90 仍写「同构照抄」+ DC-6 第 3 处漏网 + 唯一 setter 未校准；「唯一生产可达 setter」两处残留；「三组」两处残留；DC-9 L2874 残留；Subtask 0.4/0.6 旧策略名；teardown 条款漏双复位 | P1/P2/P3 | 逐位落位（正文 12 处修订——Task 3 双行/SSOT 枚举/继承清单/AC-4/完成标志②/L332/L507/DC-9/Subtask 0.4/0.6/teardown/矩阵载体） |
 
 ---
 
@@ -848,12 +860,14 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 |------|------|---------|
 | 2026-10-27 | v1.0.0 | 创建故事文件（四视角并行调研：可观测性基础设施/Agent 工作流/端口契约/测试模板 + Web 技术调研；9 项关键架构决策 DC-1~DC-9 + 4 项偏离声明 OD-1~OD-4 + 风险七项；OTel SDK 原生实现零新依赖[OD-1——phoenix.tracing 旧 API 废弃 + OTel 栈升级回归风险]；AgentTracingPort + duck-type SpanHandle[DC-2]；@trace 装饰器 OTel 全局 API + NoOp 降级[DC-3]；两级 span 树纯附加接入零构造点回归[DC-4]；OTel 全局状态唯一 setter + 测试注入通道[DC-5]；eval/drift 常量注册+通道口径[OD-2]；5-6 事件消费基建移交裁定归 5.11[OD-4]；5-3 移交三项处置[trace_id 核销/AgentDecided 不接线/R1-DF2 顺延]） |
 | 2026-10-27 | v1.1.0 | 文档审查周期 Round 1（D1 四视角调研 + D2 三审查员[正确性可行性/一致性/科学性业界对标] + 主会话 OTel 探针实证；处置 P0×1 + P1×8 + P2×11 + P3 批量 21 项——详见 Docs Review Fixes 表 R1-1~R1-21。核心：①span 可观测机制自相矛盾 P0——链级场景统一 initialize 全局通道 + 组件级纯注入分派；②OTel 1.44.0 Once 闩锁实证——reset 双复位形态（变量+Once 重建）替代单复位先例；③SpanHandle 两方法化（set_status 静默 no-op 实测）+ 行为断言纪律；④AC-3 数据源逐项钉死（active_skill_count 派生/input_hash·confidence 归 evidence/元断言子集式/全零桶实测修正）；⑤AC-5 确定性延迟 + k 轮中位数；⑥sampling 变量裁决 PHOENIX_TRACES_SAMPLER_ARG；⑦eval.confidence 键名收敛（OpenInference llm.* 前缀族避让）；⑧initialize 唯一全局通道 + 已 set 检测 + bootstrap 配置错误降级；⑨DC-3 应用插桩定位修正 + prd 伪引证删除 + 行号锚批量校准） |
+| 2026-10-27 | v1.2.0 | 文档审查周期 Round 2（回归核查 + 组合交互双审查员；处置 P0×1 + P1×5 + P2×3 + P3×4——R2-1~R2-12。核心：①create_span tracer 双源解析 P0——注入 provider 优先[tracer_provider= 参数]，None 降级判据改「无 tracer 来源」，解 R1-1 注入通道与 initialize 守卫互拆；②复位义务正交条款——凡 initialize 测试一律双复位（含组件级）+ autouse 兜底；③AC-4.1 enabled 传导改场景内直构（SINGLETON config 构造期定格）；④NoOp 观察哨钉读法丙（注入通道观察哨 + proxy 态前提断言）；⑤AC-5.2 块序钉死 + traced 正向锚（幂等闩假绿窗口封堵）；⑥try 罩住整段接线（resolve 构造期 101）；⑦R1 传播漏网 12 处落位[Task 3 双行/SSOT 枚举/继承清单/三组残留/DC-9 行号等]） |
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-10-27
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查周期 Round 1 修订（P0×1 + P1×8 + P2×11 + P3 批量——span 可观测机制 SSOT 重写/Once 闩锁双复位/SpanHandle 两方法化/AC-3·AC-5 口径重钉，详见 Docs Review Fixes）
+- v1.2.0: 文档审查周期 Round 2 修订（P0×1 + P1×5 + P2×3 + P3×4——create_span 双源解析/复位义务正交/AC-4.1 直构口径/观察哨读法丙/AC-5.2 块序/R1 传播漏网 12 处，详见 Docs Review Fixes R2-1~R2-12）
