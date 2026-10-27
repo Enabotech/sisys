@@ -1443,7 +1443,7 @@ def then_overhead_below_1_percent(context: dict[str, Any]) -> None:
     R1-F4' 复测对称（R2）：collection 字母序 acceptance 先于 integration——本
     场景是 _PERF_CACHE 首轮采样者，集成场景⑦的复测保护对首轮污染不可达；本
     断言加同款复测分支（首轮超标 → force_refresh 独立重采样 → 两轮均超标才红）。
-    R3-4 守卫对齐：独立跑 acceptance 时无集成⑦的 t_untraced 下限守卫——本处
+    R3-5 守卫对齐：独立跑 acceptance 时无集成⑦的 t_untraced 下限守卫——本处
     补同款（分母失真防护，与集成侧常量单源）。
     """
     from tests.integration.test_integration_phoenix_tracer import (
@@ -1453,7 +1453,7 @@ def then_overhead_below_1_percent(context: dict[str, Any]) -> None:
 
     assert context["overhead_perf"]["untraced_median_seconds"] >= UNTRACED_BASELINE_MIN_SECONDS, (
         f"t_untraced 基准 {context['overhead_perf']['untraced_median_seconds']:.3f}s 应 ≥ {UNTRACED_BASELINE_MIN_SECONDS}s"
-        "（R3-4——分母失真防护，与集成场景⑦守卫单源对齐）"
+        "（R3-5——分母失真防护，与集成场景⑦守卫单源对齐）"
     )
     ratio = context["overhead_perf"]["overhead_ratio"]
     if ratio < 0.01:

@@ -863,7 +863,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 
 #### 需决策 Decision Needed
 
-- 无（Round 1 全部发现已裁决：25 项中 18 项落码 + 1 项改判维持 + 6 项登记 deferred，无未决争议——**分级口径注（R2 校正）**：25 = 已修复节 19 F 项[14 物理行，P3 批量行 1 行含 6 项] + Defer 节 6 DF 项；分级 P1×4 + P2×10（F4~F11 + DF1/DF2）+ P3×11（F13~F19 + DF3~DF6）；F 编号实为 F1~F11 + F13~F19（含撇号 F4'，**F12 空号**——原「R1-F1~F22」区间虚标勘误））
+- 无（Round 1 全部发现已裁决：25 项中 18 项落码 + 1 项改判维持 + 6 项登记 deferred，无未决争议——**分级口径注（R2 校正 + R5 精化）**：25 = F 项全集 19[已修复节 13 物理行 18 项 + 维持不改节 1 行 1 项（F17），P3 批量行 1 行含 6 项] + Defer 节 6 DF 项；分级 P1×4 + P2×10（F4~F11 + DF1/DF2）+ P3×11（F13~F19 + DF3~DF6）；F 编号实为 F1~F11 + F13~F19（含撇号 F4'，**F12 空号**——原「R1-F1~F22」区间虚标勘误））
 
 #### 已修复 Patch
 
@@ -887,6 +887,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 
 #### Round 2 修复（回归核查 + 传播完备性双视角，2026-10-27）
 
+> 口径注（R5-N3）：本节 10 物理行，「15 项/落码 13」按落码动作展开口径——A5~A7 一行含 5 个落码动作（v2.0.0 短注/L681/L742/F17 移节/DF3 措辞）；P3×11 = A5~A7 五动作 + B1~B4 四项 + C 两留痕。
+
 - [x] **R2-A1（P1）** Review Findings 台账计数失实——三口径互斥（「22 项/16 落码」vs「16+6+1=23」vs 表行实际 25）+「R1-F1~F22」编号虚标（F12/F20/F21/F22 零出现）。修复：三处行内数字改实（P1×4 + P2×10 + P3×11 = 25 项；落码 18 + 改判维持 1 + 登记 6）+ 分级口径注 + F 编号区间披露 F12 空号
 - [x] **R2-A2（P1）** L247 领域异常契约节「追踪运行面零抛出」单义残留（R1-F1 联动漏网）——补分述校准（装配段 OTel 异常降级/消费方段业务异常穿透）
 - [x] **R2-A3（P2）** L179 AC-5 裕量「>1000×」单口径残留——补双口径注（无负载前提 + 全周期 ~10-100×）
@@ -899,6 +901,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - [x] **R2-C（不修留痕）** atexit 实例级累积（测试进程良性——SINGLETON 生产 1 钩子，shutdown 幂等）；attributes 批量写入段异常穿透（R1-F1 已文档化决策，SpanAttributeValue 类型注解即契约不重复 docstring）
 
 #### Round 3 深度推演（单推演员：生命周期 7 时间线 + 组合 5 组 + 数学 3 项，2026-10-27）
+
+> 口径注（R5-N3）：本节 7 物理行，「P3×9」按动作面展开口径——R3-7 行含更正/归宿登记/防呆三类动作（编号口径 P3×8 + 多动作展开 1）；「落码 6 + 留痕 3」精确。
 
 - [x] **R3-1（P2）** shutdown docstring 机制归因失实——OTel 1.44.0 `BatchProcessor.force_flush` **静默忽略超时**（源码 `# TODO ... #4568`，实验实证 timeout_millis=100 下实际阻塞 1.5s），R1-F18 的「flush 5s 超时 + ~35s 上限」系统性低估（黑洞端点最坏百秒级——⌈2048/512⌉ 批 × gRPC deadline 10s×重试 + join 30s）。修复：docstring 源码级归因重写 + 运维封顶通道披露（OTEL_EXPORTER_OTLP_TIMEOUT/OTEL_BSP_* 环境暗消费——本类零参 BSP 构造经 env 生效）+ flush 挂起饿死后续连接管理器清理的排序面披露
 - [x] **R3-2~4（P3）** 三处披露补全：initialize False 不门控 create_span（降级态×外来 set 照产真 span——双源契约语义角落）/ OTEL_PYTHON_TRACER_PROVIDER env 第三面（OTel entry-point 装配使外来 set 分支 env 可达——模块头治理注记：部署面须管住该变量）/ SpanAttributeValue 的 list 运行时行为（list[str] 静默冻结可用；含 None/混类型整属性静默丢弃——5.8 消费面沿 tuple 提示）
@@ -922,8 +926,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（从 Task 0 开始）
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施（从 Task 0 开始）
+- [x] 运行 `code-review` 进行代码审查（C1~C5 五轮循环：R1 四视角调研 + R2 回归核查 + R3 深度推演 + R4 纯验证 + R5 独立终审——周期收敛，见下方收敛声明）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
@@ -942,10 +946,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | 2026-10-27 | v2.1.0 | 代码审查周期 Round 1（四视角并行调研 + 双评审员 + 复评门禁「优秀」放行；P1×4 + P2×10 + P3×11 共 25 项，落码 18 项 + 登记 6 项 + 改判维持 1 项——详见 Review Findings 表 R1-F1~F11+F13~F19（含 F4'，F12 空号）+ R1-DF1~DF6。核心：①create_span 吞消费方异常 P1——try 收窄至装配段 + yield 双出口移出 try + 端口契约分述重写[装配段零抛出/消费方段穿透]，5.8/5.9 接入即爆的结构性缺陷；②@trace 删显式 except 分支——双 exception 事件实测消除 + CancelledError 按 OTel #4484 锁定 UNSET 语义 + 零吞异常由无 except 结构性保证；③initialize 失败降级补测[突变 M4 存活封堵] + NoOp 跑后判据 + 场景⑦噪声复测机制[force_refresh 独立重采样 + 采样入口双复位自包含]；④架构防线双升级——OTel API/SDK 分界完整模块名禁入断言[sdk/exporter/instrumentation] + application 全层第三方基线[⊆{opentelemetry,pydantic,yaml}+redis grandfather]；⑤组合根 shutdown 补 peek_singleton 刷盘[SIGTERM 面] + fallback 链补 OTel 信号级端点 + initialize 装配段入 try；⑥文档勘误六项[变异计数 15 红/src 九文件/裕量双口径/版本字段/退出延迟语义/豁免面] + deferred-work 登记 R1-DF1~6[event_metrics 同款缺陷/otel_config 单复位升格/impl 永抛缝隙/OTLP 真实通路/redis 治理/CLI 缺口]。111 测试全绿 + ruff/mypy 701 文件零问题） |
 | 2026-10-27 | v2.1.1 | 代码审查周期 Round 2 回归核查 + 传播完备性（双视角；16 项 R1 修复全部回归核查通过——111+56+15 passed 零 P0/P1/P2 新破口；修复 P1×2 + P2×2 + P3×11 = 15 项，落码 13 + 不修留痕 2。核心：①台账计数三口径互斥 P1——三处行内数字改实[25 项 = 18 落码 + 1 改判 + 6 登记；F12 空号披露]；②L247 契约节零抛出单义残留 P1——R1-F1 联动漏网补分述；③L179 裕量/L572 DC-3 选定行/L681/L742 四处二阶传播补注；④架构 scanner 逃逸口封堵[from opentelemetry import sdk 形态 names 扫描 + 常驻判别力单测] + 相对导入 level 守卫对称补；⑤AC-5.2 复测保护对称化[首轮采样者身份实证]；⑥R1-F7 shutdown 刷盘直测[顺序锚 tracer 先于 manager]。不修留痕：atexit 实例级累积[测试良性]/attributes 段穿透[已文档化]。10+2 测试新增全绿） |
 | 2026-10-27 | v2.1.2 | 代码审查周期 Round 3 单深度推演（生命周期 7 时间线 + R1/R2 修复组合 5 组 + 数学完备性 3 项——全部源码级 + /tmp 实验实证；零 P0/P1；P2×1 + P3×9，落码 6 + 留痕 3。核心：①shutdown 机制归因重写 P2——OTel 1.44.0 BatchProcessor.force_flush 静默忽略超时[#4568 TODO 实证]，R1-F18「~35s 上限」系统性低估勘误[黑洞端点最坏百秒级] + 运维封顶通道披露[OTEL_EXPORTER_OTLP_TIMEOUT/OTEL_BSP_* 暗消费] + flush 饿死后续清理排序面披露；②三处披露补全[initialize False 不门控 create_span/OTEL_PYTHON_TRACER_PROVIDER 第三面治理注记/SpanAttributeValue list 运行时行为 5.8 提示]；③AC-5.2 补 t_untraced 下限守卫；④OD-1 补 5.8 白名单前瞻；⑤四疑点证伪留痕[TRACES 双消费证伪/CLI atexit 证伪/外来 set 主线证伪[生产实为 event-bus→Phoenix 反向串流]/flush 封顶证伪]；⑥七时间线全闭合 + F1×F9 六格矩阵正交 + 复测统计特性安全方向论证） |
+| 2026-10-27 | v2.2.0 | 代码审查周期收敛（R4 纯验证零修复[四目录全量 13055 passed + 1 预存抖动隔离复跑绿 + 2 skipped；七维度快扫全过——红线零引入/lint-imports 5 kept/版本链一致] + R5 独立终审五节全过[周期闭合核对——恰 dev+三审查提交无游离；12 项关键修复双向取证成立 + 3 项行为实跑；独立快扫台账计数终验精确；门禁实跑 90+10 绿 + ruff/mypy 零问题；终审判定「周期收敛——建议流转 done」]；收敛清偿终审特权发现 3 项 P3[N1 验收注释 R3-4→R3-5 编号错位/N2 R1 口径注分节归属精化/N3 R2-R3 节口径注补]；收敛声明入 Story；Status: review → done——Story 5.7 交付闭环） |
 
 ---
 
-**故事版本/Story Version:** v2.1.2
+**故事版本/Story Version:** v2.2.0
 **创建日期/Created:** 2026-10-27
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
@@ -958,6 +963,25 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - v2.1.0: 代码审查周期 Round 1（四视角调研 + 双评审 + 复评「优秀」；P1×4 + P2×10 + P3×11 共 25 项——落码 18 + 登记 6 + 改判维持 1，详见 Review Findings；核心：create_span 消费方异常穿透 P1 + @trace 框架兜底极简化 + 三处测试判别力封堵 + 架构防线双升级 + 组合根 SIGTERM 刷盘 + OTel 信号级 fallback + 文档勘误六项）
 - v2.1.1: 代码审查周期 Round 2 回归核查 + 传播完备性（R1 修复零新破口[111+56+15 绿]；P1×2 + P2×2 + P3×11——落码 13 + 不修留痕 2；台账计数改实/契约节分述补注/scanner 逃逸口封堵/AC-5.2 复测对称/F7 直测顺序锚，详见 Review Findings Round 2 节）
 - v2.1.2: 代码审查周期 Round 3 深度推演（7 时间线 + 5 组合 + 3 数学全实证闭合；零 P0/P1，P2×1 + P3×9——落码 6 + 留痕 3；shutdown force_flush 超时失实勘误/三处披露补全/AC-5.2 守卫/OD-1 前瞻/四疑点证伪留痕，详见 Review Findings Round 3 节）
+- v2.2.0: 代码审查周期收敛（R4 纯验证 + R5 独立终审五节全过 + 特权发现 3 项 P3 清偿；收敛声明见下——Status: review → done）
+
+---
+
+### 🏁 代码审查周期收敛声明（R1-R5，2026-10-27）
+
+**周期概述**：本 Story 自 v2.0.0 交付后经三轮代码审查循环 + 纯验证 + 独立终审：R1 四视角并行调研（OTel 实现正确性/架构合规与契约/测试质量与判别力/运行面实测与文档一致性）+ 双评审员 + 复评门禁（25 项发现）→ R2 回归核查 + 传播完备性双视角（16 项 R1 修复零新破口，15 项发现）→ R3 单深度推演（生命周期 7 时间线 + 组合 5 组 + 数学完备性 3 项，10 项发现）→ R4 纯验证（四目录全量 13055 passed + 1 预存抖动隔离复跑绿 + 2 skipped；七维度快扫全过，零提交）→ R5 独立终审（周期闭合核对 + 12 项关键修复双向取证 + 3 项行为实跑 + 全文独立快扫 + 门禁确认——「不采信 Story 台账自报」）。
+
+**轮次投入与产出**：R1（7bfd6bfd，v2.1.0）处置 P1×4 + P2×10 + P3×11 共 25 项（落码 18 + 改判维持 1 + 登记 deferred 6）；R2（3f18d027，v2.1.1）处置 P1×2 + P2×2 + P3×11 共 15 项（落码 13 + 不修留痕 2）；R3（2c348fd5，v2.1.2）处置 P2×1 + P3×9（落码 6 + 留痕 3，零 P0/P1）。周期内提交面恰为 dev + 三审查提交（终审第一节核对——无游离）；工作区干净。
+
+**最终分级统计**：周期累计 **P0×0**；**P1×8 全部落码**（R1-F1/F2/F3/F4' + R2-A1/A2）；P2×13（落码 11 + R1-DF1/DF2 按 gap 四要素登记 1.3 存量归宿）；P3×31（落码 + 留痕 + 证伪/推演记录 + 终审特权 N1~N3 已清偿）。
+
+**关键实证**（终审 12 项双向取证 + 3 项实跑成立）：create_span try 收窄至装配段 + yield 双出口在 try 外（消费方异常同一对象透传实测）；@trace 无 except 分支纯 with 形态（异常事件恰 1 + CancelledError UNSET 锁定——OTel #4484 设计语义）；initialize 装配段整体入 try 降级；组合根 shutdown() 顶部 peek_singleton 刷盘（顺序锚 ["tracer_shutdown","manager_close"] 实测）；OTel API/SDK 分界完整模块名禁入 + application 全层第三方基线（scanner names 扫描逃逸口封堵 + 常驻判别力锚）；endpoint 三级 fallback 链；shutdown force_flush 静默忽略超时源码级勘误（OTel #4568）；AC-5.2 t_untraced 下限守卫常量单源（0.13s）。
+
+**零残留声明**：全部 P0/P1/P2 已修复或按四要素登记归宿并经终审独立取证核实；P3 级终审新发现 3 项（N1 验收注释编号引用错位/N2 分级口径注分节归属/N3 R2-R3 口径注缺）已随收敛提交全部清偿——**零 P1 及以上残留，P3 零挂账**。
+
+**Status 判定**：`review → done`——代码已达交付收敛态：全量四目录 13055 passed + 1 预存抖动（隔离复跑绿——1-15b 验收面 Redis TTL 计时抖动，与 5.7 零交集）+ 2 skipped；5.7 触碰面定向回归全绿（90+10 passed）；ruff/mypy 701 文件零问题；lint-imports 5 kept 0 broken；红线三条终扫本 Story 零引入。
+
+**终审签署**：代码审查周期独立终审员（Claude Code glm-5.3），2026-10-27，基于 git 考古 + HEAD 实地取证（file:line 逐项核对）+ 定向实跑（3 项行为测试 + 五文件门禁 90 绿 + shutdown 直测 10 绿 + ruff/mypy）。
 
 ---
 
