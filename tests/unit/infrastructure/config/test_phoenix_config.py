@@ -1,8 +1,10 @@
 """PhoenixConfig 配置单元测试（Story 5.7 — Task 1 TDD 循环 A）
 
-覆盖：from_env 四变量矩阵（默认值 / 覆盖 / OTEL_EXPORTER_OTLP_ENDPOINT fallback
-链 / 空串视为未设 / bool 三态）+ 101 守卫五场景参数化（isinstance → code →
-context 三段式）+ from_env 非法数值 101 包装（google_patents from None 先例）。
+覆盖：from_env 四变量矩阵（默认值 / 覆盖 / OTel 端点 fallback 链[R1-F8 三级：
+PHOENIX_OTLP_ENDPOINT > OTEL_EXPORTER_OTLP_TRACES_ENDPOINT（信号级）>
+OTEL_EXPORTER_OTLP_ENDPOINT（通用级）] / 空串视为未设 / bool 三态）+ 101 守卫
+五场景参数化（isinstance → code → context 三段式）+ from_env 非法数值 101 包装
+（google_patents from None 先例）。
 
 Run with:
     poetry run pytest tests/unit/infrastructure/config/test_phoenix_config.py -v
@@ -22,6 +24,12 @@ _PHOENIX_VARS = (
     "PHOENIX_TRACES_SAMPLER_ARG",
 )
 
+#: fallback 链的 OTel 侧环境变量（R1-F8 两级：信号级 > 通用级——进程 env 防污染逐用例清理）
+_OTEL_ENDPOINT_VARS = (
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+)
+
 
 class TestPhoenixConfigFromEnv:
     """from_env 四变量解析（bool 三态 + fallback 链 + 空串视为未设）。"""
@@ -30,7 +38,8 @@ class TestPhoenixConfigFromEnv:
         """默认值矩阵：false / localhost:4317（gRPC）/ sisys-agent / 1.0 全采样。"""
         for var in _PHOENIX_VARS:
             monkeypatch.delenv(var, raising=False)
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+        for var in _OTEL_ENDPOINT_VARS:
+            monkeypatch.delenv(var, raising=False)
 
         config = PhoenixConfig.from_env()
 
@@ -66,20 +75,39 @@ class TestPhoenixConfigFromEnv:
     def test_from_env_endpoint_fallback_to_otel(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """fallback 链：PHOENIX_OTLP_ENDPOINT 未设时取 OTEL_EXPORTER_OTLP_ENDPOINT。"""
         monkeypatch.delenv("PHOENIX_OTLP_ENDPOINT", raising=False)
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-fallback:4317")
 
         assert PhoenixConfig.from_env().endpoint == "http://otel-fallback:4317"
 
+    def test_from_env_endpoint_fallback_to_otel_traces_level(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """fallback 链（R1-F8）：仅设信号级 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT 时采用（OTel 规范信号级）。"""
+        monkeypatch.delenv("PHOENIX_OTLP_ENDPOINT", raising=False)
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://otel-traces-only:4317")
+
+        assert PhoenixConfig.from_env().endpoint == "http://otel-traces-only:4317"
+
+    def test_from_env_traces_level_takes_precedence_over_generic(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """fallback 链优先级（R1-F8）：信号级 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT > 通用级（OTel 规范）。"""
+        monkeypatch.delenv("PHOENIX_OTLP_ENDPOINT", raising=False)
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://otel-traces-first:4317")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-generic-second:4317")
+
+        assert PhoenixConfig.from_env().endpoint == "http://otel-traces-first:4317"
+
     def test_from_env_phoenix_endpoint_takes_precedence(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """fallback 链优先级：PHOENIX_OTLP_ENDPOINT > OTEL_EXPORTER_OTLP_ENDPOINT。"""
+        """fallback 链优先级：PHOENIX_OTLP_ENDPOINT > OTEL_EXPORTER_OTLP_TRACES_ENDPOINT > 通用级。"""
         monkeypatch.setenv("PHOENIX_OTLP_ENDPOINT", "http://phx-first:4317")
-        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-second:4317")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://otel-traces-second:4317")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-generic-third:4317")
 
         assert PhoenixConfig.from_env().endpoint == "http://phx-first:4317"
 
     def test_from_env_empty_string_treated_as_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """空串视为未设：两级均空串回默认值（set-but-empty 不触发 101——compose 注入空串形态）。"""
+        """空串视为未设：各级均空串回默认值（set-but-empty 不触发 101——compose 注入空串形态）。"""
         monkeypatch.setenv("PHOENIX_OTLP_ENDPOINT", "")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
         config = PhoenixConfig.from_env()
@@ -89,6 +117,7 @@ class TestPhoenixConfigFromEnv:
     def test_from_env_empty_phoenix_falls_to_nonempty_otel(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """空串视为未设：PHOENIX 空串 + OTEL 非空 → fallback 到 OTEL 值。"""
         monkeypatch.setenv("PHOENIX_OTLP_ENDPOINT", "")
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-nonempty:4317")
 
         assert PhoenixConfig.from_env().endpoint == "http://otel-nonempty:4317"

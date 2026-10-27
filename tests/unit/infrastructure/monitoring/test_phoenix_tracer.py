@@ -162,6 +162,24 @@ class TestInitializeStateMachine:
         assert isinstance(provider.sampler, TraceIdRatioBased)
         assert provider.sampler.rate == 0.5
 
+    def test_initialize_failure_degrades_and_latches(
+        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """装配失败降级 + 失败闩锁（R1-F2 补测——DC-7 契约明文却曾零覆盖）：返回 False + 再入静默仍 False + 不 set 全局。"""
+
+        def _boom() -> Any:
+            raise RuntimeError("注入装配失败（R1-F2）")
+
+        tracer = PhoenixTracer(config=_make_enabled_config())
+        monkeypatch.setattr(tracer, "_build_production_provider", _boom)
+
+        with caplog.at_level(logging.WARNING):
+            assert tracer.initialize() is False
+
+        assert tracer.initialize() is False, "失败态实例闩：再入静默返回既有 False（无重试通道）"
+        _assert_proxy_global()
+        assert [r for r in caplog.records if r.levelno >= logging.WARNING], "降级路径应 logger.warning（不静默）"
+
 
 class TestCreateSpanDegradation:
     """create_span 降级路径（DC-7——追踪失败降级不上抛）。"""
@@ -196,6 +214,45 @@ class TestCreateSpanDegradation:
         span = exporter.get_finished_spans()[0]
         for key, value in payload.items():
             assert span.attributes[key] == value
+
+
+class TestConsumerExceptionPassthrough:
+    """消费方段异常契约（R1-F1——with 体内业务异常原样穿透：不被吞、不被 RuntimeError 改写）。"""
+
+    def test_consumer_exception_passes_through_unchanged(self) -> None:
+        """真 span 路径：原异常对象原样上抛 + span ERROR + exception 事件恰 1（框架 __exit__ 兜底）。"""
+        from opentelemetry.trace import StatusCode
+
+        from src.domain.exceptions.agent_exceptions import AgentWorkflowError
+
+        provider, exporter = _make_injectable()
+        tracer = PhoenixTracer(config=_make_enabled_config(), tracer_provider=provider)
+        boom = AgentWorkflowError(agent_id="a1", phase="verify", reason="消费方注入异常（R1-F1）")
+
+        with pytest.raises(AgentWorkflowError) as excinfo:
+            with tracer.create_span("consumer-boom") as handle:
+                assert handle is not None
+                raise boom
+
+        assert excinfo.value is boom, "应透传同一异常对象（R1-F1——不被吞/不被 RuntimeError 替换）"
+        span = exporter.get_finished_spans()[0]
+        assert span.status.status_code == StatusCode.ERROR
+        exception_events = [e for e in span.events if e.name == "exception"]
+        assert len(exception_events) == 1, "exception 事件应恰 1（use_span __exit__ 兜底——无显式重复调用）"
+
+    def test_consumer_exception_passes_through_on_degraded_none(self) -> None:
+        """降级 None 路径：消费方异常同样原样穿透（降级出口在 try 外——R1-F1 四路径矩阵）。"""
+        from src.domain.exceptions.agent_exceptions import AgentWorkflowError
+
+        tracer = PhoenixTracer(config=_make_enabled_config(enabled=False))  # 无 tracer 来源（未注入未 initialize）
+        boom = AgentWorkflowError(agent_id="a2", phase="plan", reason="降级路径注入异常（R1-F1）")
+
+        with pytest.raises(AgentWorkflowError) as excinfo:
+            with tracer.create_span("degraded-boom") as handle:
+                assert handle is None
+                raise boom
+
+        assert excinfo.value is boom, "降级出口消费方异常同样原样穿透（不被吞）"
 
 
 class TestResetForTestingDoubleRestore:

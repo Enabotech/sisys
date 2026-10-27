@@ -1,10 +1,14 @@
 """PhoenixTracer 架构约束验证测试（Story 5.7 — Task 5：SDD 架构约束验证）
 
-三验证器（test_arch_isolation_switch_log 同款形态——REPO_ROOT + 目标文件常量 +
-AST 扫描 helper + 参数化验证器类）：
-A. application 触碰文件第三方 import 白名单（本 Story 新建 application 第三方
-   防线——importlinter 只限层间方向不限第三方；允许 opentelemetry[DC-3：应用
-   侧手动插桩标准 API 包]，黑名单取 domain 契约同款清单）；
+三验证器 + 全层基线（test_arch_isolation_switch_log 同款形态——REPO_ROOT +
+目标文件常量 + AST 扫描 helper + 参数化验证器类）：
+A. application 触碰文件第三方 import 白名单（本 Story 触碰面防线——importlinter
+   只限层间方向不限第三方；允许 opentelemetry[DC-3：应用侧手动插桩标准 API
+   包]，黑名单取 domain 契约同款清单；R1-F5 增设 OTel API/SDK 分界断言——
+   完整模块名禁入 sdk/exporter/instrumentation 前缀）；
+A+. application 全层第三方基线（R1-F6——触碰文件静态清单升级为全层默认拒绝：
+   全目录第三方顶层 ⊆ 白名单 + 存量违规文件级 grandfather，新文件引新第三方
+   包全层拦截——显式治理点）；
 B. domain 零触碰（本 Story 新增符号 grep 零命中 + domain 零 import opentelemetry）
    + 组合根外零实例化（PhoenixTracer( 构造点仅组合根）；
 C. 装饰器静态锚（六阶段 + execute 方法 __wrapped__ 在位）+ 构造签名不变
@@ -39,7 +43,24 @@ _APPLICATION_TARGET_FILES = [
 #: API 包——与 logging 同级定位的横切标准 API；SDK 归 infrastructure）
 _APPLICATION_ALLOWED_THIRD_PARTY = {"opentelemetry"}
 
-#: 第三方黑名单（domain 契约同款清单——重依赖/框架型包禁入 application）
+#: OTel API/SDK 分界禁入前缀（R1-F5——完整模块名级：sdk/exporter 分属
+#: opentelemetry-sdk 与 opentelemetry-exporter-* 发行包（SDK 面），instrumentation
+#: 是自动插桩框架（装配面），三者归 infrastructure；API 面是 trace/context/
+#: baggage/propagate/propagators/metrics/util/semconv——DC-3「只碰 API 包」的
+#: 可执行化，堵顶层包族名白名单对子包的穿透盲区）
+_FORBIDDEN_OTEL_SUBMODULE_PREFIXES = ("opentelemetry.sdk", "opentelemetry.exporter", "opentelemetry.instrumentation")
+
+#: application 全层第三方基线白名单（R1-F6——全目录默认拒绝：新增第三方包
+#: 必须显式修此清单过架构测试[有意识决策]，防静默渗入）
+_APPLICATION_LAYER_ALLOWED_THIRD_PARTY = {"opentelemetry", "pydantic", "yaml"}
+
+#: 全层基线存量豁免文件（相对 application/ 路径——grandfather 清单，新文件
+#: 不得追加；redis 治理归宿见 5-7 R1-DF5）
+_APPLICATION_LAYER_GRANDFATHERED_FILES = {
+    "services/document_parsing_service.py",  # redis（Epic 2 存量——本 Story 零触碰，Surgical 纪律不动先例）
+}
+
+#: 第三方黑名单（domain 契约同款清单——重依赖/框架型包禁入 application 触碰文件）
 _APPLICATION_FORBIDDEN_IMPORTS = {
     "pydantic",
     "fastapi",
@@ -105,6 +126,21 @@ def _scan_file_imports(path: Path) -> set[str]:
     return modules
 
 
+def _scan_file_full_import_names(path: Path) -> set[str]:
+    """AST 扫描文件全部 import 完整模块名（R1-F5——子包级分界判定的数据源）."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules.add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                modules.add(node.module)
+            # 相对导入（level>=1）属同层——不计入第三方判定
+    return modules
+
+
 def _scan_instantiation_sites(class_name: str) -> list[str]:
     """AST 扫描 src/ 全目录的类实例化点（相对路径:行号）。"""
     violations: list[str] = []
@@ -120,7 +156,7 @@ def _scan_instantiation_sites(class_name: str) -> list[str]:
 
 
 class TestValidatorAApplicationThirdPartyWhitelist:
-    """验证器 A：application 触碰文件第三方 import 白名单（opentelemetry 允许）."""
+    """验证器 A：application 触碰文件第三方 import 白名单（opentelemetry 允许）+ OTel API/SDK 分界."""
 
     @pytest.mark.parametrize("target", _APPLICATION_TARGET_FILES, ids=[p.name for p in _APPLICATION_TARGET_FILES])
     def test_no_forbidden_third_party_imports(self, target: Path) -> None:
@@ -140,6 +176,45 @@ class TestValidatorAApplicationThirdPartyWhitelist:
         assert non_stdlib <= _APPLICATION_ALLOWED_THIRD_PARTY, (
             f"{target.name} 白名单外第三方: {non_stdlib - _APPLICATION_ALLOWED_THIRD_PARTY}"
         )
+
+    @pytest.mark.parametrize("target", _APPLICATION_TARGET_FILES, ids=[p.name for p in _APPLICATION_TARGET_FILES])
+    def test_otel_api_sdk_boundary(self, target: Path) -> None:
+        """OTel API/SDK 分界（R1-F5）：触碰文件禁入 opentelemetry.sdk/exporter/instrumentation 子包.
+
+        顶层包族名白名单只锁「opentelemetry」家族——sdk 子包可穿透（突变实证）；
+        本断言用完整模块名把 DC-3「application 只碰 API 包」落为可执行边界。
+        """
+        full_names = _scan_file_full_import_names(target)
+        violations = sorted(name for name in full_names if name.startswith(_FORBIDDEN_OTEL_SUBMODULE_PREFIXES))
+        assert violations == [], f"{target.name} 禁入 OTel SDK/exporter/instrumentation 子包: {violations}"
+
+
+class TestValidatorAPlusApplicationLayerBaseline:
+    """验证器 A+：application 全层第三方基线（R1-F6——默认拒绝 + 存量 grandfather）."""
+
+    def test_application_layer_third_party_baseline(self) -> None:
+        """全层基线：application 全目录第三方顶层 ⊆ 白名单（新文件引新第三方包全层拦截）."""
+        import sys
+
+        for py_file in (SRC_DIR / "application").rglob("*.py"):
+            rel = str(py_file.relative_to(SRC_DIR / "application"))
+            if rel in _APPLICATION_LAYER_GRANDFATHERED_FILES:
+                continue  # 存量豁免（文件级——新文件不得追加，redis 治理归宿 R1-DF5）
+            imports = _scan_file_imports(py_file)
+            non_stdlib = {m for m in imports if m not in sys.stdlib_module_names and m != "src"}
+            extra = non_stdlib - _APPLICATION_LAYER_ALLOWED_THIRD_PARTY
+            assert not extra, f"application 全层第三方基线外 import（{rel}）: {extra}——新第三方包须显式扩白名单（有意识决策）"
+
+    def test_grandfather_files_actually_violate(self) -> None:
+        """grandfather 清单防呆（R1-F6）：豁免文件当前必须确有白名单外 import——豁免项失效即摘除."""
+        import sys
+
+        for rel in _APPLICATION_LAYER_GRANDFATHERED_FILES:
+            py_file = SRC_DIR / "application" / rel
+            imports = _scan_file_imports(py_file)
+            non_stdlib = {m for m in imports if m not in sys.stdlib_module_names and m != "src"}
+            extra = non_stdlib - _APPLICATION_LAYER_ALLOWED_THIRD_PARTY
+            assert extra, f"grandfather 文件 {rel} 已无白名单外 import——豁免应摘除（防豁免清单固化为永久化）"
 
 
 class TestValidatorBDomainZeroTouchAndRootOnlyInstantiation:

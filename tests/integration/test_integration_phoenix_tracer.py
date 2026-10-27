@@ -612,7 +612,12 @@ async def sample_span_record_perf() -> dict[str, Any]:
 
 @pytest.mark.benchmark
 async def test_scenario_6_span_record_p95_below_5ms() -> None:
-    """场景⑥：P95 < 5ms（exclusive 法 [18]——偏严侧估计量，实测 μs 级裕量 >1000×）。"""
+    """场景⑥：P95 < 5ms（exclusive 法 [18]——偏严侧估计量）。
+
+    裕量口径（R1-F15 勘误——双口径分述）：纯 span 创建实测 p50≈3.1μs（对
+    5ms 阈值裕量 >1000×）；含负载噪声的全周期 P95 实测 μs 级~百 μs 级（裕量
+    ~10-100×）——两口径不可混用，前者是 span 便宜性论证、后者是本断言实测值。
+    """
     result = await sample_span_record_perf()
     assert result["p95_seconds"] < SPAN_RECORD_P95_LIMIT_SECONDS, (
         f"span 记录 P95={result['p95_seconds'] * 1000:.2f}ms 应 < {SPAN_RECORD_P95_LIMIT_SECONDS * 1000}ms"
@@ -625,16 +630,22 @@ async def test_scenario_6_span_record_p95_below_5ms() -> None:
 # ===================================================================
 
 
-async def sample_tracing_overhead() -> dict[str, Any]:
+async def sample_tracing_overhead(force_refresh: bool = False) -> dict[str, Any]:
     """追踪开销双跑采样（委托入口——fail-once 链 k=5+5 轮取中位数）。
 
     块序钉死（R2-5）：先 t_untraced 块（全局 proxy）×5 → 一次性 initialize →
     t_traced 块×5——禁逐轮交错（幂等闩使交错 reset→initialize 短路假绿）。
     正向锚：t_traced 块结束 exporter span 计数 == 50（防 traced 轮静默降级）。
+    force_refresh（R1-F4'）：跳过缓存读取独立重采样，测量结果照常回写缓存
+    （复测值覆盖首轮值作为最终判据——供场景⑦噪声甄别复测用）。采样入口
+    显式双复位——untraced 块前提自包含（不依赖外部执行顺序；复测在首轮
+    已 set 全局的状态下可重入——否则复测 untraced 块实际产 span，ratio 恒
+    近 0 假阴性）。
     """
-    if "overhead" in _PERF_CACHE:
+    if not force_refresh and "overhead" in _PERF_CACHE:
         cached_overhead: dict[str, Any] = _PERF_CACHE["overhead"]
         return cached_overhead
+    _reset_global()  # 前提自包含（R1-F4'——复测可重入的必要条件）
 
     async def _timed_round() -> float:
         chain = await _assemble_chain(verify_mode="fail_once", delay_sec=FAKE_LLM_DELAY_SEC)
@@ -669,7 +680,7 @@ async def sample_tracing_overhead() -> dict[str, Any]:
 
 @pytest.mark.benchmark
 async def test_scenario_7_tracing_overhead_below_1_percent() -> None:
-    """场景⑦：开销公式断言 + t_untraced 下限守卫 + 正向锚。"""
+    """场景⑦：开销公式断言 + t_untraced 下限守卫 + 正向锚 + 噪声复测（R1-F4'）。"""
     result = await sample_tracing_overhead()
 
     assert result["untraced_median_seconds"] >= UNTRACED_BASELINE_MIN_SECONDS, (
@@ -679,10 +690,21 @@ async def test_scenario_7_tracing_overhead_below_1_percent() -> None:
     assert result["traced_span_count"] == TRACED_BLOCK_SPAN_COUNT, (
         f"traced 块 span 计数应恰 {TRACED_BLOCK_SPAN_COUNT}（10 span × 5 轮——正向锚），实际 {result['traced_span_count']}"
     )
-    assert result["overhead_ratio"] < 0.01, (
-        f"追踪开销比例 {result['overhead_ratio']:.4f} 应 < 1%"
-        f"（untraced={result['untraced_median_seconds']:.3f}s traced={result['traced_median_seconds']:.3f}s）"
-    )
+    if result["overhead_ratio"] >= 0.01:
+        # R1-F4' 环境噪声甄别：真实 span 开销是确定性的（复测必再红），调度噪声
+        # 是随机的（中位数差被 ±20ms 级波动污染时大概率回落）。独立复测一轮
+        # （force_refresh 绕缓存重采样），两轮均超标才判红——保持 epics「<1%」
+        # 锚点语义不引入容差稀释。
+        retest = await sample_tracing_overhead(force_refresh=True)
+        assert retest["overhead_ratio"] < 0.01, (
+            f"追踪开销比例复测两轮均超标：首轮 {result['overhead_ratio']:.4f} / 复测 {retest['overhead_ratio']:.4f} 应 < 1%"
+            f"（untraced={retest['untraced_median_seconds']:.3f}s traced={retest['traced_median_seconds']:.3f}s）"
+        )
+    else:
+        assert result["overhead_ratio"] < 0.01, (
+            f"追踪开销比例 {result['overhead_ratio']:.4f} 应 < 1%"
+            f"（untraced={result['untraced_median_seconds']:.3f}s traced={result['traced_median_seconds']:.3f}s）"
+        )
 
 
 # ===================================================================

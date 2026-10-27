@@ -8,8 +8,9 @@ Agent 评估可观测族（5.7 追踪 / 5.8 评估 / 5.9 漂移检测）的应�
 SpanHandle 方法签名逐名且逐参对齐 OTel Span 原生签名（duck-type 零包装层，
 OTel Span 天然满足）；set_status 不入协议——OTel 原生签名是
 Status|StatusCode 联合类型，bool 业务签名直透会落 isinstance 双分支皆不中的
-静默 no-op（R1-③ 实测），status 置位唯一发生在 @trace wrapper 内部（OTel 原生
-调用）。
+静默 no-op（R1-③ 实测），status 置位由 OTel use_span __exit__ 框架兜底
+（Exception 路径自动 set ERROR——R1-F4 后 @trace 无显式调用，避免双
+exception 事件；BaseException 路径按 OTel #4484 设计有意不置位）。
 """
 
 from __future__ import annotations
@@ -56,8 +57,11 @@ class AgentTracingPort(Protocol):
     provider 优先（构造注入通道下无需 initialize 即产真 span）；未注入时走
     全局 API（initialize 已 set 后解析为真 tracer，否则 proxy → NoOp）。
 
-    Raises 契约：零抛出（追踪失败降级 logger.warning 绝不上抛——DC-7 可观测性
-    附加哲学：可观测组件故障不得影响主链）。
+    Raises 契约（R1-F1 修订——装配段与消费方段分述）：
+    装配段（tracer 解析）零抛出——异常降级 logger.warning + yield None
+    （DC-7 可观测性附加哲学：可观测组件故障不得影响主链）；消费方段
+    （with 体内）异常**原样穿透**——业务异常不是追踪抛出面，实现不得捕获、
+    不得改写（OTel use_span __exit__ 兜底记录后透传）。
     """
 
     def create_span(
@@ -74,8 +78,10 @@ class AgentTracingPort(Protocol):
         Returns:
             上下文管理器——有可用 tracer 来源（已注入 provider 或已 initialize）
             时 yield SpanHandle（OTel Span 原生对象 duck-type）；无可用来源
-            （未注入且未 initialize）时 yield None（零开销降级——显式消费方
-            判 None；降级判据是「无 tracer 来源」而非「未 initialize」）
+            （未注入且未 initialize）或装配段异常时 yield None（零开销降级
+            ——显式消费方判 None；降级判据是「无 tracer 来源」而非「未
+            initialize」）；消费方在 with 体内抛出的异常原样穿透（R1-F1——
+            实现不得捕获/改写消费方异常）
         """
         ...
 

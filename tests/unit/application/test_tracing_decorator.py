@@ -84,7 +84,11 @@ class TestTraceDecorator:
         assert span.attributes["phase.reentry"] is True
 
     def test_exception_recorded_status_error_and_reraise(self, _tracing_global_channel: dict[str, Any]) -> None:
-        """异常面：record_exception + status ERROR + 原异常对象透传（零吞异常——装饰器不改异常语义）。"""
+        """异常面：record_exception + status ERROR + 原异常对象透传（零吞异常——装饰器不改异常语义）。
+
+        R1-F4 后 record/status 由 OTel use_span __exit__ 框架兜底（装饰器无显式
+        调用——双事件消除），exception 事件恰 1 是双事件消除的验证锚。
+        """
         from opentelemetry.trace import StatusCode
 
         from src.domain.exceptions.agent_exceptions import AgentWorkflowError
@@ -105,10 +109,39 @@ class TestTraceDecorator:
         assert excinfo.value is boom, "应透传同一异常对象（零吞异常）"
         span = _tracing_global_channel["exporter"].get_finished_spans()[0]
         assert span.status.status_code == StatusCode.ERROR
-        assert any(event.name == "exception" for event in span.events)
+        exception_events = [e for e in span.events if e.name == "exception"]
+        assert len(exception_events) == 1, "exception 事件应恰 1（框架 __exit__ 兜底——R1-F4 双事件消除）"
+
+    def test_cancelled_error_passes_through_with_unset_status(self, _tracing_global_channel: dict[str, Any]) -> None:
+        """CancelledError 面（R1-F4 现状锁定）：BaseException 原样透传 + span 已 end 但 UNSET 零事件。
+
+        OTel use_span 有意只处理 Exception 子类不处理 BaseException（#4484——
+        取消≠错误）；装饰器无 except 分支不拦截——本用例锁定该设计语义，防止
+        未来「顺手加 BaseException 记录」引入与框架语义的静默分叉。
+        """
+        import asyncio
+
+        from opentelemetry.trace import StatusCode
+
+        @trace("agent.execute")
+        async def _sample() -> None:
+            raise asyncio.CancelledError()
+
+        loop = asyncio.new_event_loop()
+        with pytest.raises(asyncio.CancelledError):
+            loop.run_until_complete(_sample())
+        loop.close()
+
+        span = _tracing_global_channel["exporter"].get_finished_spans()[0]
+        assert span.status.status_code == StatusCode.UNSET, "CancelledError 应 UNSET（OTel #4484——取消≠错误）"
+        assert not [e for e in span.events if e.name == "exception"], "CancelledError 不记 exception 事件（框架有意设计）"
 
     def test_noop_zero_span_when_global_unset(self) -> None:
-        """NoOp 面：全局未 set（proxy 态前提）零 span 且主链行为等价（观察哨恒零——无旁路泄漏）。"""
+        """NoOp 面：全局未 set（proxy 态前提）零 span 且主链行为等价（观察哨恒零——无旁路泄漏）。
+
+        R1-F3：补跑后 proxy 判据——封堵「装饰器实现内自动 initialize 自建
+        provider」的错误实现漏网（跑后全局仍应 proxy）。
+        """
         import asyncio
 
         import opentelemetry.trace as otel_trace
@@ -130,6 +163,9 @@ class TestTraceDecorator:
         loop.close()
 
         assert len(sentinel_exporter.get_finished_spans()) == 0, "观察哨应零 span（无旁路泄漏）"
+        assert isinstance(otel_trace.get_tracer_provider(), ProxyTracerProvider), (
+            "跑后全局仍应 proxy 态（R1-F3——封堵装饰器自动 initialize 错误实现）"
+        )
 
     def test_wraps_signature_preserved(self) -> None:
         """签名面：functools.wraps 保 __name__/__doc__/__wrapped__（mypy 泛型签名不窄化前提）。"""

@@ -32,7 +32,10 @@ class PhoenixConfig:
         enabled: 是否启用追踪（PHOENIX_TRACING_ENABLED，默认 false——保守
             默认对齐 EVENT_BUS_OTEL_TRACE_ENABLED 形态）
         endpoint: OTLP gRPC 端点（PHOENIX_OTLP_ENDPOINT，未设时 fallback
-            OTEL_EXPORTER_OTLP_ENDPOINT，空串视为未设；默认 localhost:4317）
+            OTEL_EXPORTER_OTLP_TRACES_ENDPOINT（OTel 规范信号级——R1-F8）>
+            OTEL_EXPORTER_OTLP_ENDPOINT（通用级），空串视为未设；默认
+            localhost:4317——gRPC base 端点不带路径，误配 /v1/traces 后缀
+            会在 export 期静默降级）
         project_name: Phoenix 项目名（PHOENIX_PROJECT_NAME，默认 "sisys-agent"
             ——epics 钦定值，经 Resource service.name 承载）
         sampling_ratio: 采样率（PHOENIX_TRACES_SAMPLER_ARG，Phoenix 专属采样
@@ -96,9 +99,16 @@ class PhoenixConfig:
                 （解析层包装，ValueError 禁裸抛）或构造期守卫触发
         """
         enabled = os.getenv("PHOENIX_TRACING_ENABLED", "false").lower() in _TRUTHY_VALUES
-        # fallback 链：PHOENIX_OTLP_ENDPOINT > OTEL_EXPORTER_OTLP_ENDPOINT > 默认值；
-        # 每级 `or` 形态——set-but-empty 等同未设（compose 注入空串不触发 101）
-        endpoint = os.getenv("PHOENIX_OTLP_ENDPOINT") or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or "http://localhost:4317"
+        # fallback 链（R1-F8）：PHOENIX_OTLP_ENDPOINT > OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+        # （OTel 规范信号级）> OTEL_EXPORTER_OTLP_ENDPOINT（通用级）> 默认值；每级
+        # `or` 形态——set-but-empty 等同未设（compose 注入空串不触发 101）。信号级
+        # 仅本链读取——event-bus 栈 otel_config 只读通用级，两栈互不干扰。
+        endpoint = (
+            os.getenv("PHOENIX_OTLP_ENDPOINT")
+            or os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+            or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+            or "http://localhost:4317"
+        )
         project_name = os.getenv("PHOENIX_PROJECT_NAME") or "sisys-agent"
 
         raw_sampling = os.getenv("PHOENIX_TRACES_SAMPLER_ARG", "1.0")

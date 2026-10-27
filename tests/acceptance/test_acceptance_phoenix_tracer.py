@@ -4,9 +4,9 @@ R6 骨架：@scenario 多行字面量显式绑定 + context dict fixture + _run_
 调度 + 延迟 import 纪律 + 禁 then-pass 占位；Gherkin 中文关键字取 PG 模板形态。
 
 外部服务门控 = 零外部服务（span 面进程内自包含）：链级场景 Fake LLM 手工装配
-（外部 LLM API 不可验收强依赖——5-3 验收先例豁免面仅 llm_client 一项，六阶段
-服务/图/用例/守卫链全真实，隔离仓储以零 IO stub 注入——_StubIsolationSwitchLogRepository
-同先例形态）。
+（外部 LLM API 不可验收强依赖——5-3 验收先例豁免面为 llm_client + sandbox 两项
+[R1-F19 勘误：sandbox 亦 AsyncMock 同 5-3 先例]，六阶段服务/图/用例/守卫链全
+真实，隔离仓储以零 IO stub 注入——_StubIsolationSwitchLogRepository 同先例形态）。
 
 14 场景三属性分档表（Task 0.6 定稿——依赖面/全局状态面/清理义务）:
 - AC-1.1: 零外部服务 / initialize×2（注入 set + 自建 set）/ 双复位（autouse 兜底）
@@ -703,13 +703,15 @@ def then_guard_cases_raise_101(context: dict[str, Any]) -> None:
             pytest.fail(f"非法输入 {field}={overrides} 应抛 ConfigurationError 101")
 
 
-@when("解析环境四变量（含 OTEL_EXPORTER_OTLP_ENDPOINT fallback 链与空串视为未设）")
+@when("解析环境四变量（含 OTel 标准端点 fallback 链与空串视为未设）")
 def when_from_env_matrix(context: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
-    """from_env 矩阵采样：默认值 / 全覆盖 / OTEL fallback / 空串视为未设 / bool 三态。"""
+    """from_env 矩阵采样：默认值 / 全覆盖 / OTel fallback（R1-F8 含信号级）/ 空串视为未设 / bool 三态。"""
     from src.infrastructure.config.phoenix import PhoenixConfig
 
     for var in ("PHOENIX_TRACING_ENABLED", "PHOENIX_OTLP_ENDPOINT", "PHOENIX_PROJECT_NAME", "PHOENIX_TRACES_SAMPLER_ARG"):
         monkeypatch.delenv(var, raising=False)
+    for var in ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"):
+        monkeypatch.delenv(var, raising=False)  # R1-F8——进程 env 两级端点变量防污染
 
     default_config = PhoenixConfig.from_env()
     assert default_config.enabled is False
@@ -731,7 +733,11 @@ def when_from_env_matrix(context: dict[str, Any], monkeypatch: pytest.MonkeyPatc
     assert PhoenixConfig.from_env().enabled is False
 
     monkeypatch.delenv("PHOENIX_OTLP_ENDPOINT")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://otel-traces-fallback:4317")
+    traces_fallback_config = PhoenixConfig.from_env()
+
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-fallback:4317")
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
     fallback_config = PhoenixConfig.from_env()
 
     monkeypatch.setenv("PHOENIX_OTLP_ENDPOINT", "")
@@ -740,6 +746,7 @@ def when_from_env_matrix(context: dict[str, Any], monkeypatch: pytest.MonkeyPatc
 
     context["from_env_matrix"] = {
         "override": override_config,
+        "traces_fallback": traces_fallback_config,
         "fallback": fallback_config,
         "empty": empty_config,
     }
@@ -747,12 +754,15 @@ def when_from_env_matrix(context: dict[str, Any], monkeypatch: pytest.MonkeyPatc
 
 @then("四变量与默认值矩阵及覆盖矩阵逐项一致")
 def then_from_env_matrix_values(context: dict[str, Any]) -> None:
-    """矩阵断言：覆盖矩阵四值 + fallback 链 + 空串视为未设（不落 101）。"""
+    """矩阵断言：覆盖矩阵四值 + fallback 链（R1-F8 两级）+ 空串视为未设（不落 101）。"""
     matrix = context["from_env_matrix"]
     assert matrix["override"].enabled is True
     assert matrix["override"].endpoint == "http://phx.example:4317"
     assert matrix["override"].project_name == "proj-x"
     assert matrix["override"].sampling_ratio == 0.5
+    assert matrix["traces_fallback"].endpoint == "http://otel-traces-fallback:4317", (
+        "仅设信号级 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT 应采用（R1-F8——OTel 规范信号级）"
+    )
     assert matrix["fallback"].endpoint == "http://otel-fallback:4317", "未设 PHOENIX_OTLP_ENDPOINT 应 fallback OTEL 变量"
     assert matrix["empty"].endpoint == "http://localhost:4317", "空串视为未设应回默认值（不落 101）"
 
@@ -1451,16 +1461,17 @@ def then_traced_span_count_50(context: dict[str, Any]) -> None:
     "收尾 - 交付完成清单",
 )
 def test_completion_checklist(context: dict[str, Any]) -> None:
-    """收尾：src 八文件 + tests 四目录交付清单逐项在位（missing 断言）."""
+    """收尾：src 九文件 + tests 四目录交付清单逐项在位（missing 断言——R1-F14 补 ports 聚合导出）."""
 
 
-@then("src 交付八文件全部在位（配置/Tracer/端口/装饰器/接入两文件/组合根/monitoring 导出/env）")
+@then("src 交付九文件全部在位（配置/Tracer/端口/端口聚合导出/装饰器/接入两文件/组合根/monitoring 导出/env）")
 def then_src_deliverables_present(context: dict[str, Any]) -> None:
-    """src 完成清单（新建四 + 接入两 + 组合根 + monitoring 导出 + .env.example）。"""
+    """src 完成清单（新建四 + 端口聚合导出 + 接入两 + 组合根 + monitoring 导出 + .env.example）。"""
     src_files = [
         "src/infrastructure/config/phoenix.py",
         "src/infrastructure/monitoring/phoenix_tracer.py",
         "src/application/ports/agent_tracing.py",
+        "src/application/ports/__init__.py",
         "src/application/tracing.py",
         "src/application/use_cases/run_agent_workflow.py",
         "src/application/services/agent_workflow_service.py",

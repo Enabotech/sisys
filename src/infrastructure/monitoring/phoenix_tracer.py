@@ -7,12 +7,16 @@ OTLP gRPC exporter 指向独立部署的 Phoenix server。
 
 生命周期双模板合成：initialize/shutdown 同构照抄 otel_config（init L167/
 shutdown L277 先例）；create_span 降级骨架同构 event_metrics（L227-273——
-未启用 yield None 零开销降级 + ImportError/Exception 双降级）。**差异四项**：
+未启用 yield None 零开销降级）。**差异五项**：
 ①attributes 参数化；②tracer 双源解析（注入 provider 优先经 tracer_provider=
 形参——R2-1，None 降级判据是「无 tracer 来源」非「未 initialize」）；
 ③handle 返回 OTel Span 原生对象（duck-type SpanHandle 协议零包装层）；
 ④构造器零全局副作用（R3-13——event_metrics 模板构造器在 enabled 时调 init()
-设全局是照抄陷阱；本类构造器纯赋值，全局动作唯一在 initialize()）。
+设全局是照抄陷阱；本类构造器纯赋值，全局动作唯一在 initialize()）；
+⑤**try 收窄至装配段**（R1-F1——event_metrics 模板把 yield 罩在 except 内，
+消费方在 with 体内抛出的业务异常被吞并替换为 RuntimeError；本类 try 只罩
+tracer 解析段，yield 两个出口（None 降级/真 span）均在 try 外，消费方异常
+原样穿透——OTel use_span __exit__ 兜底 record_exception + set ERROR）。
 
 reset_for_testing 双复位是本模块对既有先例的必要增强（非照抄）：锁定的
 OTel 1.44.0 全局 set 受 Once 闩锁（trace._TRACER_PROVIDER_SET_ONCE）约束，
@@ -87,8 +91,11 @@ class PhoenixTracer:
 
         实例闩（R2-9）：同实例再入静默返回既有结果；外来 set 检测：全局已非
         proxy 态且非本实例所 set 时 logger.warning 并返回既有状态（True——
-        追踪可用，全局保持他方设置）。enabled=false 返回 False 不装配不设全局
-        （NoOp 天然降级）。
+        追踪可用，全局保持他方设置；⚠️ R1-F10 披露：此时 span 经他方 provider
+        导出，本实例 project_name/endpoint/sampling 配置不生效——返回 True 仅
+        表示「span 会被记录」而非「导出到 Phoenix 端点」）。enabled=false 返回
+        False 不装配不设全局（NoOp 天然降级）；装配段异常（含 OTel import
+        失败）降级 False 不阻断主链（R1-F9）。
 
         Returns:
             是否实际启用（True=已启用；False=禁用或初始化失败降级）
@@ -101,19 +108,21 @@ class PhoenixTracer:
             logger.info("Phoenix 追踪未启用（PHOENIX_TRACING_ENABLED=false——NoOp 零开销降级）")
             return False
 
-        from opentelemetry import trace as otel_trace
-
-        current = otel_trace.get_tracer_provider()
-        if not _is_proxy_provider(current) and current is not self._provider:
-            logger.warning(
-                "全局 TracerProvider 已被他方设置（PhoenixTracer.initialize 是默认配置下唯一激活 setter——"
-                "event-bus OTel 同开时须先解决 setter 归一，见 5-7 DC-5/风险表#1）；保留既有全局状态"
-            )
-            self._initialized = True
-            self._init_result = True
-            return True
-
         try:
+            # 装配段整体入 try（R1-F9——OTel import/全局探测异常一律降级 False，
+            # 不击穿组合根 _wire 的 except ConfigurationError 防线阻断主链启动）
+            from opentelemetry import trace as otel_trace
+
+            current = otel_trace.get_tracer_provider()
+            if not _is_proxy_provider(current) and current is not self._provider:
+                logger.warning(
+                    "全局 TracerProvider 已被他方设置（PhoenixTracer.initialize 是默认配置下唯一激活 setter——"
+                    "event-bus OTel 同开时须先解决 setter 归一，见 5-7 DC-5/风险表#1）；保留既有全局状态"
+                )
+                self._initialized = True
+                self._init_result = True
+                return True
+
             if self._provider is None:
                 self._provider = self._build_production_provider()
             otel_trace.set_tracer_provider(self._provider)
@@ -157,6 +166,15 @@ class PhoenixTracer:
     def shutdown(self, timeout_sec: int = 5) -> None:
         """刷盘并释放（BatchSpanProcessor 缓冲 span force_flush 后 shutdown）。
 
+        退出延迟上限语义（R1-F18）：timeout_sec 只覆盖 force_flush；随后
+        provider.shutdown() 触发 BatchSpanProcessor worker join（OTel 1.44.0
+        默认 30s）——端点不可达时进程退出延迟可达 30s+（flush 超时 + 末次
+        export 重试 + join）；端点正常时毫秒级。正常解释器退出另有
+        TracerProvider 默认 shutdown_on_exit 的 atexit 钩子（本方法与 atexit
+        双调安全——provider.shutdown 幂等 + 本方法自带异常降级）；SIGTERM/
+        SIGKILL 不经 atexit，组合根 shutdown() 的显式调用是信号退出路径的
+        刷盘加固（见 composition_root.shutdown 接线）。
+
         Args:
             timeout_sec: force_flush 超时（秒）
         """
@@ -175,7 +193,13 @@ class PhoenixTracer:
         name: str,
         attributes: dict[str, Any] | None = None,
     ) -> Generator[Any, None, None]:
-        """span 生命周期上下文（双源解析 + 零开销降级——DC-7 零抛出契约）。
+        """span 生命周期上下文（双源解析 + 零开销降级——R1-F1 修复形态）。
+
+        异常语义边界（R1-F1——try 只罩装配段）：tracer 解析段（OTel import/
+        全局探测/get_tracer）异常时 logger.warning 降级 yield None（绝不上抛
+        ——DC-7 追踪失败不影响主链）；span 进入段与消费方段异常**原样穿透**
+        （消费方在 with 体内抛出的业务异常不是追踪抛出面——OTel use_span
+        __exit__ 自动 record_exception + set ERROR 后透传，本方法零拦截零改写）。
 
         Args:
             name: span 名称（SpanNames 常量——agent_execution 根 / agent.{phase} 子）
@@ -183,23 +207,29 @@ class PhoenixTracer:
 
         Yields:
             SpanHandle（OTel Span 原生对象——duck-type 协议零包装）；
-            无可用 tracer 来源（未注入且未 initialize）时 yield None；
-            OTel 异常降级时 yield None（logger.warning 绝不上抛）
+            无可用 tracer 来源（未注入且未 initialize）或装配段异常时
+            yield None（消费方判 None 走旁路——两个降级出口均在 try 外，
+            消费方异常不因此被吞）
         """
-        from opentelemetry import trace as otel_trace
-
-        if self._provider is None and _is_proxy_provider(otel_trace.get_tracer_provider()):
-            yield None  # 零开销降级（R2-1——降级判据是「无 tracer 来源」非「未 initialize」）
-            return
+        degraded = False
+        tracer = None
         try:
-            tracer = otel_trace.get_tracer("sisys.agent", tracer_provider=self._provider)
-            with tracer.start_as_current_span(name) as span:
-                for key, value in (attributes or {}).items():
-                    span.set_attribute(key, value)
-                yield span
-        except Exception as error:  # DC-7 追踪失败降级（warning + None，绝不上抛）
+            from opentelemetry import trace as otel_trace
+
+            if self._provider is None and _is_proxy_provider(otel_trace.get_tracer_provider()):
+                degraded = True  # 零开销降级（R2-1——降级判据是「无 tracer 来源」非「未 initialize」）
+            else:
+                tracer = otel_trace.get_tracer("sisys.agent", tracer_provider=self._provider)
+        except Exception as error:  # DC-7 装配段降级（warning + None，绝不上抛）
             logger.warning("PhoenixTracer create_span 降级（span=%s）: %s", name, error)
-            yield None
+            degraded = True
+        if degraded or tracer is None:  # or 短语使 tracer 完成非 None 收窄（mypy union-attr 根因修复）
+            yield None  # 降级出口在 try 外（R1-F1）——消费方异常经此点原样穿透不被吞
+            return
+        with tracer.start_as_current_span(name) as span:
+            for key, value in (attributes or {}).items():
+                span.set_attribute(key, value)
+            yield span  # 消费方异常经 OTel __exit__ 记录后原样穿透（R1-F1）
 
     @staticmethod
     def reset_for_testing() -> None:

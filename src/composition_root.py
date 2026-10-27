@@ -3068,6 +3068,21 @@ async def shutdown() -> None:
     from src.domain.ports.resolver import get_resolver
 
     resolver = get_resolver()
+
+    # Story 5.7 R1-F7——追踪缓冲 span 显式刷盘（先于连接管理器关闭，避免后续
+    # 释放耗时挤占 flush 窗口）。仅用 peek_singleton 清理已实例化单例（对齐
+    # L3113 datasource 段治理——resolve() 在 shutdown 路径有懒实例化危险副作用）；
+    # SIGTERM/SIGKILL 不经 atexit，本调用是信号退出路径的刷盘加固（正常退出
+    # 另有 TracerProvider 默认 shutdown_on_exit 的 atexit 钩子——双调安全，
+    # provider.shutdown 幂等 + PhoenixTracer.shutdown 自带异常降级）。
+    # CLI 面（agent_cli/ocr_cli）不调本函数的 SIGTERM 缺口见 5-7 R1-DF6 留痕。
+    try:
+        tracer = resolver.peek_singleton("agent_tracing")
+        if tracer is not None:
+            tracer.shutdown()
+            logger.info("Closed agent_tracing（追踪缓冲已刷盘）")
+    except Exception as e:
+        logger.warning("agent_tracing shutdown 降级: %s", e)
     managers = [
         "redis_connection_manager",
         "postgresql_connection_manager",
