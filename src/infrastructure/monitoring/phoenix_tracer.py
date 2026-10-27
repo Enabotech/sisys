@@ -26,8 +26,15 @@ Once 闩锁重建（主会话探针实证此形态 re-set 恢复工作）。
 
 OTel 全局状态治理（DC-5）：生产面全局 set_tracer_provider 的唯一通道 =
 本类 initialize()（默认配置下唯一激活 setter——otel_config.init 是 env 门控
-休眠第二调用点）；initialize 开头已 set 检测（非 proxy 态且非本实例所 set →
-logger.warning 显式提示，杜绝静默双 setter——OTel 二次 set 仅告警不抛）。
+休眠第二调用点；R3 注：bootstrap 内本接线是 eager 调用而 event-bus 栈
+otel_config.init 是 lazy resolve 触发——双栈同开时本类恒先 set，生产串流
+方向为 event-bus span 经全局 provider 流入 Phoenix 端点）。initialize 开头
+已 set 检测（非 proxy 态且非本实例所 set → logger.warning 显式提示，杜绝
+静默双 setter——OTel 二次 set 仅告警不抛）。ops env 前提（R3 治理注记）：
+进程 env 带 OTEL_PYTHON_TRACER_PROVIDER 时 OTel API 会在 _TRACER_PROVIDER
+为 None 态经 entry-point 装配非 proxy provider——initialize 走外来 set 分支
+（warning + True），span 经 env 配置的 provider 导出（端点/采样由 OTEL_* env
+决定——部署面须管住该变量）。
 """
 
 from __future__ import annotations
@@ -95,7 +102,9 @@ class PhoenixTracer:
         导出，本实例 project_name/endpoint/sampling 配置不生效——返回 True 仅
         表示「span 会被记录」而非「导出到 Phoenix 端点」）。enabled=false 返回
         False 不装配不设全局（NoOp 天然降级）；装配段异常（含 OTel import
-        失败）降级 False 不阻断主链（R1-F9）。
+        失败）降级 False 不阻断主链（R1-F9）。R3 披露：initialize 返回 False
+        （禁用/失败）**不门控 create_span**——降级态下全局被外来设置时
+        create_span 照产真 span（走外来 provider，双源解析契约语义）。
 
         Returns:
             是否实际启用（True=已启用；False=禁用或初始化失败降级）
@@ -166,17 +175,26 @@ class PhoenixTracer:
     def shutdown(self, timeout_sec: int = 5) -> None:
         """刷盘并释放（BatchSpanProcessor 缓冲 span force_flush 后 shutdown）。
 
-        退出延迟上限语义（R1-F18）：timeout_sec 只覆盖 force_flush；随后
-        provider.shutdown() 触发 BatchSpanProcessor worker join（OTel 1.44.0
-        默认 30s）——端点不可达时进程退出延迟可达 30s+（flush 超时 + 末次
-        export 重试 + join）；端点正常时毫秒级。正常解释器退出另有
-        TracerProvider 默认 shutdown_on_exit 的 atexit 钩子（本方法与 atexit
-        双调安全——provider.shutdown 幂等 + 本方法自带异常降级）；SIGTERM/
-        SIGKILL 不经 atexit，组合根 shutdown() 的显式调用是信号退出路径的
-        刷盘加固（见 composition_root.shutdown 接线）。
+        退出延迟语义（R3-1 修正——OTel 1.44.0 实测源码级归因）：timeout_sec
+        形参传入 force_flush 但 **BatchProcessor.force_flush 静默忽略超时**
+        （`_shared_internal` 源码 `# TODO: Fix force flush so the timeout is
+        used #4568`——阻塞至全部缓冲批次导出完成）。实际退出上界 =
+        ⌈queue 2048 / batch 512⌉ 批 ×（gRPC deadline 默认 10s
+        [OTEL_EXPORTER_OTLP_TIMEOUT] + 重试退避）+ BSP worker join 30s——
+        端点不可达（黑洞）时最坏**百秒级**（R1-F18 的「~35s 上限」系统性低估，
+        勘误）；端点正常时毫秒级。运维封顶通道（本类零参 BSP/exporter 构造，
+        经 OTel 环境变量暗消费生效）：OTEL_EXPORTER_OTLP_TIMEOUT（gRPC
+        deadline）/ OTEL_BSP_EXPORT_TIMEOUT / OTEL_BSP_MAX_QUEUE_SIZE。
+        关停后 create_span 仍产真 span 但 BSP.emit 静默丢弃（INFO 日志）——
+        良性终态。正常解释器退出另有 TracerProvider 默认 shutdown_on_exit
+        的 atexit 钩子（本方法与 atexit 双调安全——provider.shutdown 幂等 +
+        本方法自带异常降级 + provider.shutdown 自带 atexit.unregister）；
+        SIGTERM/SIGKILL 不经 atexit，组合根 shutdown() 的显式调用是信号退出
+        路径的刷盘加固（见 composition_root.shutdown 接线——注意该调用在
+        连接管理器关闭之前，挂起的 flush 会顺延后续清理，超时语义见上）。
 
         Args:
-            timeout_sec: force_flush 超时（秒）
+            timeout_sec: force_flush 超时（秒——1.44.0 下被 BSP 忽略，见上）
         """
         if self._provider is None:
             return

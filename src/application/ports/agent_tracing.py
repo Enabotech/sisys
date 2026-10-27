@@ -18,7 +18,10 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from typing import Protocol, runtime_checkable
 
-#: span 属性值合法类型（OTel set_attribute 契约——str/bool/int/float/str 序列）
+#: span 属性值合法类型（OTel set_attribute 契约——str/bool/int/float/str 序列；
+#: R3 提示：tuple 是窄化契约非运行时强制——传 list[str] 运行时被 OTel 静默冻结
+#: 为 tuple（可用），但 list 含 None/混类型会整属性静默丢弃+warning（5.8/5.9
+#: 消费面沿 tuple 并对 None 过滤）
 SpanAttributeValue = str | bool | int | float | tuple[str, ...]
 
 

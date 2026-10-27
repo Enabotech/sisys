@@ -898,6 +898,16 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - [x] **R2-B4（P3）** R1-F7 shutdown 刷盘段零直接用例。修复：test_composition_root_shutdown.py 新增 TestShutdownAgentTracingFlush（真 Resolver 模式 + 顺序锚 calls == ["tracer_shutdown", "manager_close"] + 未注册跳过）
 - [x] **R2-C（不修留痕）** atexit 实例级累积（测试进程良性——SINGLETON 生产 1 钩子，shutdown 幂等）；attributes 批量写入段异常穿透（R1-F1 已文档化决策，SpanAttributeValue 类型注解即契约不重复 docstring）
 
+#### Round 3 深度推演（单推演员：生命周期 7 时间线 + 组合 5 组 + 数学 3 项，2026-10-27）
+
+- [x] **R3-1（P2）** shutdown docstring 机制归因失实——OTel 1.44.0 `BatchProcessor.force_flush` **静默忽略超时**（源码 `# TODO ... #4568`，实验实证 timeout_millis=100 下实际阻塞 1.5s），R1-F18 的「flush 5s 超时 + ~35s 上限」系统性低估（黑洞端点最坏百秒级——⌈2048/512⌉ 批 × gRPC deadline 10s×重试 + join 30s）。修复：docstring 源码级归因重写 + 运维封顶通道披露（OTEL_EXPORTER_OTLP_TIMEOUT/OTEL_BSP_* 环境暗消费——本类零参 BSP 构造经 env 生效）+ flush 挂起饿死后续连接管理器清理的排序面披露
+- [x] **R3-2~4（P3）** 三处披露补全：initialize False 不门控 create_span（降级态×外来 set 照产真 span——双源契约语义角落）/ OTEL_PYTHON_TRACER_PROVIDER env 第三面（OTel entry-point 装配使外来 set 分支 env 可达——模块头治理注记：部署面须管住该变量）/ SpanAttributeValue 的 list 运行时行为（list[str] 静默冻结可用；含 None/混类型整属性静默丢弃——5.8 消费面沿 tuple 提示）
+- [x] **R3-5（P3）** AC-5.2 补 t_untraced 下限守卫（独立跑 acceptance 时无集成⑦的分母失真防护——常量单源对齐）
+- [x] **R3-6（P3）** OD-1 登记补 5.8 立项前瞻（openinference/phoenix 顶层包将击穿验证器 A/A+ 白名单——设计内治理点，扩白名单须改架构测试）
+- [x] **R3-7（P3·留痕）** 外来 set 分支生产顺序不可达更正（bootstrap 内 _wire_agent_tracing 是 eager 而 otel_config.init 是 lazy——双栈同开恒 Phoenix 先 set，生产串流方向为 event-bus→Phoenix 反向）+ otel_config「set 被忽略后误报 initialized」细节随 R1-DF1/DF2 归宿登记；ProxyTracer 升级缓存防呆（_real_tracer 一旦解析永不回落——本仓三处 get_tracer 均逐调用解析零缓存，未来若缓存 tracer 对象将跨 reset 串流）
+- [x] **R3-8（P3·证伪留痕）** 四疑点证伪不成立：TRACES 级双栈双重消费（phoenix/event-bus exporter 恒收非空显式 endpoint 双双绕开 env fallback——非串流面）/ CLI 无 shutdown⇒atexit 不跑（正常退出必经 atexit，仅信号退出丢）/ 外来 set 是生产主线（实为反向）/ force_flush 受 timeout 封顶（见 R3-1）
+- [x] **R3-9（P3·推演通过）** 七条时间线全闭合（正常/禁用/外来/失败/复位/SINGLETON/SIGTERM——atexit LIFO 序 + 双调幂等实验证实）；F1×F9 六格矩阵正交闭合；复测统计特性（持续负载下两轮相关双红是 fail-red 安全方向；假绿需 ≥3/5 轮同向抬高 ≥1.4ms 概率低——无需第三轮机制）
+
 #### 已推迟 Defer
 
 - [x] **R1-DF1（P2）** event_metrics.py create_span 同款吞消费方异常缺陷（1.3 存量先例——R1-F1 修复后本 Story 与模板先例行为分叉，先例缺陷必须留痕）——触发：event-bus OTel 启用且消费方 with 体内抛异常 → deferred-work
@@ -931,10 +941,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | 2026-10-27 | v2.0.0 | dev-story 实施完成：Task 0-6 全部交付——①PhoenixConfig（frozen + 101 五守卫 + from_env fallback 链，23 单测）；②PhoenixTracer（双源解析 create_span[注入 provider 优先]/实例闩 initialize/外来 set 检测 warning/reset_for_testing **双复位**[变量 + Once 闩锁重建]，13 单测）；③AgentTracingPort + SpanHandle（两方法 duck-type OTel）+ SpanAttributeKeys/SpanNames 常量注册表；④@trace 装饰器（OTel 全局 API + NoOp 降级 + 零吞异常，9 单测）；⑤工作链接入纯附加（根 span + MVP 十属性 + 六阶段子 span + trace_id 贯通核销 5-3 预留位）；⑥组合根注册 + _wire_agent_tracing 接线单元（DC-7 降级哲学）；⑦集成八场景（span 树恰 10 span/重试轮/异常 444/NoOp 观察哨/eval-drift 通道/P95 实测 μs 级/开销 <1%/trace_id 贯通）+ 验收 15 场景全绿；⑧架构验证器十八项（application 第三方白名单新建防线 + domain 零触碰 + 组合根外零实例化 + 构造签名不变）；⑨5-3 全家回归零破坏（170 passed）。变异实证 11 项红（含 2 项框架兜底不红根因登记：record_exception 由 OTel exit 钩子自动兜底 / is_recording 守卫是性能防御）（**R1-F13 勘误**：逐 Task 加总实为 **15 红** + 2 不红——Task1×5+Task2×3+Task3×3+Task4×3+Task5×1）。实施发现三项：ProxyTracerProvider 为 1.44 公开导出类（无下划线）/ resolve profile_use_case 真实实例含 Redis 443 守卫（改 loader+selector 手工装配 + _StubProfileUseCase）/ IsolationLevel 实际位于 events.enums。ruff + mypy 701 文件零问题——Status: in-progress → review |
 | 2026-10-27 | v2.1.0 | 代码审查周期 Round 1（四视角并行调研 + 双评审员 + 复评门禁「优秀」放行；P1×4 + P2×10 + P3×11 共 25 项，落码 18 项 + 登记 6 项 + 改判维持 1 项——详见 Review Findings 表 R1-F1~F11+F13~F19（含 F4'，F12 空号）+ R1-DF1~DF6。核心：①create_span 吞消费方异常 P1——try 收窄至装配段 + yield 双出口移出 try + 端口契约分述重写[装配段零抛出/消费方段穿透]，5.8/5.9 接入即爆的结构性缺陷；②@trace 删显式 except 分支——双 exception 事件实测消除 + CancelledError 按 OTel #4484 锁定 UNSET 语义 + 零吞异常由无 except 结构性保证；③initialize 失败降级补测[突变 M4 存活封堵] + NoOp 跑后判据 + 场景⑦噪声复测机制[force_refresh 独立重采样 + 采样入口双复位自包含]；④架构防线双升级——OTel API/SDK 分界完整模块名禁入断言[sdk/exporter/instrumentation] + application 全层第三方基线[⊆{opentelemetry,pydantic,yaml}+redis grandfather]；⑤组合根 shutdown 补 peek_singleton 刷盘[SIGTERM 面] + fallback 链补 OTel 信号级端点 + initialize 装配段入 try；⑥文档勘误六项[变异计数 15 红/src 九文件/裕量双口径/版本字段/退出延迟语义/豁免面] + deferred-work 登记 R1-DF1~6[event_metrics 同款缺陷/otel_config 单复位升格/impl 永抛缝隙/OTLP 真实通路/redis 治理/CLI 缺口]。111 测试全绿 + ruff/mypy 701 文件零问题） |
 | 2026-10-27 | v2.1.1 | 代码审查周期 Round 2 回归核查 + 传播完备性（双视角；16 项 R1 修复全部回归核查通过——111+56+15 passed 零 P0/P1/P2 新破口；修复 P1×2 + P2×2 + P3×11 = 15 项，落码 13 + 不修留痕 2。核心：①台账计数三口径互斥 P1——三处行内数字改实[25 项 = 18 落码 + 1 改判 + 6 登记；F12 空号披露]；②L247 契约节零抛出单义残留 P1——R1-F1 联动漏网补分述；③L179 裕量/L572 DC-3 选定行/L681/L742 四处二阶传播补注；④架构 scanner 逃逸口封堵[from opentelemetry import sdk 形态 names 扫描 + 常驻判别力单测] + 相对导入 level 守卫对称补；⑤AC-5.2 复测保护对称化[首轮采样者身份实证]；⑥R1-F7 shutdown 刷盘直测[顺序锚 tracer 先于 manager]。不修留痕：atexit 实例级累积[测试良性]/attributes 段穿透[已文档化]。10+2 测试新增全绿） |
+| 2026-10-27 | v2.1.2 | 代码审查周期 Round 3 单深度推演（生命周期 7 时间线 + R1/R2 修复组合 5 组 + 数学完备性 3 项——全部源码级 + /tmp 实验实证；零 P0/P1；P2×1 + P3×9，落码 6 + 留痕 3。核心：①shutdown 机制归因重写 P2——OTel 1.44.0 BatchProcessor.force_flush 静默忽略超时[#4568 TODO 实证]，R1-F18「~35s 上限」系统性低估勘误[黑洞端点最坏百秒级] + 运维封顶通道披露[OTEL_EXPORTER_OTLP_TIMEOUT/OTEL_BSP_* 暗消费] + flush 饿死后续清理排序面披露；②三处披露补全[initialize False 不门控 create_span/OTEL_PYTHON_TRACER_PROVIDER 第三面治理注记/SpanAttributeValue list 运行时行为 5.8 提示]；③AC-5.2 补 t_untraced 下限守卫；④OD-1 补 5.8 白名单前瞻；⑤四疑点证伪留痕[TRACES 双消费证伪/CLI atexit 证伪/外来 set 主线证伪[生产实为 event-bus→Phoenix 反向串流]/flush 封顶证伪]；⑥七时间线全闭合 + F1×F9 六格矩阵正交 + 复测统计特性安全方向论证） |
 
 ---
 
-**故事版本/Story Version:** v2.1.1
+**故事版本/Story Version:** v2.1.2
 **创建日期/Created:** 2026-10-27
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
@@ -946,6 +957,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - v2.0.0: dev-story 实施完成（Task 0-6 全交付；变更日志见表——Status: in-progress → review；**R1-F16 勘误**：本字段当时漏更 v2.0.0）
 - v2.1.0: 代码审查周期 Round 1（四视角调研 + 双评审 + 复评「优秀」；P1×4 + P2×10 + P3×11 共 25 项——落码 18 + 登记 6 + 改判维持 1，详见 Review Findings；核心：create_span 消费方异常穿透 P1 + @trace 框架兜底极简化 + 三处测试判别力封堵 + 架构防线双升级 + 组合根 SIGTERM 刷盘 + OTel 信号级 fallback + 文档勘误六项）
 - v2.1.1: 代码审查周期 Round 2 回归核查 + 传播完备性（R1 修复零新破口[111+56+15 绿]；P1×2 + P2×2 + P3×11——落码 13 + 不修留痕 2；台账计数改实/契约节分述补注/scanner 逃逸口封堵/AC-5.2 复测对称/F7 直测顺序锚，详见 Review Findings Round 2 节）
+- v2.1.2: 代码审查周期 Round 3 深度推演（7 时间线 + 5 组合 + 3 数学全实证闭合；零 P0/P1，P2×1 + P3×9——落码 6 + 留痕 3；shutdown force_flush 超时失实勘误/三处披露补全/AC-5.2 守卫/OD-1 前瞻/四疑点证伪留痕，详见 Review Findings Round 3 节）
 
 ---
 
