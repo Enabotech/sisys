@@ -24,7 +24,7 @@ provider 导出（DC-5 共享全局语义，串流推演见 5-7 风险表#1）�
 from __future__ import annotations
 
 import functools
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
@@ -37,7 +37,7 @@ _INSTRUMENTING_NAME = "sisys.agent"
 def trace(
     span_name: str,
     attributes: dict[str, Any] | None = None,
-) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+) -> Callable[[Callable[P, Coroutine[Any, Any, R]]], Callable[P, Coroutine[Any, Any, R]]]:
     """async 方法追踪装饰器（span 生命周期包裹 + 框架兜底异常记录 + 零吞异常透传）。
 
     用法（5-7 工作链接入形态）::
@@ -56,10 +56,15 @@ def trace(
 
     Returns:
         装饰器——functools.wraps 保签名（__name__/__doc__/__wrapped__ 保留，
-        ParamSpec 泛型签名不窄化——存量单测兼容前提）
+        ParamSpec 泛型签名不窄化——存量单测兼容前提）。泛型锚定
+        ``Coroutine[Any, Any, R]`` 而非 Awaitable[R]（收敛后回归修复）：
+        async def 方法经 mypy 推断为 Coroutine 返回——用 Awaitable 会把被装饰
+        方法返回类型宽化，破坏与 Protocol ``async def`` 方法签名
+        （Coroutine 返回）的结构化子类型兼容（AgentWorkflowServicePort 的
+        六阶段协议匹配即 10 处 arg-type 实证）。
     """
 
-    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+    def decorator(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
         @functools.wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             from opentelemetry.trace import get_tracer
