@@ -128,3 +128,71 @@ class TestPeekSingleton:
         registry = _fresh_registry()
         resolver = Resolver(registry=registry, overrides={"data_source_tavily": _FakeAdapter()})
         assert resolver.peek_singleton("data_source_tavily") is None
+
+
+class TestShutdownAgentTracingFlush:
+    """Story 5.7 R2——shutdown() 的 agent_tracing 刷盘段直测（R1-F7 落码时零直接用例）。
+
+    覆盖：①已实例化 tracer → shutdown() 被调（peek 通道）；②未注册/未实例化 →
+    跳过零副作用；③顺序锚——tracer 刷盘先于连接管理器 close（SIGTERM 场景
+    flush 窗不被 manager 释放耗时挤占）。
+    """
+
+    class _FakeTracer:
+        """假追踪器（同步 shutdown 计数——端口签名实证；不掺入 calls 列表则顺序锚失效）。"""
+
+        def __init__(self, calls: list[str]) -> None:
+            self._calls = calls
+
+        def shutdown(self) -> None:
+            self._calls.append("tracer_shutdown")
+
+    class _RecordingManager(_FakeAdapter):
+        """记录清理顺序的连接管理器（close 时 append）。"""
+
+        def __init__(self, calls: list[str]) -> None:
+            super().__init__()
+            self._calls = calls
+
+        async def close(self) -> None:
+            self._calls.append("manager_close")
+
+    @staticmethod
+    def _make_tracing_resolver(calls: list[str]) -> tuple[Resolver, object]:
+        """构建含 agent_tracing + redis_connection_manager 的真实 Resolver（预实例化）。"""
+        registry = _fresh_registry()
+        tracer = TestShutdownAgentTracingFlush._FakeTracer(calls)
+        manager = TestShutdownAgentTracingFlush._RecordingManager(calls)
+        instances = {"agent_tracing": tracer, "redis_connection_manager": manager}
+        for name in instances:
+            registry.register(
+                PortSpec(
+                    name=name,
+                    version="v1.0.0",
+                    interface=object,
+                    impl=lambda *, resolver, _name=name: instances[_name],
+                    module="tests.fake",
+                    lifetime=Lifetime.SINGLETON,
+                )
+            )
+        resolver = Resolver(registry=registry)
+        resolver.resolve("agent_tracing")
+        resolver.resolve("redis_connection_manager")
+        return resolver, tracer
+
+    @pytest.mark.asyncio
+    async def test_instantiated_tracer_shutdown_called_before_managers(self) -> None:
+        """已实例化 tracer → shutdown 被调且先于 manager close（R1-F7 顺序锚——tracer 段在函数顶部）。"""
+        calls: list[str] = []
+        resolver, tracer = self._make_tracing_resolver(calls)
+
+        await _run_shutdown(resolver)
+
+        assert calls == ["tracer_shutdown", "manager_close"], f"agent_tracing 刷盘应先于连接管理器关闭，实际顺序: {calls}"
+
+    @pytest.mark.asyncio
+    async def test_tracer_absent_skips_cleanly(self) -> None:
+        """agent_tracing 未注册 → shutdown 全路径零报错跳过（peek None 通道）。"""
+        resolver, _ = _make_resolver()  # 零注册 resolver——既有未注册跳过先例同款
+
+        await _run_shutdown(resolver)  # 不 raise 即通过

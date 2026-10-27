@@ -176,7 +176,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 **Given** 测试注入 SimpleSpanProcessor + InMemorySpanExporter（同步导出——测量纯进程内开销，生产 BatchSpanProcessor 异步导出不计入且更优）
 **When** 测量 span 记录延迟与追踪开销
-**Then** **span 记录延迟 P95<5ms**（epics L1746——计时锚 = `create_span` 全周期：进入 contextmanager → set_attribute × 10（MVP 属性集满量）→ 退出 end；warmup 1 + 20 采样 `statistics.quantiles(latencies, n=20)[18] < SPAN_RECORD_P95_LIMIT_SECONDS`——常量 0.005 单源定义于集成模块，验收侧 import；**口径注记**：默认 exclusive 法 [18] 是 P95 估计量贴近次大/最大样本的插值形态（实测 [1..20]→19.95，偏严侧保守——5ms 阈值 vs 实测 μs 级[本机 p95=3.7μs]裕量 >1000×，按 5-6 委托先例形态保持 n=20）；**追踪开销<1%**（epics L1747——测量口径钉死：同一手工装配六阶段 Fake LLM 链**k 轮双跑取中位数**（k=5+5——单跑墙钟噪声与效应量之比会使单次断言假阴性 flaky），`overhead = (median(t_traced) - median(t_untraced)) / median(t_untraced) < 0.01`——t 为全链 wall time；**perf 链形态钉死 fail-once（R3 重标）**：首轮 verify 失败 + reflect 修正 + 二轮通过——structured 调用恰 **7 次**[perceive/plan/verify/reflect/plan/verify/package——⚠️ execute 阶段是纯工具循环**无 LLM 调用**，R1 的「6 次」计数错误] → Fake LLM side_effect 每次注入 `asyncio.sleep(0.02)` → t_untraced ≈ **140ms** 确定性量级、span 恰 **10 个**[根+9 阶段]、1% 预算 ≈ **1.4ms**（实测 OTel span 边际 ~3μs/个[10 属性 p50=3.1μs]——R1 的「0.2-1ms」高估 10-30 倍，裕量实测 >40×）；**t_untraced 锚**：全局 provider 未 set（NoOp tracer——装饰器仍在位但 span 空转）；traced 锚：initialize + InMemory processor；**口径声明**：实测口径 = NoOp→enabled 边际开销（NoOp 装饰器自身基线开销不在分子——无装饰器态生产不可达，DC-6 论证）
+**Then** **span 记录延迟 P95<5ms**（epics L1746——计时锚 = `create_span` 全周期：进入 contextmanager → set_attribute × 10（MVP 属性集满量）→ 退出 end；warmup 1 + 20 采样 `statistics.quantiles(latencies, n=20)[18] < SPAN_RECORD_P95_LIMIT_SECONDS`——常量 0.005 单源定义于集成模块，验收侧 import；**口径注记**：默认 exclusive 法 [18] 是 P95 估计量贴近次大/最大样本的插值形态（实测 [1..20]→19.95，偏严侧保守——5ms 阈值 vs 实测 μs 级[本机无负载 p95=3.7μs]裕量 >1000×，按 5-6 委托先例形态保持 n=20——**R2 双口径注**：>1000× 仅纯创建/无负载口径成立，含负载噪声的全周期 P95 实测 μs~百 μs 级（裕量 ~10-100×，见 R1-F15 集成侧双口径分述））；**追踪开销<1%**（epics L1747——测量口径钉死：同一手工装配六阶段 Fake LLM 链**k 轮双跑取中位数**（k=5+5——单跑墙钟噪声与效应量之比会使单次断言假阴性 flaky），`overhead = (median(t_traced) - median(t_untraced)) / median(t_untraced) < 0.01`——t 为全链 wall time；**perf 链形态钉死 fail-once（R3 重标）**：首轮 verify 失败 + reflect 修正 + 二轮通过——structured 调用恰 **7 次**[perceive/plan/verify/reflect/plan/verify/package——⚠️ execute 阶段是纯工具循环**无 LLM 调用**，R1 的「6 次」计数错误] → Fake LLM side_effect 每次注入 `asyncio.sleep(0.02)` → t_untraced ≈ **140ms** 确定性量级、span 恰 **10 个**[根+9 阶段]、1% 预算 ≈ **1.4ms**（实测 OTel span 边际 ~3μs/个[10 属性 p50=3.1μs]——R1 的「0.2-1ms」高估 10-30 倍，裕量实测 >40×）；**t_untraced 锚**：全局 provider 未 set（NoOp tracer——装饰器仍在位但 span 空转）；traced 锚：initialize + InMemory processor；**口径声明**：实测口径 = NoOp→enabled 边际开销（NoOp 装饰器自身基线开销不在分子——无装饰器态生产不可达，DC-6 论证）
 **And** 计时委托集成模块（`_PERF_CACHE` 单槽缓存 + `xdist_group("phoenix-tracer-perf")` 同 worker 串行——5-6 委托模式照抄，与既有全部 perf 组名互异（agent-isolation-perf/agent-triple-isolation-perf/isolation-switch-log-perf/agent-workflow-perf 等 11 组——R1 全仓盘点；基准场景级 `pytest.mark.benchmark` 标记）；**若实测不达标排查序**：BatchSpanProcessor 误入测试链（同步 Simple 应为默认注入）→ 延迟注入缺失 → 采样混入 warmup
 
 **验证标准/Validation Criteria:**
@@ -244,7 +244,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 
 > 原则/适用范围/禁止条款同模板基线。**本 Story 零新领域异常（DC-8）**——失败面由既有异常 + 降级哲学覆盖：
 
-- [x] 复用清单（零新增）：`ConfigurationError`(101——PhoenixConfig `__post_init__` 五场景守卫)；**追踪运行面零抛出**（create_span/装饰器内任何 OTel 异常 catch → logger.warning 降级——可观测性组件故障不得影响主链，5-6 audit 降级 DC-6 同哲学的更强形态：追踪连「拒绝主链」语义都没有，纯旁路）
+- [x] 复用清单（零新增）：`ConfigurationError`(101——PhoenixConfig `__post_init__` 五场景守卫)；**追踪运行面降级分述**（R1-F1 前旧表述「追踪运行面零抛出」已校准——装配段 OTel 异常 catch → logger.warning 降级；消费方段业务异常原样穿透非追踪抛出面。可观测性组件自身故障不得影响主链，5-6 audit 降级 DC-6 同哲学的更强形态：追踪连「拒绝主链」语义都没有，纯旁路）
 - [x] 零新异常论证：配置校验=101 语义精确；span 操作无业务失败面（OTel API 契约不抛业务异常）；无新业务规则失败面。`_code_ranges.py` / `exceptions/__init__.py` / `EXCEPTION_HTTP_MAP` / §3.3.2 文档表**零改动**（异常契约四件套豁免——无新增即无登记）
 - [x] BDD 异常路径：101 配置守卫路径（AC-1.2 参数化）+ 追踪零吞异常路径（AC-2.3 原异常透传）纳入验收 Edge Cases
 
@@ -569,7 +569,7 @@ Epic 5「单 Agent 战略规划能力」价值组的可观测性基座 Story：5
 - 备选：不建端口（装饰器+全局 API 全覆盖——弃：5.8/5.9 无注入面且违反项目端口纪律）；domain/ports 放追踪端口（弃：追踪非领域概念，domain 零依赖原则下 domain/ports 只承载业务基础能力——R1/R2 分工）；SpanHandle 保留 bool set_status + 包装层适配（弃——为无消费方的方法引入包装层违反 YAGNI，且静默 no-op 风险源于签名分叉而非包装缺失）
 
 **DC-3 @trace 装饰器——OTel 全局 API + NoOp 天然降级（application/tracing.py）**
-- 选定：装饰器内部 `opentelemetry.trace.get_tracer("sisys.agent")`（全局 API——未 initialize 时 OTel 返回 proxy→NoOp tracer，span 操作空转零开销零异常）；异常路径 record_exception + set_status(ERROR) + **re-raise 原异常**（零吞异常——装饰器不改异常语义）
+- 选定：装饰器内部 `opentelemetry.trace.get_tracer("sisys.agent")`（全局 API——未 initialize 时 OTel 返回 proxy→NoOp tracer，span 操作空转零开销零异常）；异常路径 record_exception + set_status(ERROR) + **re-raise 原异常**（零吞异常——装饰器不改异常语义；**R2-F4 注**：R1-F4 落码后 record/status 由 OTel use_span `__exit__` 框架兜底、wrapper 无显式分支——行为结果等价（Exception 记录+ERROR+透传），机制为纯 with 形态，消除双 exception 事件）
 - 论证：①装饰器在类定义时静态求值——无构造注入通道，全局 API 是 OTel 官方标准的**应用侧手动插桩**形态（spec overview：「SDK is installed and managed by the application owner」——本仓组合根/bootstrap 调 initialize 正落在应用 owner 职责内；R1-③ 修正：原「库插桩」类比错位——库插桩的约束是禁碰 SDK 且不配全局，与装饰器归 application + initialize 归 bootstrap 的分层恰好互证合规）；②NoOp 降级零配置零分支（OTel API 内建——比 enabled 判断更彻底：proxy tracer 在 provider set 后自动升级为真 tracer）；③应用层依赖 opentelemetry-**api**（纯 API 包与 logging 同级定位）——.importlinter 只限层间方向不限第三方，合法且留下「application 只碰 API 包、SDK 归 infrastructure」的分界纪律（AST 验证器 A 白名单锁定——**R1-F5 校准**：原实现只锁顶层包族名，`opentelemetry.sdk.*`/`opentelemetry.exporter.*` 子包可静默穿透[突变实证]；R1-F5 增设完整模块名级禁入断言[sdk/exporter/instrumentation 前缀]后分界真实可执行；R1-F6 另增设 application 全层第三方基线[⊆{opentelemetry,pydantic,yaml}+redis 存量 grandfather]——触碰文件防线升格为全层默认拒绝）
 - 备选：装饰器经全局 Resolver resolve("agent_tracing")（弃——服务定位器 + 未 bootstrap 时 KeyError 分支复杂于 NoOp；且与端口注入双通道并存造成语义分裂）；装饰器放 infrastructure（弃——被装饰的应用层方法 import infrastructure 违反依赖方向矩阵）
 
@@ -678,7 +678,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 
 **关键学习/Key Learnings:**
 - **构造签名扩展 = 回归面苦役**（5-6 十四构造点）——本 Story 结构性规避：装饰器纯附加零构造签名变化（DC-4），回归面仅「行为不变」验证
-- **断言可满足性断层是最大实施陷阱**（5-6 R3-F1：端口声明 Raises 但照抄模板实现不满足——红错位至 Task 4）——本 Story 对策：端口「零抛出 + None 降级」契约与实现降级路径同 Task 交付（Task 1 循环 B 异常降级用例前置）
+- **断言可满足性断层是最大实施陷阱**（5-6 R3-F1：端口声明 Raises 但照抄模板实现不满足——红错位至 Task 4）——本 Story 对策：端口「装配段零抛出 + None 降级 + 消费方段穿透」（R1-F1 分述名——旧单义「零抛出」）契约与实现降级路径同 Task 交付（Task 1 循环 B 异常降级用例前置）
 - **测试环境前提必须钉死**（5-6 AC-2.3 不设 ContextVar session 前提）——本 Story 对应面：OTel 全局 provider 测试隔离前提（DC-5 + Task 0.4 SSOT）
 - **str/枚举混入与形态守卫**（5-6 R3-F1 白名单哲学）——PhoenixConfig 101 守卫 isinstance 先行 + bool 子类防呆
 - **委托计时模式**（_PERF_CACHE + xdist_group 同组 + 常量单源集成定义/验收 import + 采样禁双跑）
@@ -739,7 +739,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - [x] 链路接线断言清单 L1-L5 已定义（AC-4.1/AC-4.3 场景承载 + Task 3/5 测试锚）
 
 - [x] **Task 1 完成**——循环 A（PhoenixConfig：23 单测绿 + 双变异[上界/前缀守卫]）+ 循环 B（端口+PhoenixTracer：13 单测绿 + 三变异[service.name/降级分支/双复位换单复位]）+ 循环 C（契约 11 维度绿 + 组合根 Story 5.7 区段注册 + `_wire_agent_tracing()` 独立接线单元[R3-3] + .env.example 三变量 + monitoring/ports 双 __init__ 导出）；验收 AC-1×3 + AC-3.2 转绿。**实施发现**：OTel 1.44 proxy 类是公开导出 `ProxyTracerProvider`（无下划线——故事 R1 审查假定的 `_ProxyTracerProvider` 私有名不存在，判据统一 isinstance 公开类）
-- [x] **Task 2 完成**——装饰器五面 + 常量锁定（9 单测绿）；变异三连：re-raise 删除红 / span 名错值红 / attributes 写入删除红；**record_exception 删除不红**——根因：OTel `start_as_current_span` 的 `__exit__` 钩子在异常退出时自动 record_exception + set ERROR（框架兜底），显式调用是自文档化双保险，异常事件行为契约由框架保证（登记本文件 Dev Agent Record）。mypy 装饰器泛型签名以 `Callable[P, Awaitable[R]]` 返回形态修正（wrapper 调用返回 Coroutine ⊂ Awaitable）
+- [x] **Task 2 完成**——装饰器五面 + 常量锁定（9 单测绿）；变异三连：re-raise 删除红 / span 名错值红 / attributes 写入删除红；**record_exception 删除不红**——根因：OTel `start_as_current_span` 的 `__exit__` 钩子在异常退出时自动 record_exception + set ERROR（框架兜底），显式调用是自文档化双保险，异常事件行为契约由框架保证（登记本文件 Dev Agent Record）（**R1-F4 修复**：显式分支已删——「双保险」的代价是双 exception 事件，R1 实测后改纯 with 形态）。mypy 装饰器泛型签名以 `Callable[P, Awaitable[R]]` 返回形态修正（wrapper 调用返回 Coroutine ⊂ Awaitable）
 - [x] **Task 3 完成**——循环 A（use case 根 span + 十属性写入块：15 单测绿含 13 存量零回归 + 属性键变异红[is_recording 守卫变异不红——NonRecordingSpan.set_attribute 本身空转，守卫是性能防御非行为防御，活性归 Task 4 开销面]）+ 循环 B（六装饰器 + trace_id 派生：41 单测绿含存量零回归 + trace_id 空串回退变异红 + 装饰器删除变异红）+ 循环 C（**5-3 全家回归全绿**：unit×4+契约×3 = 147 passed；integration+acceptance = 23 passed——装饰器纯附加零构造签名变化验证）
 - [x] **Task 4 完成**——集成八场景全绿（fail-once span 树恰 10 span/重试轮再入/异常 444+ERROR+AgentDecided 零发布/NoOp 观察哨读法丙/eval-drift 通道/P95 实测 μs 级<5ms/开销实测 <1%[t_untraced≈0.14s 守卫 + traced 50 span 正向锚]/trace_id 贯通+全零）；三变异红（span 名常量错值/re-raise 删除/P95 常量突变 0.000001）；连续两次全绿稳定。**实施修正**：链装配发现 resolve("agent_profile_use_case") 真实实例内含 443 守卫绑定 Redis 仓储（stub Agent 过不了守卫）——改用 5-3 验收同款 loader+selector 手工装配 AgentProfileLoadResult + `_StubProfileUseCase` duck-typing 替身（集成/验收两文件同修）；IsolationLevel 真实模块路径为 `src.domain.events.enums`
 - [x] **Task 5 完成**——验证器 A/B/C 十八项全绿（application 第三方白名单参数化×2 + domain 零符号/零 OTel import + 组合根外零实例化 + 六装饰器锚 + 构造签名不变×3[R3-14 inspect 基线对照]）；变异（tracing.py 注入 pydantic→验证器 A 红）还原复绿
@@ -863,7 +863,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 
 #### 需决策 Decision Needed
 
-- 无（Round 1 全部发现已裁决：22 项中 16 项落码 + 6 项登记 deferred，无未决争议）
+- 无（Round 1 全部发现已裁决：25 项中 18 项落码 + 1 项改判维持 + 6 项登记 deferred，无未决争议——**分级口径注（R2 校正）**：25 = 已修复节 19 F 项[14 物理行，P3 批量行 1 行含 6 项] + Defer 节 6 DF 项；分级 P1×4 + P2×10（F4~F11 + DF1/DF2）+ P3×11（F13~F19 + DF3~DF6）；F 编号实为 F1~F11 + F13~F19（含撇号 F4'，**F12 空号**——原「R1-F1~F22」区间虚标勘误））
 
 #### 已修复 Patch
 
@@ -880,7 +880,23 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - [x] **R1-F10（P2）** 外来 set 分支返回 True 语义虚高未披露——span 经他方 provider 导出、本实例配置全部不生效。修复：initialize docstring 披露（返回 True 仅表示「span 会被记录」非「导出到 Phoenix 端点」）
 - [x] **R1-F11（P2）** PHOENIX_TRACING_ENABLED 不门控 @trace——event-bus OTel 同开时 agent span 照常经全局 provider 导出（开关语义边界）。修复：tracing.py 模块头披露（DC-5 共享全局语义）
 - [x] **R1-F13/14/15/16/18/19（P3 批量）** 文档勘误六项——变异计数勘误（dev 台账「11 项红」实为 15 红+2 不红——Task1×5+Task2×3+Task3×3+Task4×3+Task5×1）；src 文件数勘误（八→九：补 ports/__init__.py 收尾清单第九文件）；场景⑥裕量口径双分述（纯创建 3.1μs[>1000×] vs 全周期 P95 含噪声[~10-100×]）；Story 版本字段补 v2.1.0（v1.3.1 滞后于 Change Log v2.0.0）；shutdown docstring 退出延迟上限语义（BSP join 默认 30s——不可达端点时 CLI 退出 +7s 起，上限 ~35s）；验收 docstring 豁免面勘误（llm_client + sandbox 两项——5-3 先例同款）
-- [x] **R1-F17（P3）改判不落码**：PHOENIX_TRACES_SAMPLER_ARG 不补 .env.example 样例行——dev 决策有据（默认 1.0 全采样，0.1 样例行误导用户误调采样；注释形态已说明区间与默认），维持现状
+
+#### 维持不改（裁定记录）
+
+- [x] **R1-F17（P3·改判维持）** PHOENIX_TRACES_SAMPLER_ARG 不补 .env.example 样例行——dev 决策有据（默认 1.0 全采样，0.1 样例行误导用户误调采样；注释形态已说明区间与默认），维持现状（R2 自「已修复」节移入本节——改判≠修复，5-2 先例单列形态）
+
+#### Round 2 修复（回归核查 + 传播完备性双视角，2026-10-27）
+
+- [x] **R2-A1（P1）** Review Findings 台账计数失实——三口径互斥（「22 项/16 落码」vs「16+6+1=23」vs 表行实际 25）+「R1-F1~F22」编号虚标（F12/F20/F21/F22 零出现）。修复：三处行内数字改实（P1×4 + P2×10 + P3×11 = 25 项；落码 18 + 改判维持 1 + 登记 6）+ 分级口径注 + F 编号区间披露 F12 空号
+- [x] **R2-A2（P1）** L247 领域异常契约节「追踪运行面零抛出」单义残留（R1-F1 联动漏网）——补分述校准（装配段 OTel 异常降级/消费方段业务异常穿透）
+- [x] **R2-A3（P2）** L179 AC-5 裕量「>1000×」单口径残留——补双口径注（无负载前提 + 全周期 ~10-100×）
+- [x] **R2-A4（P2）** L572 DC-3 选定行未同步 R1-F4——补框架 __exit__ 兜底注记
+- [x] **R2-A5~A7（P3）** v2.0.0 行补「R1-F13 勘误：实为 15 红」短注 / L681 教训行改分述名 / L742 Task 2 行尾补「R1-F4 修复」注（措辞按评审校正——非「改判」）/ F17 移「维持不改」节 / DF3 措辞「零抛出降级」→「降级」
+- [x] **R2-B1（P3）** 架构 scanner 逃逸口——`from opentelemetry import sdk` 形态经 ImportFrom 只记 module 漏 names（sdk 可逃逸白名单）。修复：ImportFrom 补扫 names（f"{module}.{alias.name}"）+ 常驻 scanner 级单测（tmp_path 双形态——防 scanner 自身回退）
+- [x] **R2-B2（P3）** scanner 相对导入假阳性——注释称不计入但无 level 守卫。修复：两函数对称补 `node.level` 守卫 + 单测
+- [x] **R2-B3（P3）** AC-5.2 复测保护不对称——collection 字母序 acceptance 先跑，AC-5.2 是 _PERF_CACHE 首轮采样者（集成⑦复测不可达）。修复：then 断言加同款复测分支（_run_async 形态，feature 零改）
+- [x] **R2-B4（P3）** R1-F7 shutdown 刷盘段零直接用例。修复：test_composition_root_shutdown.py 新增 TestShutdownAgentTracingFlush（真 Resolver 模式 + 顺序锚 calls == ["tracer_shutdown", "manager_close"] + 未注册跳过）
+- [x] **R2-C（不修留痕）** atexit 实例级累积（测试进程良性——SINGLETON 生产 1 钩子，shutdown 幂等）；attributes 批量写入段异常穿透（R1-F1 已文档化决策，SpanAttributeValue 类型注解即契约不重复 docstring）
 
 #### 已推迟 Defer
 
@@ -912,12 +928,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | 2026-10-27 | v1.3.0 | 文档审查周期 Round 3 深度推演（单审查员：15 场景三轴推演 + 7 文件全局状态时间线 + 数学完备性 + 红阶段可达性 + 契约维度适配，全部带推演链条与本机实证[OTel 1.44.0/langgraph 1.2.9/pytest-bdd 8.1.0]；零 P0——R1/R2 关键修复独立复核成立 + LangGraph ainvoke parent 链引擎级实证；处置 P1×2 + P2×5 + P3×7——R3-1~R3-8。核心：①AC-5.2 分母重标——execute 阶段无 LLM 调用（枚举定谳），perf 链形态钉 fail-once[7×20ms/10 span/预算 1.4ms]，span 开销实测 3.1μs 级重标；②前提测试条款——TestInitTracing 全局泄漏点名 + function-scope autouse；③AC-4.1 接线提取 _wire_agent_tracing() 消负路径假绿；④契约 Dummy 裁决单选项；⑤AC-2.2 注入类型钉 LLMAPIError；⑥Task 2 NoOp 重建义务；⑦七处 P3 收敛） |
 | 2026-10-27 | v1.3.1 | 文档审查周期收敛（R4 纯验证零修复[41 行台账全落位 + 30 锚点全存续 + src/ 零漂移实证] + R5 独立终审[周期闭合核对 + 10 项核心修复三向取证成立 + 全文快扫 4 项 P3 + 门禁确认]；收敛清偿 6 项 P3：L136 LLMError→LLMAPIError/L139 执行序补第二个 execute[9 阶段]/L92 frozen 残留/L729 风险计数注/v1.2.0 分级口径注/R3 子项编号映射注；R5-N3[L95 文件名缺后缀]经主会话 grep 定谳为**误报**不修留痕；收敛声明入 Story 见下方——Status 保持 ready-for-dev） |
 | 2026-10-27 | v1.4.0 | dev-story 实施启动：Task 0 SDD 规范定义完成（四视角并行调研 + 独立三向验证零漂移；Gherkin 14 场景 + BDD 完整步骤实现；红阶段 14 场景逐一 failed[R3-10 形态达成]；deferred-work OD-1/OD-2/OD-4 登记 + R1-DF2 顺延 5.11 注记；移交留项三项处置落盘）——Status: ready-for-dev → in-progress |
-| 2026-10-27 | v2.0.0 | dev-story 实施完成：Task 0-6 全部交付——①PhoenixConfig（frozen + 101 五守卫 + from_env fallback 链，23 单测）；②PhoenixTracer（双源解析 create_span[注入 provider 优先]/实例闩 initialize/外来 set 检测 warning/reset_for_testing **双复位**[变量 + Once 闩锁重建]，13 单测）；③AgentTracingPort + SpanHandle（两方法 duck-type OTel）+ SpanAttributeKeys/SpanNames 常量注册表；④@trace 装饰器（OTel 全局 API + NoOp 降级 + 零吞异常，9 单测）；⑤工作链接入纯附加（根 span + MVP 十属性 + 六阶段子 span + trace_id 贯通核销 5-3 预留位）；⑥组合根注册 + _wire_agent_tracing 接线单元（DC-7 降级哲学）；⑦集成八场景（span 树恰 10 span/重试轮/异常 444/NoOp 观察哨/eval-drift 通道/P95 实测 μs 级/开销 <1%/trace_id 贯通）+ 验收 15 场景全绿；⑧架构验证器十八项（application 第三方白名单新建防线 + domain 零触碰 + 组合根外零实例化 + 构造签名不变）；⑨5-3 全家回归零破坏（170 passed）。变异实证 11 项红（含 2 项框架兜底不红根因登记：record_exception 由 OTel exit 钩子自动兜底 / is_recording 守卫是性能防御）。实施发现三项：ProxyTracerProvider 为 1.44 公开导出类（无下划线）/ resolve profile_use_case 真实实例含 Redis 443 守卫（改 loader+selector 手工装配 + _StubProfileUseCase）/ IsolationLevel 实际位于 events.enums。ruff + mypy 701 文件零问题——Status: in-progress → review |
-| 2026-10-27 | v2.1.0 | 代码审查周期 Round 1（四视角并行调研 + 双评审员 + 复评门禁「优秀」放行；P1×4 + P2×8 + P3×10，落码 16 项 + 登记 6 项 + 改判 1 项——详见 Review Findings 表 R1-F1~F22。核心：①create_span 吞消费方异常 P1——try 收窄至装配段 + yield 双出口移出 try + 端口契约分述重写[装配段零抛出/消费方段穿透]，5.8/5.9 接入即爆的结构性缺陷；②@trace 删显式 except 分支——双 exception 事件实测消除 + CancelledError 按 OTel #4484 锁定 UNSET 语义 + 零吞异常由无 except 结构性保证；③initialize 失败降级补测[突变 M4 存活封堵] + NoOp 跑后判据 + 场景⑦噪声复测机制[force_refresh 独立重采样 + 采样入口双复位自包含]；④架构防线双升级——OTel API/SDK 分界完整模块名禁入断言[sdk/exporter/instrumentation] + application 全层第三方基线[⊆{opentelemetry,pydantic,yaml}+redis grandfather]；⑤组合根 shutdown 补 peek_singleton 刷盘[SIGTERM 面] + fallback 链补 OTel 信号级端点 + initialize 装配段入 try；⑥文档勘误六项[变异计数 15 红/src 九文件/裕量双口径/版本字段/退出延迟语义/豁免面] + deferred-work 登记 R1-DF1~6[event_metrics 同款缺陷/otel_config 单复位升格/impl 永抛缝隙/OTLP 真实通路/redis 治理/CLI 缺口]。111 测试全绿 + ruff/mypy 701 文件零问题） |
+| 2026-10-27 | v2.0.0 | dev-story 实施完成：Task 0-6 全部交付——①PhoenixConfig（frozen + 101 五守卫 + from_env fallback 链，23 单测）；②PhoenixTracer（双源解析 create_span[注入 provider 优先]/实例闩 initialize/外来 set 检测 warning/reset_for_testing **双复位**[变量 + Once 闩锁重建]，13 单测）；③AgentTracingPort + SpanHandle（两方法 duck-type OTel）+ SpanAttributeKeys/SpanNames 常量注册表；④@trace 装饰器（OTel 全局 API + NoOp 降级 + 零吞异常，9 单测）；⑤工作链接入纯附加（根 span + MVP 十属性 + 六阶段子 span + trace_id 贯通核销 5-3 预留位）；⑥组合根注册 + _wire_agent_tracing 接线单元（DC-7 降级哲学）；⑦集成八场景（span 树恰 10 span/重试轮/异常 444/NoOp 观察哨/eval-drift 通道/P95 实测 μs 级/开销 <1%/trace_id 贯通）+ 验收 15 场景全绿；⑧架构验证器十八项（application 第三方白名单新建防线 + domain 零触碰 + 组合根外零实例化 + 构造签名不变）；⑨5-3 全家回归零破坏（170 passed）。变异实证 11 项红（含 2 项框架兜底不红根因登记：record_exception 由 OTel exit 钩子自动兜底 / is_recording 守卫是性能防御）（**R1-F13 勘误**：逐 Task 加总实为 **15 红** + 2 不红——Task1×5+Task2×3+Task3×3+Task4×3+Task5×1）。实施发现三项：ProxyTracerProvider 为 1.44 公开导出类（无下划线）/ resolve profile_use_case 真实实例含 Redis 443 守卫（改 loader+selector 手工装配 + _StubProfileUseCase）/ IsolationLevel 实际位于 events.enums。ruff + mypy 701 文件零问题——Status: in-progress → review |
+| 2026-10-27 | v2.1.0 | 代码审查周期 Round 1（四视角并行调研 + 双评审员 + 复评门禁「优秀」放行；P1×4 + P2×10 + P3×11 共 25 项，落码 18 项 + 登记 6 项 + 改判维持 1 项——详见 Review Findings 表 R1-F1~F11+F13~F19（含 F4'，F12 空号）+ R1-DF1~DF6。核心：①create_span 吞消费方异常 P1——try 收窄至装配段 + yield 双出口移出 try + 端口契约分述重写[装配段零抛出/消费方段穿透]，5.8/5.9 接入即爆的结构性缺陷；②@trace 删显式 except 分支——双 exception 事件实测消除 + CancelledError 按 OTel #4484 锁定 UNSET 语义 + 零吞异常由无 except 结构性保证；③initialize 失败降级补测[突变 M4 存活封堵] + NoOp 跑后判据 + 场景⑦噪声复测机制[force_refresh 独立重采样 + 采样入口双复位自包含]；④架构防线双升级——OTel API/SDK 分界完整模块名禁入断言[sdk/exporter/instrumentation] + application 全层第三方基线[⊆{opentelemetry,pydantic,yaml}+redis grandfather]；⑤组合根 shutdown 补 peek_singleton 刷盘[SIGTERM 面] + fallback 链补 OTel 信号级端点 + initialize 装配段入 try；⑥文档勘误六项[变异计数 15 红/src 九文件/裕量双口径/版本字段/退出延迟语义/豁免面] + deferred-work 登记 R1-DF1~6[event_metrics 同款缺陷/otel_config 单复位升格/impl 永抛缝隙/OTLP 真实通路/redis 治理/CLI 缺口]。111 测试全绿 + ruff/mypy 701 文件零问题） |
+| 2026-10-27 | v2.1.1 | 代码审查周期 Round 2 回归核查 + 传播完备性（双视角；16 项 R1 修复全部回归核查通过——111+56+15 passed 零 P0/P1/P2 新破口；修复 P1×2 + P2×2 + P3×11 = 15 项，落码 13 + 不修留痕 2。核心：①台账计数三口径互斥 P1——三处行内数字改实[25 项 = 18 落码 + 1 改判 + 6 登记；F12 空号披露]；②L247 契约节零抛出单义残留 P1——R1-F1 联动漏网补分述；③L179 裕量/L572 DC-3 选定行/L681/L742 四处二阶传播补注；④架构 scanner 逃逸口封堵[from opentelemetry import sdk 形态 names 扫描 + 常驻判别力单测] + 相对导入 level 守卫对称补；⑤AC-5.2 复测保护对称化[首轮采样者身份实证]；⑥R1-F7 shutdown 刷盘直测[顺序锚 tracer 先于 manager]。不修留痕：atexit 实例级累积[测试良性]/attributes 段穿透[已文档化]。10+2 测试新增全绿） |
 
 ---
 
-**故事版本/Story Version:** v2.1.0
+**故事版本/Story Version:** v2.1.1
 **创建日期/Created:** 2026-10-27
 **最后更新/Last Updated:** 2026-10-27
 **更新说明/Description:**
@@ -927,7 +944,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - v1.3.0: 文档审查周期 Round 3 深度推演修订（P1×2 + P2×5 + P3 批量——15 场景三轴推演/7 文件时间线/数学完备性[structured 次数枚举定谳 execute 无 LLM]/LangGraph ainvoke parent 链引擎级实证；perf 链形态钉 fail-once[7×20ms/10 span/预算 1.4ms 实测重标]/前提测试条款[已知泄漏源点名]/AC-4.1 接线提取/契约 Dummy 单选项/AC-2.2 注入类型钉 LLMAPIError，详见 Docs Review Fixes R3-1~R3-8）
 - v1.3.1: 文档审查周期收敛（R4 纯验证 + R5 独立终审；10 项核心修复三向取证成立；收敛清偿 6 项 P3 + 1 项误报留痕；收敛声明见下——Status 保持 ready-for-dev）
 - v2.0.0: dev-story 实施完成（Task 0-6 全交付；变更日志见表——Status: in-progress → review；**R1-F16 勘误**：本字段当时漏更 v2.0.0）
-- v2.1.0: 代码审查周期 Round 1（四视角调研 + 双评审 + 复评「优秀」；P1×4 + P2×8 + P3×10——落码 16 + 登记 6 + 改判 1，详见 Review Findings；核心：create_span 消费方异常穿透 P1 + @trace 框架兜底极简化 + 三处测试判别力封堵 + 架构防线双升级 + 组合根 SIGTERM 刷盘 + OTel 信号级 fallback + 文档勘误六项）
+- v2.1.0: 代码审查周期 Round 1（四视角调研 + 双评审 + 复评「优秀」；P1×4 + P2×10 + P3×11 共 25 项——落码 18 + 登记 6 + 改判维持 1，详见 Review Findings；核心：create_span 消费方异常穿透 P1 + @trace 框架兜底极简化 + 三处测试判别力封堵 + 架构防线双升级 + 组合根 SIGTERM 刷盘 + OTel 信号级 fallback + 文档勘误六项）
+- v2.1.1: 代码审查周期 Round 2 回归核查 + 传播完备性（R1 修复零新破口[111+56+15 绿]；P1×2 + P2×2 + P3×11——落码 13 + 不修留痕 2；台账计数改实/契约节分述补注/scanner 逃逸口封堵/AC-5.2 复测对称/F7 直测顺序锚，详见 Review Findings Round 2 节）
 
 ---
 

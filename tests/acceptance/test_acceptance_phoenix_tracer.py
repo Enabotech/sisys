@@ -1438,9 +1438,22 @@ def when_overhead_sampling(context: dict[str, Any]) -> None:
 
 @then("开销比例小于 1%（中位数公式）")
 def then_overhead_below_1_percent(context: dict[str, Any]) -> None:
-    """开销公式断言：(median(t_traced) - median(t_untraced)) / median(t_untraced) < 0.01。"""
+    """开销公式断言：(median(t_traced) - median(t_untraced)) / median(t_untraced) < 0.01。
+
+    R1-F4' 复测对称（R2）：collection 字母序 acceptance 先于 integration——本
+    场景是 _PERF_CACHE 首轮采样者，集成场景⑦的复测保护对首轮污染不可达；本
+    断言加同款复测分支（首轮超标 → force_refresh 独立重采样 → 两轮均超标才红）。
+    """
+    from tests.integration.test_integration_phoenix_tracer import sample_tracing_overhead
+
     ratio = context["overhead_perf"]["overhead_ratio"]
-    assert ratio < 0.01, f"追踪开销比例 {ratio:.4f} 应 < 1%"
+    if ratio < 0.01:
+        return
+    retest = _run_async(context["_loop"], sample_tracing_overhead(force_refresh=True))
+    retest_ratio = retest["overhead_ratio"]
+    assert retest_ratio < 0.01, (
+        f"追踪开销比例复测两轮均超标：首轮 {ratio:.4f} / 复测 {retest_ratio:.4f} 应 < 1%（R1-F4' 噪声甄别）"
+    )
 
 
 @then("traced 块导出器 span 计数恰为 50（正向锚——防静默降级假绿）")

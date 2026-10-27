@@ -120,14 +120,17 @@ def _scan_file_imports(path: Path) -> set[str]:
             for alias in node.names:
                 modules.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
+            if node.level == 0 and node.module:  # 相对导入（level>=1）属同层不计入（R2 守卫——防假阳性红）
                 modules.add(node.module.split(".")[0])
-            # from . import xxx 相对导入（node.module None）——level>=1 属同层
     return modules
 
 
 def _scan_file_full_import_names(path: Path) -> set[str]:
-    """AST 扫描文件全部 import 完整模块名（R1-F5——子包级分界判定的数据源）."""
+    """AST 扫描文件全部 import 完整模块名（R1-F5——子包级分界判定的数据源）.
+
+    R2 增补两形态：ImportFrom 的 names 子模块（`from opentelemetry import sdk`
+    形态——只记 module 会漏 sdk 逃逸）+ 相对导入 level 守卫。
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     modules: set[str] = set()
     for node in ast.walk(tree):
@@ -135,9 +138,12 @@ def _scan_file_full_import_names(path: Path) -> set[str]:
             for alias in node.names:
                 modules.add(alias.name)
         elif isinstance(node, ast.ImportFrom):
+            if node.level >= 1:
+                continue  # 相对导入属同层——不计入第三方判定（R2 守卫——防假阳性）
             if node.module:
                 modules.add(node.module)
-            # 相对导入（level>=1）属同层——不计入第三方判定
+                for alias in node.names:  # from X import y[, z]——y/z 也是 X.y/X.z 的使用（R2 逃逸口封堵）
+                    modules.add(f"{node.module}.{alias.name}")
     return modules
 
 
@@ -215,6 +221,29 @@ class TestValidatorAPlusApplicationLayerBaseline:
             non_stdlib = {m for m in imports if m not in sys.stdlib_module_names and m != "src"}
             extra = non_stdlib - _APPLICATION_LAYER_ALLOWED_THIRD_PARTY
             assert extra, f"grandfather 文件 {rel} 已无白名单外 import——豁免应摘除（防豁免清单固化为永久化）"
+
+
+class TestScannerImportForms:
+    """scanner 两函数的 import 形态判别力（R2——对修复自身的常驻判别力锚）."""
+
+    def test_full_names_catches_from_package_import_submodule(self, tmp_path: Path) -> None:
+        """逃逸口封堵（R2）：`from opentelemetry import sdk` 形态必须落入完整名集合（sdk 前缀可命中）."""
+        probe = tmp_path / "probe.py"
+        probe.write_text(
+            "from opentelemetry import sdk, trace\nfrom opentelemetry import trace as otel_trace\n",
+            encoding="utf-8",
+        )
+        full_names = _scan_file_full_import_names(probe)
+        assert "opentelemetry.sdk" in full_names, "`from opentelemetry import sdk` 形态应被完整名捕获（防 scanner 回退）"
+        assert "opentelemetry.trace" in full_names
+        assert any(n.startswith(_FORBIDDEN_OTEL_SUBMODULE_PREFIXES) for n in full_names), "sdk 子包应命中禁入前缀"
+
+    def test_relative_imports_excluded(self, tmp_path: Path) -> None:
+        """相对导入不计入（R2 守卫）：`from .foo import x` 不得计入第三方集合（防假阳性红）."""
+        probe = tmp_path / "probe.py"
+        probe.write_text("from .sibling import thing\nfrom ..parent import other\n", encoding="utf-8")
+        assert _scan_file_imports(probe) == set()
+        assert _scan_file_full_import_names(probe) == set()
 
 
 class TestValidatorBDomainZeroTouchAndRootOnlyInstantiation:
