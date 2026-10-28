@@ -193,9 +193,11 @@ class RunAgentWorkflowUseCase:
         # 评估失败降级 warning 跳过不阻断主链，三键缺席不写哨兵值——0.0 可能是
         # 合法幻觉分；overall 不写 span——三键经权重常量可派生，5.7 键表零改动。
         # 降级 catch 面含 LLMConfigError（CR1-F1）：332 的现实可达源是运行期
-        # UDMR/LLM env 半配置态（经健康回退 local 分支或云端空 key 形态）非
-        # 开发期代码错误——评估管线内一切失败不阻断主链（附加面边界=catch
-        # 边界）；主链六阶段的 332 显性失败语义不变）
+        # UDMR/LLM env 半配置态经 local 分支（健康回退或 local_first/合规强制
+        # 本地——主链 build_default 忽略 local_first 照常走 cloud，评估 local
+        # 分支 from_env 缺 endpoint/key 即 332）非开发期代码错误——评估管线内
+        # 一切失败不阻断主链（附加面边界=catch 边界）；主链六阶段的 332 显性
+        # 失败语义不变）
         if self._evaluation_harness is not None:
             try:
                 evaluation_result = await self._evaluation_harness.evaluate(result)

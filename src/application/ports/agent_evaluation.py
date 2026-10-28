@@ -105,7 +105,8 @@ class EvaluationResult:
       被压缩——ca 条件可达域 [min(a,1−a), 1]（a 居中时 ca≥0.5 常数垫底），
       h=1.0（完全幻觉）+cr=1.0 角 overall∈[0.475, 0.60]、h=0+cr=0 角
       overall∈[0.525, 0.65]，两病态角分数带重叠——合成分判别力在病态区
-      坍缩，消费方阈值设计勿按 [0,1] 全域假设（详见 _compute_overall）**。
+      坍缩，消费方阈值设计勿按 [0,1] 全域假设（无条件全域 [0,1] 仅极端自报角
+      可达——典型分布下动态范围显著窄于全域；详见 _compute_overall）**。
 
     与 AgentWorkflowResult 同层同风格（application/ports/agent_workflow.py 先例）；
     分数域守卫自设加严（[0,1] 闭区间——应用层输入校验，越界抛 ValidationError 201）。

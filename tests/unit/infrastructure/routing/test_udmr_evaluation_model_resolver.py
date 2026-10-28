@@ -69,14 +69,12 @@ class _RecordingDecisionLogRepository:
 
 
 class _StubHealthChecker:
-    """健康检查替身（外部探测面豁免——True/False 可控路由方向；双方法防 isinstance）。"""
+    """健康检查替身（外部探测面豁免——True/False 可控路由方向；close 防御性预留——全仓现无 isinstance 校验）。"""
 
     def __init__(self, healthy: bool) -> None:
         self._healthy = healthy
-        self.check_calls = 0
 
     async def check(self) -> bool:
-        self.check_calls += 1
         return self._healthy
 
     async def close(self) -> None:

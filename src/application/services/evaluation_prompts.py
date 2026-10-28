@@ -6,10 +6,10 @@ prompt 常量实名形态（SYSTEM_PROMPT + USER_PROMPT_TEMPLATE——relevance_
 prompt 设计三细则（DC-2——业界 judge prompt 实践）：
 - (a) 证据摘要纳入 artifacts_snapshot 简编（四材料：citations/tool_trace/
   confidence_rationale/artifacts_snapshot——引用标识无内容时 judge 对伪造引用
-  失去判别力，工件内容使 judge 保有判别力；**核对依据仅前三类**——
-  confidence_rationale 是 Agent 自我声明非外部证据，prompt 明示不得作为
-  支撑依据核对[CR1-F2：防自证文本洗白——Agent 在置信理由预写虚构引用源
-  可协调造假逃过检测]）；
+  失去判别力，工件内容使 judge 保有判别力；**核对依据为除 confidence_rationale
+  外的三类**——confidence_rationale 是 Agent 自我声明非外部证据，prompt 明示
+  不得作为支撑依据核对[CR1-F2：防自证文本洗白——Agent 在置信理由预写虚构
+  引用源可协调造假逃过检测]）；
 - (b) Schema 输出顺序 rationale 先行、评分后置（EXPLANATION→LABEL）；
 - (c) SYSTEM_PROMPT 附六档量表锚定（0.0/0.2/0.4/0.6/0.8/1.0 各一句语义定义
   ——裸 float 评分会塌缩到少数锚定值，量表锚定使塌缩点语义化可复现[锚定

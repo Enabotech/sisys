@@ -190,18 +190,6 @@ class _RecordingEventPublisher:
         )
 
 
-class _RecordingToolExecutionService:
-    """记录 ExecutionContext 的工具执行服务包装（duck-typing 委托）。"""
-
-    def __init__(self, inner: Any) -> None:
-        self._inner = inner
-        self.captured_contexts: list[Any] = []
-
-    async def execute(self, tool_id: Any, tool_call: Any, execution_context: Any) -> Any:
-        self.captured_contexts.append(execution_context)
-        return await self._inner.execute(tool_id, tool_call, execution_context)
-
-
 class _StubProfileUseCase:
     """零 IO 档案用例替身（duck-typing——返回手工装配的 AgentProfileLoadResult）。"""
 
@@ -223,14 +211,16 @@ class _RecordingDecisionLogRepository:
 
 
 class _StubHealthChecker:
-    """健康检查替身（外部探测面豁免——True/False 可控路由方向；双方法防 isinstance 校验）。"""
+    """健康检查替身（外部探测面豁免——True/False 可控路由方向）。
+
+    close 防御性预留：全仓现无 isinstance 校验（UDMRService 仅 duck-call
+    check()），保留双方法是对未来 runtime_checkable Protocol 校验的防御。
+    """
 
     def __init__(self, healthy: bool) -> None:
         self._healthy = healthy
-        self.check_calls = 0
 
     async def check(self) -> bool:
-        self.check_calls += 1
         return self._healthy
 
     async def close(self) -> None:
@@ -578,11 +568,11 @@ def _assemble_evaluation_workflow_chain(
         hallucination_error=hallucination_error,
     )
     context["fake_llm"] = fake_llm
-    recording_tool_service = _RecordingToolExecutionService(_build_tool_execution_service(fake_llm))
+    tool_execution_service = _build_tool_execution_service(fake_llm)
 
     service: Any = AgentWorkflowService(
         llm_client=fake_llm,
-        tool_execution_service=recording_tool_service,
+        tool_execution_service=tool_execution_service,
         skill_loader=resolve("skill_loader"),
         tool_registry_service=_make_registry(),
         isolation_guard=guard,

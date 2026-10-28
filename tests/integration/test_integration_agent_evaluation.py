@@ -128,7 +128,7 @@ class _StubIsolationRepository:
 
 
 class _StubIsolationSwitchLogRepository:
-    """手写 duck-typing 日志仓储替身（零 IO）。"""
+    """手写 duck-typing 日志仓储替身（零 IO——隔离切换日志仓储正确用途）。"""
 
     async def save(self, log: Any) -> None:
         return None
@@ -137,6 +137,18 @@ class _StubIsolationSwitchLogRepository:
         from src.domain.ports.isolation_switch_log_repository import IsolationSwitchLogSearchResult
 
         return IsolationSwitchLogSearchResult(items=(), total=0, offset=query.offset, limit=query.limit)
+
+
+class _RecordingDecisionLogRepository:
+    """零 IO 路由决策日志仓储替身（CR1-20 清偿——语义对齐：UDMRService.log_repo
+    消费的是路由决策日志非隔离切换日志，原以 _StubIsolationSwitchLogRepository
+    充当属 duck-typing 合法但语义错位；验收 AC-2 同款形态）。"""
+
+    def __init__(self) -> None:
+        self.saved_logs: list[Any] = []
+
+    async def save(self, log_entry: Any) -> None:
+        self.saved_logs.append(log_entry)
 
 
 class _RecordingEventPublisher:
@@ -302,7 +314,7 @@ def _build_udmr_resolver(cloud_model: str, fake_llm: Any) -> Any:
     from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
     from src.infrastructure.security.pipl_compliance_service_impl import PIPLComplianceServiceImpl
 
-    stub_log_repo: Any = _StubIsolationSwitchLogRepository()
+    stub_log_repo: Any = _RecordingDecisionLogRepository()
     stub_publisher: Any = _RecordingEventPublisher()
     service = UDMRService(
         compliance_gateway=ComplianceGatewayImpl(pipl_service=PIPLComplianceServiceImpl()),
