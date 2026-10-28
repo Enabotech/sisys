@@ -160,7 +160,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 **Given** 工作流链 = 5-7 手工装配形态（Fake LLM[**五 Schema 身份分派**——perceive/plan/verify/package 四次 structured 调用 + execute 阶段零 structured 调用[工具执行走 tool_execution_service] + reflect 单轮通过时跳过——R3 推演勘误：原「六阶段 Schema 身份分派」措辞易误导 dev 造第六阶段分支，分派表仍是五个既有 Schema] + **HallucinationEvaluationSchema 分派分支新增**[评估块第 5 次调用] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + 零 IO stub 仓储）+ use case 构造注入 `evaluation_harness`（真实 EvaluationHarness + Fake LLM + **resolver 替身返回固定基底 LLMConfig**[R3 钉死：AC-3 用替身——三键值与路由方向无关（h 来自 Fake 注入、cr 来自 evidence 构造），真实 UDMR 链归 AC-2 与集成场景②；真实链形态要求 policy 与 resolver 的 cloud_configs 对齐注入，错配即 450 降级假红]）+ **链级 initialize 全局通道**（场景级新 TracerProvider + SimpleSpanProcessor + InMemorySpanExporter 经 `PhoenixTracer(config=测试配置, tracer_provider=注入).initialize()`——装饰器/@trace 链路 span 只经全局 provider 可观测，5-7 SSOT）
 **When** 调用 `RunAgentWorkflowUseCase.execute(agent_id, task)` 执行六阶段工作流
 **Then** execute 末尾（结果组装 L162-168 → MVP 十属性写入块 L169-185 之后、`return result` 之前）评估块执行：`if self._evaluation_harness is not None:` → `await self._evaluation_harness.evaluate(result)` → `span.is_recording()` 守卫下经 `SpanAttributeKeys.EVAL_HALLUCINATION_SCORE`/`EVAL_CONTEXT_RELEVANCE`/`EVAL_CONFIDENCE_ACCURACY` 三常量写入根 span（值 = EvaluationResult 对应字段——**5.7 OD-2 兑现：三键生产填值**）；overall_score 不写 span（5.7 SpanAttributeKeys 契约键表零改动——三键可派生 overall，YAGNI）；工作流返回值与评估块零耦合（result 原样返回——评估不改写工作流结果）
-**And** **降级路径**（可观测附加面哲学——5.7 DC-7 同款）：evaluate 抛 `AgentEvaluationError`（450——LLM 调用失败/Schema 校验失败注入）→ `except AgentEvaluationError → logger.warning("评估降级跳过...")` → 主链正常返回 result + span 三键**缺席**（不写哨兵值——OD-2[5.7] 语义歧义论证同款：0.0 可能是合法幻觉分）+ 既有 MVP 十属性不受影响；**未注入路径**（`evaluation_harness=None`——向后兼容默认）：评估块整体跳过 + 行为与 5-3/5-7 完全一致（存量零破坏前提）；**构造签名扩展**：use case 第六可选依赖 `evaluation_harness: AgentEvaluationPort | None = None`（尾部追加——存量五参构造调用零破坏）；**5-7 资产同步 ×2**（R1 审查补正——原「唯一触碰点」声明遗漏第二处）：①test_acceptance_phoenix_tracer.py AC-4.3 构造签名断言基线更新（五依赖 → 六依赖——`inspect.signature` 对照，L1351-1376）；②**test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 常量更新**（L101-107 五依赖清单 → 六依赖——该常量被验证器 C L305 断言消费（params L304），六参数落地后不更新即红）；另全仓构造点 8 处（组合根 lambda/5-7 验收 L459/单测 `_make_use_case`/集成×3/triple_isolation/5-7 集成）全为五参调用，None 默认零破坏无需改动
+**And** **降级路径**（可观测附加面哲学——5.7 DC-7 同款）：evaluate 抛 `AgentEvaluationError`（450——LLM 调用失败/Schema 校验失败注入）→ `except AgentEvaluationError → logger.warning("评估降级跳过...")` → 主链正常返回 result + span 三键**缺席**（不写哨兵值——OD-2[5.7] 语义歧义论证同款：0.0 可能是合法幻觉分）+ 既有 MVP 十属性不受影响；**未注入路径**（`evaluation_harness=None`——向后兼容默认）：评估块整体跳过 + 行为与 5-3/5-7 完全一致（存量零破坏前提）；**构造签名扩展**：use case 第六可选依赖 `evaluation_harness: AgentEvaluationPort | None = None`（尾部追加——存量五参构造调用零破坏）；**5-7 资产同步 ×2**（R1 审查补正——原「唯一触碰点」声明遗漏第二处）：①test_acceptance_phoenix_tracer.py AC-4.3 构造签名断言基线更新（五依赖 → 六依赖——`inspect.signature` 对照，L1351-1376）；②**test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 常量更新**（L101-107 五依赖清单 → 六依赖——该常量被验证器 C L304 断言消费（params L303），六参数落地后不更新即红）；另全仓构造点 8 处（组合根 lambda/5-7 验收 L459/单测 `_make_use_case`/集成×3/triple_isolation/5-7 集成）全为五参调用，None 默认零破坏无需改动
 
 **验证标准/Validation Criteria:**
 - [ ] 真实链评估执行：InMemory exporter 取 agent_execution span → attributes 含三键且值 == EvaluationResult 字段（Fake LLM 注入的幻觉分 + 启发式计算值 + 校准值逐项手算对照——**[R3 推演] 已验证精确三元组钦定：h=0.2（Fake 注入）+ cr=0.0（零工具步链 evidence 三元组全空）+ pred=0.85（verify 置信）→ actual=0.4/ca=0.55 三键全二进制精确，字面量断言安全；overall=0.4575000000000001 非精确——断言用同式表达式**）
@@ -497,7 +497,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | `tests/unit/application/use_cases/test_run_agent_workflow.py` 追加（**经 initialize 全局通道**——**类级 function-scope autouse fixture：reset 双复位 → initialize → teardown 双复位**[R1 审查钉死：镜像同文件 5-7 节 TestExecuteRootSpanAttributes L346-436 形态——scope="module" 的 initialize 会被 5-7 类级 teardown 双复位中途清掉，后续用例见 proxy 假红]）：注入 Fake evaluation_harness[AsyncMock spec=AgentEvaluationPort + evaluate side_effect 返回固定 EvaluationResult] → execute → agent_execution span 三键断言（值 == Fake 注入的 EvaluationResult 字段——经 get_current_span 面取 exporter）/ 降级路径[Fake evaluate side_effect 抛 AgentEvaluationError → 主链正常返回 + 三键缺席 + MVP 十属性仍在 + caplog warning] / None 默认路径[五参构造 → 行为与 5-7 基线一致 + 三键缺席] |
-| 🟢 绿 | `run_agent_workflow.py`：第六可选依赖 + execute 末尾评估块（None 守卫 → try evaluate → is_recording 三键写入 → except AgentEvaluationError → logger.warning 降级）+ **use case 注册 lambda 更新**（resolve_optional("agent_evaluation") 注入第六依赖——与第六参数同窗落地，R1-F1 时序）+ **5-7 资产同步 ×2**：test_acceptance_phoenix_tracer.py AC-4.3 构造签名基线更新（五依赖 → 六依赖）+ test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 常量更新（L101-107 五依赖 → 六依赖——L305 断言随常量转绿） |
+| 🟢 绿 | `run_agent_workflow.py`：第六可选依赖 + execute 末尾评估块（None 守卫 → try evaluate → is_recording 三键写入 → except AgentEvaluationError → logger.warning 降级）+ **use case 注册 lambda 更新**（resolve_optional("agent_evaluation") 注入第六依赖——与第六参数同窗落地，R1-F1 时序）+ **5-7 资产同步 ×2**：test_acceptance_phoenix_tracer.py AC-4.3 构造签名基线更新（五依赖 → 六依赖）+ test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 常量更新（L101-107 五依赖 → 六依赖——L304 断言随常量转绿） |
 | 🟡 变异 | 三键写入删除→span 断言红；降级 catch 删除→主链断言红[AgentEvaluationError 上抛击穿 execute]；None 守卫删除→五参构造用例红[AttributeError]；还原→绿 |
 | 🔄 重构 | 评估块注释（OD-2[5.7] 兑现注记 + 降级哲学锚）+ ruff+mypy |
 
@@ -608,12 +608,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 
 **DC-5 主链接入——第六可选依赖 + 可观测附加面降级（5-6 苦役结构性规避）**
 - 选定：`RunAgentWorkflowUseCase.__init__` 尾部追加 `evaluation_harness: AgentEvaluationPort | None = None`（存量五参调用零破坏）；execute 末尾评估块（None 守卫 → try evaluate → 三键写入[is_recording 守卫] → except AgentEvaluationError → logger.warning 降级跳过）
-- 论证：①可选 None 默认 = 存量构造点零苦役（5-6 十四构造点教训——必选依赖会击穿全部存量构造/测试）；②降级哲学（5.7 DC-7 同款强化）：评估是可观测附加面——评估失败不得阻断工作流主链（LLM 调用失败是评估最高频失败面——主链可用性 > 评估完整性）；③写入位置钉死 execute 体内 return 前（span 在方法返回时 end——end 后 set_attribute no-op；Agent B 调研实证）；④overall 不写 span（5.7 SpanAttributeKeys 契约键表零改动——三键经权重常量可派生 overall，YAGNI + 键表是 5.7 已收敛契约）；⑤**5-7 资产同步义务 ×2**（R1 审查补正——原「唯一触碰点」声明失实，实为两处）：test_acceptance_phoenix_tracer.py AC-4.3 构造签名断言（L1351-1376 inspect.signature 对照五依赖）+ test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 基线常量（L101-107——验证器 C L305 断言消费（params L304））均须同步更新为六依赖（两处显式登记防遗漏）
+- 论证：①可选 None 默认 = 存量构造点零苦役（5-6 十四构造点教训——必选依赖会击穿全部存量构造/测试）；②降级哲学（5.7 DC-7 同款强化）：评估是可观测附加面——评估失败不得阻断工作流主链（LLM 调用失败是评估最高频失败面——主链可用性 > 评估完整性）；③写入位置钉死 execute 体内 return 前（span 在方法返回时 end——end 后 set_attribute no-op；Agent B 调研实证）；④overall 不写 span（5.7 SpanAttributeKeys 契约键表零改动——三键经权重常量可派生 overall，YAGNI + 键表是 5.7 已收敛契约）；⑤**5-7 资产同步义务 ×2**（R1 审查补正——原「唯一触碰点」声明失实，实为两处）：test_acceptance_phoenix_tracer.py AC-4.3 构造签名断言（L1351-1376 inspect.signature 对照五依赖）+ test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS` 基线常量（L101-107——验证器 C L304 断言消费（params L303））均须同步更新为六依赖（两处显式登记防遗漏）
 - 备选：必选第六依赖（弃——存量苦役）；评估块放 AgentWorkflowService（弃——span 是根 span 上下文[use case 层]，服务层写入拿不到根 span；且服务层职责是六阶段不是评估）；独立 RunEvaluationUseCase 不接主链（弃——epics AC「Given Agent 执行完成」语义绑定工作流 + span 存活期 + 5.9 连续评估数据流依赖主链触发）；评估失败上抛（弃——违反可观测附加面哲学）
 
 **DC-6 评估异常契约——evaluation 子域 450-459 新开 + LLM 族传播纪律照抄**
 - 选定：`AgentEvaluationError`（EXCEPTION_450，SystemException——「评估管线执行失败」系统侧语义，AgentWorkflowError[444] 同族论证）；传播纪律照 `_structured_call`：LLMAPIError/LLMResponseError/TimeoutError/ServiceUnavailableError → 450 包装 `from error`；LLMConfigError/CancelledError → 透传
-- 论证：①agent 段 440-449 已满（_code_ranges.py L131 注记）——四代开段先例（data_source 410/debate 420/tool_version 430/agent 440）支持 evaluation 独立段 450-459；②SystemException vs ExternalException 抉择：450 的外层语义是「评估管线编排失败」（路由+调用+计算+组装多环节），LLM 外部失败已在内层 cause 链——与 RelevanceEvaluationError（360 ExternalException——检索域直调外部评估服务单环节）语义分立；③异常体系四件套 + test_code_ranges 两表增行 + §3.3.2 文档表——完整 checklist 落地；④降级 catch 面收窄为 `except AgentEvaluationError`（精确捕获——LLMConfigError 透传会击穿主链是**设计意图**[配置错误是开发期错误应显性失败非运行期降级面]）
+- 论证：①agent 段 440-449 已满（_code_ranges.py L131 注记）——四代开段先例（data_source 410/debate 420/tool_version 430/agent 440）支持 evaluation 独立段 450-459；②SystemException vs ExternalException 抉择：450 的外层语义是「评估管线编排失败」（路由+调用+计算+组装多环节），LLM 外部失败已在内层 cause 链——与 RelevanceEvaluationError（360 ExternalException——检索域直调外部评估服务单环节）语义分立；③异常体系四件套 + test_code_ranges 两表**无需增行**[R5-F1 勘误：直接继承抽象基类——见异常契约节 R1-F9 注记] + §3.3.2 文档表——完整 checklist 落地；④降级 catch 面收窄为 `except AgentEvaluationError`（精确捕获——LLMConfigError 透传会击穿主链是**设计意图**[配置错误是开发期错误应显性失败非运行期降级面]）
 - 备选：复用 llm 333-339 预留位（弃——评估失败不全是 LLM 失败[Schema 校验/路由匹配失败]）；复用 AgentWorkflowError 444（弃——phase 枚举是六阶段[perceive..package]，"evaluation" 不在其列；444 语义绑定工作流阶段执行）；EvaluationError 命名（弃——agent 前缀对齐 AgentWorkflowError 族命名 + 检索域 RelevanceEvaluationError 消歧）
 
 **DC-7 测试通道与替身——零外部服务自包含 + UDMR 真实链手工装配**
@@ -651,7 +651,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 | 1 | UDMRService.decide() 事件副作用量级（评估高频调用 → RoutingDecided 事件 + 决策日志逐次累积——每工作流 run +1 事件/日志；MVP 单 Agent 低频可接受） | 语义正确性论证：评估调用是真实 LLM 调用（成本应统计/路由应审计——CostMetricsListener 既有面覆盖）；量级风险登记：5.9+ 多 Agent 高频场景若事件洪流再评估（批量评估/采样评估策略——deferred 知悉不进台账，触发条件明确[事件量监控告警]） |
 | 2 | 评估 LLM 调用叠加主链延迟（+500ms 预算内——但真实 LLM 网络秒级时主链总延迟显著增加） | DC-5 降级哲学覆盖失败面；延迟面：MVP 接受（评估是 FR-EV-02 P0 价值）；V1 若主链延迟敏感可评估异步评估/旁路评估（范围边界表外——V1 按需，deferred-work 不登记[无当前 gap——设计选项记录]） |
 | 3 | UDMR 合规检测 forced_local 路由（评估文本命中 PIPL 正则 → 评估模型强制本地——本地小模型幻觉检测质量弱于云端） | DC-3 论证②：合规是防线非缺陷（强制本地是正确行为）；测试预期钉死（AC-2 合规注记——评估文本含敏感词场景路由断言 local；**装配前提：ComplianceGatewayImpl 显式注入 pipl_service**——零参装配下 PIPL 分支被 None 门死恒不可达[R1 审查补正]；反向风险：cloud 场景文本规避正则命中）；**生产态知悉[R2 审查]：组合根 compliance_gateway 为字符串 impl 零参注册（composition_root L682——既有形态），生产态 PIPL 分支同样休眠，合规防线全量生效待 UDMR 域装配演进（非本 Story 修复面——组合根注册形态不属 5.8 触碰清单）**；质量风险知悉：V1 评估模型池分级（deferred 不登记——UDMR 域演化） |
-| 4 | 5-7 构造签名断言遗漏更新（use case 六依赖后 5-7 两处钉死点红——回归破坏：验收 AC-4.3 断言 L1351-1376 + 架构基线 `_USE_CASE_INIT_PARAMS` L101-107/L305） | Task 3 循环 B 显式登记两处同步义务 + Task 3 循环 C 全家回归清单含 5-7 验收 15 场景与 test_arch_phoenix_tracer；5-8 AST 验证器 C 六依赖基线双锚（更新后断言锁死）；全仓 8 构造点五参调用 None 默认零破坏（调研实证） |
+| 4 | 5-7 构造签名断言遗漏更新（use case 六依赖后 5-7 两处钉死点红——回归破坏：验收 AC-4.3 断言 L1351-1376 + 架构基线 `_USE_CASE_INIT_PARAMS` L101-107/L304） | Task 3 循环 B 显式登记两处同步义务 + Task 3 循环 C 全家回归清单含 5-7 验收 15 场景与 test_arch_phoenix_tracer；5-8 AST 验证器 C 六依赖基线双锚（更新后断言锁死）；全仓 8 构造点五参调用 None 默认零破坏（调研实证） |
 | 5 | RoutingDecided 事件与评估链的发布依赖（resolver 手工装配测试中 publisher 替身遗漏 → decide() 内部发布抛异常击穿 resolve_config） | AC-2 装配清单钉死四替身（publisher/决策日志/健康检查/合规真实）；UDMRService 构造器依赖注入完整清单对齐组合根 L1627-1647 形态 |
 | 6 | hallucination_score 语义误读（后续消费方[5.9/仪表盘]误当「越高越好」与 context_relevance 混用） | OD-5 显式裁定 + EvaluationResult 字段 docstring 语义注记 + overall 反转公式 docstring；**5.9 移交注记[R1 科学性审查扩充]**：CUSUM 以 overall_score 为总览/告警级序列，但三键序列同样可从 span 取出且逐指标归因更优（业界漂移检测惯例是逐指标分布监控——合成分掩盖「哪个组件漂了」；RAGAS 废弃聚合分的核心理由）；另两须知随移交：降级产生的序列缺口（三键缺席 run）需缺失数据策略（跳过 vs 计缺口——CUSUM 连续性假设敏感）；judge 温度 0.1 仍非确定——CUSUM 阈值需预热窗口估 σ |
 | 7 | Fake LLM Schema 身份分派与既有五 Schema 冲突（HallucinationEvaluationSchema 意外与既有 Schema 同名/同对象——分派键失效） | Schema 独立新类 + AC-1 验证标准「与既有五 Schema 两两不同 is not 断言」；agent_workflow_schemas.py L9-10 设计决策前提保持 |
@@ -732,7 +732,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - **测试环境前提必须钉死**（5-7 OTel 全局状态 R1 实测 Once 闩锁 + TestInitTracing 泄漏源）——本 Story 继承：凡 initialize 一律双复位 + 前提测试条款 + env 不带 PHOENIX_TRACING_ENABLED=true
 - **委托计时模式**（_PERF_CACHE + xdist_group 同组 + 常量单源 + 采样禁双跑 + 复测保护）——本 Story 照抄（AC-5）
 - **Fake LLM Schema 身份分派前提**（Schema 两两不同——5-3 设计决策）——本 Story 新增 HallucinationEvaluationSchema 分派分支保持前提
-- **组合根 lambda 构造期配置异常击穿 bootstrap**（5-7 R1-13/R2-6 try 罩整段）——本 Story 对策：resolve_optional + lambda 内 ConfigurationError 防护（风险表 #9）
+- **组合根 lambda 构造期配置异常击穿 bootstrap**（5-7 R1-13/R2-6 try 罩整段）——本 Story 对策：resolve_optional + 注册工厂函数（def）内 ConfigurationError 防护（风险表 #9——R5 措辞同步 R3-F2：lambda 无法承载 try/except）
 - **OD-n 偏离声明编号 + gap 四要素 + 承接方链接**（5-6/5-7 规范）——本 Story OD-1~OD-5 + 三条 5-7 移交留项处置落盘
 - **验收禁 mock 红线豁免口径**（llm_client 外部 SaaS + 零 IO 手写替身——5-3/5-7 先例）——本 Story 豁免面扩展：健康检查替身（外部探测面）
 - **mypy 全仓验证盲区**（5-7 v2.2.1 教训：装饰器类跨文件类型影响组件改签名后必须 mypy . 全仓）——本 Story 对策：use case 构造签名扩展后跑全仓 mypy 验证（Task 3 收尾）
@@ -743,7 +743,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - [ ] 双配置矩阵/正向锚/手算对照三判别力设计（AC-1/AC-2/AC-5）
 - [ ] OTel 双复位纪律全套继承（测试隔离约束节）
 - [ ] 委托计时三件（Task 4 + AC-5）
-- [ ] resolve_optional + lambda ConfigurationError 防护（Task 3 循环 B + 风险表 #9——R2 勘误：该 lambda 即 use case 注册 lambda，随 R1-F1 时序归 Task 3）
+- [ ] resolve_optional + 注册工厂函数（def）内 ConfigurationError 防护（Task 3 循环 B + 风险表 #9——R2 勘误 Task 归属[随 R1-F1 归 Task 3] + R5 措辞同步 R3-F2）
 - [ ] 全仓 mypy 验证（Task 3 收尾）
 
 ---
@@ -776,7 +776,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - [x] 前一个故事学习经验整合（5-7 教训链 + 三条移交留项处置 + trace_id 防呆复核）
 - [x] 五视角并行代码调研（UDMR 路由机制与消费模式 / 5.7 追踪交付物与 span 通道 / 工作流数据模型与 LLM 调用面 / 验收测试模板与 R6 改造形态 / 偏离台账与异常体系组合根惯例——关键事实独立验证：per-call UDMR 消费模式零先例 / agent 段 440-449 全满 / RelevanceEvaluationPort 语义甄别 / 5-7 AC-4.3 构造签名断言绊线 / anthropic 扁平 Schema 约束 / SpanAttributeValue 值域）
 - [x] 状态设置为 `ready-for-dev`
-- [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-9 设计决策 + OD-1~OD-5 偏离声明 + 风险九项）
+- [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-9 设计决策 + OD-1~OD-5 偏离声明 + 风险十项[R5 勘误：#10 self-preference bias 系 R1 审查新增——原「九项」过时]）
 - [x] 项目结构对齐统一规范
 
 ### 文件清单 File List
@@ -852,7 +852,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | R1-F1 | Task 1 循环 C 要求「use case lambda 更新（第六 kwarg 注入）」但第六构造参数 Task 3 才交付——Task 1→3 窗口内每次 resolve 即 TypeError，契约维度 9b/AC-4.1 必红，Task 1 DoD 不可达（双审查员独立发现交叉确认） | P1 | lambda 更新移至 Task 3 循环 B 与第六参数同窗；Task 1 仅双端口注册；AC-4.1 转绿拆分注册面（Task 1）/接线面（Task 3）；测试分类表/AC-4 Then③/Subtask 1.7 同步 |
 | R1-F2 | 场景计数 off-by-one：AC 场景实际 12 个（3+3+3+2+1）+ 收尾 1 = 13 终态；原「Task 0 编写 13 + 收尾 = 14」计数错误——红/绿两道 DoD 门必不符 | P1 | 全文 9 处改「Task 0 编写 12 + 收尾 1 = 13 终态」（Gherkin 节/Task 0 DoD×2/Subtask 0.6/0.7/Task 6 DoD/分类表/文件清单/结构树） |
 | R1-F3 | `_build_llm_config_from_cloud_model` 的 timeout 映射引用失实：原文「timeout ← llm_timeout——L312-332 字段映射同款」，实际 L331 是 `timeout=self._config.timeout`（客户端基底）且 src 无生产调用方（死代码）——dev 照抄先例即错 | P1 | timeout 同款先例改引 `build_default_llm_config`（config/llm.py L13-41，timeout=float(udmr.llm_timeout)）；L312-332 降级为「六字段映射模板（timeout 除外）」并注死代码事实（继承表 + AC-2 Then 双处） |
-| R1-F4 | 「唯一 5-7 资产触碰点」声明失实：test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS`（L101-107）五依赖基线被验证器 C L305 断言消费（params L304），六参数后必红——遗漏登记的第二处触碰 | P2 | AC-3/端口契约节/DC-5⑤/风险表#4/Task 3 循环 B/文件清单/项目结构树七处补登记「5-7 资产同步 ×2」；继承表行号修正 L92-107→L101-107 |
+| R1-F4 | 「唯一 5-7 资产触碰点」声明失实：test_arch_phoenix_tracer.py `_USE_CASE_INIT_PARAMS`（L101-107）五依赖基线被验证器 C L304 断言消费（params L303），六参数后必红——遗漏登记的第二处触碰 | P2 | AC-3/端口契约节/DC-5⑤/风险表#4/Task 3 循环 B/文件清单/项目结构树七处补登记「5-7 资产同步 ×2」；继承表行号修正 L92-107→L101-107 |
 | R1-F5 | ComplianceGatewayImpl 零参装配下 PIPL 正则分支被 `if self._pipl_service:` 门死（L101-108）——「敏感词→forced_local」测试预期恒不可达（AC-2 合规注记 + 风险#3 按原文实施必假红） | P2 | 装配钉死 `ComplianceGatewayImpl(pipl_service=PIPLComplianceServiceImpl())`（零参可构造实证）+ 反向风险注记（cloud 场景中文文本规避正则命中）；AC-2 Given/And/风险#3/Task 3 循环 A/DC-7 五处同步 |
 | R1-F6 | 验收「匹配失败 450」场景唯一构造法 = monkeypatch decide——违反验收禁 mock 红线（DC-7 豁免面不含 domain service 方法 monkeypatch） | P2 | 验收场景钉死漂移配置双注入构造（policy=cloud_configs[B] × resolver=cloud_configs=[A]——decide 真实链发布事件后 resolver 匹配失败抛 450，零 mock 全真实组件）；monkeypatch 变体仅限单测文件 |
 | R1-F7 | 「决策日志替身捕获 task 上下文」是幻影锚：RoutingDecisionLog 与 RoutingDecided 均不含 task.input（字段面实测 udmr_service.py L179-193）——按原文写断言不可满足 | P2 | 单测改用手写 UDMRService 子类 wrapper（覆写 decide 记录 task 后 super() 委托真实链）；验收场景降级为 config.model/事件 selected_model 一致性断言 |
@@ -874,7 +874,10 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | R2-F4 | R1-F1 修复同步清单漏 Lessons Applied 尾部清单位：「lambda ConfigurationError 防护（Task 1 循环 C）」违反时序（该 lambda 归 Task 3 循环 B） | P2 | 改「Task 3 循环 B + 风险表 #9」 |
 | R2-F5 | R1-F10 动机表述与实现事实偏差：LLMConfig.from_env 现实现无校验且非法值静默回退默认（llm_client.py L46-96）实际不抛 101——「运行期 env 损坏」触发面不存在，包装是纯防御性契约 | P3 | ResolverPort Raises 补防御性契约注记（未来 from_env 加校验即活，测试经 monkeypatch 注入触发——动机语义仍正确） |
 | R2-F6 | R1-S1「三处 docstring 代理一致性」在 Task 0.1 唯一真源字段行未落锚：confidence_accuracy 是四字段中唯一无 OD 锚者 | P3 | L219 字段行补「OD-4 语义注记：proxy agreement 非真值校准」 |
-| R2-P3 打包 | 7 项：R1-S3 传播漏网×2（AC-1 Then① 证据摘要未含 artifacts_snapshot 四材料 + Task 0.1 Schema 字段序未体现 rationale 先行与量表锚定——主会话热修补齐）；L341 测试隔离 5-7 全家漏 test_arch；L67「零参装配形态」与「纯本地正则」并置误导（零参下 PIPL 恰不做正则计算）；RoutingDecisionLog 行号 L177-192→L179-193（两处）；_RecordingEventPublisher「6 文件」→ 全仓 12 文件（另 11）；「L304 断言」→ L305（params L304）四处 | P3 | 逐项清偿；另生产态观察项登记风险 #3（组合根 compliance_gateway 零参注册致生产 PIPL 分支休眠——既有形态非本 Story 修复面） |
+| R2-P3 打包 | 7 项：R1-S3 传播漏网×2（AC-1 Then① 证据摘要未含 artifacts_snapshot 四材料 + Task 0.1 Schema 字段序未体现 rationale 先行与量表锚定——主会话热修补齐）；L341 测试隔离 5-7 全家漏 test_arch；L67「零参装配形态」与「纯本地正则」并置误导（零参下 PIPL 恰不做正则计算）；RoutingDecisionLog 行号 L177-192→L179-193（两处）；_RecordingEventPublisher「6 文件」→ 全仓 12 文件（另 11）；「L304 断言」→ L305（params L304）四处[R4 勘误：本轮「L304→L305」修订系反向引入偏移——实地 assert 在 L304/params 在 L303，R1 原文本正确；R4 已回正五处（R5 计数勘误：原注「四处」，风险表 #4 行的 L305 亦在其中）] | P3 | 逐项清偿；另生产态观察项登记风险 #3（组合根 compliance_gateway 零参注册致生产 PIPL 分支休眠——既有形态非本 Story 修复面） |
+| R5-F1 | R1-F9「两表无需增行」修正的传播漏网：DC-6 论证③（L616）仍写「test_code_ranges 两表增行」——与异常契约节 L249「两表无需增行」直接矛盾（v1.0.0 原文两处同措辞，R1 只修真源节，R2 传播核查/R3 推演/R4 锚点核验均未捕获——终审取证发现） | P2 | L616 改「两表无需增行（见异常契约节 R1-F9 注记）」一行修正 |
+| R5-P3 打包 | 3 项：Lessons L735/L746「lambda（内）ConfigurationError 防护」旧措辞 ×2（同步 R3-F2 def 工厂函数）；完成清单 L779「风险九项」过时（#10 系 R1 新增——改十项）；R4 注记回正计数「四处」→「五处」 | P3 | 随 v1.3.1 收敛提交清偿（成本趋零应做） |
+| R5 终审判定 | 五节终审：周期闭合通过（四提交链干净 + R4 回正与源码逐字吻合）/12 项双向取证 10 过 2 带（R5-F1 + P3 残留）/15 外部锚点零失实/红线零违规/浮点声明独立复算证实（awk 实算 overall=0.64750000000000008≠0.6475 等四项全立）——**收敛 ✅（R5-F1 + P3×3 清偿后，即本 v1.3.1）** | — | 收敛声明已录入（Change Log v1.3.1 行）；ready-for-dev 维持 |
 | R3-F1 | 组合链浮点期望值形态未钉死：直调矩阵安全值对已注但组合链（h=0.2,cr=0.4,ca=0.75）实算 overall=0.6475000000000001——dev 写十进制字面量 0.6475 必假红；「同理」是引导非钦定形态 | P2 | AC-1.3/AC-3.1 两处钉死「expected 以同式 Python 表达式或 pytest.approx，禁十进制字面量」+ 钦定已验证精确三元组（h=0.2/cr=0.0/pred=0.85 → 三键 0.2/0.0/0.55 全二进制精确）；权重和 == 元断言实算确认全排列精确（正面确认非发现） |
 | R3-F2 | 风险#9「lambda 内 try/except ConfigurationError」Python 语法不可实现——lambda 表达式不能含 try/except，按字面实施即 SyntaxError（语义闭合链本身经推演成立：101 穿透 resolve_optional fallback_on 与两道 lambda 后被工厂函数捕获） | P2 | 措辞改「use case 注册工厂函数（def）内 try/except」+ 注册 impl 接受任意 callable 注记 + B.5 异常层级闭合推演结论随注（ConfigurationError 非 RuntimeError 子类/SINGLETON 失败不缓存） |
 | R3-F3 | AC-3 Given「resolver 链」替身 vs 真实 UDMR 链歧义：三键值唯一性两态均成立（h 来自 Fake 与路由无关），但真实链需 policy/resolver cloud_configs 对齐注入，错配即 450 降级假红 | P3 | AC-3 Given 钉死替身形态（固定基底 config）；真实 UDMR 链归 AC-2 与集成场景② |
@@ -922,10 +925,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | 2026-10-28 | v1.1.0 | Round 1 文档审查修订（D1 五 Agent 代码调研 + D2 三视角审查：一致性/可测试性/科学性业界对标）：P1×3（R1-F1 lambda 时序矛盾——Task 1→3 窗口 resolve 必炸，双审查员交叉确认；R1-F2 场景计数 off-by-one 13/14→12/13；R1-F3 timeout 映射先例引用失实——改引 build_default_llm_config）+ P2×8（5-7 资产触碰漏第二处 test_arch 基线/PIPL 装配门死/验收 mock 红线违反/task.input 幻影锚/env 前提未钉/异常两表误导增行/local 分支 101 击穿降级网/EventBus 名实）+ 科学性修订×7 组（OD-4 循环论证改写+代理一致性诚实注记/OD-3 证据完备度语义澄清/DC-2 prompt 三细则[artifacts 简编+rationale 先行+量表锚定]/风险#10 self-preference bias/DC-8 回归绊线注记/5.9 移交三须知/V1 失败率计数）+ P3×28 打包（行号微偏/计数勘误/判别力细则[基底值/浮点陷阱/fixture scope/聚合口径]）；Task 0.7 V1 登记扩充至 6 通道；deferred-work 处置注记三项保持 |
 | 2026-10-28 | v1.2.0 | Round 2 回归核查 + 增量面审查（双 Agent：R1 修复传播完备性源码级验证 + R1 增量文本正确性）：R1 修复传播基本完备（F6 漂移双注入/F7 wrapper/F10 双防线经源码推演全部成立）；P2×4（R2-F1 monkeypatch glob 写法守卫无效——R1-F8 修复自身引入的新缺陷；R2-F2 .env.example 举例失实——openai 缺 MAX_TOKENS 不抛 101；R2-F3/F4 Lessons 节两处 R1 修复漏改残留[唯一触碰点/Task 1 lambda]）；P3×7 打包（R1-S3 传播漏网×2 热修/行号勘误×3/计数勘误/5-7 全家补 test_arch）；生产态观察项登记风险#3（组合根 compliance_gateway 零参注册致生产 PIPL 分支休眠——既有形态知悉） |
 | 2026-10-28 | v1.3.0 | Round 3 单深度推演（12 场景三轴 + 6 时间线终态 + 5 不可满足性数学判定，全部实算验证）：**零 P1**——两大数学高危候选排除（权重和 == 元断言全排列二进制精确、ca 安全值对精确）；P2×2（R3-F1 组合链浮点期望值形态钉死——overall=0.6475000000000001 非字面量，钦定精确三元组 h=0.2/cr=0.0/pred=0.85；R3-F2「lambda 内 try/except」语法不可实现——改 def 工厂函数 + B.5 异常层级闭合推演随注）；P3×5+打包 5（AC-3 resolver 替身钉死/AST 锚 attr 形态/101 复现缺 MODEL 前提+delenv 前缀放宽/config.route 不可断言面/五 Schema 措辞勘误等）；正面确认留痕：12 场景三轴全过/6 时间线自洽/B.4 漂移三断言时序成立/单轮 structured 调用数=4+评估 1 |
+| 2026-10-28 | v1.3.1 | **五轮文档审查收敛**：R1 三视角审查（P1×3 + P2×8 + 科学性×7 组 + P3×28）→ R2 回归核查+增量面（P2×4 + P3×7）→ R3 深度推演（零 P1——全部实算验证；P2×2 + P3×5+打包5）→ R4 锚点核验（勘误 R2 反向引入的 L305 偏移，五处回正 L304/params L303——与 test_arch 源码逐字吻合）→ R5 独立终审（12 项双向取证 + 15 外部锚点零失实 + 红线零违规 + 浮点声明独立复算证实；新发现 R5-F1 DC-6③ 两表增行残留矛盾 P2 一行修正 + P3×3 顺手清偿）。最大价值修复：R1-F1 lambda 时序（Task 1→3 窗口 resolve 必 TypeError——双审查员交叉确认）、R3-F1 浮点期望值形态钉死（0.6475 字面量必假红）。遗留：零——全部清偿；ready-for-dev 维持 |
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-28
 **更新说明/Description:**
@@ -933,3 +937,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - v1.1.0: Round 1 文档审查修订（P1×3 + P2×8 + 科学性×7 组 + P3×28——详见 Docs Review Fixes 表）
 - v1.2.0: Round 2 回归核查 + 增量面审查（P2×4 + P3×7——R1 修复的修复）
 - v1.3.0: Round 3 单深度推演（零 P1；P2×2 + P3×5+打包——浮点期望值形态/lambda 语法/三轴推演正面确认留痕）
+- v1.3.1: Round 4 锚点核验 + Round 5 独立终审收敛（L305 反噬回正×5 + R5-F1 DC-6③ 矛盾修正 + P3×3 清偿——五轮周期收敛，零遗留）
