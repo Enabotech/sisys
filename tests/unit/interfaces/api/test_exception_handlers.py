@@ -22,6 +22,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from src.domain.exceptions import (
     AgentConfigError,
+    AgentEvaluationError,
     AgentNotFoundError,
     AgentProfileError,
     AgentRoleNotSupportedError,
@@ -348,6 +349,7 @@ class TestExceptionHttpMap:
             IsolationStateNotInitializedError,  # 447 — Story 5.4 隔离状态未初始化（404）
             IsolationAccessViolationError,  # 448 — Story 5.5 跨 Agent 私有资源访问越权（403）
             IsolationOperationForbiddenError,  # 449 — Story 5.5 隔离等级策略禁止操作（403）
+            AgentEvaluationError,  # 450 — Story 5.8 评估管线执行失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

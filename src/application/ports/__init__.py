@@ -5,6 +5,11 @@
 - 定义应用层特定方法
 """
 
+from src.application.ports.agent_evaluation import (
+    AgentEvaluationPort,
+    EvaluationModelResolverPort,
+    EvaluationResult,
+)
 from src.application.ports.agent_tracing import (
     AgentTracingPort,
     SpanAttributeKeys,
@@ -26,10 +31,13 @@ from src.application.ports.session_cache_port import SessionCachePort
 from src.application.ports.text_extractor_service import TextExtractorService
 
 __all__ = [
+    "AgentEvaluationPort",
     "AgentTracingPort",
     "CompressorService",
     "DocumentStoragePort",
     "EventSubscriber",
+    "EvaluationModelResolverPort",
+    "EvaluationResult",
     "ExceptionMetricsPort",
     "MemoryFilePort",
     "MemoryGraphPort",

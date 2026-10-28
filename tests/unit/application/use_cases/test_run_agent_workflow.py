@@ -434,3 +434,217 @@ class TestExecuteRootSpanAttributes:
         assert result.retry_count == 0
         assert result.executed_phases == ("perceive", "plan", "execute", "verify", "package")
         assert result.evidence.input_hash == "a" * 64
+
+
+# ===================================================================
+# Story 5.8 — 评估块三面（eval.* 三键写入 + 降级 + None 默认兼容）
+# ===================================================================
+
+
+class TestExecuteEvaluationBlock:
+    """Story 5.8 — execute 末尾评估块：eval.* 三键写根 span + 降级不阻断 + None 兼容。
+
+    测试通道（5-7 SSOT 继承）：function-scope autouse「双复位 → 注入 provider 经
+    initialize 全局 set → teardown 双复位」——镜像 TestExecuteRootSpanAttributes 形态
+    （scope="module" 的 initialize 会被 5-7 类级 teardown 双复位中途清掉——R1 钉死
+    function-scope）。Fake evaluation_harness 是 AsyncMock(spec=AgentEvaluationPort)
+    ——评估端口替身（单元测试 Mock 面，真实链归 AC-3 验收/集成）。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _tracing_global_channel(self) -> Any:
+        """装饰器链路测试通道（注入 provider 经 initialize——5-7 同款）。"""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from src.infrastructure.config.phoenix import PhoenixConfig
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = PhoenixTracer(
+            config=PhoenixConfig(enabled=True, project_name="sisys-agent", sampling_ratio=1.0),
+            tracer_provider=provider,
+        )
+        assert tracer.initialize() is True
+        self._exporter = exporter
+        yield exporter
+        PhoenixTracer.reset_for_testing()
+
+    def _assemble_with_evaluation(self, evaluation_harness: Any = None) -> tuple[Any, dict[str, Any]]:
+        """装配链（5-7 _assemble_with_real_profile 同款 + 第六依赖注入）。"""
+        from types import SimpleNamespace
+
+        mocks = _make_mocks()
+        agent = mocks["repository"].get_by_id.return_value
+        profile_result = SimpleNamespace(
+            agent_id=agent.agent_id,
+            role=AgentRole.CEO,
+            profile=Mock(),
+            tools_l1=(Mock(), Mock(), Mock()),
+            startup_context_tokens=4321,
+        )
+        mocks["profile_use_case"].execute.return_value = profile_result
+        _wire_engine_success(mocks)
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        use_case = RunAgentWorkflowUseCase(
+            agent_repository=mocks["repository"],
+            agent_profile_use_case=mocks["profile_use_case"],
+            agent_engine=mocks["agent_engine"],
+            agent_workflow_service=mocks["workflow_service"],
+            isolation_guard=mocks["isolation_guard"],
+            evaluation_harness=evaluation_harness,
+        )
+        return use_case, {"agent": agent, "profile_result": profile_result, "mocks": mocks}
+
+    @staticmethod
+    def _make_eval_result() -> Any:
+        """固定评估结果（Fake evaluate side_effect 返回值——三键真值数据源）。"""
+        from src.application.ports.agent_evaluation import EvaluationResult
+
+        return EvaluationResult(
+            hallucination_score=0.2,
+            context_relevance=0.0,
+            confidence_accuracy=0.55,
+            overall_score=(1.0 - 0.2) * 0.4 + 0.0 * 0.35 + 0.55 * 0.25,
+        )
+
+    @staticmethod
+    def _make_fake_harness(return_value: Any = None, raises: Any = None) -> Any:
+        """Fake 评估端口替身（AsyncMock spec——evaluate 返回固定结果或抛注入异常）。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.agent_evaluation import AgentEvaluationPort
+
+        fake = AsyncMock(spec=AgentEvaluationPort)
+        if raises is not None:
+            fake.evaluate.side_effect = raises
+        else:
+            fake.evaluate.return_value = return_value
+        return fake
+
+    async def test_execute_writes_eval_keys_to_root_span(self) -> None:
+        """注入评估链 → execute → 三键写入根 span（值 == EvaluationResult 字段）+ overall 不写。"""
+        from src.application.ports.agent_tracing import SpanAttributeKeys
+
+        eval_result = self._make_eval_result()
+        fake_harness = self._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_evaluation(fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        # 工作流返回值与评估块零耦合（result 原样返回）
+        assert result.workflow_status == "completed"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert attributes[SpanAttributeKeys.EVAL_HALLUCINATION_SCORE] == eval_result.hallucination_score == 0.2
+        assert attributes[SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE] == eval_result.context_relevance == 0.0
+        assert attributes[SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY] == eval_result.confidence_accuracy == 0.55
+        # overall 不写 span（三键可派生——YAGNI 契约）
+        assert not [k for k in attributes if "overall" in k.lower()]
+        fake_harness.evaluate.assert_awaited_once()
+
+    async def test_evaluation_failure_degrades_gracefully(self, caplog: pytest.LogCaptureFixture) -> None:
+        """evaluate 抛 450 → 主链正常返回 + 三键缺席 + warning + 十属性仍在。"""
+        import logging
+
+        from src.application.ports.agent_tracing import SpanAttributeKeys
+        from src.domain.exceptions import AgentEvaluationError
+
+        caplog.set_level(logging.WARNING, logger="src.application.use_cases.run_agent_workflow")
+        fake_harness = self._make_fake_harness(raises=AgentEvaluationError(reason="llm_call"))
+        use_case, materials = self._assemble_with_evaluation(fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "评估失败应降级不阻断主链"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        for key in (
+            SpanAttributeKeys.EVAL_HALLUCINATION_SCORE,
+            SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE,
+            SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY,
+        ):
+            assert key not in attributes, f"降级路径三键应缺席: {key}"
+        for key in (
+            SpanAttributeKeys.AGENT_ID,
+            SpanAttributeKeys.AGENT_ROLE,
+            SpanAttributeKeys.AGENT_NAME,
+            SpanAttributeKeys.AGENT_STARTUP_CONTEXT_TOKENS,
+            SpanAttributeKeys.AGENT_ACTIVE_SKILL_COUNT,
+            SpanAttributeKeys.WORKFLOW_STATUS,
+            SpanAttributeKeys.WORKFLOW_RETRY_COUNT,
+            SpanAttributeKeys.WORKFLOW_EXECUTED_PHASES,
+            SpanAttributeKeys.EVAL_CONFIDENCE,
+            SpanAttributeKeys.EVIDENCE_INPUT_HASH,
+        ):
+            assert key in attributes, f"降级不应伤 MVP 属性: {key}"
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "评估降级" in r.getMessage()]
+        assert warnings, "应记录评估降级 warning 日志"
+
+    async def test_none_harness_keeps_5_7_baseline(self) -> None:
+        """None 默认（五参构造兼容）→ 评估块整体跳过——行为与 5-7 基线一致。"""
+        from src.application.ports.agent_tracing import SpanAttributeKeys
+
+        use_case, materials = self._assemble_with_evaluation(None)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed"
+        assert result.evidence.confidence == 0.85
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        for key in (
+            SpanAttributeKeys.EVAL_HALLUCINATION_SCORE,
+            SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE,
+            SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY,
+        ):
+            assert key not in attributes, f"None 路径三键应缺席: {key}"
+        assert SpanAttributeKeys.AGENT_ID in attributes
+        assert SpanAttributeKeys.WORKFLOW_STATUS in attributes
+
+    async def test_constructor_sixth_param_default_none(self) -> None:
+        """构造签名：六依赖清单 + 第六参数默认 None（存量五参调用零破坏）。"""
+        import inspect
+
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        params = list(inspect.signature(RunAgentWorkflowUseCase.__init__).parameters)[1:]
+        assert params == [
+            "agent_repository",
+            "agent_profile_use_case",
+            "agent_engine",
+            "agent_workflow_service",
+            "isolation_guard",
+            "evaluation_harness",
+        ]
+        default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["evaluation_harness"].default
+        assert default is None
+
+    async def test_five_arg_construction_still_works(self) -> None:
+        """存量五参构造零破坏（向后兼容——不传第六参数）。"""
+        mocks = _make_mocks()
+        _wire_engine_success(mocks)
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        use_case = RunAgentWorkflowUseCase(
+            agent_repository=mocks["repository"],
+            agent_profile_use_case=mocks["profile_use_case"],
+            agent_engine=mocks["agent_engine"],
+            agent_workflow_service=mocks["workflow_service"],
+            isolation_guard=mocks["isolation_guard"],
+        )
+        assert getattr(use_case, "_evaluation_harness", "missing") is None

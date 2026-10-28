@@ -2642,6 +2642,24 @@ buckets/
 > 贯通。未引入 arize-phoenix 运行时依赖（实现口径见 sisys-core-domain-design §17.3.8
 > 实现注记）；评估指标面（eval.* 生产填值）归 Story 5.8、CUSUM 漂移检测归 5.9。
 
+> **Story 5.8 交付注记（FR-EV-02 评估面）**：Agent 输出质量评估已落地——
+> `EvaluationHarness.evaluate(AgentWorkflowResult) → EvaluationResult`
+> （幻觉检测 LLM 结构化调用 + 证据支撑度启发式 + 置信度校准公式 + overall
+> 反转加权；`src/application/services/evaluation_harness.py`）+
+> `AgentEvaluationPort`/`EvaluationModelResolverPort` 双端口（评估契约与模型
+> 解析解耦——`src/application/ports/agent_evaluation.py`）+
+> `UdmrEvaluationModelResolver`（评估模型 UDMR in-band 动态路由——仓内首个
+> per-call 路由消费方，区别于执行模型 bootstrap SSOT 静态接线；
+> `src/infrastructure/routing/udmr_evaluation_model_resolver.py`）。评估结果经
+> use case 第六可选依赖在 execute 末尾写入 agent_execution 根 span 的
+> `eval.hallucination_score`/`eval.context_relevance`/`eval.confidence_accuracy`
+> 三键（5.7 OD-2 兑现）；评估失败降级 warning 不阻断工作流主链（可观测附加面
+> 哲学）。幻觉检测以自有扁平 pydantic Schema + structured_generate 同构达成
+> （OD-1[5.7] 触发条件裁定不满足——零新依赖零架构白名单变更）；算法裁定
+> （OD-3 证据支撑度存在性启发式/OD-4 actual 口径/OD-5 幻觉分字面语义）见
+> sisys-core-domain-design §17.3.8 实现注记；评估管线 P95<500ms（Fake LLM
+> 口径）。CUSUM 漂移检测归 5.9（消费 overall_score 连续序列）。
+
 ---
 
 ## 15. 风险缓解措施

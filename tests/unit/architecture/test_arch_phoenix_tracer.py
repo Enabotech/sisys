@@ -104,6 +104,7 @@ _USE_CASE_INIT_PARAMS = [
     "agent_engine",
     "agent_workflow_service",
     "isolation_guard",
+    "evaluation_harness",  # Story 5.8 第六可选依赖（None 默认——资产同步②）
 ]
 
 #: 六阶段方法名（验证器 C——package_evidence 方法名 + span 名末段 package 的

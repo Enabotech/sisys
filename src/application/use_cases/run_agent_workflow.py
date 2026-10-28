@@ -38,13 +38,14 @@ from uuid import UUID
 
 from opentelemetry.trace import get_current_span
 
+from src.application.ports.agent_evaluation import AgentEvaluationPort
 from src.application.ports.agent_tracing import SpanAttributeKeys, SpanNames
 from src.application.ports.agent_workflow import AgentWorkflowResult, AgentWorkflowServicePort
 from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.tracing import trace
 from src.application.use_cases.agent_instantiation import SUPPORTED_ROLES
 from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
-from src.domain.exceptions import AgentNotFoundError, AgentRoleNotSupportedError
+from src.domain.exceptions import AgentEvaluationError, AgentNotFoundError, AgentRoleNotSupportedError
 from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.agent_repository import AgentRepository
 from src.domain.value_objects.flow_status import FlowStatus
@@ -70,8 +71,9 @@ class RunAgentWorkflowUseCase:
         agent_engine: AgentEnginePort,
         agent_workflow_service: AgentWorkflowServicePort,
         isolation_guard: IsolationGuardPort,
+        evaluation_harness: AgentEvaluationPort | None = None,
     ) -> None:
-        """初始化执行用例（五依赖注入——编排模板对齐 5-2 六步形态）
+        """初始化执行用例（六依赖注入——编排模板对齐 5-2 六步形态）
 
         Args:
             agent_repository: Agent 仓储端口（存在性守卫）
@@ -80,12 +82,16 @@ class RunAgentWorkflowUseCase:
             agent_workflow_service: 六阶段工作流服务端口（上下文装配）
             isolation_guard: 三重隔离守卫端口（Story 5.5——入口 fail-closed 检查，
                 必填无默认：RunAgentWorkflowUseCase 构造缺守卫即 TypeError）
+            evaluation_harness: 评估端口（Story 5.8——可选依赖 None 默认：评估是
+                可观测附加面，未注入时评估块整体跳过，存量五参构造零破坏——
+                DC-5 六依赖向后兼容形态）
         """
         self._repository = agent_repository
         self._profile_use_case = agent_profile_use_case
         self._agent_engine = agent_engine
         self._workflow_service = agent_workflow_service
         self._isolation_guard = isolation_guard
+        self._evaluation_harness = evaluation_harness
 
     @trace(SpanNames.AGENT_EXECUTION)
     async def execute(self, agent_id: UUID, task: str) -> AgentWorkflowResult:
@@ -183,6 +189,18 @@ class RunAgentWorkflowUseCase:
             span.set_attribute(SpanAttributeKeys.WORKFLOW_EXECUTED_PHASES, result.executed_phases)
             span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE, result.evidence.confidence)
             span.set_attribute(SpanAttributeKeys.EVIDENCE_INPUT_HASH, result.evidence.input_hash)
+        # Story 5.8 评估块（OD-2[5.7] 兑现——eval.* 三键生产填值；可观测附加面哲学：
+        # 评估失败降级 warning 跳过不阻断主链，三键缺席不写哨兵值——0.0 可能是
+        # 合法幻觉分；overall 不写 span——三键经权重常量可派生，5.7 键表零改动）
+        if self._evaluation_harness is not None:
+            try:
+                evaluation_result = await self._evaluation_harness.evaluate(result)
+                if span.is_recording():
+                    span.set_attribute(SpanAttributeKeys.EVAL_HALLUCINATION_SCORE, evaluation_result.hallucination_score)
+                    span.set_attribute(SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE, evaluation_result.context_relevance)
+                    span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY, evaluation_result.confidence_accuracy)
+            except AgentEvaluationError as error:
+                logger.warning("评估降级跳过（可观测附加面——评估失败不阻断工作流）: %s", error)
         return result
 
 

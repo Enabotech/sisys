@@ -216,6 +216,7 @@ def _make_fake_llm(
         ReflectionSchema,
         VerificationSchema,
     )
+    from src.application.services.evaluation_schemas import HallucinationEvaluationSchema
     from src.domain.ports.llm_client import LLMClientPort, LLMResponse
 
     verify_calls = {"count": 0}
@@ -225,6 +226,13 @@ def _make_fake_llm(
     ) -> Any:
         if delay_sec:
             await asyncio.sleep(delay_sec)
+        if response_schema is HallucinationEvaluationSchema:
+            # Story 5.8 评估分支（CLI 全链经组合根注入评估链——第五次 structured
+            # 调用；分派表扩展保持 Schema 身份互斥前提）
+            return HallucinationEvaluationSchema(
+                rationale="回答与证据材料一致，无幻觉内容",
+                hallucination_score=0.2,
+            )
         if response_schema is PerceptionSchema:
             return PerceptionSchema(summary=f"任务摘要：{prompt[:60]}")
         if response_schema is PlanSchema:

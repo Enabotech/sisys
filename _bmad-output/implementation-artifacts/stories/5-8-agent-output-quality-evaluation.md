@@ -1,6 +1,6 @@
 # Story 5.8: Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -373,17 +373,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 
 **关联 AC:** 全部
 
-- [ ] Subtask 0.1: 定义数据模型规范——EvaluationResult（frozen 四字段 + 201 分数域守卫）+ HallucinationEvaluationSchema（扁平两字段 ge/le）+ EVALUATION_WEIGHTS 七常量 + 评估调用常量（本文件「数据模型」节为唯一真源）
-- [ ] Subtask 0.2: 定义端口契约——AgentEvaluationPort（evaluate）+ EvaluationModelResolverPort（resolve_config）+ 组合根注册元数据 ×2 + 契约变更登记 ×1（use case 第六依赖——含 5-7 AC-4.3 断言基线更新）+ 端口命名甄别（vs RelevanceEvaluationPort 检索域）
-- [ ] Subtask 0.3: 定义异常契约——evaluation 子域 450-459 新开 + AgentEvaluationError(450, SystemException) 编码注册四件套 + LLM 族透传/包装纪律 + 复用清单（201）
-- [ ] Subtask 0.4: 定义 UDMR in-band 消费链规范——UdmrEvaluationModelResolver（UDMRTask → decide() → selected_model 匹配 → per-call LLMConfig；cloud/local/匹配失败三分支）+ 与 SSOT 静态接线的区别锚
-- [ ] Subtask 0.5: 定义性能测量口径——Fake LLM 评估管线 P95（warmup 1 + 20 采样 + 常量单源 + 正向锚 + 口径声明）
-- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_evaluation.feature`（12 场景）+ BDD 步骤实现 `.py`（@scenario 全显式绑定 + context dict fixture + 链级 initialize 全局通道 fixture + Fake LLM 手工装配链 fixture[HallucinationEvaluationSchema 分派分支] + UDMR 真实决策链手工装配 fixture + 文件级 autouse 双复位兜底）+ **12 场景三属性分档表**定稿（docstring）
-- [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——红形态钉死：12 场景逐一 failed 非 collection error）+ **deferred-work.md 处置注记**（OD-1[5.7] 触发条件裁定不满足 + OD-2[5.7] eval.* 兑现注记 + R1-DF3 锚位顺延[5.8 消费面走 get_current_span 不触发]）+ **本 Story V1 升级通道登记 ×6**[R1 科学性审查扩充——gap 四要素齐备：①OD-3 语义相关性通道（LLM-as-a-Judge/embedding 余弦）②幻觉检测两步法（claim 分解→逐条 verdict→聚合——OD-2 效度升级）③真值校准通道（人类反馈/标签 → 窗口级 ECE/Brier——OD-4 代理构造升级，5.10 需随快照持久化 predicted）④judge 漂移控制（golden set 周期复评）⑤评估模型池 + 排除被评模型 + 采样评估策略（风险 #10 缓解——5.9+ 高频场景）⑥真实评估调用延迟遥测（eval LLM call P95 监控面——DC-8④）] + 本 Story OD-1~OD-5 知悉登记（OD-3/OD-4/OD-5 设计裁定不进台账[非 gap——伪码空白/缺陷的必要裁定]，OD-1/OD-2 命名/依赖裁定不进台账[5-7 OD-3 同款]）
-- [ ] Subtask 0.8: 移交留项处置落盘（前置依赖表四项逐一登记处置结果：OD-1[5.7] 裁定不触发 / OD-2[5.7] 本 Story 兑现 / R1-DF3 不触发顺延 / trace_id 防呆复核零风险知悉）
+- [x] Subtask 0.1: 定义数据模型规范——EvaluationResult（frozen 四字段 + 201 分数域守卫）+ HallucinationEvaluationSchema（扁平两字段 ge/le）+ EVALUATION_WEIGHTS 七常量 + 评估调用常量（本文件「数据模型」节为唯一真源）
+- [x] Subtask 0.2: 定义端口契约——AgentEvaluationPort（evaluate）+ EvaluationModelResolverPort（resolve_config）+ 组合根注册元数据 ×2 + 契约变更登记 ×1（use case 第六依赖——含 5-7 AC-4.3 断言基线更新）+ 端口命名甄别（vs RelevanceEvaluationPort 检索域）
+- [x] Subtask 0.3: 定义异常契约——evaluation 子域 450-459 新开 + AgentEvaluationError(450, SystemException) 编码注册四件套 + LLM 族透传/包装纪律 + 复用清单（201）
+- [x] Subtask 0.4: 定义 UDMR in-band 消费链规范——UdmrEvaluationModelResolver（UDMRTask → decide() → selected_model 匹配 → per-call LLMConfig；cloud/local/匹配失败三分支）+ 与 SSOT 静态接线的区别锚
+- [x] Subtask 0.5: 定义性能测量口径——Fake LLM 评估管线 P95（warmup 1 + 20 采样 + 常量单源 + 正向锚 + 口径声明）
+- [x] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_evaluation.feature`（12 场景）+ BDD 步骤实现 `.py`（@scenario 全显式绑定 + context dict fixture + 链级 initialize 全局通道 fixture + Fake LLM 手工装配链 fixture[HallucinationEvaluationSchema 分派分支] + UDMR 真实决策链手工装配 fixture + 文件级 autouse 双复位兜底）+ **12 场景三属性分档表**定稿（docstring）
+- [x] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——红形态钉死：12 场景逐一 failed 非 collection error）+ **deferred-work.md 处置注记**（OD-1[5.7] 触发条件裁定不满足 + OD-2[5.7] eval.* 兑现注记 + R1-DF3 锚位顺延[5.8 消费面走 get_current_span 不触发]）+ **本 Story V1 升级通道登记 ×6**[R1 科学性审查扩充——gap 四要素齐备：①OD-3 语义相关性通道（LLM-as-a-Judge/embedding 余弦）②幻觉检测两步法（claim 分解→逐条 verdict→聚合——OD-2 效度升级）③真值校准通道（人类反馈/标签 → 窗口级 ECE/Brier——OD-4 代理构造升级，5.10 需随快照持久化 predicted）④judge 漂移控制（golden set 周期复评）⑤评估模型池 + 排除被评模型 + 采样评估策略（风险 #10 缓解——5.9+ 高频场景）⑥真实评估调用延迟遥测（eval LLM call P95 监控面——DC-8④）] + 本 Story OD-1~OD-5 知悉登记（OD-3/OD-4/OD-5 设计裁定不进台账[非 gap——伪码空白/缺陷的必要裁定]，OD-1/OD-2 命名/依赖裁定不进台账[5-7 OD-3 同款]）
+- [x] Subtask 0.8: 移交留项处置落盘（前置依赖表四项逐一登记处置结果：OD-1[5.7] 裁定不触发 / OD-2[5.7] 本 Story 兑现 / R1-DF3 不触发顺延 / trace_id 防呆复核零风险知悉）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义；验收测试红阶段确认（12 场景逐一 failed）；链路接线断言清单 L1-L5 定义
+- [x] 规范项全部定义；验收测试红阶段确认（12 场景逐一 failed）；链路接线断言清单 L1-L5 定义
 
 ---
 
@@ -418,17 +418,18 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 | 🟡 变异 | lambda 漏 llm_client 注入→维度 9b 红；注册名拼写错→维度 1 红；还原→绿 |
 | 🔄 重构 | 注册区段设计注释（SINGLETON 依据 + lambda 依赖清单 + 原始值注入纪律）+ ruff+mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — AgentEvaluationError 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — evaluation_exceptions + 注册四件套
-- [ ] Subtask 1.3: 🟡 变异 — code/子域注册突变实证
-- [ ] Subtask 1.4: 🔴 红 — EvaluationResult + 双端口失败测试
-- [ ] Subtask 1.5: 🟢 绿 — agent_evaluation.py 端口族实现
-- [ ] Subtask 1.6: 🟡 变异 — 201 守卫/权重突变实证
-- [ ] Subtask 1.7: 🔴🔴🟢 — 契约测试 ×2 + 组合根双注册（use case lambda 更新归 Task 3 循环 B——时序约束 R1-F1：第六参数不存在时注入 kwarg 必 TypeError）
-- [ ] Subtask 1.8: 🔄 重构 — 导出/docstring/编码分配表/门禁
+- [x] Subtask 1.1: 🔴 红 — AgentEvaluationError 失败测试
+- [x] Subtask 1.2: 🟢 绿 — evaluation_exceptions + 注册四件套
+- [x] Subtask 1.3: 🟡 变异 — code/子域注册突变实证
+- [x] Subtask 1.4: 🔴 红 — EvaluationResult + 双端口失败测试
+- [x] Subtask 1.5: 🟢 绿 — agent_evaluation.py 端口族实现
+- [x] Subtask 1.6: 🟡 变异 — 201 守卫/权重突变实证
+- [x] Subtask 1.7: 🔴🔴🟢 — 契约测试 ×2 + 组合根双注册（use case lambda 更新归 Task 3 循环 B——时序约束 R1-F1：第六参数不存在时注入 kwarg 必 TypeError）
+- [x] Subtask 1.8: 🔄 重构 — 导出/docstring/编码分配表/门禁
 
 **完成标准/Definition of Done:**
-- [ ] 异常/端口/注册三件交付；契约 11 维度 ×2 绿；异常体系 CI 测试全绿；验收 AC-1.1 转绿 + AC-4.1 注册面（双注册 + 契约维度）转绿——AC-4.1 接线面（use case lambda 注入断言）随 Task 3 循环 B 转绿
+- [x] 异常/端口/注册三件交付；契约 11 维度 ×2 绿；异常体系 CI 测试全绿；验收 AC-1.1 转绿 + AC-4.1 注册面（双注册 + 契约维度）转绿——AC-4.1 接线面（use case lambda 注入断言）随 Task 3 循环 B 转绿
+  - **实施注记（2026-10-28）**：契约维度 1-9a（注册面 18 用例）Task 1 绿；维度 9b/10/11（impl 产出端口实例——6 用例）依赖 EvaluationHarness（Task 2）/UdmrEvaluationModelResolver（Task 3）类交付渐进转绿（lambda 经 `__import__` 延迟导入，类未创建即 ModuleNotFoundError——设计内时序，Task 3 收口全绿）
 
 ---
 
@@ -463,19 +464,20 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 | 🟡 变异 | evaluate 字段装配错位[confidence_accuracy 与 context_relevance 互换]→四字段断言红；还原→绿 |
 | 🔄 重构 | EvaluationHarness 类 docstring（评估管线五步流程图）+ ruff+mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — Schema/prompt/幻觉检测失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 幻觉检测调用面最小实现
-- [ ] Subtask 2.3: 🟡 变异 — 温度/守卫/包装突变实证
-- [ ] Subtask 2.4: 🔴 红 — 双本地计算 + overall 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 计算方法实现
-- [ ] Subtask 2.6: 🟡 变异 — 权重/公式突变实证
-- [ ] Subtask 2.7: 🔴 红 — evaluate 编排失败测试
-- [ ] Subtask 2.8: 🟢 绿 — evaluate 编排实现
-- [ ] Subtask 2.9: 🟡 变异 — 装配错位突变实证
-- [ ] Subtask 2.10: 🔄 重构 — docstring/门禁
+- [x] Subtask 2.1: 🔴 红 — Schema/prompt/幻觉检测失败测试
+- [x] Subtask 2.2: 🟢 绿 — 幻觉检测调用面最小实现
+- [x] Subtask 2.3: 🟡 变异 — 温度/守卫/包装突变实证
+- [x] Subtask 2.4: 🔴 红 — 双本地计算 + overall 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 计算方法实现
+- [x] Subtask 2.6: 🟡 变异 — 权重/公式突变实证
+- [x] Subtask 2.7: 🔴 红 — evaluate 编排失败测试
+- [x] Subtask 2.8: 🟢 绿 — evaluate 编排实现
+- [x] Subtask 2.9: 🟡 变异 — 装配错位突变实证
+- [x] Subtask 2.10: 🔄 重构 — docstring/门禁
 
 **完成标准/Definition of Done:**
-- [ ] EvaluationHarness 三循环全绿；验收 AC-1.2 + AC-1.3 转绿；应用层覆盖率 ≥85% 达标面
+- [x] EvaluationHarness 三循环全绿；验收 AC-1.2 + AC-1.3 转绿；应用层覆盖率 ≥85% 达标面
+  - **实施注记（2026-10-28）**：实现粒度选择——循环 A 绿阶段一次交付 evaluate 全链编排与双计算方法（模块单文件完整性），循环 B/C 用例追加后首跑即绿（活性由六项变异实证承载：温度 0.7 突变/守卫禁用/包装改透传/citation 权重漂移/overall 反转删除/装配字段错位——全部红→还原→绿）；契约 agent_evaluation 维度 9b/10/11 随本 Task 转绿（12/12）；变异 3 还原时曾因 sed 行号偏移引入语法损坏，即时发现并修复（Edit 精确还原 + 35 用例复绿验证）
 
 ---
 
@@ -507,17 +509,18 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 |------|------|
 | 🔴→🟢 | 回归绿清单执行：**5-3 全家**（test_agent_workflow_service 存量 + 契约×3[service/use_case/engine] + test_single_agent_workflow_graph + test_langgraph_engine + 集成 + 验收）+ **5-7 全家**（test_phoenix_config/test_phoenix_tracer/test_tracing_decorator + 契约 + test_arch_phoenix_tracer + 集成八场景 + 验收 15 场景[AC-4.3 基线更新后]）——第六可选依赖 None 默认 + 评估块 None 守卫使存量零破坏预期全绿；**异常项逐一登记**（实施时以实际清单为准甄别修复） |
 
-- [ ] Subtask 3.1: 🔴 红 — resolver 六用例失败测试
-- [ ] Subtask 3.2: 🟢 绿 — UdmrEvaluationModelResolver 实现
-- [ ] Subtask 3.3: 🟡 变异 — 匹配/回退/失败分支突变实证
-- [ ] Subtask 3.4: 🔴 红 — 主链评估块失败测试（三面：注入/降级/None）
-- [ ] Subtask 3.5: 🟢 绿 — 第六依赖 + 评估块 + 5-7 断言更新
-- [ ] Subtask 3.6: 🟡 变异 — 三键/降级/守卫突变实证
-- [ ] Subtask 3.7: 🟢 — 5-3/5-7 存量全家回归绿（清单登记）
-- [ ] Subtask 3.8: 🔄 重构 — docstring/门禁
+- [x] Subtask 3.1: 🔴 红 — resolver 六用例失败测试
+- [x] Subtask 3.2: 🟢 绿 — UdmrEvaluationModelResolver 实现
+- [x] Subtask 3.3: 🟡 变异 — 匹配/回退/失败分支突变实证
+- [x] Subtask 3.4: 🔴 红 — 主链评估块失败测试（三面：注入/降级/None）
+- [x] Subtask 3.5: 🟢 绿 — 第六依赖 + 评估块 + 5-7 断言更新
+- [x] Subtask 3.6: 🟡 变异 — 三键/降级/守卫突变实证
+- [x] Subtask 3.7: 🟢 — 5-3/5-7 存量全家回归绿（清单登记）
+- [x] Subtask 3.8: 🔄 重构 — docstring/门禁
 
 **完成标准/Definition of Done:**
-- [ ] resolver + 主链评估块交付；验收 AC-2 ×3 + AC-3 ×3 + AC-4.1 转绿；5-3/5-7 全家零回归；组合根 use case lambda 接线完整生效
+- [x] resolver + 主链评估块交付；验收 AC-2 ×3 + AC-3 ×3 + AC-4.1 转绿；5-3/5-7 全家零回归；组合根 use case lambda 接线完整生效
+  - **实施注记（2026-10-28）**：回归清单——5-3 全家（单测/契约/图/引擎 132 绿 + 集成/验收 22+18 绿）+ 5-7 全家（单测×3/契约/架构 90 绿 + 集成/验收 23 绿）+ 全仓 mypy 707 文件零告警 + ruff 全仓通过。**第三处存量触碰（实施发现，原故事未预见）**：test_acceptance_agent_workflow.py（5-3 资产）Fake LLM 分派表追加 HallucinationEvaluationSchema 分支——AC-6.3 CLI 全链经组合根 resolve_optional 注入评估链后真实触发第五次 structured 调用，5-3 Fake 分派表无幻觉分支抛 AssertionError（非 AgentEvaluationError 不入降级网）击穿 CLI exit 0 断言；修复 = 分派表扩展（与 5-7/5-8 Fake 同款形态，Schema 身份互斥前提保持）——适配器契约变更回归面（改共享装配后全量 grep 消费方测试）实例
 
 ---
 
@@ -527,12 +530,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 
 > 性质说明：本 Task 对 Task 1-3 已交付链编写验证型测试（套件型豁免——红由 Task 0 前置，活性由变异保证）。
 
-- [ ] Subtask 4.1: 编写 `tests/integration/test_integration_agent_evaluation.py`（Fake LLM 手工装配六阶段链 + 真实 EvaluationHarness + 真实 UDMR 决策链[零 IO 替身] + **链级 initialize 全局通道**[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]）：场景① 全链评估（execute → span 三键真值断言[幻觉分 == Fake 注入 + context_relevance == 手算 + confidence_accuracy == 手算] + overall 可派生性断言[三键经 EVALUATION_WEIGHTS 重构 == overall]）② UDMR in-band 全链（resolver 真实链 → 幻觉检测 config.model == 路由产物——经 Fake LLM call_args 捕获 config 断言）③ 降级链（幻觉检测分支抛 LLMAPIError → 主链正常 + 三键缺席 + warning + AgentDecided 照常发布[AgentDecided = 工作流既有事件 agent_events.py——非本 Story 新建]）④ None 路径对比（五参构造 execute → 与 5-7 基线 span 树等价[十属性 + 零 eval.* 键]）⑤ P95<500ms（`_PERF_CACHE` + warmup 1 + 20 采样 + Fake LLM 即时返回 + 正向锚[Fake structured_generate 调用计数 == 21] + `EVALUATION_P95_LIMIT_SECONDS = 0.5` 常量单源 + benchmark 场景级标记）
-- [ ] Subtask 4.2: 变异实证——权重常量改错→场景①手算断言红；三键写入删除→场景①红；P95 常量突变（0.5→0.000001）→场景⑤红；匹配循环破坏→场景②红；还原→绿
-- [ ] Subtask 4.3: 验收 AC-5.1 场景转绿（委托计时缓存命中验证）+ AC-3/AC-2 集成对应场景转绿
+- [x] Subtask 4.1: 编写 `tests/integration/test_integration_agent_evaluation.py`（Fake LLM 手工装配六阶段链 + 真实 EvaluationHarness + 真实 UDMR 决策链[零 IO 替身] + **链级 initialize 全局通道**[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]）：场景① 全链评估（execute → span 三键真值断言[幻觉分 == Fake 注入 + context_relevance == 手算 + confidence_accuracy == 手算] + overall 可派生性断言[三键经 EVALUATION_WEIGHTS 重构 == overall]）② UDMR in-band 全链（resolver 真实链 → 幻觉检测 config.model == 路由产物——经 Fake LLM call_args 捕获 config 断言）③ 降级链（幻觉检测分支抛 LLMAPIError → 主链正常 + 三键缺席 + warning + AgentDecided 照常发布[AgentDecided = 工作流既有事件 agent_events.py——非本 Story 新建]）④ None 路径对比（五参构造 execute → 与 5-7 基线 span 树等价[十属性 + 零 eval.* 键]）⑤ P95<500ms（`_PERF_CACHE` + warmup 1 + 20 采样 + Fake LLM 即时返回 + 正向锚[Fake structured_generate 调用计数 == 21] + `EVALUATION_P95_LIMIT_SECONDS = 0.5` 常量单源 + benchmark 场景级标记）
+- [x] Subtask 4.2: 变异实证——权重常量改错→场景①手算断言红；三键写入删除→场景①红；P95 常量突变（0.5→0.000001）→场景⑤红；匹配循环破坏→场景②红；还原→绿
+- [x] Subtask 4.3: 验收 AC-5.1 场景转绿（委托计时缓存命中验证）+ AC-3/AC-2 集成对应场景转绿
 
 **完成标准/Definition of Done:**
-- [ ] 集成五场景全绿；P95 达标（实测 μs~ms 级——500ms 裕量充足）；计时组与既有 12 组不冲突；验收对应场景全绿
+- [x] 集成五场景全绿；P95 达标（实测 μs~ms 级——500ms 裕量充足）；计时组与既有 12 组不冲突；验收对应场景全绿
+  - **实施注记（2026-10-28）**：采样函数 async 协程形态（集成场景⑤ await 直调 / 验收 BDD 步骤 _run_async 同循环调度——避免 run_until_complete 嵌套已运行 loop 的 RuntimeError，R3 推演未预见的形态适配）；正向锚经共享单 Fake + 闭包计数聚合（Task 0.6 钉死的二选一取「采样轮共享单 Fake」）；xdist 组全仓 13 组互异确认（agent-evaluation-perf 新增）
 
 ---
 
@@ -542,12 +546,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 
 > 性质说明：SDD 规范验证测试（验证架构约束是否被遵守），非 TDD 单元测试。
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_evaluation.py`——验证器 A：application 触碰文件（agent_evaluation.py/evaluation_harness.py/evaluation_schemas.py/evaluation_prompts.py/run_agent_workflow.py + **ports/__init__.py**[聚合导出也是触碰文件]）第三方 import 白名单（pydantic/opentelemetry 允许——5.7 验证器 A+ 全层基线 {opentelemetry, pydantic, yaml} 内零新增断言——OD-1[5.7] 裁定不触发的实现面证据）；验证器 B：domain 触碰收窄（_STORY58 业务符号[EvaluationHarness/AgentEvaluationPort/EvaluationModelResolverPort/EvaluationResult/HallucinationEvaluationSchema] 在 domain/ports|services|entities|value_objects|events 零命中 + AgentEvaluationError 仅在 domain/exceptions/ 三件内命中）+ 组合根外零实例化（EvaluationHarness(/UdmrEvaluationModelResolver( 构造点仅 composition_root.py + tests/）+ 依赖方向（udmr_evaluation_model_resolver.py import src.application 断言——infrastructure→application 合法面锚定）；验证器 C：主链评估块静态锚（execute 体内 evaluate 调用 + SpanAttributeKeys 三常量引用 + is_recording 守卫在位——AST/inspect 扫描）+ use case 六依赖签名基线（inspect.signature 对照——[agent_repository, agent_profile_use_case, agent_engine, agent_workflow_service, isolation_guard, evaluation_harness] 且第六参数默认 None）+ evaluation_exceptions 标准库零外部依赖断言
-- [ ] Subtask 5.2: 变异实证——evaluation_harness.py 注入 fastapi import→验证器 A 红；domain/services 下放置评估符号→验证器 B 红；评估块三常量引用删除→验证器 C 红；还原→绿
-- [ ] Subtask 5.3: 验收 AC-4.2 场景转绿
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_evaluation.py`——验证器 A：application 触碰文件（agent_evaluation.py/evaluation_harness.py/evaluation_schemas.py/evaluation_prompts.py/run_agent_workflow.py + **ports/__init__.py**[聚合导出也是触碰文件]）第三方 import 白名单（pydantic/opentelemetry 允许——5.7 验证器 A+ 全层基线 {opentelemetry, pydantic, yaml} 内零新增断言——OD-1[5.7] 裁定不触发的实现面证据）；验证器 B：domain 触碰收窄（_STORY58 业务符号[EvaluationHarness/AgentEvaluationPort/EvaluationModelResolverPort/EvaluationResult/HallucinationEvaluationSchema] 在 domain/ports|services|entities|value_objects|events 零命中 + AgentEvaluationError 仅在 domain/exceptions/ 三件内命中）+ 组合根外零实例化（EvaluationHarness(/UdmrEvaluationModelResolver( 构造点仅 composition_root.py + tests/）+ 依赖方向（udmr_evaluation_model_resolver.py import src.application 断言——infrastructure→application 合法面锚定）；验证器 C：主链评估块静态锚（execute 体内 evaluate 调用 + SpanAttributeKeys 三常量引用 + is_recording 守卫在位——AST/inspect 扫描）+ use case 六依赖签名基线（inspect.signature 对照——[agent_repository, agent_profile_use_case, agent_engine, agent_workflow_service, isolation_guard, evaluation_harness] 且第六参数默认 None）+ evaluation_exceptions 标准库零外部依赖断言
+- [x] Subtask 5.2: 变异实证——evaluation_harness.py 注入 fastapi import→验证器 A 红；domain/services 下放置评估符号→验证器 B 红；评估块三常量引用删除→验证器 C 红；还原→绿
+- [x] Subtask 5.3: 验收 AC-4.2 场景转绿
 
 **完成标准/Definition of Done:**
-- [ ] 架构验证器三件全绿；违规即红；循环依赖检测沿用 ruff/isort（不引入新工具）
+- [x] 架构验证器三件全绿；违规即红；循环依赖检测沿用 ruff/isort（不引入新工具）
+  - **实施注记（2026-10-28）**：验证器 B 与验收 AC-4.2 轻量版的 domain 符号扫描采词边界匹配（`\bEvaluationResult\b`）——检索域既有 ``RelevanceEvaluationResult``（relevance_evaluation.py L23——Task 0.2 契约甄别的撞名）子串形态不误伤（子串匹配首跑红即假阳性暴露）；额外附加 TestArchNoSuppressionComments 七文件零抑制注释断言（红线面钉死）；评估块位置锚（三常量行号在 MVP 十属性末键 EVIDENCE_INPUT_HASH 之后）追加
 
 ---
 
@@ -563,13 +568,14 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第二 Story：5
 | 🟢 绿 | 编写 BDD 步骤实现（文件存在性检查——src 新建六文件[agent_evaluation.py/evaluation_harness.py/evaluation_schemas.py/evaluation_prompts.py/udmr_evaluation_model_resolver.py/evaluation_exceptions.py] + 修改六文件[run_agent_workflow.py/composition_root.py/exception_handlers.py/`_code_ranges.py`/domain exceptions `__init__.py`/application ports `__init__.py`——R1 审查勘误：原「四文件」漏 ports/__init__.py 且计数失实] + tests 四目录清单 + 5-7 断言更新文件×2，missing 断言） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 6.1: 收尾场景步骤 1 — src 完成清单逐项确认（新建六文件 + 修改六文件[R1 审查勘误——含 ports/__init__.py 聚合导出] + .env.example 零改动断言 + event_channels.yaml 零改动断言）
-- [ ] Subtask 6.2: 收尾场景步骤 2 — tests 四目录完成清单逐项确认（unit 四件[exceptions/model/harness/resolver + use case 追加面] + 契约×2 + 集成 + 架构 + acceptance 两件 + 5-7 更新面×2——同一收尾场景内两份清单）
-- [ ] Subtask 6.3: 运行全量验收（13 场景终态）+ `pytest tests/` + `ruff check` + `mypy` 收尾校验 + 5-3/5-7 全家回归终验 + 异常体系 CI 终验
-- [ ] Subtask 6.4: 文档与台账终态更新——deferred-work.md 留项终态（OD-1[5.7]/OD-2[5.7]/R1-DF3 处置注记落盘确认 + OD-3 V1 通道登记终态）+ architecture.md §14.4 交付注记更新（评估面交付——5.8）+ sisys-core-domain-design.md §17.3.8 实现注记更新（OD-2/OD-3/OD-4/OD-5 裁定映射）+ sisys-uni-exception-design.md §3.3.2 编码分配表（Task 1 已同步——终态确认）+ sprint-status.yaml 状态流转
+- [x] Subtask 6.1: 收尾场景步骤 1 — src 完成清单逐项确认（新建六文件 + 修改六文件[R1 审查勘误——含 ports/__init__.py 聚合导出] + .env.example 零改动断言 + event_channels.yaml 零改动断言）
+- [x] Subtask 6.2: 收尾场景步骤 2 — tests 四目录完成清单逐项确认（unit 四件[exceptions/model/harness/resolver + use case 追加面] + 契约×2 + 集成 + 架构 + acceptance 两件 + 5-7 更新面×2——同一收尾场景内两份清单）
+- [x] Subtask 6.3: 运行全量验收（13 场景终态）+ `pytest tests/` + `ruff check` + `mypy` 收尾校验 + 5-3/5-7 全家回归终验 + 异常体系 CI 终验
+- [x] Subtask 6.4: 文档与台账终态更新——deferred-work.md 留项终态（OD-1[5.7]/OD-2[5.7]/R1-DF3 处置注记落盘确认 + OD-3 V1 通道登记终态）+ architecture.md §14.4 交付注记更新（评估面交付——5.8）+ sisys-core-domain-design.md §17.3.8 实现注记更新（OD-2/OD-3/OD-4/OD-5 裁定映射）+ sisys-uni-exception-design.md §3.3.2 编码分配表（Task 1 已同步——终态确认）+ sprint-status.yaml 状态流转
 
 **完成标准/Definition of Done:**
-- [ ] 13 场景全绿；全量回归零 5.8 面新失败；Story 可进入 `review`
+- [x] 13 场景全绿；全量回归零 5.8 面新失败；Story 可进入 `review`
+  - **实施注记（2026-10-28）**：全量回归 13552 passed / 21 failed / 38 skipped——21 失败甄别全部非 5.8 面：①test_ac_5_2_tracing_overhead 单独重跑绿（全量并发 50 分钟高负载下 overhead 基线漂移 flaky）；②OCR benchmark ×12 + gpu/hybrid_search/route_perf/embedding_qdrant/redis_latency/docker_sandbox ×8——OCR/GPU/Qdrant/Redis/Docker 环境依赖域与 5.8 改动面（application 评估族 + infrastructure/routing + use case）零交集。覆盖率门禁四档全过（application 93%≥85 / infrastructure 91%≥75 / 整体 93%≥80 / domain 通过）；三条红线自查零输出 + 零抑制注释；全仓 mypy 707 文件零告警 + ruff 全仓通过
 
 ---
 
@@ -779,44 +785,53 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-9 设计决策 + OD-1~OD-5 偏离声明 + 风险十项[R5 勘误：#10 self-preference bias 系 R1 审查新增——原「九项」过时]）
 - [x] 项目结构对齐统一规范
 
+### Dev Story 实施完成清单（2026-10-28 dev-story 执行）
+
+- [x] Task 0：Gherkin 13 场景（12 + 收尾）编写 + 红阶段钉死（13 场景逐一 failed——延迟 import 承载红，零 collection error）+ deferred-work 三处置注记（OD-1[5.7] 不触发/OD-2[5.7] 兑现/R1-DF3 顺延）+ V1 升级通道 ×6 登记（V1-EV1~EV6）+ 移交留项四项落盘
+- [x] Task 1：AgentEvaluationError（EXCEPTION_450，evaluation 子域 450-459 新开）四件套注册 + EvaluationResult/双端口/权重常量（纯标准库）+ 契约 ×2 + 组合根双注册（use case lambda 不动——R1-F1 时序）；异常体系 CI + 验收 AC-1.1 绿
+- [x] Task 2：HallucinationEvaluationSchema（扁平 + rationale 先行 + ge/le）+ evaluation_prompts（六档量表 + 三要素占位）+ EvaluationHarness（幻觉检测调用纪律 + 双本地计算 + overall 反转加权 + evaluate 编排）；六项变异实证；验收 AC-1.2/1.3 绿 + agent_evaluation 契约 12/12 绿
+- [x] Task 3：UdmrEvaluationModelResolver（真实 UDMR 链：cloud 匹配/local 回退/双配置非硬编码/匹配失败 450/from_env 防御包装/事件发布/UDMRTask wrapper）+ use case 第六可选依赖 + execute 评估块（三键写入 + 降级）+ 组合根 def 工厂函数（ConfigurationError 防护）+ 5-7 资产同步 ×2 + 5-3 Fake 分派表扩展（第三处存量触碰——AC-6.3 CLI 全链）；5-3/5-7 全家回归绿 + 全仓 mypy 零告警
+- [x] Task 4：集成五场景（全链三键真值/UDMR in-band 全链/降级链/None 对比/P95 计时委托）+ P95<500ms 达标（μs~ms 级实测）+ 正向锚（21 调用计数）+ xdist 组 13 组互异；验收 AC-5.1 绿
+- [x] Task 5：AST 架构验证器 A/B/C 31 用例（白名单/domain 词边界收窄/零实例化/依赖方向/主链静态锚/六依赖签名/零抑制注释）+ 三项变异实证；验收 AC-4.2 绿（词边界修复 RelevanceEvaluationResult 撞名假阳性）
+- [x] Task 6：验收 13 场景全绿 + 全量回归 13552 passed（21 失败全部甄别为非 5.8 面：ac_5_2 负载漂移 flaky 单独重跑绿 + OCR/GPU/Qdrant/Redis/Docker 环境类零交集）+ 覆盖率四档门禁全过（93%/91%/93%/domain）+ 三红线自查零输出 + 文档终态四件（architecture.md §14.4 注记/sisys-core-domain-design §17.3.8 注记/deferred-work/编码分配表）+ sprint-status → review
+
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
-- `_bmad-output/implementation-artifacts/stories/5-8-agent-output-quality-evaluation.md`（本文件）
-
-**待创建的文件/To Be Created (Dev Story 实施):**
 - `src/application/ports/agent_evaluation.py` - 评估端口族（AgentEvaluationPort + EvaluationModelResolverPort + EvaluationResult + 权重常量）
 - `src/application/services/evaluation_harness.py` - EvaluationHarness（评估编排核心）
 - `src/application/services/evaluation_schemas.py` - HallucinationEvaluationSchema
 - `src/application/services/evaluation_prompts.py` - 幻觉检测 prompt 模块
 - `src/infrastructure/routing/udmr_evaluation_model_resolver.py` - UDMR in-band 模型解析器
 - `src/domain/exceptions/evaluation_exceptions.py` - AgentEvaluationError（EXCEPTION_450）
-- `tests/unit/domain/exceptions/test_evaluation_exceptions.py` - 异常单测
-- `tests/unit/application/test_agent_evaluation_model.py` - 端口模型单测
-- `tests/unit/application/services/test_evaluation_harness.py` - Harness 单测（三循环）
-- `tests/unit/infrastructure/routing/test_udmr_evaluation_model_resolver.py` - resolver 单测（真实 UDMR 链）
-- `tests/contracts/test_port_contract_agent_evaluation.py` - 契约测试
-- `tests/contracts/test_port_contract_evaluation_model_resolver.py` - 契约测试
-- `tests/integration/test_integration_agent_evaluation.py` - 集成（五场景 + 计时委托）
-- `tests/unit/architecture/test_arch_evaluation.py` - AST 架构验证器
+- `tests/unit/domain/exceptions/test_evaluation_exceptions.py` - 异常单测（118 用例组合的一部分）
+- `tests/unit/application/test_agent_evaluation_model.py` - 端口模型单测（34 用例）
+- `tests/unit/application/services/test_evaluation_harness.py` - Harness 单测（三循环 35 用例）
+- `tests/unit/infrastructure/routing/test_udmr_evaluation_model_resolver.py` - resolver 单测（真实 UDMR 链 11 用例）
+- `tests/contracts/test_port_contract_agent_evaluation.py` - 契约测试（11 维度）
+- `tests/contracts/test_port_contract_evaluation_model_resolver.py` - 契约测试（11 维度）
+- `tests/integration/test_integration_agent_evaluation.py` - 集成（五场景 + 计时委托常量单源）
+- `tests/unit/architecture/test_arch_evaluation.py` - AST 架构验证器（A/B/C 31 用例）
 - `tests/acceptance/test_acceptance_agent_evaluation.feature` - Gherkin（12+收尾=13 场景）
 - `tests/acceptance/test_acceptance_agent_evaluation.py` - BDD 步骤实现
 
-**待修改的文件/To Be Modified (Dev Story 实施):**
-- `src/application/use_cases/run_agent_workflow.py` - 第六可选依赖 + execute 评估块（纯附加）
-- `src/application/ports/__init__.py` - 聚合导出
-- `src/domain/exceptions/_code_ranges.py` - evaluation 子域注册
-- `src/domain/exceptions/__init__.py` - 导出
+**修改的文件/Modified Files:**
+- `src/application/use_cases/run_agent_workflow.py` - 第六可选依赖 + execute 评估块（纯附加 None 兼容）
+- `src/application/ports/__init__.py` - 聚合导出（AgentEvaluationPort/EvaluationModelResolverPort/EvaluationResult）
+- `src/domain/exceptions/_code_ranges.py` - evaluation 子域 450-459 注册 + _CLASS_TO_SUBDOMAIN
+- `src/domain/exceptions/__init__.py` - 导出 AgentEvaluationError
 - `src/interfaces/api/exception_handlers.py` - EXCEPTION_HTTP_MAP 450→500
-- `src/composition_root.py` - Story 5.8 区段双注册 + use case lambda 更新
+- `src/composition_root.py` - Story 5.8 区段双注册 + use case 注册改 def 工厂函数（_build_agent_workflow_use_case——ConfigurationError 防护 + resolve_optional 第六依赖）
 - `tests/acceptance/test_acceptance_phoenix_tracer.py` - AC-4.3 构造签名基线更新（5-7 资产同步①）
-- `tests/unit/architecture/test_arch_phoenix_tracer.py` - _USE_CASE_INIT_PARAMS 常量五→六依赖（5-7 资产同步②——R1 审查补正）
-- `tests/unit/application/use_cases/test_run_agent_workflow.py` - 评估块三面追加
-- `docs/architecture/sisys-uni-exception-design.md` - §3.3.2 编码分配表
-- `docs/architecture/architecture.md` - §14.4 交付注记
-- `docs/architecture/sisys-core-domain-design.md` - §17.3.8 实现注记
-- `_bmad-output/implementation-artifacts/deferred-work.md` - 三条处置注记 + OD-3 V1 通道登记
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` - 状态流转
+- `tests/unit/architecture/test_arch_phoenix_tracer.py` - _USE_CASE_INIT_PARAMS 常量五→六依赖（5-7 资产同步②）
+- `tests/unit/application/use_cases/test_run_agent_workflow.py` - 评估块三面追加（TestExecuteEvaluationBlock 5 用例）
+- `tests/acceptance/test_acceptance_agent_workflow.py` - Fake LLM 分派表追加幻觉分支（5-3 资产——实施发现的第三处存量触碰：AC-6.3 CLI 全链经组合根真实触发评估）
+- `tests/unit/interfaces/api/test_exception_handlers.py` - expected_types 集合追加 AgentEvaluationError（映射表完整性伴随更新）
+- `docs/architecture/sisys-uni-exception-design.md` - §3.3.2 编码分配表 450 行 + 子域范围表 evaluation 行
+- `docs/architecture/architecture.md` - §14.4 交付注记（Story 5.8 评估面）
+- `docs/architecture/sisys-core-domain-design.md` - §17.3.8 实现注记（OD-2/OD-3/OD-4/OD-5 裁定映射）
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 三条处置注记（OD-1 不触发/OD-2 兑现/R1-DF3 顺延）+ V1 升级通道 ×6（V1-EV1~EV6）
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - 状态流转（in-progress → review）
 
 ---
 
@@ -911,7 +926,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（从 Task 0 开始）
+- [x] 运行 `dev-story` 开始实施（从 Task 0 开始）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
@@ -922,6 +937,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | 日期 | 版本 | 变更内容 |
 |------|------|---------|
 | 2026-10-28 | v1.0.0 | 创建故事文件（五视角并行调研：UDMR 路由机制/5.7 追踪交付物/工作流数据模型/验收测试模板/偏离台账与异常体系；9 项关键架构决策 DC-1~DC-9 + 5 项偏离声明 OD-1~OD-5 + 风险九项；双端口分立[DC-1——评估契约与模型解析解耦]；幻觉检测 structured_generate + 扁平 Schema[DC-2——OD-1[5.7] 触发条件裁定不满足，零新依赖]；UDMR in-band 动态路由[DC-3——仓内首个 per-call 路由消费方]；三指标算法裁定[DC-4——OD-3 证据支撑度启发式/OD-4 actual 口径/OD-5 幻觉分字面语义]；第六可选依赖主链接入 + 降级[DC-5——5-6 苦役结构性规避 + 5-7 AC-4.3 断言同步]；evaluation 子域 450-459 新开[DC-6——agent 段满后四代开段先例]；5-7 移交留项三项处置[OD-1 裁定不触发/OD-2 本 Story 兑现/R1-DF3 顺延] + trace_id 防呆复核零风险知悉） |
+| 2026-10-28 | v2.0.0 | **dev-story 实施完成**（Task 0-6 全绿）：Task 0 验收 13 场景红阶段钉死 + deferred-work 三处置注记 + V1 通道 ×6；Task 1 AgentEvaluationError 450 四件套 + 端口族（纯标准库）+ 契约 ×2 + 组合根双注册；Task 2 EvaluationHarness 三循环（幻觉检测调用纪律 + 双本地计算 + overall 反转加权——六项变异实证）；Task 3 UdmrEvaluationModelResolver（真实 UDMR 链三分支 + 事件发布 + wrapper 断言）+ use case 第六依赖 + 评估块三键写入 + 降级 + def 工厂函数（ConfigurationError 防护）+ 5-7 资产同步 ×2 + **5-3 Fake 分派表扩展（实施发现第三处存量触碰——AC-6.3 CLI 全链经组合根真实触发评估）**；Task 4 集成五场景 + P95<500ms（μs~ms 级）+ 正向锚 + xdist 13 组互异；Task 5 AST 验证器 A/B/C 31 用例（词边界修复 RelevanceEvaluationResult 撞名假阳性）+ 零抑制注释断言；Task 6 全量回归 13552 passed（21 失败全部甄别非 5.8 面）+ 覆盖率四档门禁全过（93%/91%/93%/domain≥90）+ 三红线自查零输出 + 文档终态四件。**Status: ready-for-dev → review** |
 | 2026-10-28 | v1.1.0 | Round 1 文档审查修订（D1 五 Agent 代码调研 + D2 三视角审查：一致性/可测试性/科学性业界对标）：P1×3（R1-F1 lambda 时序矛盾——Task 1→3 窗口 resolve 必炸，双审查员交叉确认；R1-F2 场景计数 off-by-one 13/14→12/13；R1-F3 timeout 映射先例引用失实——改引 build_default_llm_config）+ P2×8（5-7 资产触碰漏第二处 test_arch 基线/PIPL 装配门死/验收 mock 红线违反/task.input 幻影锚/env 前提未钉/异常两表误导增行/local 分支 101 击穿降级网/EventBus 名实）+ 科学性修订×7 组（OD-4 循环论证改写+代理一致性诚实注记/OD-3 证据完备度语义澄清/DC-2 prompt 三细则[artifacts 简编+rationale 先行+量表锚定]/风险#10 self-preference bias/DC-8 回归绊线注记/5.9 移交三须知/V1 失败率计数）+ P3×28 打包（行号微偏/计数勘误/判别力细则[基底值/浮点陷阱/fixture scope/聚合口径]）；Task 0.7 V1 登记扩充至 6 通道；deferred-work 处置注记三项保持 |
 | 2026-10-28 | v1.2.0 | Round 2 回归核查 + 增量面审查（双 Agent：R1 修复传播完备性源码级验证 + R1 增量文本正确性）：R1 修复传播基本完备（F6 漂移双注入/F7 wrapper/F10 双防线经源码推演全部成立）；P2×4（R2-F1 monkeypatch glob 写法守卫无效——R1-F8 修复自身引入的新缺陷；R2-F2 .env.example 举例失实——openai 缺 MAX_TOKENS 不抛 101；R2-F3/F4 Lessons 节两处 R1 修复漏改残留[唯一触碰点/Task 1 lambda]）；P3×7 打包（R1-S3 传播漏网×2 热修/行号勘误×3/计数勘误/5-7 全家补 test_arch）；生产态观察项登记风险#3（组合根 compliance_gateway 零参注册致生产 PIPL 分支休眠——既有形态知悉） |
 | 2026-10-28 | v1.3.0 | Round 3 单深度推演（12 场景三轴 + 6 时间线终态 + 5 不可满足性数学判定，全部实算验证）：**零 P1**——两大数学高危候选排除（权重和 == 元断言全排列二进制精确、ca 安全值对精确）；P2×2（R3-F1 组合链浮点期望值形态钉死——overall=0.6475000000000001 非字面量，钦定精确三元组 h=0.2/cr=0.0/pred=0.85；R3-F2「lambda 内 try/except」语法不可实现——改 def 工厂函数 + B.5 异常层级闭合推演随注）；P3×5+打包 5（AC-3 resolver 替身钉死/AST 锚 attr 形态/101 复现缺 MODEL 前提+delenv 前缀放宽/config.route 不可断言面/五 Schema 措辞勘误等）；正面确认留痕：12 场景三轴全过/6 时间线自洽/B.4 漂移三断言时序成立/单轮 structured 调用数=4+评估 1 |
@@ -929,7 +945,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-28
 **更新说明/Description:**
@@ -938,3 +954,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - v1.2.0: Round 2 回归核查 + 增量面审查（P2×4 + P3×7——R1 修复的修复）
 - v1.3.0: Round 3 单深度推演（零 P1；P2×2 + P3×5+打包——浮点期望值形态/lambda 语法/三轴推演正面确认留痕）
 - v1.3.1: Round 4 锚点核验 + Round 5 独立终审收敛（L305 反噬回正×5 + R5-F1 DC-6③ 矛盾修正 + P3×3 清偿——五轮周期收敛，零遗留）
+- v2.0.0: dev-story 实施完成（Task 0-6 全绿——13 验收场景全绿 + 13552 全量回归 + 覆盖率四档门禁 + 文档终态四件；Status → review）

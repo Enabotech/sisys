@@ -72,6 +72,9 @@ from src.domain.exceptions.embedding_exceptions import (
     ModelInferenceError,
 )
 from src.domain.exceptions.entity_extraction_exceptions import EntityExtractionError
+from src.domain.exceptions.evaluation_exceptions import (
+    AgentEvaluationError,
+)
 from src.domain.exceptions.event_exceptions import EventPublishError, VersionError
 from src.domain.exceptions.external_exceptions import (
     ExternalException,
@@ -310,6 +313,8 @@ __all__ = [
     "IsolationStateNotInitializedError",
     "IsolationAccessViolationError",
     "IsolationOperationForbiddenError",
+    # 评估子域异常（Story 5.8）
+    "AgentEvaluationError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

@@ -739,6 +739,8 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_447 | IsolationStateNotInitializedError | BusinessException | 404 |（Story 5.4，Agent EIP 隔离状态缺失——三成因：存量 Agent 无隔离键（5.4 部署前实例化）/未初始化查询/实例化 fail-fast 后键残留（服务级同 id 重 initialize 可自愈，用例/CLI 通道靠 TTL 回收）；与 443「Agent 不存在」是两聚合两语义的精确诊断分离，context={agent_id}；HTTP 404 对齐 443 NotFound 族）|
 | EXCEPTION_448 | IsolationAccessViolationError | BusinessException | 403 |（Story 5.5，跨 Agent 私有资源访问越权——三重隔离判定矩阵 private+cross 格拦截（Prompt/数据面全资源，L4/L3/L2 全等级）；与 449 两语义轴正交：448=跨主体越权（actor≠target 私有资源）、449=单主体操作被自身等级禁止；构造器对齐 446/441 首参必填形态，context 五字段={actor_agent_id, target_agent_id, resource, operation, reason}——reason 承载判定依据含等级名（decision.reason，并发串扰判别锚）；消息面向调用方可理解禁泄露资源内容/内部键名；HTTP 403 权限不足族（Forbidden 语义，非 404 非 422））|
 | EXCEPTION_449 | IsolationOperationForbiddenError | BusinessException | 403 |（Story 5.5，当前隔离等级策略禁止的操作——双触发路径（同码多因 context.reason 编码区分，446 双路径先例）：①L4 严格白名单外工具请求（reason=tool_not_in_allowlist:{tool_name}——白名单明细不进 context 禁泄露，经配置通道可查）②READ_ONLY/RESTRICTED_WRITE 等级共享面写（reason=data_isolation:{mode}——MVP 受限写白名单未定义一律拒，D-4）；context 三字段={agent_id, operation, reason}；HTTP 403；agent 段 440-449 至此全分配）|
+| EXCEPTION_450 | AgentEvaluationError | SystemException | 500 |（Story 5.8，Agent 输出质量评估管线执行失败——幻觉检测 LLM 调用失败包装（LLM 族 330/331/Timeout/ServiceUnavailable 收敛）+ Schema 实例守卫失败 + 评估模型路由匹配失败（配置漂移禁静默回退）+ local 分支 from_env 防御性包装；context 三键={agent_id, phase, reason}——reason ∈ llm_call/schema_validation/model_resolution 标识失败环节（+ context_extra 诊断键如 selected_model/available_models）；LLMConfigError 与 CancelledError 透传不包装——_structured_call 纪律先例；use case 降级 catch（可观测附加面哲学——评估失败 warning 跳过不阻断主链）；evaluation 子域 450-459 新开——agent 段 440-449 已满后四代开段先例第五段）|
+| EXCEPTION_451~459 | （预留 evaluation 子域）| — | — |（后续 5.9 漂移检测/5.10 评估历史如需新码在此段取）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -817,6 +819,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `debate` | 420–429 | DebateGenerationError, DebateSynthesisError, DebateLowDivergenceError（Story 4.5 红蓝辩论 MVP；420/421 语义归属 external、422 语义归属 business，物理段独立——business 2XX 与 external 3XX 均无整段空位，遵循 data_source 410-419 独立段先例；423-429 预留 V1 多轮辩论 Story 10.6） |
 | `tool_version` | 430–439 | ToolVersionNotFoundError, ToolVersionAlreadyExistsError, ToolVersionTrafficWeightError, ToolVersionRollbackError（Story 4.6 灰度发布与回滚；语义归属 business——继承 NotFoundError/ConflictError/ValidationError/InvalidStateError 具体类，物理段独立——tool 380-389 仅剩 384 保留位、toolchain 390-399 已由 4.7 分配 399（ValidationFeedbackRetryExhaustedError），遵循 data_source/debate 独立段先例；434-439 预留） |
 | `agent` | 440–449 | AgentConfigError, AgentRoleNotSupportedError（Story 5.1 CEO Agent 实例化 MVP）+ AgentProfileError, AgentNotFoundError（Story 5.2 Agent 身份档案加载；440/442 语义归属 system（SystemException 子类——配置/档案资产属系统资源）、441/443 语义归属 business（BusinessException 子类——阶段性能力范围限制/请求资源不存在），物理段独立——遵循 data_source/debate/tool_version 独立段先例；444-449 预留 5.4-5.5 EIP 隔离 / 5.3 工作流异常） |
+| `evaluation` | 450–459 | AgentEvaluationError（Story 5.8 Agent 输出质量评估；450 语义归属 system（SystemException 子类——评估是系统侧可观测行为，AgentWorkflowError[444] 同族论证），物理段独立——agent 段 440-449 已满后四代开段先例第五段（data_source 410/debate 420/tool_version 430/agent 440）；451-459 预留 5.9 漂移检测/5.10 评估历史） |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

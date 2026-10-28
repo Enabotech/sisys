@@ -2836,16 +2836,7 @@ def bootstrap() -> None:
             "src.application.use_cases.run_agent_workflow",
             fromlist=["RunAgentWorkflowUseCase"],
         ).RunAgentWorkflowUseCase,
-        impl=lambda resolver: __import__(
-            "src.application.use_cases.run_agent_workflow",
-            fromlist=["RunAgentWorkflowUseCase"],
-        ).RunAgentWorkflowUseCase(
-            agent_repository=resolver.resolve("agent_repository"),
-            agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
-            agent_engine=resolver.resolve("agent_engine"),
-            agent_workflow_service=resolver.resolve("agent_workflow_service"),
-            isolation_guard=resolver.resolve("isolation_guard_service"),
-        ),
+        impl=_build_agent_workflow_use_case,
         module="src.application.use_cases.run_agent_workflow",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
@@ -2995,6 +2986,53 @@ def bootstrap() -> None:
     # warning 降级跳过不阻断主链启动——DC-7；独立可调用单元便于负路径直测）
     _wire_agent_tracing()
 
+    # === Story 5.8 — Agent 输出质量评估（EvaluationHarness + UDMR in-band 评估模型路由）===
+    # 双 SINGLETON（Epic 5 全家政策——DC-9：EvaluationHarness 无状态纯函数式 evaluate
+    # [无 eval_history 累积——5.9/5.10 范围]；resolver 持 UDMRService 单例引用 +
+    # UDMRConfig 原始值构造期定格）。use case 第六依赖注入（resolve_optional 可选
+    # 接线）归 Task 3 循环 B 与第六构造参数同窗落地——本区段仅双端口注册
+    # （R1-F1 时序约束：第六参数不存在时注入 kwarg 必 TypeError）。
+    register_port(
+        name="agent_evaluation",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_evaluation",
+            fromlist=["AgentEvaluationPort"],
+        ).AgentEvaluationPort,
+        impl=lambda resolver: __import__(
+            "src.application.services.evaluation_harness",
+            fromlist=["EvaluationHarness"],
+        ).EvaluationHarness(
+            llm_client=resolver.resolve("llm_client"),
+            model_resolver=resolver.resolve("evaluation_model_resolver"),
+        ),
+        module="src.application.services.evaluation_harness",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "evaluation", "observability"),
+    )
+    register_port(
+        name="evaluation_model_resolver",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_evaluation",
+            fromlist=["EvaluationModelResolverPort"],
+        ).EvaluationModelResolverPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.routing.udmr_evaluation_model_resolver",
+            fromlist=["UdmrEvaluationModelResolver"],
+        ).UdmrEvaluationModelResolver(
+            udmr_service=resolver.resolve("udmr_service"),
+            cloud_configs=UDMRConfig.from_env().cloud_configs,
+            local_model=UDMRConfig.from_env().local_model,
+            llm_timeout=UDMRConfig.from_env().llm_timeout,
+        ),
+        module="src.infrastructure.routing.udmr_evaluation_model_resolver",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "evaluation", "udmr"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
@@ -3032,6 +3070,37 @@ def bootstrap() -> None:
                 asyncio.new_event_loop().run_until_complete(async_register())
             except Exception as e:
                 logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
+
+
+def _build_agent_workflow_use_case(resolver: Any) -> Any:
+    """Story 5.8 — agent_workflow_use_case 注册工厂（def 承载 try/except——lambda 语法不可能）。
+
+    第六依赖 evaluation_harness 经 resolve_optional 可选注入（audit_service 先例
+    ——注册缺失/构造失败降级 None）；评估接线配置错误（如 UDMR_* env 半配置态
+    from_env 抛 ConfigurationError——不在 resolve_optional 默认 fallback_on 内）
+    被本工厂捕获降级 None：评估面损失不阻断主链（可观测附加面哲学——风险 #9，
+    ConfigurationError 非 RuntimeError 子类故须显式捕获；SINGLETON 失败不缓存，
+    后续 resolve 重试不残留毒化）。
+    """
+    use_case_cls = __import__(
+        "src.application.use_cases.run_agent_workflow",
+        fromlist=["RunAgentWorkflowUseCase"],
+    ).RunAgentWorkflowUseCase
+    from src.domain.exceptions import ConfigurationError
+
+    try:
+        evaluation_harness = resolver.resolve_optional("agent_evaluation")
+    except ConfigurationError as error:
+        logger.warning("评估接线降级跳过（agent_evaluation 构造失败——评估面损失不阻断主链）: %s", error)
+        evaluation_harness = None
+    return use_case_cls(
+        agent_repository=resolver.resolve("agent_repository"),
+        agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
+        agent_engine=resolver.resolve("agent_engine"),
+        agent_workflow_service=resolver.resolve("agent_workflow_service"),
+        isolation_guard=resolver.resolve("isolation_guard_service"),
+        evaluation_harness=evaluation_harness,
+    )
 
 
 def _wire_agent_tracing() -> None:

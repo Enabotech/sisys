@@ -1610,6 +1610,33 @@ class SAPMessage(BaseModel):
 > 「任意 OTLP 导出 + Phoenix server 独立部署」）。OpenInference LLM span 语义约定
 > （llm.* 属性族）触发时由 Story 5.8 按需评估引入（deferred-work 登记）。
 
+> **Story 5.8 实现注记（OD-2/OD-3/OD-4/OD-5 裁定映射）**：本节评估面伪码已由
+> Story 5.8（FR-EV-02）落地为可实施口径，四处伪码空白/缺陷的裁定映射：
+> **OD-2**（幻觉检测）——`phoenix.evals.llm_eval_binary_classifier` 不引入，以
+> `LLMClientPort.structured_generate(prompt=三要素, response_schema=
+> HallucinationEvaluationSchema[扁平 pydantic], config=UDMR 路由产物派生)`
+> 实现同构语义（LLM 结构化评分 [0,1] 连续 + rationale——binary 宽化为连续是
+> 5.9 CUSUM 连续序列消费前提；prompt 三要素 = chain.input_summary + 证据四材料
+> 摘要[含 artifacts_snapshot 简编] + chain.final_answer）；**OD-3**
+> （compute_context_relevance 算法空白）——裁定为证据支撑度确定性启发式
+> （citations 非空 +0.4 / artifacts_snapshot 非空 +0.3 / tool_trace 非空 +0.3；
+> 语义诚实注记：度量证据完备度[存在性]非语义相关性，消费方不得当语义质量用；
+> V1 通道 LLM-as-a-Judge/embedding 余弦——deferred-work V1-EV1）；**OD-4**
+> （confidence_accuracy 的 actual=eval_result.quality_score 循环依赖缺陷）——
+> actual 口径裁定为 `(1-hallucination_score)×0.5 + context_relevance×0.5`（代理
+> 质量均权——反循环规避；语义诚实注记：度量代理一致性[proxy agreement]非真值
+> 校准——无人类标签的 MVP 代理构造；V1 真校准通道 ECE/Brier——deferred-work
+> V1-EV3）；公式照抄钦定 `1.0 - min(|predicted-actual|, 1.0)`（L1681）；
+> **OD-5**（weighted_sum 权重未定义）——`overall_score = (1-h)×0.4 + cr×0.35 +
+> ca×0.25`（反转加权——hallucination_score 字面语义 0=无幻觉越高越坏，overall
+> 三键方向归一单调正向）。评估模型经 `UdmrEvaluationModelResolver`（UDMRTask →
+> UDMRService.decide() → selected_model 匹配 → per-call LLMConfig）in-band 动态
+> 路由获取（非硬编码——仓内首个 per-call 路由消费方）；评估结果写入根 span 三键
+> 由 `RunAgentWorkflowUseCase` 第六可选依赖承载（评估失败降级 warning 不阻断主链）；
+> `run_with_evaluation` 独立包装类形态不采用（评估块内嵌 use case——5.7 DC-4 接入
+> 形态延续）。CUSUMDriftDetector/is_drifted/trigger_recalibration/checkpoint 集成
+> 归 5.9/5.10。
+
 ```python
 from phoenix.tracing import trace
 from phoenix.evals import llm_eval_binary_classifier
