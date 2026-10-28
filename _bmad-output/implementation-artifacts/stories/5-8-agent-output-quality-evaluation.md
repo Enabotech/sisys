@@ -955,6 +955,21 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | R2-9 | P3 | agent_evaluation.py + harness docstring | overall 可达域「勿按 [0,1] 全域假设」措辞严格读可被误解为「overall 不可达 0/1」——无条件全域 [0,1] 恰可达但仅极端自报角（h=1,cr=0,p=1→0.0 / h=0,cr=1,p 恰校准→1.0，R2-B 实算确认） | 落码（两处 docstring 补「无条件全域仅极端自报角可达——典型分布下动态范围显著窄于全域」） |
 | CR1-20 处置 | P3 | 验收 py + resolver 单测 + 集成 py | 死脚手架三处清偿（R2-B 读码评估）：①删 `_RecordingToolExecutionService` 包装类（captured_contexts 零断言消费零引用——L581 直接注入）；②删 `_StubHealthChecker.check_calls` 计数（两文件各 2 行只写不读；close() 保留——docstring 理由改「防御性预留[全仓现无 isinstance 校验——UDMRService 仅 duck-call check()]」防失实句）；③集成 `_StubIsolationSwitchLogRepository` 充 UDMR 决策日志语义错位 → 换 `_RecordingDecisionLogRepository`（验收 AC-2 同款 8 行——决策日志断言面本就在验收承载，零断言损失） | 落码（三处全清偿） |
 
+#### Round 3 推演留痕（单深度推演 2026-10-28——组合交互/时序/并发/边界，主会话推演 + 实测定谳）
+
+**零新缺陷（P2/P3 均零）——推演结论与证伪排除双留痕**：
+
+| # | 推演面 | 结论 | 推演链 |
+|---|--------|------|--------|
+| R3-1 | 修复组合交互：CR1-F1（catch 扩 332）× CR1-F3（max_length 3000） | ✅ 无新静默形态 | 超长 rationale → finish_reason=length 截断 → LLMResponseError 331 → 450 包装 → 降级 warning——降级可见性 MVP 仅 warning 日志是 R1 科学性审查已声明的「MVP 最薄弱处」（范围边界表 V1 项已含失败率/覆盖率计数），组合后无新增静默面 |
+| R3-2 | 修复组合交互：CR1-F1 × 验收 AC-1 透传用例（同一异常双层断言相反行为） | ✅ 设计意图分层非冲突 | harness 层（直调 evaluate 断言 332 透传 `pytest.raises`）与 use case 层（断言 332 降级 warning + 主链返回）——透传使降级网可区分「配置错（可行动）」与「瞬态失败（450 族）」是 CR1-F1 的设计论证（docstring 已声明）；两层各有 docstring 说明，维护者无困惑面 |
+| R3-3 | 修复组合交互：CR1-F2（置信理由除名）× cr 存在性检查（Goodhart 刷分交叉通道） | 🔬 疑点排除 | cr = citations/artifacts/tool_trace 非空存在性检查**不读内容**——Agent 在置信理由中撒谎无法刷 cr（cr 根本不消费 rationale 内容）；F2 修复后 judge 也不读——双向关闭 |
+| R3-4 | 时序：评估块 span 生命周期三分支 | ✅ 全部正确 | ①六阶段异常 → 传播出 execute → @trace 记录 span exception → end ERROR（评估块不执行——位于六阶段之后的 return 前）；②评估 450/332 → execute 内降级 catch → 主链返回 → span 正常 end 无 ERROR（工作流成功的正确语义——评估失败非工作流失败）；③RuntimeError/ValidationError 201 击穿 → span ERROR（理论不可达防御层显性失败） |
+| R3-5 | 并发：SINGLETON 评估链并发 evaluate | ✅ 安全 | UDMRService.decide() 全局部变量零共享可变态（health_start/health_latency/event/route_type 均 decide 内局部——L85-133 实读确认）；EvaluationHarness 无状态（SINGLETON 声明成立）；CloudHealthChecker._cache 单槽并发写为**良性竞态**（`self._cache: tuple[bool, float] | None` 单槽 tuple 赋值原子——最坏两协程都 miss 都探测都写，无撕裂无数据损坏；且属 Story 1.17 交付面非 5.8 面） |
+| R3-6 | 边界：NaN 通道三防线 | ✅ 实测成立 | ①pydantic 2.13.4 实测 ge/le **全拒** NaN/±inf（h 通道——含 json.loads 对 "NaN" 字面量的 parse_constant 产出 float('nan') 后被 Schema 校验拒）；②TaskEvidencePackage VO `0.0<=x<=1.0` 拒 NaN（p 通道）；③EvaluationResult `__post_init__` 链式比较对 NaN 恒 False → raise 201（兜底）。附带确认：Schema 校验失败抛的 pydantic ValidationError 是 ValueError 子类 → litellm L787 `except (…, ValueError, …)` 捕获 → LLMResponseError 331 → 450 → 降级（链路闭合） |
+| R3-7 | 边界：set_attribute NaN 兜底必要性 | 🔬 不需要（排除） | 四分数不可能 NaN（R3-6 三防线拦截 + cr 是常量计算 + ca/overall 是 h/cr/p 的正常算术导出）——OTel set_attribute 的 NaN 行为不构成可达面 |
+| R3-8 | 文档表述：「健康检查 TTL 缓存」（AC-5 L193 + DC-8④ L632） | ✅ 属实（再核验） | CloudHealthChecker 生产实现确有缓存（`cache_ttl=300` 默认 + `_cache` 单槽 + monotonic 过期判断——cloud_health_checker.py L32-54 实读）；UDMRService（domain）无缓存每次委托 check()——两层职责正确分层，文档表述指生产 CloudHealthChecker 无失实 |
+
 #### Round 1 修复方案（C2——待 C3 评审门禁）
 
 > **CR1-F1（CR1-1 + CR1-6 成套）评估块降级 catch 扩 LLMConfigError + catch 边界双测试**
@@ -1038,6 +1053,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 | 2026-10-28 | v2.0.0 | **dev-story 实施完成**（Task 0-6 全绿）：Task 0 验收 13 场景红阶段钉死 + deferred-work 三处置注记 + V1 通道 ×6；Task 1 AgentEvaluationError 450 四件套 + 端口族（纯标准库）+ 契约 ×2 + 组合根双注册；Task 2 EvaluationHarness 三循环（幻觉检测调用纪律 + 双本地计算 + overall 反转加权——六项变异实证）；Task 3 UdmrEvaluationModelResolver（真实 UDMR 链三分支 + 事件发布 + wrapper 断言）+ use case 第六依赖 + 评估块三键写入 + 降级 + def 工厂函数（ConfigurationError 防护）+ 5-7 资产同步 ×2 + **5-3 Fake 分派表扩展（实施发现第三处存量触碰——AC-6.3 CLI 全链经组合根真实触发评估）**；Task 4 集成五场景 + P95<500ms（μs~ms 级）+ 正向锚 + xdist 13 组互异；Task 5 AST 验证器 A/B/C 31 用例（词边界修复 RelevanceEvaluationResult 撞名假阳性）+ 零抑制注释断言；Task 6 全量回归 13552 passed（21 失败全部甄别非 5.8 面）+ 覆盖率四档门禁全过（93%/91%/93%/domain≥90）+ 三红线自查零输出 + 文档终态四件。**Status: ready-for-dev → review** |
 | 2026-10-28 | v2.1.0 | **代码审查 Round 1**（C1 四视角并行调研——契约一致性/科学性/测试判别力/架构与运行面，审查对象 = 提交 b846dae9 全变更集 33 文件；C3 双评审员①机理证伪+②传播完备性）：零 P0/P1，P2×7 + P3×16——落码 16 修复簇（最高价值：CR1-F1 评估块 catch 扩 LLMConfigError[332 现实可达源是运行期 env 半配置态——评审员①实测修正可达路径为「多云非对称+健康回退 local 分支+LLM_ENDPOINT 未设」，原 cloud 直配链被健康检查拦截] + catch 边界双测试；CR1-F2 置信理由除名 judge 核对依据[自证文本洗白通道]；CR1-F3 rationale 1000→3000+逐项概括核对[长回答丢评估覆盖]；CR1-F4 overall 可达域注记[h=1 上界 0.60/病态角重叠带]；CR1-F5 扁平性断言根修；CR1-F6 prompt 证据内容锚+简编截断锚；CR1-F7 noqa 根修）+ P3 批 9 项 + 登记 5 项（V1-EV7 prompt 输入预算/CR1-DF1 llm_client from_env 无防护预存面/CR1-DF2 组合根降级测试缺口/CR1-11 from_env 三连调改判维持/CR1-9 context 字符串形态 V1）；门禁实测：ruff 全绿 + mypy 零告警 + 单测/契约/架构 173 passed + 验收 13 全绿 + 集成 5 全绿 |
 | 2026-10-28 | v2.2.0 | **代码审查 Round 2**（回归核查 + 增量面双视角）：R1 回归风险判定**低**（16 修复簇联动位逐位对照 ✅ + 修复自身正确性抽查 ✅ + 177 例/ruff/mypy 全绿——零 P1/P2 零代码行为级回归）；R1 数学与量化声明质量高（可达域四组数字/恒等式/ca 条件域/±0.25 杠杆/2.6bit/镜像默认值全部实算实码核验通过）；新发现 P3×9 全清偿——可达性机理句勘误 ×2（「云端空 key 形态」经同源论证不可达→改 local 分支两支表述[R2-B 证伪 R1 评审员①论断，主会话实测采纳]；组合根净值场景（a）折叠为（b）子情形）、prompts 枚举序字面矛盾、CR1-9 补入 deferred-work（V1-EV8）、权重注记假反例换实测真例（0.33+0.56+0.11——主会话 poetry run python 定谳）、簇号错引、P3 计数勘误（16→15）+ 行号旧坐标勘误、overall 无条件全域边缘注记补、CR1-20 死脚手架三处全清偿（删包装类/删计数×2/集成决策日志替身语义对齐） |
+| 2026-10-28 | v2.3.0 | **代码审查 Round 3**（单深度推演——组合交互/时序/并发/边界，纯文档轮）：**零新缺陷**——八面推演全过：修复组合交互 ×3（F1×F3 降级可见性无新静默形态[已登记 V1 项]/F1 透传分层是设计意图非冲突/F2×cr 疑点排除[存在性检查不读内容]）；时序 ×1（span 生命周期三分支语义正确——六阶段异常 ERROR/评估降级正常 end/击穿 ERROR）；并发 ×1（UDMRService.decide 零共享可变态实读确认 + CloudHealthChecker._cache 单槽并发写良性竞态[1.17 预存面]）；边界 ×3（NaN 三防线实测成立[pydantic 2.13.4 ge/le 全拒 NaN/±inf + VO 拒 + 201 兜底；ValidationError 是 ValueError 子类经 litellm L787 捕获链闭合]/set_attribute NaN 兜底不需要/TTL 缓存表述属实[CloudHealthChecker cache_ttl=300 实读]）。零代码改动——无独立代码提交，推演留痕入本表 |
 | 2026-10-28 | v1.1.0 | Round 1 文档审查修订（D1 五 Agent 代码调研 + D2 三视角审查：一致性/可测试性/科学性业界对标）：P1×3（R1-F1 lambda 时序矛盾——Task 1→3 窗口 resolve 必炸，双审查员交叉确认；R1-F2 场景计数 off-by-one 13/14→12/13；R1-F3 timeout 映射先例引用失实——改引 build_default_llm_config）+ P2×8（5-7 资产触碰漏第二处 test_arch 基线/PIPL 装配门死/验收 mock 红线违反/task.input 幻影锚/env 前提未钉/异常两表误导增行/local 分支 101 击穿降级网/EventBus 名实）+ 科学性修订×7 组（OD-4 循环论证改写+代理一致性诚实注记/OD-3 证据完备度语义澄清/DC-2 prompt 三细则[artifacts 简编+rationale 先行+量表锚定]/风险#10 self-preference bias/DC-8 回归绊线注记/5.9 移交三须知/V1 失败率计数）+ P3×28 打包（行号微偏/计数勘误/判别力细则[基底值/浮点陷阱/fixture scope/聚合口径]）；Task 0.7 V1 登记扩充至 6 通道；deferred-work 处置注记三项保持 |
 | 2026-10-28 | v1.2.0 | Round 2 回归核查 + 增量面审查（双 Agent：R1 修复传播完备性源码级验证 + R1 增量文本正确性）：R1 修复传播基本完备（F6 漂移双注入/F7 wrapper/F10 双防线经源码推演全部成立）；P2×4（R2-F1 monkeypatch glob 写法守卫无效——R1-F8 修复自身引入的新缺陷；R2-F2 .env.example 举例失实——openai 缺 MAX_TOKENS 不抛 101；R2-F3/F4 Lessons 节两处 R1 修复漏改残留[唯一触碰点/Task 1 lambda]）；P3×7 打包（R1-S3 传播漏网×2 热修/行号勘误×3/计数勘误/5-7 全家补 test_arch）；生产态观察项登记风险#3（组合根 compliance_gateway 零参注册致生产 PIPL 分支休眠——既有形态知悉） |
 | 2026-10-28 | v1.3.0 | Round 3 单深度推演（12 场景三轴 + 6 时间线终态 + 5 不可满足性数学判定，全部实算验证）：**零 P1**——两大数学高危候选排除（权重和 == 元断言全排列二进制精确、ca 安全值对精确）；P2×2（R3-F1 组合链浮点期望值形态钉死——overall=0.6475000000000001 非字面量，钦定精确三元组 h=0.2/cr=0.0/pred=0.85；R3-F2「lambda 内 try/except」语法不可实现——改 def 工厂函数 + B.5 异常层级闭合推演随注）；P3×5+打包 5（AC-3 resolver 替身钉死/AST 锚 attr 形态/101 复现缺 MODEL 前提+delenv 前缀放宽/config.route 不可断言面/五 Schema 措辞勘误等）；正面确认留痕：12 场景三轴全过/6 时间线自洽/B.4 漂移三断言时序成立/单轮 structured 调用数=4+评估 1 |
@@ -1045,7 +1061,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 
 ---
 
-**故事版本/Story Version:** v2.2.0
+**故事版本/Story Version:** v2.3.0
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-28
 **更新说明/Description:**
@@ -1057,3 +1073,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-8 状态�
 - v2.0.0: dev-story 实施完成（Task 0-6 全绿——13 验收场景全绿 + 13552 全量回归 + 覆盖率四档门禁 + 文档终态四件；Status → review）
 - v2.1.0: 代码审查 Round 1（零 P0/P1，P2×7 + P3×15[R2 勘误]——16 修复簇落码 + 5 项登记；最高价值：CR1-F1 评估降级网扩 332 + CR1-F2/F3 prompt 判别力修复）
 - v2.2.0: 代码审查 Round 2（R1 回归风险低——零 P1/P2；P3×9 全清偿：可达性机理勘误 ×2 + 假反例换真例 + CR1-20 死脚手架清偿 + V1-EV8 补登记）
+- v2.3.0: 代码审查 Round 3（单深度推演——八面全过零新缺陷：组合交互×3/时序/并发/边界×3；纯文档轮无代码改动）
