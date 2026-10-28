@@ -68,8 +68,11 @@ class UdmrEvaluationModelResolver(EvaluationModelResolverPort):
             udmr_service: 组合根注册的 UDMRService 实例（真实决策链）。
             cloud_configs: 云端模型配置清单（UDMRConfig.from_env().cloud_configs
                 原始值注入——构造期定格）。
-            local_model: 本地模型名（from_env 回退对齐）。
-            llm_timeout: per-call 超时基底（秒）。
+            local_model: 本地模型名（from_env 回退对齐；默认值镜像
+                UDMRConfig.from_env 默认 "qwen2.5:7b"——仅便利测试装配，
+                生产路径组合根显式注入；改 UDMRConfig 默认时须同步[CR1-F8]）。
+            llm_timeout: per-call 超时基底（秒；默认值 600 镜像 UDMRConfig
+                默认——同上双真源知悉）。
         """
         self._udmr_service = udmr_service
         self._cloud_configs = cloud_configs

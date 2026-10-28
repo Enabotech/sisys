@@ -684,14 +684,7 @@ def test_ac_1_3_context_relevance_and_calibration_formulas(context: dict[str, An
 @given("评估端口模型模块已加载")
 def given_evaluation_port_module_loaded(context: dict[str, Any]) -> None:
     """端口模型加载（延迟 import——Task 0 红阶段的 ModuleNotFoundError 承载者）。"""
-    from src.application.ports.agent_evaluation import (  # noqa: F401
-        ACTUAL_FACTUAL_WEIGHT,
-        CONFIDENCE_ACCURACY_WEIGHT,
-        CONTEXT_ARTIFACT_WEIGHT,
-        CONTEXT_CITATION_WEIGHT,
-        CONTEXT_RELEVANCE_WEIGHT,
-        CONTEXT_TOOL_TRACE_WEIGHT,
-        HALLUCINATION_WEIGHT,
+    from src.application.ports.agent_evaluation import (
         AgentEvaluationPort,
         EvaluationModelResolverPort,
         EvaluationResult,
@@ -807,7 +800,7 @@ def then_hallucination_call_assertions(context: dict[str, Any]) -> None:
     prompt = call.kwargs["prompt"]
     # 三要素：input_summary（任务理解参照）+ 证据摘要 + final_answer（被评估回答）
     assert "分析新能源汽车行业进入战略" in prompt, "prompt 应含 chain.input_summary"
-    assert "证据" in prompt, "prompt 应含证据摘要段"
+    assert "（无引用源）" in prompt, "prompt 应含证据摘要段（零证据链的确定性占位形态——CR1-F6 内容锚）"
     assert '{"answer"' in prompt, "prompt 应含 chain.final_answer（JSON 尾段）"
     assert call.kwargs["response_schema"] is HallucinationEvaluationSchema
     assert call.kwargs.get("system_prompt"), "应传 SYSTEM_PROMPT"
@@ -1083,8 +1076,8 @@ def then_routing_decided_event_published(context: dict[str, Any]) -> None:
     assert event.selected_model == config.model
 
 
-@then("UDMRTask 构造与决策日志调用断言通过")
-def then_udmr_task_and_decision_log(context: dict[str, Any]) -> None:
+@then("决策日志持久化断言通过")
+def then_decision_log_persisted(context: dict[str, Any]) -> None:
     """决策日志持久化调用断言（零 IO 替身捕获——R1-F7：input 不可断言，以日志/事件一致性替代）。"""
     saved = context["log_repo"].saved_logs
     assert len(saved) >= 1, "decide() 应持久化决策日志"
@@ -1101,9 +1094,10 @@ def then_local_branch_assertions(context: dict[str, Any]) -> None:
     config = context["resolved_config"]
     assert config is not None, "local 路由应返回 config"
     assert config.model == _TEST_LOCAL_MODEL, f"local 分支 model 应对齐路由产物，实际 {config.model}"
-    # 连接字段来自 from_env 形态（local_model ≠ from_env 默认 qwen2.5:7b——判别力前提）
+    # 连接字段来自 from_env 形态（local_model ≠ from_env 默认 qwen2.5:7b 的判别力前提
+    # 由单测 resolver L225 前提断言承载——验收侧此断言由上行 ==_TEST_LOCAL_MODEL 蕴含，
+    # CR1-F12 删除自证冗余行）
     from_env_defaults = LLMConfig.from_env()
-    assert config.model != from_env_defaults.model
     assert config.endpoint == from_env_defaults.endpoint
     assert config.api_key == from_env_defaults.api_key
 
@@ -1380,10 +1374,10 @@ def then_baseline_assets_updated(context: dict[str, Any]) -> None:
     """5-7 资产同步 ×2 在位断言（AC-4.3 构造签名基线 + _USE_CASE_INIT_PARAMS 常量）。"""
     acceptance_text = context["baseline_acceptance_text"]
     arch_text = context["baseline_arch_text"]
-    # ① 5-7 验收 AC-4.3 use_case_params 基线更新（五依赖 → 六依赖）
-    assert "evaluation_harness" in acceptance_text, "5-7 验收 AC-4.3 基线应更新六依赖"
-    # ② 5-7 架构验证器 _USE_CASE_INIT_PARAMS 常量更新（五依赖 → 六依赖）
-    assert "evaluation_harness" in arch_text, "_USE_CASE_INIT_PARAMS 应含 evaluation_harness"
+    # ① 5-7 验收 AC-4.3 use_case_params 基线更新（五依赖 → 六依赖）——CR1-F13 清单行锚
+    assert '"evaluation_harness",  # Story 5.8 第六可选依赖' in acceptance_text, "5-7 验收基线应含六依赖清单行"
+    # ② 5-7 架构验证器 _USE_CASE_INIT_PARAMS 常量更新（五依赖 → 六依赖）——CR1-F13 清单行锚
+    assert '"evaluation_harness",  # Story 5.8 第六可选依赖' in arch_text, "_USE_CASE_INIT_PARAMS 应含六依赖清单行"
 
 
 # ===================================================================
@@ -1647,7 +1641,11 @@ def then_env_and_event_channels_untouched(context: dict[str, Any]) -> None:
     assert "AGENT_EVALUATION" not in env_content, ".env.example 不应新增评估开关（YAGNI 裁定）"
     assert "EVALUATION_P95" not in env_content and "EVALUATION_MODEL" not in env_content, "评估常量不应环境变量化"
     channels_content = (REPO_ROOT / "configs" / "event_channels.yaml").read_text(encoding="utf-8")
-    assert "evaluation" not in channels_content.lower(), "评估不经事件总线（event_channels.yaml 零改动）"
+    # CR1-F14 锚收窄：原 "evaluation" 全文子串对检索域等未来含 evaluation 字样的
+    # 事件名会假红——收窄为本 Story 评估面专属符号（agent_evaluation 端口族/
+    # 幻觉检测事件化）零新增
+    assert "agent_evaluation" not in channels_content.lower(), "评估不经事件总线（本 Story 零新增评估事件）"
+    assert "hallucination" not in channels_content.lower(), "幻觉检测不经事件总线（评估是进程内同步面）"
 
 
 # ===================================================================
@@ -1774,8 +1772,13 @@ def then_test_files_present(context: dict[str, Any]) -> None:
 
 @then("5-7 断言更新文件两处已更新")
 def then_5_7_assets_updated(context: dict[str, Any]) -> None:
-    """5-7 资产同步 ×2 断言（验收 AC-4.3 + 架构 _USE_CASE_INIT_PARAMS）。"""
+    """5-7 资产同步 ×2 断言（验收 AC-4.3 + 架构 _USE_CASE_INIT_PARAMS）。
+
+    CR1-F13 锚升级：裸 "evaluation_harness" 全文子串弱锚（注释提及即绿）——
+    改锚参数清单行片段（含资产同步注释的六依赖清单行）；主防线是 5-7 自身
+    的 inspect.signature 断言与验证器 C 基线（本断言是跨文件回执级注记）。
+    """
     acceptance_text = (REPO_ROOT / "tests" / "acceptance" / "test_acceptance_phoenix_tracer.py").read_text(encoding="utf-8")
     arch_text = (REPO_ROOT / "tests" / "unit" / "architecture" / "test_arch_phoenix_tracer.py").read_text(encoding="utf-8")
-    assert "evaluation_harness" in acceptance_text, "5-7 验收 AC-4.3 基线应更新六依赖"
-    assert "evaluation_harness" in arch_text, "5-7 架构 _USE_CASE_INIT_PARAMS 应更新六依赖"
+    assert '"evaluation_harness",  # Story 5.8 第六可选依赖' in acceptance_text, "5-7 验收 AC-4.3 基线应含六依赖清单行"
+    assert '"evaluation_harness",  # Story 5.8 第六可选依赖' in arch_text, "5-7 架构 _USE_CASE_INIT_PARAMS 应含六依赖清单行"

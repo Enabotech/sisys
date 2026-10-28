@@ -16,7 +16,9 @@ asyncio.CancelledError 透传不包装；LLMAPIError/LLMResponseError/TimeoutErr
 ServiceUnavailableError 包装 AgentEvaluationError（450）from error；isinstance
 守卫在 try 块之外（守卫 raise 不被异常分支二次捕获——relevance 服务双层包装
 缺陷规避）。不引入兜底 except Exception（比 _structured_call 宽的 relevance
-先例不抄——评估失败面应全部显性映射）。
+先例不抄——评估失败面应全部显性映射）。透传的 332 在 use case 评估块降级
+网捕获（CR1-F1——附加面边界=catch 边界：透传使降级网可区分「配置错（可
+行动）」与「瞬态失败（450 族）」，332 的现实可达源是运行期 env 半配置态）。
 """
 
 from __future__ import annotations
@@ -123,7 +125,8 @@ class EvaluationHarness:
 
         Args:
             result: 工作流结果（chain.input_summary 任务理解 + chain.final_answer
-                被评估回答与路由输入 + evidence 证据四材料）。
+                被评估回答与路由输入 + evidence 证据四材料——核对依据仅前三类，
+                confidence_rationale 是自我声明不作为支撑依据[CR1-F2]）。
 
         Returns:
             float: 幻觉分 [0,1]（Schema ge/le 域约束保证）。
@@ -152,7 +155,8 @@ class EvaluationHarness:
                 system_prompt=SYSTEM_PROMPT,
             )
         except LLMConfigError:
-            # 配置错误透传不包装（开发期错误应显性失败——_structured_call L468-473 纪律）
+            # 配置错误透传不包装（透传至 use case 评估块降级网——区分配置错与瞬态失败；
+            # 332 现实可达源是运行期 env 半配置态，_structured_call L468-473 纪律）
             raise
         except asyncio.CancelledError:
             # 协程取消透传（父任务取消语义保护）
@@ -174,6 +178,10 @@ class EvaluationHarness:
     @staticmethod
     def _summarize_evidence(evidence: TaskEvidencePackage) -> str:
         """证据摘要四材料组装（DC-2 细则(a)：纳入工件简编使 judge 对伪造引用保有判别力）。
+
+        四材料呈现但核对依据仅前三类（CR1-F2）：confidence_rationale 是
+        Agent 自我声明非外部证据——prompt 明示不得作为支撑依据核对（防自证
+        文本洗白：Agent 在置信理由预写虚构引用源可协调造假逃过检测）。
 
         Args:
             evidence: 任务证据包（citations/artifacts_snapshot/tool_trace/
@@ -233,6 +241,9 @@ class EvaluationHarness:
         与证据支撑均权），本指标度量「自报置信度与代理质量的代理一致性
         （proxy agreement）」非真值校准（业界 calibration 的 actual = ground
         truth + ECE/Brier 度量——无人类标签可用，V1 真校准通道见 deferred-work）。
+        弱判别力知悉（CR1-F9）：p 对 overall 有 ±0.25 边际杠杆（∂overall/∂p，
+        p=a 处折点）；退化常数策略 p≡0.5 即锁定 ca∈[0.5,1]（|0.5−a|≤0.5 恒
+        成立）——ca 无法区分「自知」与「永远报 0.5」。
 
         Args:
             predicted: Agent 自报置信度（evidence.confidence，[0,1]）。
@@ -270,6 +281,14 @@ class EvaluationHarness:
         （hallucination_score 字面语义越高越坏，质量分须单调正向——5.9 CUSUM
         消费方向一致性前提）。权重为手工产品先验（grounding 类维度合计 0.75
         ——overall 高度由证据面驱动），V1 有数据可重标定。
+
+        可达域注记（CR1-F4——消费方阈值设计须知）：ca 条件可达域为
+        ``[min(a,1−a), 1]``（a=((1-h)+cr)/2 居中时 ca≥0.5 常数垫底）——
+        h=1.0（完全幻觉）+cr=1.0 角 overall∈[0.475, 0.60]、h=0+cr=0 角
+        overall∈[0.525, 0.65]，两病态角分数带重叠 [0.525, 0.60]（合成分
+        判别力在病态区坍缩）；精确恒等式 ``overall ≡ 0.25·ca + 0.8·a − 0.05·cr``
+        （actual 与 overall 近仿射——仅 cr 项偏差）。5.9 CUSUM 阈值设计勿按
+        [0,1] 全域假设。
 
         Args:
             hallucination_score: 幻觉分 [0,1]。

@@ -45,7 +45,7 @@ from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.tracing import trace
 from src.application.use_cases.agent_instantiation import SUPPORTED_ROLES
 from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
-from src.domain.exceptions import AgentEvaluationError, AgentNotFoundError, AgentRoleNotSupportedError
+from src.domain.exceptions import AgentEvaluationError, AgentNotFoundError, AgentRoleNotSupportedError, LLMConfigError
 from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.agent_repository import AgentRepository
 from src.domain.value_objects.flow_status import FlowStatus
@@ -191,7 +191,11 @@ class RunAgentWorkflowUseCase:
             span.set_attribute(SpanAttributeKeys.EVIDENCE_INPUT_HASH, result.evidence.input_hash)
         # Story 5.8 评估块（OD-2[5.7] 兑现——eval.* 三键生产填值；可观测附加面哲学：
         # 评估失败降级 warning 跳过不阻断主链，三键缺席不写哨兵值——0.0 可能是
-        # 合法幻觉分；overall 不写 span——三键经权重常量可派生，5.7 键表零改动）
+        # 合法幻觉分；overall 不写 span——三键经权重常量可派生，5.7 键表零改动。
+        # 降级 catch 面含 LLMConfigError（CR1-F1）：332 的现实可达源是运行期
+        # UDMR/LLM env 半配置态（经健康回退 local 分支或云端空 key 形态）非
+        # 开发期代码错误——评估管线内一切失败不阻断主链（附加面边界=catch
+        # 边界）；主链六阶段的 332 显性失败语义不变）
         if self._evaluation_harness is not None:
             try:
                 evaluation_result = await self._evaluation_harness.evaluate(result)
@@ -199,7 +203,7 @@ class RunAgentWorkflowUseCase:
                     span.set_attribute(SpanAttributeKeys.EVAL_HALLUCINATION_SCORE, evaluation_result.hallucination_score)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE, evaluation_result.context_relevance)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY, evaluation_result.confidence_accuracy)
-            except AgentEvaluationError as error:
+            except (AgentEvaluationError, LLMConfigError) as error:
                 logger.warning("评估降级跳过（可观测附加面——评估失败不阻断工作流）: %s", error)
         return result
 

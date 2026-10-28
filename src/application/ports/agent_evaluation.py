@@ -101,7 +101,11 @@ class EvaluationResult:
       度量；本指标是无标注 MVP 的代理构造）。
     - ``overall_score``：质量总分——OD-5 反转加权
       ``(1-h)×0.4 + cr×0.35 + ca×0.25``（三键方向归一，越高越好；5.9 CUSUM
-      消费本键做漂移累积——方向一致性前提）。
+      消费本键做漂移累积——方向一致性前提）。**可达域注记：overall 动态范围
+      被压缩——ca 条件可达域 [min(a,1−a), 1]（a 居中时 ca≥0.5 常数垫底），
+      h=1.0（完全幻觉）+cr=1.0 角 overall∈[0.475, 0.60]、h=0+cr=0 角
+      overall∈[0.525, 0.65]，两病态角分数带重叠——合成分判别力在病态区
+      坍缩，消费方阈值设计勿按 [0,1] 全域假设（详见 _compute_overall）**。
 
     与 AgentWorkflowResult 同层同风格（application/ports/agent_workflow.py 先例）；
     分数域守卫自设加严（[0,1] 闭区间——应用层输入校验，越界抛 ValidationError 201）。
@@ -165,8 +169,10 @@ class AgentEvaluationPort(Protocol):
                 （LLMAPIError/LLMResponseError/TimeoutError/ServiceUnavailableError）/
                 Schema 实例校验失败 / 路由产物匹配失败。
             LLMConfigError: EXCEPTION_332 与 asyncio.CancelledError 透传不包装
-                （``_structured_call`` L468-473 同款纪律——配置错误是开发期错误
-                应显性失败非运行期降级面）。
+                （``_structured_call`` L468-473 同款纪律——透传使 use case 评估块
+                降级网可区分「配置错（可行动）」与「瞬态失败（450 族）」；332 的
+                现实可达源是运行期 env 半配置态，评估附加面内降级 warning 不阻断
+                主链——主链六阶段的 332 显性失败语义不受影响）。
             ValidationError: EXCEPTION_201——EvaluationResult 分数域守卫
                 （理论不可达[输入域已约束]防御层）。
         """

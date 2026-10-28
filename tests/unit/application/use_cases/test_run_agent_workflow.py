@@ -28,6 +28,13 @@ from src.domain.entities.agent import AgentRole, AgentStatus
 from src.domain.value_objects.flow_status import FlowStatus
 
 
+def _make_validation_error() -> Any:
+    """构造 ValidationError(201) 实例（parametrize 参数——模块级求值需 helper 承载延迟 import）。"""
+    from src.domain.exceptions import ValidationError
+
+    return ValidationError(message="201 域守卫击穿")
+
+
 def _make_agent(role: AgentRole = AgentRole.CEO) -> Any:
     """构造 Agent 实体（守卫数据源）。"""
     from src.domain.entities.agent import Agent
@@ -591,6 +598,57 @@ class TestExecuteEvaluationBlock:
             assert key in attributes, f"降级不应伤 MVP 属性: {key}"
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "评估降级" in r.getMessage()]
         assert warnings, "应记录评估降级 warning 日志"
+
+    async def test_evaluation_llm_config_error_degrades_gracefully(self, caplog: pytest.LogCaptureFixture) -> None:
+        """evaluate 抛 LLMConfigError(332) → 同降级（CR1-F1——现实可达源是运行期 env 半配置态）。"""
+        import logging
+
+        from src.application.ports.agent_tracing import SpanAttributeKeys
+        from src.domain.exceptions import LLMConfigError
+
+        caplog.set_level(logging.WARNING, logger="src.application.use_cases.run_agent_workflow")
+        fake_harness = self._make_fake_harness(raises=LLMConfigError(message="LLM API Key 未配置"))
+        use_case, materials = self._assemble_with_evaluation(fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "评估面 332 应降级不阻断主链（附加面边界=catch 边界）"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        for key in (
+            SpanAttributeKeys.EVAL_HALLUCINATION_SCORE,
+            SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE,
+            SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY,
+        ):
+            assert key not in attributes, f"332 降级路径三键应缺席: {key}"
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "评估降级" in r.getMessage()]
+        assert warnings, "332 降级应记录 warning 日志"
+
+    @pytest.mark.parametrize(
+        "unexpected_error",
+        [
+            RuntimeError("评估块外的意外异常不应被吞"),
+            _make_validation_error(),
+        ],
+        ids=["runtime-error", "validation-error-201"],
+    )
+    async def test_evaluation_unexpected_error_propagates(self, unexpected_error: Exception) -> None:
+        """evaluate 抛非降级网异常（RuntimeError/ValidationError 201）→ 击穿主链。
+
+        钉死 catch 收窄边界（CR1-F6）：降级网仅 (AgentEvaluationError, LLMConfigError)
+        ——201 是文档化兄弟面（理论不可达防御层，真触发说明实现 bug 应显性失败）；
+        本用例红 = catch 被放宽为 except Exception（吞掉契约外异常）。
+        """
+
+        fake_harness = self._make_fake_harness(raises=unexpected_error)
+        use_case, materials = self._assemble_with_evaluation(fake_harness)
+        agent = materials["agent"]
+
+        with pytest.raises(type(unexpected_error)):
+            await use_case.execute(agent_id=agent.agent_id, task="分析任务")
 
     async def test_none_harness_keeps_5_7_baseline(self) -> None:
         """None 默认（五参构造兼容）→ 评估块整体跳过——行为与 5-7 基线一致。"""

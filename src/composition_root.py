@@ -3076,11 +3076,16 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
     """Story 5.8 — agent_workflow_use_case 注册工厂（def 承载 try/except——lambda 语法不可能）。
 
     第六依赖 evaluation_harness 经 resolve_optional 可选注入（audit_service 先例
-    ——注册缺失/构造失败降级 None）；评估接线配置错误（如 UDMR_* env 半配置态
-    from_env 抛 ConfigurationError——不在 resolve_optional 默认 fallback_on 内）
-    被本工厂捕获降级 None：评估面损失不阻断主链（可观测附加面哲学——风险 #9，
-    ConfigurationError 非 RuntimeError 子类故须显式捕获；SINGLETON 失败不缓存，
-    后续 resolve 重试不残留毒化）。
+    ——注册缺失/构造失败降级 None）；评估接线配置错误（不在 resolve_optional
+    默认 fallback_on 内）被本工厂捕获降级 None：评估面损失不阻断主链（可观测
+    附加面哲学——风险 #9，ConfigurationError 非 RuntimeError 子类故须显式捕获；
+    SINGLETON 失败不缓存，后续 resolve 重试不残留毒化）。
+
+    适用面注记（CR1-F16——实测收窄）：本防护的净值场景是**评估独有失败面**
+    （如 evaluation_model_resolver lambda 内 udmr_service 解析失败）或 llm_client
+    单例已缓存后 env 中途损坏——若 UDMR_* env 损坏发生在冷启动，主链五 resolve
+    先经 llm_client→build_default_llm_config→from_env 同源 101 失败（预存面：
+    llm_client 无 from_env 防护，非 5.8 引入），工厂降级触发但 use case 仍失败。
     """
     use_case_cls = __import__(
         "src.application.use_cases.run_agent_workflow",

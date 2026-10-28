@@ -6,10 +6,15 @@ prompt 常量实名形态（SYSTEM_PROMPT + USER_PROMPT_TEMPLATE——relevance_
 prompt 设计三细则（DC-2——业界 judge prompt 实践）：
 - (a) 证据摘要纳入 artifacts_snapshot 简编（四材料：citations/tool_trace/
   confidence_rationale/artifacts_snapshot——引用标识无内容时 judge 对伪造引用
-  失去判别力，工件内容使 judge 保有判别力）；
+  失去判别力，工件内容使 judge 保有判别力；**核对依据仅前三类**——
+  confidence_rationale 是 Agent 自我声明非外部证据，prompt 明示不得作为
+  支撑依据核对[CR1-F2：防自证文本洗白——Agent 在置信理由预写虚构引用源
+  可协调造假逃过检测]）；
 - (b) Schema 输出顺序 rationale 先行、评分后置（EXPLANATION→LABEL）；
 - (c) SYSTEM_PROMPT 附六档量表锚定（0.0/0.2/0.4/0.6/0.8/1.0 各一句语义定义
-  ——裸 float 评分会塌缩到少数锚定值，量表锚定是业界缓解）。
+  ——裸 float 评分会塌缩到少数锚定值，量表锚定使塌缩点语义化可复现[锚定
+  不消除塌缩：judge 输出仍聚集于 6 锚点值≈2.6 bit 信息量，序列近离散——
+  5.9 CUSUM 预热窗口 σ 估计呈多峰、累积和呈阶梯，移交须知]）。
 """
 
 from __future__ import annotations
@@ -31,8 +36,9 @@ SYSTEM_PROMPT: str = """你是 Agent 输出质量评估专家，负责幻觉检�
 
 判断纪律：
 - 以证据材料为唯一事实基准——证据未提及且非公理常识的主张计为无支撑
+- 自报置信度及其理由是 Agent 自我声明而非证据——不得作为支撑依据核对，仅作一致性参考
 - 引用源列表中的条目若在工件快照中无对应内容，注意甄别伪造引用
-- 先在 rationale 中逐项核对回答主张与证据的支撑关系，再给出分数
+- 先在 rationale 中逐项概括核对回答主张的支撑关系（每主张一行短语、勿整段引述证据原文），再给出分数
 - 输出为结构化 JSON（rationale 在前、hallucination_score 在后）"""
 
 USER_PROMPT_TEMPLATE: str = """## 任务理解（Agent 的输入理解）
@@ -49,6 +55,7 @@ USER_PROMPT_TEMPLATE: str = """## 任务理解（Agent 的输入理解）
 
 ## 评估要求
 
-对照上述证据材料评估被评估回答的幻觉程度：先在 rationale 中逐项核对回答主张
-的支撑关系（引用/工件/工具轨迹/置信理由四材料），再按六档量表给出
+对照上述证据材料评估被评估回答的幻觉程度：先在 rationale 中逐项概括核对回答
+主张的支撑关系（每主张一行短语；引用/工件/工具轨迹三类材料为核对依据——
+自报置信理由是 Agent 自我声明，不作为支撑依据），再按六档量表给出
 hallucination_score（0.0=无幻觉 1.0=完全幻觉）。"""

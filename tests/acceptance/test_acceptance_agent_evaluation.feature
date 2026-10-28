@@ -40,7 +40,7 @@
     当 调用 resolver.resolve_config 解析评估模型配置
     那么 config 匹配云端模型（model 与 endpoint 与 api_key 与 timeout 逐字段相等）
     并且 RoutingDecided 事件经替身捕获发布断言通过
-    并且 UDMRTask 构造与决策日志调用断言通过
+    并且 决策日志持久化断言通过
 
   场景: AC-2.2 - 云端不可用 local 回退与非硬编码双配置判别
     假如 真实 UDMR 决策链已装配（健康检查替身 False + 云端配置 + 本地模型）

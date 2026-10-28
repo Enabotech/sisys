@@ -3,7 +3,9 @@
 子域范围：Agent 输出质量评估管线（EvaluationHarness：幻觉检测 LLM 调用 +
 证据支撑度计算 + 置信度校准 + overall 加权；评估模型 UDMR in-band 路由解析）。
 评估是 Agent 可观测族的可观测附加面——评估失败经 use case 降级 catch（warning
-跳过不阻断工作流主链），450 是降级网捕获的唯一异常面。
+跳过不阻断工作流主链），450 与评估路径透传的 LLMConfigError（332——现实可达
+源是运行期 env 半配置态，CR1-F1）是降级网捕获面；主链六阶段的 332 显性失败
+语义不受影响。
 
 编码段：450-459（evaluation 子域新开——agent 段 440-449 已满后的四代开段先例：
 data_source 410/debate 420/tool_version 430/agent 440 后第五段）。
@@ -29,8 +31,10 @@ class AgentEvaluationError(SystemException):
           归降级网——运行期 env 损坏不得击穿主链）。
 
     LLM 族异常传播策略（``_structured_call`` L468-473 纪律照抄）：LLMConfigError
-    （332，配置错误属开发期错误应显性失败）与 asyncio.CancelledError（协程取消
-    语义保护）透传不包装；其余 LLM 族异常包装 450 携 cause 链。
+    （332——透传使 use case 评估块降级网可区分「配置错（可行动）」与「瞬态失败
+    （450 族）」，现实可达源是运行期 env 半配置态非开发期代码错误[CR1-F1]）与
+    asyncio.CancelledError（协程取消语义保护）透传不包装；其余 LLM 族异常包装
+    450 携 cause 链。
 
     Attributes:
         code: EXCEPTION_450

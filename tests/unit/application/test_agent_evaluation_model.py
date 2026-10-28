@@ -123,14 +123,20 @@ class TestEvaluationResultFrozen:
 
 
 class TestEvaluationWeights:
-    """权重常量单源（防漂移——两组和为 1.0 元断言）。"""
+    """权重常量单源（防漂移——两组和为 1.0 元断言）。
+
+    承重注记（CR1-F9）：下方两个 ``== 1.0`` 直接相等断言是 EvaluationResult
+    [0,1] 域守卫不崩主链的前提——权重和二进制精确时全满场景 cr/overall 恰触
+    1.0 不越界；任一权重改动选到非精确组合（如 0.1+0.2+0.7=1.0000000000000002）
+    则 201 击穿降级网。**未来重标定者禁改 math.isclose**（改即静默拆护栏）。
+    """
 
     def test_overall_weights_sum_to_one(self) -> None:
-        """overall 三维权重和精确 == 1.0（二进制精确——R3 实算确认）。"""
+        """overall 三维权重和精确 == 1.0（二进制精确——R3 实算确认；承重断言见类 docstring）。"""
         assert HALLUCINATION_WEIGHT + CONTEXT_RELEVANCE_WEIGHT + CONFIDENCE_ACCURACY_WEIGHT == 1.0
 
     def test_context_weights_sum_to_one(self) -> None:
-        """证据支撑度三元权重和精确 == 1.0。"""
+        """证据支撑度三元权重和精确 == 1.0（承重断言见类 docstring）。"""
         assert CONTEXT_CITATION_WEIGHT + CONTEXT_ARTIFACT_WEIGHT + CONTEXT_TOOL_TRACE_WEIGHT == 1.0
 
     def test_expected_weight_values(self) -> None:

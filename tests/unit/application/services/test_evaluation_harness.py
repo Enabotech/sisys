@@ -143,11 +143,19 @@ class TestHallucinationSchema:
         assert field_order == ["rationale", "hallucination_score"]
 
     def test_schema_flat_no_nested_models(self) -> None:
-        """扁平零嵌套（anthropic 通道约束——嵌套 Schema 服务端栈溢出）."""
+        """扁平零嵌套（anthropic 通道约束——嵌套 Schema 服务端栈溢出）.
+
+        CR1-F5 根修：原 ``"BaseModel" not in str(annotation)`` 恒真（嵌套模型注解的
+        str() 是 ``<class '...SubSchema'>`` 不含 "BaseModel" 子串）——改为注解集合
+        子集断言（变异：加嵌套字段 → 注解为嵌套类对象 → 不在标量集 → 红）。
+        """
         from src.application.services.evaluation_schemas import HallucinationEvaluationSchema
 
-        for field_info in HallucinationEvaluationSchema.model_fields.values():
-            assert "BaseModel" not in str(field_info.annotation), f"字段 {field_info} 应为标量（零嵌套）"
+        allowed = {str, float, int}
+        for name, field_info in HallucinationEvaluationSchema.model_fields.items():
+            assert field_info.annotation in allowed, (
+                f"字段 {name} 注解应为标量（{allowed}），实际 {field_info.annotation}——嵌套 Schema 触发 anthropic 栈溢出"
+            )
 
     def test_schema_domain_constraint_violation(self) -> None:
         """ge/le 域约束（越界 pydantic 校验失败）。"""
@@ -241,6 +249,36 @@ class TestHallucinationDetection:
         assert config.model == "base-eval-model"
         assert config.endpoint == "https://base-eval.example/v1"
         assert config.api_key == resolver.base_config.api_key
+
+    async def test_prompt_evidence_content_anchors(self) -> None:
+        """全证据链 prompt 内容锚（CR1-F6——证据要素从模板级升级为内容级验证）。"""
+
+        from src.application.services.evaluation_schemas import HallucinationEvaluationSchema
+
+        long_excerpt = "甲" * 120 + "乙" * 30  # 第 121 字符起为简编边界外内容
+        result = _make_input(
+            citations=("行业白皮书-2026",),
+            tool_trace=("udmr_policy_probe",),
+            artifacts_snapshot=(("战略报告A", long_excerpt),),
+        )
+        fake_llm = _make_fake_llm()
+        harness = _make_harness(fake_llm=fake_llm)
+        await harness.evaluate(result)
+
+        calls = [
+            c
+            for c in fake_llm.structured_generate.call_args_list
+            if c.kwargs.get("response_schema") is HallucinationEvaluationSchema
+        ]
+        prompt = calls[0].kwargs["prompt"]
+        # 证据三材料内容锚：_summarize_evidence 输出真传入（返空串/分支损坏即红）
+        assert "行业白皮书-2026" in prompt, "prompt 应含 citation 字面量"
+        assert "udmr_policy_probe" in prompt, "prompt 应含 tool_trace 字面量"
+        assert "战略报告A" in prompt, "prompt 应含 artifact 名"
+        # 120 字符简编截断行为锚（CR1-F6 顺带覆盖——简编常量此前零覆盖）
+        assert "甲" * 120 in prompt, "prompt 应含 artifact 摘录前 120 字符"
+        assert "乙" not in prompt, "prompt 不应含摘录第 121 字符后内容（简编截断）"
+        assert "（无引用源）" not in prompt, "全证据链不应出现空占位标记"
 
     async def test_resolver_input_is_final_answer(self) -> None:
         """resolver 入参 = chain.final_answer（UDMRTask.input——合规检测输入面）."""
