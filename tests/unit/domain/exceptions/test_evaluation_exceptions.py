@@ -1,8 +1,9 @@
-"""AgentEvaluationError（EXCEPTION_450）单元测试——Story 5.8 评估子域新开。
+"""AgentEvaluationError（EXCEPTION_450）+ DriftDetectionError（EXCEPTION_451）单元测试。
 
 覆盖面：构造与 context 三键暴露 / code 与 message / to_dict 序列化 / HTTP 映射 500
 （EXCEPTION_HTTP_MAP 显式注册）/ 子域注册（CODE_RANGES evaluation 段 450-459 +
-_CLASS_TO_SUBDOMAIN 映射）/ SystemException 继承面。
+_CLASS_TO_SUBDOMAIN 映射）/ SystemException 继承面；451（Story 5.9 漂移检测——
+evaluation 子域预留段首个取用）同族追加。
 
 Run with:
     poetry run pytest tests/unit/domain/exceptions/test_evaluation_exceptions.py -v
@@ -10,7 +11,7 @@ Run with:
 
 from __future__ import annotations
 
-from src.domain.exceptions import AgentEvaluationError, SystemException, ValidationError
+from src.domain.exceptions import AgentEvaluationError, DriftDetectionError, SystemException, ValidationError
 from src.domain.exceptions._code_ranges import _CLASS_TO_SUBDOMAIN, CODE_RANGES
 
 
@@ -116,3 +117,94 @@ class TestAgentEvaluationErrorSubdomainRegistration:
         agent_low, agent_high = CODE_RANGES["agent"]
         eval_low, eval_high = CODE_RANGES["evaluation"]
         assert eval_low > agent_high
+
+
+class TestDriftDetectionErrorConstruction:
+    """DriftDetectionError（EXCEPTION_451——Story 5.9 漂移检测）构造与 context 暴露。"""
+
+    def test_default_message_and_code(self) -> None:
+        """默认消息非空 + code 精确 451。"""
+        error = DriftDetectionError()
+        assert error.code == "EXCEPTION_451"
+        assert error.message, "默认消息应为非空静态文案"
+
+    def test_context_carries_three_keys(self) -> None:
+        """context 三键（metric_name/phase/reason）——漂移检测的定位维度。"""
+        error = DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        assert error.context["metric_name"] == "overall_score"
+        assert error.context["phase"] == "drift_detection"
+        assert error.context["reason"] == "drift_update"
+
+    def test_metric_name_defaults_to_overall_score(self) -> None:
+        """metric_name 默认 overall_score（检测器绑定常量同值）。"""
+        error = DriftDetectionError()
+        assert error.context["metric_name"] == "overall_score"
+
+    def test_phase_defaults_to_drift_detection(self) -> None:
+        """phase 默认 drift_detection（区别于 450 的 evaluation——降级网诊断区分锚）。"""
+        error = DriftDetectionError(reason="invalid_state")
+        assert error.context["phase"] == "drift_detection"
+
+    def test_custom_message_override(self) -> None:
+        """自定义 message 覆盖默认。"""
+        error = DriftDetectionError(message="漂移检测状态异常（自定义）")
+        assert error.message == "漂移检测状态异常（自定义）"
+
+    def test_cause_chain_preserved(self) -> None:
+        """cause 异常链保留。"""
+        original = ValidationError(message="内层校验失败")
+        error = DriftDetectionError(reason="degenerate_baseline", cause=original)
+        assert error.cause is original
+
+    def test_inherits_system_exception(self) -> None:
+        """继承面：SystemException（漂移检测是系统侧可观测行为——450 同族论证延续）。"""
+        from src.domain.exceptions.base_exceptions import DomainError
+
+        error = DriftDetectionError()
+        assert isinstance(error, SystemException)
+        assert isinstance(error, DomainError)
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict 序列化（code/message/context 三段）。"""
+        error = DriftDetectionError(metric_name="overall_score", reason="invalid_state")
+        data = error.to_dict()
+        assert data["code"] == "EXCEPTION_451"
+        assert data["context"]["phase"] == "drift_detection"
+        assert data["context"]["reason"] == "invalid_state"
+
+
+class TestDriftDetectionErrorHttpMapping:
+    """HTTP 映射（EXCEPTION_HTTP_MAP 显式注册——惯例性消歧，SystemException 族 500）。"""
+
+    def test_maps_to_500_via_function(self) -> None:
+        """_get_http_status 正向断言。"""
+        from src.interfaces.api.exception_handlers import _get_http_status
+
+        error = DriftDetectionError()
+        assert _get_http_status(error) == 500
+
+    def test_registered_in_exception_http_map(self) -> None:
+        """表直查反向断言（防 isinstance 回退歧义——451 精确注册惯例）。"""
+        from fastapi import status
+
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert EXCEPTION_HTTP_MAP[DriftDetectionError] == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class TestDriftDetectionErrorSubdomainRegistration:
+    """子域注册（evaluation 段内取用 451——预留段钦定 L137-138 注释兑现）。"""
+
+    def test_class_to_subdomain_mapping(self) -> None:
+        """_CLASS_TO_SUBDOMAIN 映射到 evaluation。"""
+        assert _CLASS_TO_SUBDOMAIN["DriftDetectionError"] == "evaluation"
+
+    def test_code_within_segment(self) -> None:
+        """码值 451 落 evaluation 段（450-459）。"""
+        low, high = CODE_RANGES["evaluation"]
+        numeric = int(DriftDetectionError.code.removeprefix("EXCEPTION_"))
+        assert low <= numeric <= high
+
+    def test_code_distinct_from_450(self) -> None:
+        """451 与 450 语义分立（评估失败 vs 检测失败——三层降级网诊断区分）。"""
+        assert DriftDetectionError.code != AgentEvaluationError.code

@@ -50,6 +50,7 @@ from src.domain.exceptions import (
     DictionaryVersionConflictError,
     DocumentVersionConflictError,
     DomainError,
+    DriftDetectionError,
     EntityBusinessRuleError,
     EntityExtractionError,
     EntityStateTransitionError,
@@ -280,8 +281,9 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     IsolationStateNotInitializedError: status.HTTP_404_NOT_FOUND,  # 447 — 隔离状态未初始化（404 族）
     IsolationAccessViolationError: status.HTTP_403_FORBIDDEN,  # 448 — 跨 Agent 私有资源访问越权（Story 5.5 三重硬隔离）
     IsolationOperationForbiddenError: status.HTTP_403_FORBIDDEN,  # 449 — 等级策略禁止操作（Story 5.5 白名单外工具/共享面写拒）
-    # 评估子域异常（Story 5.8 — Agent 输出质量评估）
+    # 评估子域异常（Story 5.8 — Agent 输出质量评估 + Story 5.9 漂移检测）
     AgentEvaluationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 450 — 评估管线执行失败（系统可观测语义，精确注册防回退歧义）
+    DriftDetectionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 451 — CUSUM 漂移检测执行失败（精确注册防回退歧义）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

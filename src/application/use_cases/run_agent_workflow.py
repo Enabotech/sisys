@@ -38,6 +38,7 @@ from uuid import UUID
 
 from opentelemetry.trace import get_current_span
 
+from src.application.ports.agent_drift import DriftDetectionPort
 from src.application.ports.agent_evaluation import AgentEvaluationPort
 from src.application.ports.agent_tracing import SpanAttributeKeys, SpanNames
 from src.application.ports.agent_workflow import AgentWorkflowResult, AgentWorkflowServicePort
@@ -45,7 +46,13 @@ from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.tracing import trace
 from src.application.use_cases.agent_instantiation import SUPPORTED_ROLES
 from src.application.use_cases.agent_profile_loading import LoadAgentProfileUseCase
-from src.domain.exceptions import AgentEvaluationError, AgentNotFoundError, AgentRoleNotSupportedError, LLMConfigError
+from src.domain.exceptions import (
+    AgentEvaluationError,
+    AgentNotFoundError,
+    AgentRoleNotSupportedError,
+    DriftDetectionError,
+    LLMConfigError,
+)
 from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.agent_repository import AgentRepository
 from src.domain.value_objects.flow_status import FlowStatus
@@ -72,8 +79,9 @@ class RunAgentWorkflowUseCase:
         agent_workflow_service: AgentWorkflowServicePort,
         isolation_guard: IsolationGuardPort,
         evaluation_harness: AgentEvaluationPort | None = None,
+        drift_detector: DriftDetectionPort | None = None,
     ) -> None:
-        """初始化执行用例（六依赖注入——编排模板对齐 5-2 六步形态）
+        """初始化执行用例（七依赖注入——编排模板对齐 5-2 六步形态）
 
         Args:
             agent_repository: Agent 仓储端口（存在性守卫）
@@ -85,6 +93,9 @@ class RunAgentWorkflowUseCase:
             evaluation_harness: 评估端口（Story 5.8——可选依赖 None 默认：评估是
                 可观测附加面，未注入时评估块整体跳过，存量五参构造零破坏——
                 DC-5 六依赖向后兼容形态）
+            drift_detector: 漂移检测端口（Story 5.9——可选依赖 None 默认：漂移
+                检测是可观测附加面，未注入时漂移块整体跳过，存量六参构造零破坏
+                ——尾部追加形态，DC-5 第七依赖向后兼容）
         """
         self._repository = agent_repository
         self._profile_use_case = agent_profile_use_case
@@ -92,6 +103,7 @@ class RunAgentWorkflowUseCase:
         self._workflow_service = agent_workflow_service
         self._isolation_guard = isolation_guard
         self._evaluation_harness = evaluation_harness
+        self._drift_detector = drift_detector
 
     @trace(SpanNames.AGENT_EXECUTION)
     async def execute(self, agent_id: UUID, task: str) -> AgentWorkflowResult:
@@ -197,7 +209,14 @@ class RunAgentWorkflowUseCase:
         # 本地——主链 build_default 忽略 local_first 照常走 cloud，评估 local
         # 分支 from_env 缺 endpoint/key 即 332）非开发期代码错误——评估管线内
         # 一切失败不阻断主链（附加面边界=catch 边界）；主链六阶段的 332 显性
-        # 失败语义不变）
+        # 失败语义不变。
+        # Story 5.9 漂移检测块内嵌评估块 try 体内（evaluate 成功 + 三键写入后）：
+        # 漂移消费评估产物（evaluation_result 局部变量存活域内）+ 评估失败时漂移
+        # 天然跳过（序列缺口 MVP=跳过——缺口不入累积，5.8 风险 #6②处置）+ 451
+        # 降级网共享评估块 catch（三层网 450/332/451 单一 catch 点——CR1-F1 论证
+        # 形态延续）。drift.detected 仅确认漂移时写（OD-2[5.7] 兑现——键缺席=
+        # 本 run 无确认漂移[预热期/无漂移/降级跳过三态]，与 eval 三键「缺席=
+        # 降级」语义分立：drift 缺席是常态，勿误读为故障）。
         if self._evaluation_harness is not None:
             try:
                 evaluation_result = await self._evaluation_harness.evaluate(result)
@@ -205,7 +224,16 @@ class RunAgentWorkflowUseCase:
                     span.set_attribute(SpanAttributeKeys.EVAL_HALLUCINATION_SCORE, evaluation_result.hallucination_score)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE, evaluation_result.context_relevance)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY, evaluation_result.confidence_accuracy)
-            except (AgentEvaluationError, LLMConfigError) as error:
+                # Story 5.9 漂移检测块（None 守卫 → update → is_drifted 分支 →
+                # DRIFT_DETECTED 写入[is_recording 守卫] → trigger_recalibration
+                # [agent_id 从 execute 形参透传——DriftDetected 人工介入定位维度]）
+                if self._drift_detector is not None:
+                    drift_assessment = await self._drift_detector.update(evaluation_result.overall_score)
+                    if drift_assessment.is_drifted:
+                        if span.is_recording():
+                            span.set_attribute(SpanAttributeKeys.DRIFT_DETECTED, True)
+                        await self._drift_detector.trigger_recalibration(drift_assessment, agent_id=str(agent_id))
+            except (AgentEvaluationError, LLMConfigError, DriftDetectionError) as error:
                 logger.warning("评估降级跳过（可观测附加面——评估失败不阻断工作流）: %s", error)
         return result
 

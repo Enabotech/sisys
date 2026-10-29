@@ -1,21 +1,23 @@
-"""评估子域异常（evaluation，450-459）——Story 5.8 Agent 输出质量评估。
+"""评估子域异常（evaluation，450-459）——Story 5.8 Agent 输出质量评估 + Story 5.9 漂移检测。
 
 子域范围：Agent 输出质量评估管线（EvaluationHarness：幻觉检测 LLM 调用 +
-证据支撑度计算 + 置信度校准 + overall 加权；评估模型 UDMR in-band 路由解析）。
-评估是 Agent 可观测族的可观测附加面——评估失败经 use case 降级 catch（warning
-跳过不阻断工作流主链），450 与评估路径透传的 LLMConfigError（332——现实可达
-源是运行期 env 半配置态，CR1-F1）是降级网捕获面；主链六阶段的 332 显性失败
-语义不受影响。
+证据支撑度计算 + 置信度校准 + overall 加权；评估模型 UDMR in-band 路由解析）+
+CUSUM 漂移检测管线（CUSUMDriftDetector：双侧累积和 + N中M 确认 + DriftDetected
+事件发布）。评估与漂移检测均为 Agent 可观测族的可观测附加面——失败经 use case
+评估块降级 catch（warning 跳过不阻断工作流主链），450/451 与评估路径透传的
+LLMConfigError（332——现实可达源是运行期 env 半配置态，CR1-F1）是三层降级网
+捕获面；主链六阶段的 332 显性失败语义不受影响。
 
 编码段：450-459（evaluation 子域新开——agent 段 440-449 已满后的四代开段先例：
-data_source 410/debate 420/tool_version 430/agent 440 后第五段）。
+data_source 410/debate 420/tool_version 430/agent 440 后第五段；451 是预留段
+首个取用——_code_ranges 段注释钦定「5.9 漂移检测/5.10 评估历史如需新码在此段取」）。
 """
 
 from __future__ import annotations
 
 from src.domain.exceptions.system_exceptions import SystemException
 
-__all__ = ["AgentEvaluationError"]
+__all__ = ["AgentEvaluationError", "DriftDetectionError"]
 
 
 class AgentEvaluationError(SystemException):
@@ -72,6 +74,63 @@ class AgentEvaluationError(SystemException):
         """
         context: dict[str, str] = {
             "agent_id": agent_id,
+            "phase": phase,
+            "reason": reason,
+        }
+        if context_extra:
+            context.update(context_extra)
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class DriftDetectionError(SystemException):
+    """CUSUM 漂移检测管线执行失败（Story 5.9 — FR-EV-03 漂移检测面）
+
+    触发场景：
+        - 检测管线状态异常防御面（update 双侧累积/确认窗状态机不可达态——
+          理论不可达的防御层，主链可用性优先于漂移检测完整性）；
+        - degenerate 基线外的管线级异常路径（σ₀ 退化是数据形态降级非管线
+          错误——恒走 detection=False 可观测降级，不抛本异常）。
+
+    三层降级网第三层（CR1-F1[5.8] 论证形态延续）：评估失败 450 / 评估配置
+    失败 332 / 漂移检测失败 451——use case 评估块 catch 元组
+    ``(AgentEvaluationError, LLMConfigError, DriftDetectionError)`` 单一 catch 点
+    warning 跳过不阻断主链（可观测附加面哲学：漂移检测完整性损失不阻断已
+    完成的工作流结果）。
+
+    Attributes:
+        code: EXCEPTION_451（evaluation 子域预留段首个取用）
+        message: 默认消息（静态文案——仅 phase/reason 语义面，不泄露内部
+            统计量全序列）
+        context: 领域上下文（metric_name/phase/reason——reason 取值
+            invalid_state/degenerate_baseline 标识失败环节）
+    """
+
+    code = "EXCEPTION_451"
+    message = "CUSUM 漂移检测执行失败"
+
+    def __init__(
+        self,
+        metric_name: str = "overall_score",
+        phase: str = "drift_detection",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """初始化漂移检测管线执行异常
+
+        Args:
+            metric_name: 漂移检测的指标名（检测器绑定常量同值——overall_score）。
+            phase: 失败环节名（漂移检测管线恒为 "drift_detection"——与 450 的
+                "evaluation" 区分，降级网诊断锚）。
+            reason: 面向调用方可理解的失败环节摘要（invalid_state/
+                degenerate_baseline 等）。
+            message: 覆盖默认消息（可选）。
+            cause: 原始异常（可选，用于异常链）。
+            context_extra: 额外诊断键（合并进 context，值域 str）。
+        """
+        context: dict[str, str] = {
+            "metric_name": metric_name,
             "phase": phase,
             "reason": reason,
         }

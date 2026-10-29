@@ -5,6 +5,10 @@
 - 定义应用层特定方法
 """
 
+from src.application.ports.agent_drift import (
+    DriftAssessment,
+    DriftDetectionPort,
+)
 from src.application.ports.agent_evaluation import (
     AgentEvaluationPort,
     EvaluationModelResolverPort,
@@ -35,6 +39,8 @@ __all__ = [
     "AgentTracingPort",
     "CompressorService",
     "DocumentStoragePort",
+    "DriftAssessment",
+    "DriftDetectionPort",
     "EventSubscriber",
     "EvaluationModelResolverPort",
     "EvaluationResult",

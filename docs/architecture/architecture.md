@@ -2658,7 +2658,22 @@ buckets/
 > （OD-1[5.7] 触发条件裁定不满足——零新依赖零架构白名单变更）；算法裁定
 > （OD-3 证据支撑度存在性启发式/OD-4 actual 口径/OD-5 幻觉分字面语义）见
 > sisys-core-domain-design §17.3.8 实现注记；评估管线 P95<500ms（Fake LLM
-> 口径）。CUSUM 漂移检测归 5.9（消费 overall_score 连续序列）。
+> 口径）。
+>
+> **Story 5.9 交付注记（CUSUM 漂移检测面——FR-EV-03 闭环）**：`CUSUMDriftDetector`
+> （infrastructure/monitoring——L2594 钦定位置）实现 `DriftDetectionPort`
+> （application/ports/agent_drift.py——Agent 评估可观测族第三端口）：双侧累积和
+> （k=0.5σ₀/h=5σ₀ 相对量）+ 预热基线（30 样本冻结）+ N中M 确认（3中5 含当前样本
+> detection 条件——ISA-18.2 M-of-N 告警宣告语义）+ 分级（moderate/severe 乘法
+> 同式）+ 确认后复位（持续漂移周期性再告警）。主链第七可选依赖接入评估块内
+> （三层降级网 450/332/451），确认漂移时写 `drift.detected=True` 根 span（5.7
+> OD-2 全量兑现——eval.* 5.8 + drift.* 5.9）+ 发布 `DriftDetected` 领域事件
+> （reliable 单通道双登记——人工介入通知载体，recommended_action="manual_review"）。
+> 纯标准库零新依赖（OD-2——附录 I 示例 numpy/scipy 不采用）；性能双锚：检测管线
+> P99<100ms（纯内存口径——事件发布出栈）+ 合成序列回测准确率 0.975≥0.85
+> （固定种子确定性——真实历史回测 V2）；实现裁定（OD-3 冻结基线/OD-4 单指标
+> overall_score/OD-5 确认复位/OD-6 人工介入单通道/OD-7 单方法原子化）见
+> sisys-core-domain-design §17.3.8 实现注记与 5-9 故事文件。
 
 ---
 

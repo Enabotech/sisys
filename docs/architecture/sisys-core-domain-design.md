@@ -1741,6 +1741,28 @@ class CheckpointWithEvaluation:
 | 可视化 | Grafana | 评估仪表盘、漂移告警 |
 | 分布式追踪 | OpenTelemetry | Phoenix 与 SISYS 追踪系统对接 |
 
+> **Story 5.9 实现注记（CUSUM 漂移检测——本节伪码的落地裁定）**：本节伪码的
+> `CUSUMDriftDetector`/`is_drifted`/`trigger_recalibration` 三符号已由 Story 5.9
+> 交付，落地形态经 OD-3~OD-7 五项裁定映射（详见 5-9 故事文件偏离声明节）：
+> **OD-3** 预热基线 = 进程内 30 样本冻结（附录 I 的 14 天 ≥1000 样本采集期在 MVP
+> 验收窗口不可满足——30 锚定 §29.2.3.2 正态性检验最小样本量；冻结基线保留慢漂移
+> 检出能力——滑动基线随漂移同向移动会掩蔽慢漂移，业界同构 Evidently 固定
+> reference/current 二窗；重启归零 MVP 知悉，Redis 持久化 V1-EV12）；**OD-4**
+> 单指标 overall_score（伪码 update(eval_result.overall_score) 钦定序列源——多指标
+> 逐键归因 V1-EV9）；**OD-5** 确认后立即复位（Sₕ/Sₗ 归零 + 窗清空——持续漂移下
+> 周期性再告警，间隔与漂移幅度反比）+ severity 确认后仅 moderate/severe 两档
+> （N中M 确认含当前样本 detection 条件 → max(S)>5σ₀ 恒成立，minor 观察档不可达）
+> + 参考实现 raise ValueError 改领域异常体系（201 入参域/451 管线失败）；
+> **OD-6** trigger_recalibration MVP「提示人工介入」单通道（发布 DriftDetected
+> reliable 事件 + logger.warning——自动模型配置变更 V1-EV11）；**OD-7** 伪码
+> update+is_drifted 两方法原子化为端口单方法 `update(score) -> DriftAssessment`
+> （判定语义由返回值字段承载——并发/异常路径无中间态）+ 独立方法
+> `trigger_recalibration(assessment, agent_id)`。算法核心纯标准库实现
+> （OD-2——附录 I §29.7.1 示例的 numpy/scipy 不采用：O(1) 增量无向量化需求）；
+> 事件通道 reliable 单通道双登记（告警不可丢——RabbitMQ + Outbox）；性能双锚
+> 实测：检测管线 P99 μs 级（<100ms 门）、合成回测准确率 0.975（钦定种子 40
+> 序列——真实历史回测 V2-EV1 数据积累后）。
+
 ---
 
 ### 17.4 战略规划架构设计

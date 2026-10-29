@@ -1316,7 +1316,7 @@ def when_check_signature_and_none_path(context: dict[str, Any]) -> None:
 
 @then("第六参数 evaluation_harness 默认 None 且签名清单断言通过")
 def then_sixth_param_default_none(context: dict[str, Any]) -> None:
-    """签名断言（六依赖清单 + 第六参数默认 None——存量五参调用零破坏）。"""
+    """签名断言（七依赖清单 + 第六参数默认 None——存量五参调用零破坏；5-9 扩七资产同步⑤）。"""
     assert context["signature_params"] == [
         "agent_repository",
         "agent_profile_use_case",
@@ -1324,7 +1324,8 @@ def then_sixth_param_default_none(context: dict[str, Any]) -> None:
         "agent_workflow_service",
         "isolation_guard",
         "evaluation_harness",
-    ], f"构造签名应为六依赖: {context['signature_params']}"
+        "drift_detector",
+    ], f"构造签名应为七依赖（5-9 扩七）: {context['signature_params']}"
     assert context["signature_default"] is None
 
 

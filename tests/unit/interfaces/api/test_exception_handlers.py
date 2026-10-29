@@ -56,6 +56,7 @@ from src.domain.exceptions import (
     DictionaryNotFoundError,
     DictionaryVersionConflictError,
     DocumentVersionConflictError,
+    DriftDetectionError,
     EntityBusinessRuleError,
     EntityExtractionError,
     EntityStateTransitionError,
@@ -350,6 +351,7 @@ class TestExceptionHttpMap:
             IsolationAccessViolationError,  # 448 — Story 5.5 跨 Agent 私有资源访问越权（403）
             IsolationOperationForbiddenError,  # 449 — Story 5.5 隔离等级策略禁止操作（403）
             AgentEvaluationError,  # 450 — Story 5.8 评估管线执行失败（500）
+            DriftDetectionError,  # 451 — Story 5.9 CUSUM 漂移检测执行失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

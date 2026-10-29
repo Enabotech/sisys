@@ -3033,6 +3033,32 @@ def bootstrap() -> None:
         tags=("agent", "evaluation", "udmr"),
     )
 
+    # === Story 5.9 — CUSUM 漂移检测与触发重校准（CUSUMDriftDetector + DriftDetected 事件）===
+    # SINGLETON（DC-6 有状态单例——状态即功能：跨 run 序列累积[预热 30 + 检测期]必须
+    # 跨 execute 调用存活，与 5.8 无状态 SINGLETON 论证分立；重启归零 MVP 知悉[OD-3⑤]，
+    # V1 Redis 持久化 V1-EV12）。use case 第七依赖注入（resolve_optional 可选接线）归
+    # Task 3 循环 B 与第七构造参数同窗落地——本区段仅端口注册（R1-F1[5.8] 时序约束：
+    # 第七参数不存在时注入 kwarg 必 TypeError）。检测器 lambda 无 env 依赖（纯常量
+    # 构造——k/h/N/M/预热窗是代码常量单源，.env.example 零改动）。
+    register_port(
+        name="agent_drift",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_drift",
+            fromlist=["DriftDetectionPort"],
+        ).DriftDetectionPort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.monitoring.cusum_detector",
+            fromlist=["CUSUMDriftDetector"],
+        ).CUSUMDriftDetector(
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.infrastructure.monitoring.cusum_detector",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "drift", "observability"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
@@ -3101,6 +3127,14 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
     except ConfigurationError as error:
         logger.warning("评估接线降级跳过（agent_evaluation 构造失败——评估面损失不阻断主链）: %s", error)
         evaluation_harness = None
+    # Story 5.9 — 第七依赖同款降级防护（agent_drift resolve_optional 可选接线：
+    # 检测器构造失败 → None 不阻断 bootstrap；CR1-DF2[5.8] 一并处置——降级路径
+    # 测试覆盖经 5-9 验收 AC-4.1 承载）
+    try:
+        drift_detector = resolver.resolve_optional("agent_drift")
+    except ConfigurationError as error:
+        logger.warning("漂移检测接线降级跳过（agent_drift 构造失败——漂移检测面损失不阻断主链）: %s", error)
+        drift_detector = None
     return use_case_cls(
         agent_repository=resolver.resolve("agent_repository"),
         agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
@@ -3108,6 +3142,7 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
         agent_workflow_service=resolver.resolve("agent_workflow_service"),
         isolation_guard=resolver.resolve("isolation_guard_service"),
         evaluation_harness=evaluation_harness,
+        drift_detector=drift_detector,
     )
 
 

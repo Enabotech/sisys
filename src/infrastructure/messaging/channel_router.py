@@ -270,6 +270,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="战略偏差警告",
         ),
+        "DriftDetected": ChannelMapping(
+            event_type="DriftDetected",
+            rabbitmq_routing_key="sisys.events.reliable.drift_detected",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="CUSUM 漂移检测确认（触发重校准——人工介入通道）",
+        ),
         "MFAChallengeIssuedEvent": ChannelMapping(
             event_type="MFAChallengeIssuedEvent",
             rabbitmq_routing_key="sisys.events.reliable.mfa_challenge_issued_event",

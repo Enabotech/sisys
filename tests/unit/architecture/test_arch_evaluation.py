@@ -50,7 +50,7 @@ _STORY58_BUSINESS_SYMBOLS = (
     "EVALUATION_WEIGHTS",
 )
 
-#: 验证器 C 六依赖签名基线（use case 构造签名——5-8 资产同步②对齐）
+#: 验证器 C 七依赖签名基线（use case 构造签名——5-8 资产同步②对齐 + 5-9 扩七）
 _USE_CASE_INIT_PARAMS = [
     "agent_repository",
     "agent_profile_use_case",
@@ -58,6 +58,7 @@ _USE_CASE_INIT_PARAMS = [
     "agent_workflow_service",
     "isolation_guard",
     "evaluation_harness",
+    "drift_detector",
 ]
 
 

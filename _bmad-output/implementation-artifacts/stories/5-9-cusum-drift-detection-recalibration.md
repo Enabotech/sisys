@@ -1,6 +1,6 @@
 # Story 5.9: CUSUM 漂移检测与触发重校准
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -288,10 +288,10 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 - [ ] teardown：span 面零资源（凡 initialize 场景 teardown 双复位 + exporter 清空）；计时/回测场景委托缓存防双跑；检测器状态零残留（每场景新实例——SINGLETON 污染防线）
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——红形态钉死：13 场景逐一 failed[场景级延迟 import 的 ModuleNotFoundError/断言红]而非 collection error——5.8 Task 0 同款纪律）
-- [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_drift` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec + SINGLETON）②use case 工厂第七依赖注入确认（resolve("agent_workflow_use_case") 实例 `_drift_detector` 非 None——接线可达性）③主链漂移块静态锚（execute 体内 update 调用 + DRIFT_DETECTED 常量引用 + is_drifted 分支 + trigger_recalibration 调用——AST/inspect 扫描）④drift.detected span 落链验证（链级场景经 initialize 全局通道后 InMemory exporter 取到 drift.detected=True 真值——AC-3.1 场景承载）⑤DriftDetected 事件发布验证（trigger_recalibration → publish 调用 + 事件字段——AC-2.1 场景承载）+ 事件通道映射验证（双登记一致——AC-2.2 契约承载）
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证——红形态钉死：13 场景逐一 failed[场景级延迟 import 的 ModuleNotFoundError/断言红]而非 collection error——5.8 Task 0 同款纪律）
+- [x] 规范文档通过人工评审或自动化校验
+- [x] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_drift` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec + SINGLETON）②use case 工厂第七依赖注入确认（resolve("agent_workflow_use_case") 实例 `_drift_detector` 非 None——接线可达性）③主链漂移块静态锚（execute 体内 update 调用 + DRIFT_DETECTED 常量引用 + is_drifted 分支 + trigger_recalibration 调用——AST/inspect 扫描）④drift.detected span 落链验证（链级场景经 initialize 全局通道后 InMemory exporter 取到 drift.detected=True 真值——AC-3.1 场景承载）⑤DriftDetected 事件发布验证（trigger_recalibration → publish 调用 + 事件字段——AC-2.1 场景承载）+ 事件通道映射验证（双登记一致——AC-2.2 契约承载）
 
 ---
 
@@ -380,17 +380,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 
 **关联 AC:** 全部
 
-- [ ] Subtask 0.1: 定义数据模型规范——DriftAssessment（frozen 十字段 + 201 域/Literal/一致性守卫）+ CUSUM 参数六常量（本文件「数据模型」节为唯一真源）
-- [ ] Subtask 0.2: 定义端口契约——DriftDetectionPort（update + trigger_recalibration[**含 agent_id 透传参数与 is_drifted 零发布守卫——R1 裁定落端口定义，取消原「二选一」悬空**]）+ 组合根注册元数据 + 契约变更登记 ×1（use case 第七依赖——含存量断言同步 ×5 全清单）+ 命名甄别（vs MetricsPort 计量语义分立）
-- [ ] Subtask 0.3: 定义异常契约——DriftDetectionError（451，evaluation_exceptions.py 追加 + 注册四件套）+ 复用清单（201）+ 降级网 catch 扩登记
-- [ ] Subtask 0.4: 定义领域事件规范——DriftDetected（kw_only 十二字段[含 agent_id——R1 新增] + aggregate_type="AgentEvaluation"）+ 通道双登记条目（reliable）+ 发布失败降级纪律
-- [ ] Subtask 0.5: 定义性能双锚口径——P99 纯内存检测管线（100 采样 quantiles[98] + 常量单源 + 正向锚）+ 合成回测（**R1 参数定稿**：固定种子 40 序列 × 60 样本[30 基线 uniform(0.7,0.9) + 30 评估段；漂移 delta=uniform(0.3,0.5)] + (TP+TN)/40 ≥0.85[钦定种子基准 acc=0.975] + 分项计数 + 评估段长 30 禁拉长）
-- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_drift_detection.feature`（13 场景）+ BDD 步骤实现 `.py`（@scenario 全显式绑定 + context dict fixture + 链级 initialize 全局通道 fixture + 检测器预填充 fixture + Fake LLM 手工装配链 fixture + 文件级 autouse 双复位兜底 + **模块级 event_loop fixture 与 _run_async 自备**[R1 注记：conftest 不提供——26/16 处先例均各文件自定义，照 5-8 验收 L53/L88 形态]）+ **13 场景三属性分档表**定稿（docstring）
-- [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——红形态钉死：13 场景逐一 failed 非 collection error）+ **deferred-work.md 处置注记 ×4**（OD-2[5.7] drift.* 兑现闭环[条目核销] + R1-DF3[5.7] 不触发锚位继续顺延 + CR1-DF2[5.8] 本 Story 采纳核销 + 5-2 R1-DF1 ACTIVE 基线消费面核销评估[来源 deferred-work L181——条目原文点名「5.9 漂移检测立项[ACTIVE 基线数消费该面]」为触发候选；R1 预评：5.9 实际消费 overall_score 评估序列、不触碰 skills L1 缓存——**预期结论=不触发锚位顺延**，核销注记如实登记]）+ **本 Story V1 升级通道登记**（V1-EV9 多指标逐键检测 + V1-EV10 滑动基线/定期更新/季节性调整 + V1-EV11 自动重校准[模型配置变更——依赖漂移归因 + UDMR 运行时配置面] + V1-EV12 检测器状态 Redis 持久化[重启存活——随 5.10/监控域评估] + V1-EV13 序列缺口计数器[评估降级缺口可观测——5.8 风险 #6②] + **V1-EV14 per-agent 检测器键控[R3 补——SINGLETON 跨 Agent 混流对策：agent_id 维度本 Story 已落，键控是 V1 形态；AC-2/事件字段/DC-3/R1-9 四处引用本编号，登记动作此前无锚]** + V2-EV1 真实历史数据回测[数据积累后]——gap 四要素齐备）+ 本 Story OD-1~OD-7 知悉登记（OD-1/OD-2 命名/依赖裁定不进台账[5-8 OD-1 同款]；OD-3~OD-7 设计裁定不进台账[非 gap——规范不可行面的必要裁定]）
-- [ ] Subtask 0.8: 移交留项处置落盘（前置依赖表四项逐一登记处置结果）
+- [x] Subtask 0.1: 定义数据模型规范——DriftAssessment（frozen 十字段 + 201 域/Literal/一致性守卫）+ CUSUM 参数六常量（本文件「数据模型」节为唯一真源）
+- [x] Subtask 0.2: 定义端口契约——DriftDetectionPort（update + trigger_recalibration[**含 agent_id 透传参数与 is_drifted 零发布守卫——R1 裁定落端口定义，取消原「二选一」悬空**]）+ 组合根注册元数据 + 契约变更登记 ×1（use case 第七依赖——含存量断言同步 ×5 全清单）+ 命名甄别（vs MetricsPort 计量语义分立）
+- [x] Subtask 0.3: 定义异常契约——DriftDetectionError（451，evaluation_exceptions.py 追加 + 注册四件套）+ 复用清单（201）+ 降级网 catch 扩登记
+- [x] Subtask 0.4: 定义领域事件规范——DriftDetected（kw_only 十二字段[含 agent_id——R1 新增] + aggregate_type="AgentEvaluation"）+ 通道双登记条目（reliable）+ 发布失败降级纪律
+- [x] Subtask 0.5: 定义性能双锚口径——P99 纯内存检测管线（100 采样 quantiles[98] + 常量单源 + 正向锚）+ 合成回测（**R1 参数定稿**：固定种子 40 序列 × 60 样本[30 基线 uniform(0.7,0.9) + 30 评估段；漂移 delta=uniform(0.3,0.5)] + (TP+TN)/40 ≥0.85[钦定种子基准 acc=0.975] + 分项计数 + 评估段长 30 禁拉长）
+- [x] Subtask 0.6: 编写 Gherkin `test_acceptance_drift_detection.feature`（13 场景）+ BDD 步骤实现 `.py`（@scenario 全显式绑定 + context dict fixture + 链级 initialize 全局通道 fixture + 检测器预填充 fixture + Fake LLM 手工装配链 fixture + 文件级 autouse 双复位兜底 + **模块级 event_loop fixture 与 _run_async 自备**[R1 注记：conftest 不提供——26/16 处先例均各文件自定义，照 5-8 验收 L53/L88 形态]）+ **13 场景三属性分档表**定稿（docstring）
+- [x] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——红形态钉死：13 场景逐一 failed 非 collection error）+ **deferred-work.md 处置注记 ×4**（OD-2[5.7] drift.* 兑现闭环[条目核销] + R1-DF3[5.7] 不触发锚位继续顺延 + CR1-DF2[5.8] 本 Story 采纳核销 + 5-2 R1-DF1 ACTIVE 基线消费面核销评估[来源 deferred-work L181——条目原文点名「5.9 漂移检测立项[ACTIVE 基线数消费该面]」为触发候选；R1 预评：5.9 实际消费 overall_score 评估序列、不触碰 skills L1 缓存——**预期结论=不触发锚位顺延**，核销注记如实登记]）+ **本 Story V1 升级通道登记**（V1-EV9 多指标逐键检测 + V1-EV10 滑动基线/定期更新/季节性调整 + V1-EV11 自动重校准[模型配置变更——依赖漂移归因 + UDMR 运行时配置面] + V1-EV12 检测器状态 Redis 持久化[重启存活——随 5.10/监控域评估] + V1-EV13 序列缺口计数器[评估降级缺口可观测——5.8 风险 #6②] + **V1-EV14 per-agent 检测器键控[R3 补——SINGLETON 跨 Agent 混流对策：agent_id 维度本 Story 已落，键控是 V1 形态；AC-2/事件字段/DC-3/R1-9 四处引用本编号，登记动作此前无锚]** + V2-EV1 真实历史数据回测[数据积累后]——gap 四要素齐备）+ 本 Story OD-1~OD-7 知悉登记（OD-1/OD-2 命名/依赖裁定不进台账[5-8 OD-1 同款]；OD-3~OD-7 设计裁定不进台账[非 gap——规范不可行面的必要裁定]）
+- [x] Subtask 0.8: 移交留项处置落盘（前置依赖表四项逐一登记处置结果）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义；验收测试红阶段确认（13 场景逐一 failed）；链路接线断言清单 L1-L5 定义
+- [x] 规范项全部定义；验收测试红阶段确认（13 场景逐一 failed）；链路接线断言清单 L1-L5 定义
 
 ---
 
@@ -425,17 +425,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 | 🟡 变异 | yaml 条目删除→映射契约红；routing_key 拼写错→一致断言红；还原→绿（注册名变异随 Task 2 端口契约轮） |
 | 🔄 重构 | 通道条目设计注释（reliable 单通道依据 + 命名惯例锚）+ ruff+mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — DriftDetectionError 451 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 异常注册四件套
-- [ ] Subtask 1.3: 🟡 变异 — code/子域注册突变实证
-- [ ] Subtask 1.4: 🔴 红 — 事件 + DriftAssessment + 端口失败测试
-- [ ] Subtask 1.5: 🟢 绿 — drift_events.py + agent_drift.py 实现
-- [ ] Subtask 1.6: 🟡 变异 — 守卫/注册突变实证
-- [ ] Subtask 1.7: 🔴🔴🟢 — 通道双登记 + 契约 ×2（事件契约 + 通道映射；端口契约与组合根注册归 Task 2、use case 工厂归 Task 3——R1 时序约束）
-- [ ] Subtask 1.8: 🔄 重构 — 导出/docstring/编码分配表（三步处方）/门禁
+- [x] Subtask 1.1: 🔴 红 — DriftDetectionError 451 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 异常注册四件套
+- [x] Subtask 1.3: 🟡 变异 — code/子域注册突变实证
+- [x] Subtask 1.4: 🔴 红 — 事件 + DriftAssessment + 端口失败测试
+- [x] Subtask 1.5: 🟢 绿 — drift_events.py + agent_drift.py 实现
+- [x] Subtask 1.6: 🟡 变异 — 守卫/注册突变实证
+- [x] Subtask 1.7: 🔴🔴🟢 — 通道双登记 + 契约 ×2（事件契约 + 通道映射；端口契约与组合根注册归 Task 2、use case 工厂归 Task 3——R1 时序约束）
+- [x] Subtask 1.8: 🔄 重构 — 导出/docstring/编码分配表（三步处方）/门禁
 
 **完成标准/Definition of Done:**
-- [ ] 异常/事件/端口文件/通道双登记四件交付（组合根注册随 Task 2——R1 时序修正）；事件契约 + 通道映射契约 ×2 全绿；异常体系 CI 全绿（含 expected_types 伴随更新）；验收 AC-2.2 转绿（AC-4.1 注册面随 Task 2、AC-1.1 检测器面随 Task 2——DriftAssessment 模型面单测本 Task 绿）
+- [x] 异常/事件/端口文件/通道双登记四件交付（组合根注册随 Task 2——R1 时序修正）；事件契约 + 通道映射契约 ×2 全绿；异常体系 CI 全绿（含 expected_types 伴随更新）；验收 AC-2.2 转绿（AC-4.1 注册面随 Task 2、AC-1.1 检测器面随 Task 2——DriftAssessment 模型面单测本 Task 绿）
 
 ---
 
@@ -470,17 +470,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 | 🟡 变异 | 注册名拼写错→契约维度 1 红；lifetime 改 TRANSIENT→生命周期维度红；还原→绿 |
 | 🔄 重构 | 注册区段设计注释（SINGLETON 有状态依据[DC-6] + lambda 依赖清单）+ ruff+mypy |
 
-- [ ] Subtask 2.1: 🔴 红 — 预热/累积/手算锚失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 检测器最小实现
-- [ ] Subtask 2.3: 🟡 变异 — 常量/公式突变实证
-- [ ] Subtask 2.4: 🔴 红 — 确认/分级/复位/防御失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 确认机制实现
-- [ ] Subtask 2.6: 🟡 变异 — 确认/复位/分级突变实证
-- [ ] Subtask 2.7: 🔄 重构 — docstring/门禁
-- [ ] Subtask 2.8: 🔴🟢🟡 — 组合根注册 + 端口契约 11 维度（R1 自 Task 1 移入——_DummyResolver 扩 event_publisher 分支）
+- [x] Subtask 2.1: 🔴 红 — 预热/累积/手算锚失败测试
+- [x] Subtask 2.2: 🟢 绿 — 检测器最小实现
+- [x] Subtask 2.3: 🟡 变异 — 常量/公式突变实证
+- [x] Subtask 2.4: 🔴 红 — 确认/分级/复位/防御失败测试
+- [x] Subtask 2.5: 🟢 绿 — 确认机制实现
+- [x] Subtask 2.6: 🟡 变异 — 确认/复位/分级突变实证
+- [x] Subtask 2.7: 🔄 重构 — docstring/门禁
+- [x] Subtask 2.8: 🔴🟢🟡 — 组合根注册 + 端口契约 11 维度（R1 自 Task 1 移入——_DummyResolver 扩 event_publisher 分支）
 
 **完成标准/Definition of Done:**
-- [ ] CUSUMDriftDetector 三循环全绿（算法/确认/注册契约）；组合根注册 + 端口契约 11 维度全绿；验收 AC-1.1/1.2/1.3 转绿；**AC-4.1 场景整体随 Task 3 转绿**（R2 口径修正：BDD 场景原子红绿——场景含工厂第七依赖与 CR1-DF2 断言[Task 3 交付]，Task 2 末无「部分绿」可观测态；Task 2 末可核验 = resolve 四件 + 契约 11 维度子断言绿）；infrastructure 覆盖率 ≥75% 主战场达标面
+- [x] CUSUMDriftDetector 三循环全绿（算法/确认/注册契约）；组合根注册 + 端口契约 11 维度全绿；验收 AC-1.1/1.2/1.3 转绿；**AC-4.1 场景整体随 Task 3 转绿**（R2 口径修正：BDD 场景原子红绿——场景含工厂第七依赖与 CR1-DF2 断言[Task 3 交付]，Task 2 末无「部分绿」可观测态；Task 2 末可核验 = resolve 四件 + 契约 11 维度子断言绿）；infrastructure 覆盖率 ≥75% 主战场达标面
 
 ---
 
@@ -512,17 +512,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 |------|------|
 | 🔴→🟢 | 回归绿清单执行：**5.3 全家**（test_agent_workflow_service 存量 + 契约×3 + 图/引擎单测×2 + 集成 + 验收[含 Fake 分派表]）+ **5.7 全家**（单测×3 + 契约 + test_arch_phoenix_tracer[资产同步②更新后] + 集成 + 验收 15 场景[AC-4.3 更新后]）+ **5.8 全家**（单测×4 + 契约×2 + test_arch_evaluation[资产同步③更新后] + 集成 + 验收 13 场景）——第七可选依赖 None 默认 + 漂移块 None 守卫使存量零破坏预期全绿；**异常项逐一登记**（实施时以实际清单为准甄别修复——适配器契约变更回归面纪律） |
 
-- [ ] Subtask 3.1: 🔴 红 — trigger_recalibration 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 事件发布 + 降级实现
-- [ ] Subtask 3.3: 🟡 变异 — 字段装配/降级突变实证
-- [ ] Subtask 3.4: 🔴 红 — 主链漂移块失败测试（五面：确认/451 降级/评估降级联动/None/签名）
-- [ ] Subtask 3.5: 🟢 绿 — 第七依赖 + 漂移块 + catch 扩 + 断言同步 ×5
-- [ ] Subtask 3.6: 🟡 变异 — span 写入/降级网/守卫突变实证
-- [ ] Subtask 3.7: 🟢 — 5-3/5-7/5-8 存量全家回归绿（清单登记）
-- [ ] Subtask 3.8: 🔄 重构 — docstring/全仓门禁
+- [x] Subtask 3.1: 🔴 红 — trigger_recalibration 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 事件发布 + 降级实现
+- [x] Subtask 3.3: 🟡 变异 — 字段装配/降级突变实证
+- [x] Subtask 3.4: 🔴 红 — 主链漂移块失败测试（五面：确认/451 降级/评估降级联动/None/签名）
+- [x] Subtask 3.5: 🟢 绿 — 第七依赖 + 漂移块 + catch 扩 + 断言同步 ×5
+- [x] Subtask 3.6: 🟡 变异 — span 写入/降级网/守卫突变实证
+- [x] Subtask 3.7: 🟢 — 5-3/5-7/5-8 存量全家回归绿（清单登记）
+- [x] Subtask 3.8: 🔄 重构 — docstring/全仓门禁
 
 **完成标准/Definition of Done:**
-- [ ] trigger_recalibration + 主链漂移块交付；验收 AC-2.1/2.3 + AC-3 ×3 + AC-4.1 接线面转绿；三家存量零回归；组合根工厂接线完整生效
+- [x] trigger_recalibration + 主链漂移块交付；验收 AC-2.1/2.3 + AC-3 ×3 + AC-4.1 接线面转绿；三家存量零回归；组合根工厂接线完整生效
 
 ---
 
@@ -532,12 +532,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 
 > 性质说明：本 Task 对 Task 1-3 已交付链编写验证型测试（套件型豁免——红由 Task 0 前置，活性由变异保证）。
 
-- [ ] Subtask 4.1: 编写 `tests/integration/test_integration_drift_detection.py`（Fake LLM 手工装配六阶段链 + 真实 CUSUMDriftDetector[手写零 IO publisher 替身] + 链级 initialize 全局通道[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]）：场景① 全链漂移确认（检测器预填充 34 样本 + execute[幻觉分注入 overall 0.4 邻域] → 根 span drift.detected is True + 键字符串逐字对照 + DriftDetected 事件发布 + direction=="down"）② 无漂移对照（**预填充 34 正常样本[30 基线交替 + 4 交替续灌 0.7/0.9——R2 钉死：4×0.4 预填会使任意尾样本确认 down，对照场景必红]** + execute[正常 overall] → drift.detected 缺席 + 事件零发布 + eval 三键正常——5.8 回归锚）③ 451 降级链（drift port 替身注入抛 DriftDetectionError → 主链正常 + 三键在 + drift 缺席 + warning）④ None 路径对比（六参构造 → 与 5.8 基线 span 树等价）⑤ P99<100ms（`_PERF_CACHE["p99"]` + warmup 1 + 100 采样 + 每采样完整 update[检测器预填充至检测态] + `statistics.quantiles(latencies, n=100)[98]` exclusive P99 + 正向锚[update 调用计数 == 101] + `DRIFT_P99_LIMIT_SECONDS = 0.1` 常量单源 + benchmark 场景级标记）⑥ 合成回测准确率（**R1 参数定稿**：`random.Random(20261028)` 生成 40 序列[前 20 稳定/后 20 漂移按序]，每条 60 样本 = 30 基线期 uniform(0.7,0.9) + 30 评估期[稳定同分布续灌/漂移先抽 delta=uniform(0.3,0.5) 再 uniform(0.7-delta,0.9-delta)——全部样本天然 [0,1] 域，禁未截断正态] + 每序列独立检测器全序列灌入 + TP/FP/TN 统计 + `(TP+TN)/40 ≥ 0.85`[钦定种子基准 TP=20/FP=1/acc=0.975] + 分项计数断言消息 + 评估段长 30 禁拉长 docstring 注记 + `_PERF_CACHE["backtest"]` 委托 + 确定性[同种子两次生成相等断言]）
-- [ ] Subtask 4.2: 变异实证——K_MULTIPLIER 改错→场景①手算断言红；drift.detected 写入删除→场景①红；P99 常量突变（0.1→0.000001）→场景⑤红；回测漂移注入幅度归零→场景⑥准确率塌缩红；还原→绿
-- [ ] Subtask 4.3: 验收 AC-5.1/5.2 场景转绿（委托缓存命中验证——双委托槽）+ AC-3 集成对应场景转绿
+- [x] Subtask 4.1: 编写 `tests/integration/test_integration_drift_detection.py`（Fake LLM 手工装配六阶段链 + 真实 CUSUMDriftDetector[手写零 IO publisher 替身] + 链级 initialize 全局通道[场景级 reset 双复位 → initialize → 断言 → teardown 双复位]）：场景① 全链漂移确认（检测器预填充 34 样本 + execute[幻觉分注入 overall 0.4 邻域] → 根 span drift.detected is True + 键字符串逐字对照 + DriftDetected 事件发布 + direction=="down"）② 无漂移对照（**预填充 34 正常样本[30 基线交替 + 4 交替续灌 0.7/0.9——R2 钉死：4×0.4 预填会使任意尾样本确认 down，对照场景必红]** + execute[正常 overall] → drift.detected 缺席 + 事件零发布 + eval 三键正常——5.8 回归锚）③ 451 降级链（drift port 替身注入抛 DriftDetectionError → 主链正常 + 三键在 + drift 缺席 + warning）④ None 路径对比（六参构造 → 与 5.8 基线 span 树等价）⑤ P99<100ms（`_PERF_CACHE["p99"]` + warmup 1 + 100 采样 + 每采样完整 update[检测器预填充至检测态] + `statistics.quantiles(latencies, n=100)[98]` exclusive P99 + 正向锚[update 调用计数 == 101] + `DRIFT_P99_LIMIT_SECONDS = 0.1` 常量单源 + benchmark 场景级标记）⑥ 合成回测准确率（**R1 参数定稿**：`random.Random(20261028)` 生成 40 序列[前 20 稳定/后 20 漂移按序]，每条 60 样本 = 30 基线期 uniform(0.7,0.9) + 30 评估期[稳定同分布续灌/漂移先抽 delta=uniform(0.3,0.5) 再 uniform(0.7-delta,0.9-delta)——全部样本天然 [0,1] 域，禁未截断正态] + 每序列独立检测器全序列灌入 + TP/FP/TN 统计 + `(TP+TN)/40 ≥ 0.85`[钦定种子基准 TP=20/FP=1/acc=0.975] + 分项计数断言消息 + 评估段长 30 禁拉长 docstring 注记 + `_PERF_CACHE["backtest"]` 委托 + 确定性[同种子两次生成相等断言]）
+- [x] Subtask 4.2: 变异实证——K_MULTIPLIER 改错→场景①手算断言红；drift.detected 写入删除→场景①红；P99 常量突变（0.1→0.000001）→场景⑤红；回测漂移注入幅度归零→场景⑥准确率塌缩红；还原→绿
+- [x] Subtask 4.3: 验收 AC-5.1/5.2 场景转绿（委托缓存命中验证——双委托槽）+ AC-3 集成对应场景转绿
 
 **完成标准/Definition of Done:**
-- [ ] 集成六场景全绿；P99 达标（μs~ms 级预期——100ms 裕量充足）；回测准确率 ≥0.85 实测；xdist 组与既有 13 组不冲突；验收对应场景全绿
+- [x] 集成六场景全绿；P99 达标（μs~ms 级预期——100ms 裕量充足）；回测准确率 ≥0.85 实测；xdist 组与既有 13 组不冲突；验收对应场景全绿
 
 ---
 
@@ -547,12 +547,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 
 > 性质说明：SDD 规范验证测试（验证架构约束是否被遵守），非 TDD 单元测试。
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_drift_detection.py`——验证器 A：application 触碰文件（agent_drift.py / run_agent_workflow.py / application/ports/__init__.py）第三方 import 白名单（**零新增第三方断言**——本 Story application 触碰面纯标准库 + 既有 opentelemetry；黑名单新第三方零引入）；验证器 B：domain 触碰白名单域（_STORY59 业务符号[CUSUMDriftDetector/DriftDetectionPort/DriftAssessment]在 domain/ports|services|entities|value_objects 零命中[词边界正则] + **DriftDetected 允许在 domain/events 命中**[本 Story 与 5.8 的差异面——白名单域] + DriftDetectionError 仅在 domain/exceptions 三件内命中）+ 组合根外零实例化（CUSUMDriftDetector( 构造点仅 composition_root.py + tests/）+ 依赖方向（cusum_detector.py import src.application/src.domain 断言——infrastructure→application/domain 合法面锚定）+ drift_events.py/evaluation_exceptions.py 标准库零外部依赖断言；验证器 C：主链漂移块静态锚（execute 体内 update 调用 + DRIFT_DETECTED 常量引用[ast.Attribute.attr 与 ast.Name.id 双形态——5.8 R3 钉死] + is_drifted 分支 + trigger_recalibration 调用在位——AST/inspect 扫描）+ use case 七依赖签名基线（inspect.signature 对照——第七参数默认 None）+ cusum_detector.py 标准库零外部依赖断言（OD-2 实现面证据——numpy/scipy 零引入）
-- [ ] Subtask 5.2: 变异实证——cusum_detector.py 注入 numpy import→验证器 A/B[零外部依赖断言]红；domain/services 下放置检测器符号→验证器 B 红；漂移块 DRIFT_DETECTED 引用删除→验证器 C 红；还原→绿
-- [ ] Subtask 5.3: 零抑制注释验证器（本 Story 触碰文件七件零 noqa/type: ignore/pylint: disable——test_arch_evaluation.py TestArchNoSuppressionComments 同款）
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_drift_detection.py`——验证器 A：application 触碰文件（agent_drift.py / run_agent_workflow.py / application/ports/__init__.py）第三方 import 白名单（**零新增第三方断言**——本 Story application 触碰面纯标准库 + 既有 opentelemetry；黑名单新第三方零引入）；验证器 B：domain 触碰白名单域（_STORY59 业务符号[CUSUMDriftDetector/DriftDetectionPort/DriftAssessment]在 domain/ports|services|entities|value_objects 零命中[词边界正则] + **DriftDetected 允许在 domain/events 命中**[本 Story 与 5.8 的差异面——白名单域] + DriftDetectionError 仅在 domain/exceptions 三件内命中）+ 组合根外零实例化（CUSUMDriftDetector( 构造点仅 composition_root.py + tests/）+ 依赖方向（cusum_detector.py import src.application/src.domain 断言——infrastructure→application/domain 合法面锚定）+ drift_events.py/evaluation_exceptions.py 标准库零外部依赖断言；验证器 C：主链漂移块静态锚（execute 体内 update 调用 + DRIFT_DETECTED 常量引用[ast.Attribute.attr 与 ast.Name.id 双形态——5.8 R3 钉死] + is_drifted 分支 + trigger_recalibration 调用在位——AST/inspect 扫描）+ use case 七依赖签名基线（inspect.signature 对照——第七参数默认 None）+ cusum_detector.py 标准库零外部依赖断言（OD-2 实现面证据——numpy/scipy 零引入）
+- [x] Subtask 5.2: 变异实证——cusum_detector.py 注入 numpy import→验证器 A/B[零外部依赖断言]红；domain/services 下放置检测器符号→验证器 B 红；漂移块 DRIFT_DETECTED 引用删除→验证器 C 红；还原→绿
+- [x] Subtask 5.3: 零抑制注释验证器（本 Story 触碰文件七件零 noqa/type: ignore/pylint: disable——test_arch_evaluation.py TestArchNoSuppressionComments 同款）
 
 **完成标准/Definition of Done:**
-- [ ] 架构/约束测试全绿；任何违规都会导致测试失败；验证器 B 白名单域含 events（与 5.8 验证器的 domain 零 events 触碰断言形成本 Story 差异锚）
+- [x] 架构/约束测试全绿；任何违规都会导致测试失败；验证器 B 白名单域含 events（与 5.8 验证器的 domain 零 events 触碰断言形成本 Story 差异锚）
 
 ---
 
@@ -570,17 +570,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 | 🟢 绿 | 编写 `tests/acceptance/test_acceptance_drift_detection.py` 的收尾 BDD 步骤实现 |
 | 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
 
-- [ ] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认（检测器/端口/事件/异常/组合根/通道双登记 + 修改文件清单锚[run_agent_workflow.py 漂移块文本锚——5.8 收尾同款 `"drift_detector",  # Story 5.9 第七可选依赖` 形态]）
-- [ ] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认（**十件新建[.feature/.py 分计] + 六件存量触碰更新文本锚——R1 计数修正**：断言同步 ×5 + test_exception_handlers expected_types；追加一件 test_evaluation_exceptions 451 用例与继承#8「追加」分计口径对齐[R2 口径澄清]）
-- [ ] Subtask 6.3: 运行开发结束验收测试并确认通过（14 场景全绿）
-- [ ] Subtask 6.4: 运行 `pytest tests/`（全量回归 + 连续 5 次无随机失败）、`ruff check`、`mypy .`（全仓）进行收尾校验 + 覆盖率四档门禁（scripts/check_coverage_gates.py）+ 三红线自查零输出
-- [ ] Subtask 6.5: 文档终态四件——architecture.md §14.4 交付注记（Story 5.9 漂移检测面）+ sisys-core-domain-design.md §17.3.8 实现注记（OD-3~OD-7 裁定映射）+ deferred-work.md（处置注记 ×4 + V1/V2 通道登记核验）+ sprint-status.yaml 状态流转（in-progress → review）
+- [x] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认（检测器/端口/事件/异常/组合根/通道双登记 + 修改文件清单锚[run_agent_workflow.py 漂移块文本锚——5.8 收尾同款 `"drift_detector",  # Story 5.9 第七可选依赖` 形态]）
+- [x] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认（**十件新建[.feature/.py 分计] + 六件存量触碰更新文本锚——R1 计数修正**：断言同步 ×5 + test_exception_handlers expected_types；追加一件 test_evaluation_exceptions 451 用例与继承#8「追加」分计口径对齐[R2 口径澄清]）
+- [x] Subtask 6.3: 运行开发结束验收测试并确认通过（14 场景全绿）
+- [x] Subtask 6.4: 运行 `pytest tests/`（全量回归 + 连续 5 次无随机失败）、`ruff check`、`mypy .`（全仓）进行收尾校验 + 覆盖率四档门禁（scripts/check_coverage_gates.py）+ 三红线自查零输出
+- [x] Subtask 6.5: 文档终态四件——architecture.md §14.4 交付注记（Story 5.9 漂移检测面）+ sisys-core-domain-design.md §17.3.8 实现注记（OD-3~OD-7 裁定映射）+ deferred-work.md（处置注记 ×4 + V1/V2 通道登记核验）+ sprint-status.yaml 状态流转（in-progress → review）
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests` 四目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过（14 场景全绿）
-- [ ] Story 可进入 `review`
+- [x] `src` 完成清单已逐项验证确认
+- [x] `tests` 四目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过（14 场景全绿）
+- [x] Story 可进入 `review`
 
 ---
 
@@ -789,13 +789,28 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成（DC-1~DC-8 设计决策 + OD-1~OD-7 偏离声明 + 风险十项）
 - [x] 项目结构对齐统一规范
+- [x] **Task 0 完成（2026-10-29）**：Gherkin 13 场景 + BDD 步骤实现（@scenario 全显式绑定 + 延迟 import 红形态 13 failed 非 collection error）；deferred-work.md 处置注记 ×4（OD-2[5.7] 兑现闭环 / R1-DF3[5.7] 顺延 / CR1-DF2[5.8] 采纳 / 5-2 R1-DF1 不触发顺延）+ V1-EV9~14 + V2-EV1 登记
+- [x] **Task 1 完成（2026-10-29）**：DriftDetectionError 451 注册四件套 + exception_handlers 451→500 + expected_types 伴随 + sisys-uni-exception-design.md 三步处方（插 451 行 + 预留收缩 452~459 + 子域表）；DriftDetected 事件 + DriftAssessment/DriftDetectionPort 端口 + 两处 __init__ 导出；通道双登记（yaml + DEFAULT_MAPPINGS）+ 契约 ×2 全绿；验收 AC-2.2 转绿
+- [x] **Task 2 完成（2026-10-29）**：CUSUMDriftDetector（预热 30 冻结基线 + 双侧累积和 + N中M 含当前样本条件 + 乘法同式分级 + 确认复位 + degenerate 防线 + 201 域守卫）+ 组合根 # === Story 5.9 === 注册 + 端口契约 11 维度全绿；验收 AC-1.1/1.2/1.3 转绿；变异 ×4 实证（K 乘数/当前样本条件/复位/注册名）
+- [x] **Task 3 完成（2026-10-29）**：trigger_recalibration（is_drifted 守卫零发布 + agent_id 透传 + 发布失败 logger.error 降级）+ use case 第七可选依赖 + 评估块内漂移块（None 守卫→update→is_drifted→DRIFT_DETECTED 写入→trigger）+ catch 扩 451 + 组合根工厂第七依赖；**断言同步 ×5 全清单落实**（①phoenix_tracer 验收②phoenix_tracer arch③arch_evaluation④test_run_agent_workflow⑤agent_evaluation 验收——①②回执字面行保留防线执行：既有行原样 + 尾部追加）；5-3 全家 179 / 5-7 全家 88 / 5-8 全家 154 回归绿；验收 AC-3×3 + AC-4.1 + AC-4.2 转绿；变异 ×2 实证（DRIFT_DETECTED 删除/catch 回退）
+- [x] **Task 4 完成（2026-10-29）**：集成六场景（全链确认/无漂移对照/451 降级/None 对比/P99/回测）+ 确定性；钦定种子基准精确复现（TP=20/FP=1/acc=0.975）；P99 正向锚口径对齐 101（R2-8）；验收 AC-5.1/5.2 转绿；变异 ×3 实证（P99 常量/漂移幅度归零/h×100）
+- [x] **Task 5 完成（2026-10-29）**：AST 验证器 A（application 零新第三方）/B（domain 收窄含 events 白名单域 + 组合根外零实例化 + 依赖方向）/C（主链静态锚四件 + 七依赖签名 + cusum 纯标准库）+ 零抑制 ×9 文件；架构目录 863 全绿；变异 ×3 实证（numpy 注入/domain 符号注入/静态锚删除）
+- [x] **Task 6 完成（2026-10-29）**：收尾场景追加（14 终态全绿）+ 全量回归 + 覆盖率门禁 + 三红线自查（本 Story 触碰面零命中——存量 3 处 ValueError/2 处 HTTPException 非本 Story 文件）+ 文档终态四件（architecture.md §14.4 + sisys-core-domain-design.md §17.3.8 + deferred-work 核验 + sprint-status → review）
+
+### 实施摘要 Implementation Notes [dev-story 补记]
+
+- **数学锚全部验算复核**：手算锚序列（[0.7,0.9]×15 基线 σ₀≈0.1017 + 0.4×5 下漂 s35 确认 severe down）/ 边界三形态（R2 钦定序列逐样本 S 演算）/ 0.95×8 上漂（s38 确认 moderate——n≤5 闭式位等 + n≥6 区间断言 1ulp 纪律）/ 0.62×10 moderate 档（s36）/ 再确认间隔（复位后 5 样本）/ 回测钦定基准（seed=20261028 独立脚本预验证 TP=20/FP=1/acc=0.975 精确复现）——与故事 v1.3.1 锚全部一致
+- **浮点纪律实战修正两处**（同式表达式的计算序陷阱）：无漂移对照上界 `0.9-0.8-k` 形态与实现 `(μ₀-k)-x` 序不等价（差 1.5e-16 必假红）——单测与验收两处统一改 `0.8 - 0.5*sigma0 - 0.7`（实现同序）；这是「同式表达式」纪律的细化：不仅值同式，**计算序也要同形**
+- **事件循环嵌套修正两处**：async 测试方法（pytest-asyncio auto 模式）内禁 `new_event_loop().run_until_complete` 嵌套——检测器预填充 helper 与集成链装配改 async/await 直调
+- **接口实现细节**：DriftAssessment 一致性守卫（is_drifted=False 只锁 level="none"、方向可带探测值）；未确认态 direction 探测值（Sₕ>Sₗ→up/反向→down/平局→none）；trigger_recalibration 无 publisher（None 构造）纯检测消费面零异常
+- **全仓 mypy（含 tests）收尾修复 ×9（用户复查发现——Task 6.4 首轮只跑了 `mypy src/` 漏 tests 面）**：①yaml safe_load Any → 显式 `dict[str, dict[str, dict[str, str]]]` 变量注解（契约测试）；②frozen 赋值断言改 `setattr()` 动态形式 ×2（FrozenInstanceError 测试语义的正确姿势——静态只读检查不适用 setattr）；③helper kwargs `dict[str, object]` → `**overrides: Any`（域外值注入的类型通道）；④stub 替身传参 `: Any` 标注（duck-typing 对具体类参数——5.8 验收同款）；⑤update 域外注入经 `untyped_score: Any` 通道（测试意图即传域外类型）——全部类型层正确修复，零抑制注释；修复后 `mypy .` 1798 文件零错误 + 受影响五文件 68 测试全绿 + ruff 全过
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-9-cusum-drift-detection-recalibration.md`
 
-**待创建的文件/To Be Created (Dev Story 实施):**
+**已创建的文件/Created Files (dev-story 已交付):**
 - `src/application/ports/agent_drift.py` - 漂移检测端口（DriftDetectionPort + DriftAssessment）
 - `src/domain/events/drift_events.py` - DriftDetected 领域事件
 - `src/infrastructure/monitoring/cusum_detector.py` - CUSUMDriftDetector（算法核心）
@@ -810,7 +825,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 - `tests/acceptance/test_acceptance_drift_detection.feature` - Gherkin（13+收尾=14 场景）
 - `tests/acceptance/test_acceptance_drift_detection.py` - BDD 步骤实现
 
-**待修改的文件/To Be Modified:**
+**已修改的文件/Modified Files (dev-story 已交付):**
 - `src/application/use_cases/run_agent_workflow.py` - 第七可选依赖 + 漂移块 + catch 扩 451
 - `src/application/ports/__init__.py` / `src/domain/events/__init__.py` / `src/domain/exceptions/__init__.py` - 聚合导出
 - `src/domain/exceptions/evaluation_exceptions.py` - 追加 DriftDetectionError（451）
@@ -934,7 +949,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
@@ -949,8 +964,9 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 | v1.2.0 | 2026-10-28 | 文档审查 Round 2（回归核查 + 组合交互双视角）：P0×1（无漂移路径共享 4×0.4 预填数学互斥→钉死 34 正常样本预填 + 末样本域归一 [0,1] 全域）+ P1×3（边界参数化钦定构造序列[三形态各新实例] / AC-4.1 场景原子性口径 / R1 时序重构传播漏网三处）+ P2×3 + P3 批量；9 条证伪留痕（数值锚 A-I 全过） | SM (Claude Code) |
 | v1.3.0 | 2026-10-28 | 文档审查 Round 3（单深度推演）：P1×1（AC-3.2 验收 AsyncMock 违红线→手写 FakeDriftPort）+ P2×2（上漂锚 n≥6 闭式 1ulp 假红形态注记 / V1-EV14 登记无锚）+ P3×2 簇（RNG 调用序/caplog 断言锚/Fake LLM 措辞/severity 乘法实现/第 30 样本统计语义）；12 条证伪留痕 + 时间线 T1-T6 全过 | SM (Claude Code) |
 | v1.3.1 | 2026-10-28 | 文档审查 Round 4 纯验证全过（31 行台账零虚假落地 + 22 组行号锚全精确）+ Round 5 独立终审收敛（五节取证：周期闭合/8 项双向取证/独立快扫无 P0P1/R4 留项清偿/收敛判定）；R5 收敛清偿 P3×4（替身计数口径/OD-3 慢漂移论据/R1-13 位置勘误/免同步命中括注）；收敛声明落入——周期闭环，Status 保持 ready-for-dev | SM (Claude Code) |
+| v2.0.0 | 2026-10-29 | dev-story 实施完成（Task 0-6 全绿）：CUSUMDriftDetector + DriftDetectionPort/DriftAssessment + DriftDetected 事件（reliable 双登记）+ DriftDetectionError 451 + 主链第七依赖漂移块（drift.detected span 兑现 OD-2[5.7]）+ 断言同步 ×5 + AST 验证器 + 集成六场景 + P99<100ms + 合成回测 0.975；14 验收场景全绿；三家存量回归绿（5.3:179/5.7:88/5.8:154）；数学锚全部验算复核（钦定基准独立复现）；Status → review | Dev (Claude Code) |
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-28
 **更新说明/Description:**

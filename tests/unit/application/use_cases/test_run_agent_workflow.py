@@ -675,7 +675,7 @@ class TestExecuteEvaluationBlock:
         assert SpanAttributeKeys.WORKFLOW_STATUS in attributes
 
     async def test_constructor_sixth_param_default_none(self) -> None:
-        """构造签名：六依赖清单 + 第六参数默认 None（存量五参调用零破坏）。"""
+        """构造签名：七依赖清单 + 第六参数默认 None（存量五参调用零破坏——断言同步④ 5-9 扩七）。"""
         import inspect
 
         from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
@@ -688,6 +688,7 @@ class TestExecuteEvaluationBlock:
             "agent_workflow_service",
             "isolation_guard",
             "evaluation_harness",
+            "drift_detector",
         ]
         default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["evaluation_harness"].default
         assert default is None
@@ -706,3 +707,234 @@ class TestExecuteEvaluationBlock:
             isolation_guard=mocks["isolation_guard"],
         )
         assert getattr(use_case, "_evaluation_harness", "missing") is None
+
+
+class TestExecuteDriftBlock:
+    """Story 5.9 — execute 评估块内漂移检测块：drift.detected span 填值 + 降级不阻断。
+
+    测试通道（5-7 SSOT 继承）：function-scope autouse「双复位 → 注入 provider 经
+    initialize 全局 set → teardown 双复位」——镜像 TestExecuteEvaluationBlock 同款
+    （scope="module" 的 initialize 会被 5-7 类级 teardown 中途清掉——function-scope
+    钉死）。Fake drift port 是 AsyncMock(spec=DriftDetectionPort)——单元测试 Mock
+    面（验收禁 mock 红线下 AC-3.2 用手写 FakeDriftPort 承载）。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _tracing_global_channel(self) -> Any:
+        """装饰器链路测试通道（注入 provider 经 initialize——5-7/5-8 同款）。"""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from src.infrastructure.config.phoenix import PhoenixConfig
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = PhoenixTracer(
+            config=PhoenixConfig(enabled=True, project_name="sisys-agent", sampling_ratio=1.0),
+            tracer_provider=provider,
+        )
+        assert tracer.initialize() is True
+        self._exporter = exporter
+        yield exporter
+        PhoenixTracer.reset_for_testing()
+
+    def _assemble_with_drift(self, drift_detector: Any = None, evaluation_harness: Any = None) -> tuple[Any, dict[str, Any]]:
+        """装配链（TestExecuteEvaluationBlock._assemble_with_evaluation 同款 + 第七依赖注入）。"""
+        from types import SimpleNamespace
+
+        mocks = _make_mocks()
+        agent = mocks["repository"].get_by_id.return_value
+        profile_result = SimpleNamespace(
+            agent_id=agent.agent_id,
+            role=AgentRole.CEO,
+            profile=Mock(),
+            tools_l1=(Mock(), Mock(), Mock()),
+            startup_context_tokens=4321,
+        )
+        mocks["profile_use_case"].execute.return_value = profile_result
+        _wire_engine_success(mocks)
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        use_case = RunAgentWorkflowUseCase(
+            agent_repository=mocks["repository"],
+            agent_profile_use_case=mocks["profile_use_case"],
+            agent_engine=mocks["agent_engine"],
+            agent_workflow_service=mocks["workflow_service"],
+            isolation_guard=mocks["isolation_guard"],
+            evaluation_harness=evaluation_harness,
+            drift_detector=drift_detector,
+        )
+        return use_case, {"agent": agent, "profile_result": profile_result, "mocks": mocks}
+
+    @staticmethod
+    def _make_fake_harness(return_value: Any = None, raises: Any = None) -> Any:
+        """Fake 评估端口替身（AsyncMock spec——5-8 同款镜像）。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.agent_evaluation import AgentEvaluationPort
+
+        fake = AsyncMock(spec=AgentEvaluationPort)
+        if raises is not None:
+            fake.evaluate.side_effect = raises
+        else:
+            fake.evaluate.return_value = return_value
+        return fake
+
+    @staticmethod
+    async def _make_real_detector_prefilled(publisher: Any) -> Any:
+        """真实检测器 + 预填充 34 样本（30 基线交替 + 4×0.4——链上末样本即确认形态）。"""
+        from src.infrastructure.monitoring.cusum_detector import CUSUMDriftDetector
+
+        detector = CUSUMDriftDetector(event_publisher=publisher)
+        baseline = [0.7, 0.9] * 15
+        for score in baseline + [0.4, 0.4, 0.4, 0.4]:
+            await detector.update(score)
+        return detector
+
+    async def test_drift_confirmed_writes_span_and_publishes_event(self) -> None:
+        """预填充 34 样本 + execute（幻觉 0.2 → overall ≈0.4575 病态角带内）→
+        drift.detected=True 写根 span + DriftDetected 事件发布 + agent_id 透传。"""
+        from src.domain.events.drift_events import DriftDetected
+
+        class _Recorder:
+            """零 IO 事件替身（publish 捕获——_RecordingEventPublisher 单测变体）。"""
+
+            def __init__(self) -> None:
+                self.published: list[Any] = []
+
+            async def publish(self, event: Any) -> Any:
+                from src.domain.events.publish_result import ChannelResult, PublishResult
+
+                self.published.append(event)
+                return PublishResult(
+                    event_id=str(event.event_id),
+                    results=(ChannelResult(channel_name="inmemory", success=True),),
+                )
+
+        recorder = _Recorder()
+        detector = await self._make_real_detector_prefilled(recorder)
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = self._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_drift(drift_detector=detector, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "漂移确认不影响工作流返回值（零耦合）"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        assert len(roots) == 1
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert attributes["drift.detected"] is True, "确认漂移应写 drift.detected=True"
+        # 事件发布断言（direction=down + agent_id 透传）
+        drift_events = [e for e in recorder.published if isinstance(e, DriftDetected)]
+        assert len(drift_events) == 1, "确认漂移应恰发布一次 DriftDetected"
+        assert drift_events[0].drift_direction == "down"
+        assert drift_events[0].agent_id == str(agent.agent_id)
+        # eval 三键仍在（评估先于漂移成功）
+        assert attributes["eval.hallucination_score"] == eval_result.hallucination_score
+
+    async def test_drift_detection_error_degrades_gracefully(self, caplog: pytest.LogCaptureFixture) -> None:
+        """update 抛 451 → 主链正常返回 + eval 三键仍在 + drift.detected 缺席 + warning。"""
+        import logging
+
+        from src.domain.exceptions import DriftDetectionError
+
+        caplog.set_level(logging.WARNING, logger="src.application.use_cases.run_agent_workflow")
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.agent_drift import DriftDetectionPort
+
+        fake_drift = AsyncMock(spec=DriftDetectionPort)
+        injected_error = DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        fake_drift.update.side_effect = injected_error
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = self._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_drift(drift_detector=fake_drift, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "451 应降级不阻断主链"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert "drift.detected" not in attributes, "漂移失败时 drift.detected 应缺席（不写哨兵值）"
+        assert attributes["eval.hallucination_score"] == eval_result.hallucination_score, "三键仍在（评估先于漂移成功）"
+        warning_texts = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any(str(injected_error) in text for text in warning_texts), (
+            f"451 共享评估块 catch——warning 文本应含 451 异常 str（实际 {warning_texts}）"
+        )
+
+    async def test_evaluation_failure_skips_drift_block(self) -> None:
+        """评估失败（LLMAPIError→450 包装）→ 漂移块跳过（update 零调用——序列缺口策略）。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.agent_drift import DriftDetectionPort
+        from src.domain.exceptions import AgentEvaluationError
+
+        fake_drift = AsyncMock(spec=DriftDetectionPort)
+        fake_harness = self._make_fake_harness(raises=AgentEvaluationError(reason="llm_call"))
+        use_case, materials = self._assemble_with_drift(drift_detector=fake_drift, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed"
+        fake_drift.update.assert_not_awaited(), "评估失败时漂移块应整体跳过（update 零调用）"
+
+    async def test_none_detector_baseline_unchanged(self) -> None:
+        """六参构造（drift_detector=None）→ 行为与 5.8 基线一致 + 漂移块零执行。"""
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = self._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_drift(drift_detector=None, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed"
+        assert getattr(use_case, "_drift_detector", "missing") is None, "六参构造 _drift_detector 应为 None"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert "drift.detected" not in attributes, "None 路径漂移块整体跳过（键缺席）"
+        assert attributes["eval.hallucination_score"] == eval_result.hallucination_score, "5.8 基线行为一致"
+
+    async def test_constructor_seventh_param_default_none(self) -> None:
+        """构造签名：七依赖清单 + 第七参数默认 None（存量六参调用零破坏）。"""
+        import inspect
+
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        params = list(inspect.signature(RunAgentWorkflowUseCase.__init__).parameters)[1:]
+        assert params == [
+            "agent_repository",
+            "agent_profile_use_case",
+            "agent_engine",
+            "agent_workflow_service",
+            "isolation_guard",
+            "evaluation_harness",
+            "drift_detector",
+        ]
+        default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["drift_detector"].default
+        assert default is None
+
+    async def test_six_arg_construction_still_works(self) -> None:
+        """存量六参构造零破坏（向后兼容——不传第七参数）。"""
+        mocks = _make_mocks()
+        _wire_engine_success(mocks)
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        use_case = RunAgentWorkflowUseCase(
+            agent_repository=mocks["repository"],
+            agent_profile_use_case=mocks["profile_use_case"],
+            agent_engine=mocks["agent_engine"],
+            agent_workflow_service=mocks["workflow_service"],
+            isolation_guard=mocks["isolation_guard"],
+            evaluation_harness=None,
+        )
+        assert getattr(use_case, "_drift_detector", "missing") is None

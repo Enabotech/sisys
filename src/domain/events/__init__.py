@@ -25,6 +25,7 @@ from .data_source_events import DataSourceFetched, DataSourceFetchFailed
 from .debate_events import DebateCompleted
 from .dictionary_events import DictionaryUpdated
 from .document_events import DocumentProcessed, DocumentUploaded, DocumentVersionSnapshotCreated
+from .drift_events import DriftDetected
 from .entity_extraction_events import EntitiesExtracted
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
@@ -63,6 +64,7 @@ __all__ = [
     "CheckpointRecovered",
     "CorrectionApproved",
     "DictionaryUpdated",
+    "DriftDetected",
     "EntitiesExtracted",
     "StrategicDeviationWarning",
     "HeartbeatTriggered",
