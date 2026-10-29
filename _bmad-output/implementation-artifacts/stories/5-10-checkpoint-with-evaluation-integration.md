@@ -12,7 +12,7 @@
 
 **As a** 可观测性工程师,
 **I want** 实现 CheckpointWithEvaluation 集成（评估历史累积器 + `to_checkpoint_snapshot()` 快照转换 + 真实持久化/恢复 + 主链第八可选依赖接入）,
-**So that** 评估历史（eval_history / hallucination_trend / confidence_accuracy_trend）随 Checkpoint 持久化，支持漂移趋势追踪与历史质量回溯。
+**So that** 评估历史（eval_history / hallucination_trend / confidence_accuracy_trend）随 Checkpoint 持久化，支持漂移趋势追踪与历史质量回溯（趋势数据面的消费方是 V1-EV12——5.9 检测器本体零消费，见 OD-4④）。
 
 ### 业务价值
 
@@ -51,8 +51,8 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | OD-4 | 伪码 `hallucination_trend=self.cusum_detector.get_trend()` 的检测器 getter 不实现——三趋势序列由 Recorder 自持累积（每次 record 从 EvaluationResult 逐次追加 hallucination_score / confidence_accuracy_trend 序列），`CUSUMDriftDetector` 零改动 | sisys-core-domain-design.md §17.3.8 L1722（cusum_detector.get_trend() 调用） | ①检测器私有窗口语义是「检测算法状态」非「历史趋势源」——基线窗 30 样本冻结后不清空滚动、确认窗 5 样本滚动覆盖，都不是完整历史序列（拿它们当 trend 会丢历史）；②检测器有状态（SINGLETON——5.9 DC-6「状态即功能」），给它加历史职责违反单一职责且与 V1-EV12（检测器状态持久化）纠缠；③评估历史与检测器窗口是同一评估流的两个投影——Recorder 自持累积即得全量趋势，检测器保持纯检测职责；④「评估历史（CUSUM 用）」的伪码语义反向承载：5.10 持久化的评估历史正是 CUSUM 序列（overall_score 可从三键派生——5.8 L204-206 注记）的数据留存面，V1-EV12 的「从评估历史回放重建基线」通道由此就绪 |
 | OD-5 | `CHECKPOINTED` 第六态不引入——AgentStatus 维持五态（IDLE/RUNNING/WAITING/COMPLETED/FAILED） | sisys-core-domain-design.md L1044-1048（Story 5-1 偏离声明 D-1：「CHECKPOINTED 态延至 Story 5.10 时随 Checkpoint 机制一并评估引入」）+ L1050-1109（六态 AgentLifecycle 规划） | ①本 Story 评估后裁定：5.10 的 Checkpoint 是「评估历史快照」——可观测附加面，评估块内自动触发、每 run 一次、不中断执行；CHECKPOINTED 的规划语义是「WAITING 态中断保存后的状态」（L1082 save_checkpoint 在 waiting_user_confirm 分支）——执行中断恢复面，属 6.3 BLM 阶段审批；两者语义分立，5.10 引入 CHECKPOINTED 无状态转换可达路径（评估快照不改变 Agent 执行状态）；②AgentStatus 五态改六态需动 start/complete/fail/restart/wait 五守卫 + 既有状态机测试（5-1 DC-2 明示「改动属回归风险」）——无消费方的守卫扩展违反 YAGNI；③D-1 的「评估引入」义务经本 OD 履行（评估结论=不引入），锚位更新至 6.3（中断恢复面落地时再评估）——deferred-work 落注记（留项处置 #4） |
 | OD-6 | 评估快照创建**不发布** `CheckpointReached` 事件（事件通道 yaml + DEFAULT_MAPPINGS 零改动） | docs/architecture/sisys-checkpoint-timetravel-design.md L697（CheckpointReached 归档时机表——「检查点到达」）+ 既有事件定义（checkpoint_events.py——src 内无发布点） | ①CheckpointReached 字段语义是 BLM 规划检查点（phase_identifier + user_feedback_request——阶段审批面），评估历史快照不是规划阶段检查点——语义误植会污染事件消费方（未来 WORM 归档按「检查点到达」归档评估数据）；②评估历史持久化是可观测附加面（5.8 DC-5/5.9 同族哲学）——附加面失败降级不告警，无事件语义需求；③MVP 无 CheckpointReached 消费方（src 内零发布点零订阅方）——发布是纯开销；④6.3 BLM 检查点落地时该事件获得真实发布点（届时 user_feedback_request 语义配套） |
-| OD-7 | 端口接口形态：`async def record(agent_id, evaluation_result, predicted) -> CheckpointSnapshot`（单方法原子完成：内存累积 + 快照打包 + 持久化）+ `async def restore(session_id) -> CheckpointWithEvaluation | None` 两方法端口——伪码的 CheckpointWithEvaluation 聚合类与 to_checkpoint_snapshot() 方法保留为 frozen DTO + 纯转换方法（聚合数据类在端口文件，累积器职责在 Recorder 实现） | sisys-core-domain-design.md L1714-1724（CheckpointWithEvaluation 类 + to_checkpoint_snapshot 方法伪码）+ L1094-1101（CheckpointManager 规划） | ①原子性（5-9 OD-7 同款论证）：累积与持久化两方法形态存在中间态（累积成功 save 失败——内存与存储不一致）无消费语义；record 一次调用完成累积→打包→save，返回保存的快照供调用方断言；②CheckpointWithEvaluation 保持设计命名的 frozen 聚合 DTO（三序列 tuple + 元数据 + to_checkpoint_snapshot/from_snapshot 纯转换）——伪码形态保留；有状态累积（deque 滚动窗口）归 Recorder 实现（应用服务实现应用端口——evaluation_harness.py 实现 AgentEvaluationPort 同款先例）；③restore 返回 None 而非抛异常（快照不存在是正常态——首次评估前无历史，AutoExecuteService.load 同款 None 语义）；④CheckpointManager（L1066 规划）不新建——其 save_checkpoint/load 职责已由 SnapshotRepositoryProtocol + Recorder 组合承载，禁同义组件重复定义 |
-| OD-8 | 评估历史窗口上限 `MAX_HISTORY_SIZE = 100`（模块常量单源，deque maxlen——最旧滚动丢弃，三序列同窗同步滚动） | 规划无窗口上限语义（伪码 eval_history 无界列表） | ①每次 record 全量重写 Redis Hash（snapshot 存储是 latest 覆盖语义——redis_snapshot_store.py L119-121），无界历史 = 快照体积随 run 数线性膨胀（IO 延迟击穿 P95<100ms 门）+ Redis 单键体积失控；②100 条评估记录（每条 7 字段 JSON）≈ 数 KB——Redis Hash 单键安全量级；③100 run 量级覆盖 MVP 单 Agent 阶段回溯需求（5.9 OD-3 预热 30 样本锚的可回放窗口）；④窗口外历史经 DriftDetected 事件通道（reliable 持久化）与 OTel span（Phoenix 查询面）另行留存——三通道互补注记落 docstring；⑤上限值 V1 可调（配置化非本 Story 面） |
+| OD-7 | 端口接口形态：`async def record(agent_id, evaluation_result, predicted) -> CheckpointSnapshot`（单方法原子完成：内存累积 + 快照打包 + 持久化）+ `async def restore(session_id) -> CheckpointWithEvaluation | None` 两方法端口——伪码的 CheckpointWithEvaluation 聚合类与 to_checkpoint_snapshot() 方法保留为 frozen DTO + 纯转换方法（聚合数据类在端口文件，累积器职责在 Recorder 实现） | sisys-core-domain-design.md L1714-1724（CheckpointWithEvaluation 类 + to_checkpoint_snapshot 方法伪码）+ L1094-1101（CheckpointManager 规划） | ①原子性（5-9 OD-7 同款论证）：累积与持久化两方法形态存在中间态（累积成功 save 失败——内存与存储不一致）无消费语义；record 一次调用完成累积→打包→save，返回保存的快照供调用方断言；②CheckpointWithEvaluation 保持设计命名的 frozen 聚合 DTO（三序列 tuple + 元数据 + to_checkpoint_snapshot/from_snapshot 纯转换）——伪码形态保留；有状态累积（deque 滚动窗口）归 Recorder 实现（应用服务实现应用端口——evaluation_harness.py 实现 AgentEvaluationPort 同款先例）；③restore 是**恢复式语义非只读查询**：load → 解包聚合 → 灌回内部三 deque（deque maxlen 同窗裁剪）→ 返回聚合——AC-3②「restore 后 record → 历史 = 恢复 + 新记录」的机制承载（state_version 计数器同步续接 snapshot.state_version + 1）；restore 返回 None 而非抛异常（快照不存在是正常态——首次评估前无历史，AutoExecuteService.load 同款 None 语义）；④CheckpointManager（L1066 规划）不新建——其 save_checkpoint/load 职责已由 SnapshotRepositoryProtocol + Recorder 组合承载，禁同义组件重复定义 |
+| OD-8 | 评估历史窗口上限 `MAX_HISTORY_SIZE = 100`（模块常量单源，deque maxlen——最旧滚动丢弃，三序列同窗同步滚动） | 规划无窗口上限语义（伪码 eval_history 无界列表） | ①每次 record 全量重写 Redis Hash（snapshot 存储是 latest 覆盖语义——redis_snapshot_store.py L119-121），无界历史 = 快照体积随 run 数线性膨胀（IO 延迟击穿 P95<100ms 门）+ Redis 单键体积失控；②100 条评估记录（每条 7 字段 JSON）≈ 数 KB——Redis Hash 单键安全量级；③100 run 量级覆盖 MVP 单 Agent 阶段回溯需求（5.9 OD-3 预热 30 样本锚的可回放窗口）；④窗口外完整序列的留存通道是 OTel span（eval.* 三键 per-run 留痕——Phoenix 查询面，保留期随部署配置）；DriftDetected 事件仅在确认漂移时发布（稀疏锚点——单确认样本 + CUSUM 统计，非历史序列通道）——通道语义分述注记落 docstring（R1-F 修正：原「经事件通道留存历史」表述失实——绝大多数被逐出窗口的评估不出现在任何事件里）；⑤上限值 V1 可调（配置化非本 Story 面）；恢复聚合 ≤ 窗口上限由结构保证（快照由 maxlen deque 产出）——上限值将来调小时旧快照恢复被 deque 静默截断的版本偏斜知悉（V1 配置化时注记） |
 
 > 优先级锚说明（非偏离）：epics L532 将 FR-EV-04 定级 P1（功能等级），epics L1446 执行优先级 P1-10（执行序）。双锚不矛盾（5.8/5.9 同款注记）。
 
@@ -62,12 +62,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 | 依赖 | 组件 | 用途 | 状态 |
 |------|------|------|------|
-| Story 5.8 | `EvaluationResult` 四字段 frozen DTO（src/application/ports/agent_evaluation.py L84-138——hallucination_score/context_relevance/confidence_accuracy/overall_score，[0,1] 域守卫抛 201）+ 评估块宿主（run_agent_workflow.py L220-238——`evaluate` → 三键 span → 5.9 漂移块 → 共享 catch `(AgentEvaluationError, LLMConfigError, DriftDetectionError)`；**record 块的内嵌宿主**）+ `EvaluationHarness` 应用服务实现应用端口先例（src/application/services/evaluation_harness.py——Recorder 落位形态模板） | 评估历史的数据源 + 接入宿主 + 服务落位先例 | ✅ done（v2.3.1） |
-| Story 5.9 | `DriftAssessment` 十字段 DTO + DriftDetectionPort（agent_drift.py——端口文件结构模板：模块 docstring 讲 Story/FR/端口族/R1R2R3 规则落地/纯标准库声明）+ 主链漂移块形态（record 块与漂移块的顺序协定见 AC-2）+ 452-459 预留段钦定（_code_ranges.py 段注释「5.9 漂移检测/5.10 评估历史如需新码在此段取」——5.9 取 451，5.10 取 452）+ evaluation_exceptions.py 单文件续段惯例 | 端口文件风格 + 异常码归宿 + 主链块形态 | ✅ done（v2.3.1） |
+| Story 5.8 | `EvaluationResult` 四字段 frozen DTO（src/application/ports/agent_evaluation.py L84-138——hallucination_score/context_relevance/confidence_accuracy/overall_score，[0,1] 域守卫抛 201）+ 评估块宿主（run_agent_workflow.py L220-237——L220 None 守卫 → L221 try → L222 `evaluate` → L224-226 三键 span → L230-235 漂移块 → L236 共享 catch `(AgentEvaluationError, LLMConfigError, DriftDetectionError)` → L237 warning；L238 是块外 `return result`；**record 块的内嵌宿主**）+ `EvaluationHarness` 应用服务实现应用端口先例（src/application/services/evaluation_harness.py——Recorder 落位形态模板） | 评估历史的数据源 + 接入宿主 + 服务落位先例 | ✅ done（v2.3.1） |
+| Story 5.9 | `DriftAssessment` 十字段 DTO + DriftDetectionPort（agent_drift.py——端口文件结构模板：模块 docstring 讲 Story/FR/端口族/R1R2R3 规则落地/纯标准库声明）+ 主链漂移块形态（record 块与漂移块的顺序协定见 AC-2）+ 452-459 预留段钦定（_code_ranges.py L139-140 段注释「452-459 预留/后续评估域异常——5.10 评估历史如需新码在此段取」——5.9 取 451，5.10 取 452）+ evaluation_exceptions.py 单文件续段惯例 | 端口文件风格 + 异常码归宿 + 主链块形态 | ✅ done（v2.3.1） |
 | Story 5.7 | `SpanAttributeKeys` 14 键注册表（agent_tracing.py L105-128——**本 Story 零改动零新增键**：checkpoint 无 span 键需求，5.7 键表契约不动）+ OTel 链级测试通道 SSOT（场景级 initialize + InMemorySpanExporter + reset_for_testing 双复位义务）+ 延迟 import 纪律 | span 契约边界 + 测试通道 | ✅ done |
 | Checkpoint 基建（1-14a/1-15） | `CheckpointSnapshot` 实体（domain/entities/checkpoint_snapshot.py——frozen 7 字段 + with_updated_state 合并语义）+ `SnapshotRepositoryProtocol`（domain/ports/snapshot_repository_protocol.py——save/load/delete，R1 领域基础端口）+ `RedisSnapshotStore` 实现（infrastructure/storage/redis/redis_snapshot_store.py——pipeline 原子 hset+expire、json_dumps/json_loads 序列化、build_key("snapshot", session_id)）+ 组合根 `snapshot_repository` 注册（composition_root.py L941-955——**SCOPED**，注入 redis_adapter）+ `AutoExecuteService` 可选注入消费先例（domain/services/auto_execute_service.py——构造器可选 snapshot_repo + create_snapshot version 递增 + restore_snapshot None 语义） | 持久化端口与存储实现——**直接复用禁新建同义端口**（R2 组合注入） | ✅ 就绪 |
 | 序列化工具 | `json_dumps/json_loads`（infrastructure/utils/json_ser.py——RedisJSONEncoder；state_data dict 直接可序列化，Python json float 往返保真）+ `build_key`（infrastructure/storage/redis/key_builder.py） | state_data 序列化边界 | ✅ 就绪 |
-| predicted 数据源 | `TaskEvidencePackage.confidence: float`（domain/value_objects/task_evidence.py L59——[0,1] 验证阶段产物，**V1-EV3 钦定必须随快照持久化的 predicted**）+ 主链 `result.evidence.confidence` 可达性（run_agent_workflow.py L202 已写 span `eval.confidence` 键——同源） | record 的 predicted 形参来源 | ✅ 就绪 |
+| predicted 数据源 | `TaskEvidencePackage.confidence: float`（domain/value_objects/task_evidence.py L59——[0,1] 验证阶段产物，**V1-EV3 钦定必须随快照持久化的 predicted**）+ 主链 `result.evidence.confidence` 可达性（run_agent_workflow.py L202 已写 span `eval.confidence` 键——L202 属根 span MVP 十属性块 L192-203，非评估块三键 L224-226（`EVAL_CONFIDENCE` 与 `EVAL_CONFIDENCE_ACCURACY` 两键分立）；predicted 与 span 键同源双写） | record 的 predicted 形参来源 | ✅ 就绪 |
 | 异常体系 | evaluation 子域 452-459 预留段（_code_ranges.py——451 已占 DriftDetectionError）+ `AgentEvaluationError` 风格模板（evaluation_exceptions.py 构造 agent_id/phase/reason/message/cause/context_extra）+ `ValidationError`（201——DTO 分数域守卫）+ `EXCEPTION_HTTP_MAP`（exception_handlers.py）+ CI 校验（test_code_ranges.py + test_error_code_uniqueness.py） | EvaluationHistoryError 452 落位 | ✅ 就绪 |
 | 测试基建 | tests/acceptance/conftest.py（文件名服务 marker 自动挂载——checkpoint_evaluation 文件名不含服务关键词，仅自动挂 acceptance marker）+ 模块级 event_loop fixture + `_run_async` 同循环调度 + 集成委托计时三件（`_PERF_CACHE` + xdist_group 同组串行 + 常量单源集成定义/验收 import）+ AST 验证器 helper（test_arch_evaluation.py `_scan_file_top_imports`/`_scan_instantiation_sites`）+ TestTenant 租户隔离（tests/isolation.py——redis_key_prefix） | 测试骨架 | ✅ 就绪 |
 
@@ -90,12 +90,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 组件 | 文件路径 | 复用方式 |
 |------|---------|---------|
 | 快照仓储端口 | `src/domain/ports/snapshot_repository_protocol.py`（SnapshotRepositoryProtocol——save/load/delete） | **直接消费**——Recorder 构造注入（R2：应用层端口组合注入领域基础端口）；禁新建 checkpoint_repository/evaluation_history_store 等同义端口 |
-| Redis 快照存储 | `src/infrastructure/storage/redis/redis_snapshot_store.py`（RedisSnapshotStore） | **直接消费**——组合根既有 `snapshot_repository` 注册（L941-955）resolve 注入；序列化（_snapshot_to_hash 七字段哈希）零改动（OD-3——评估数据在 state_data JSON blob 内） |
-| 快照实体 | `src/domain/entities/checkpoint_snapshot.py`（CheckpointSnapshot + with_updated_state） | **直接消费**——to_checkpoint_snapshot 构造目标 / restore 解包来源；实体零改动 |
+| Redis 快照存储 | `src/infrastructure/storage/redis/redis_snapshot_store.py`（RedisSnapshotStore） | **直接消费**——组合根既有 `snapshot_repository` 注册（L941-955）resolve 注入；序列化（_snapshot_to_hash 七字段 → **单 field "latest" 承载 7 字段 dict 的 JSON 串**——`hget(key, "latest")` 取全量后需两层 json_loads：外层 7 字段 dict、state_data 值本身已是内层 JSON 字符串）零改动（OD-3——评估数据在 state_data JSON blob 内）；**load 侧任何异常（含 Redis 故障）均捕获返回 None**（L162-164——故障与快照不存在不可区分，restore 返 None 双义知悉）；save/delete 异常包装 StorageError；回归面含 contracts 层 `test_port_contract_repositories.py` L313-335（断言注册 interface 同一性——组合根注册变更会被感知） |
+| 快照实体 | `src/domain/entities/checkpoint_snapshot.py`（CheckpointSnapshot + with_updated_state） | **直接消费**——to_checkpoint_snapshot 构造目标 / restore 解包来源；实体零改动；**时间字段名是 `timestamp`**（L36，非 created_at——recorded_at 是本 Story 新 DTO 字段，json_loads 不自动还原 datetime、from_snapshot 须自行 fromisoformat）；七字段**全带默认值**（state_version 默认 **0**——「≥1」值由构造方显式传入[AutoExecuteService L171-177 先例：load existing → version+1 if existing else 1]；session_id 默认空串）；实体零校验（TTL 范围守卫只在 store.set_ttl） |
 | 可选注入消费先例 | `src/domain/services/auto_execute_service.py`（构造器可选 snapshot_repo + create_snapshot version 递增语义 + restore None 语义） | **形态参考**——Recorder 的注入与 version 语义照此（差异：AutoExecuteService 是 domain 服务，Recorder 是 application 服务——评估是应用可观测面） |
 | 应用服务落位先例 | `src/application/services/evaluation_harness.py`（EvaluationHarness 实现 AgentEvaluationPort——端口在 application/ports、实现在 application/services） | **落位照抄**——EvaluationCheckpointRecorder 实现 AgentCheckpointPort 同款布局 |
 | 端口文件风格模板 | `src/application/ports/agent_drift.py`（模块 docstring：Story/FR/端口族/R1R2R3 规则落地/纯标准库声明 + Protocol + frozen DTO + 域守卫 + __all__） | **参考照抄**——agent_checkpoint.py 同款形态（Agent 可观测族第四端口，文件名=端口名先例延续：agent_tracing[5.7]/agent_evaluation[5.8]/agent_drift[5.9]/agent_checkpoint[5.10]） |
-| 主链评估块宿主 | `src/application/use_cases/run_agent_workflow.py` L220-238（evaluate → 三键 → 漂移块 → 共享 catch） | **原地扩展**——record 块内嵌：三键写入后、漂移块前；独立降级网（内层 except EvaluationHistoryError——见 AC-2 Then）；**共享 catch 元组零改动**（450/332/451 三元组不动，452 由 record 块专属内层 catch 承载） |
+| 主链评估块宿主 | `src/application/use_cases/run_agent_workflow.py` L220-237（evaluate L222 → 三键 L224-226 → 漂移块 L230-235 → 共享 catch L236） | **原地扩展**——record 块内嵌：三键写入后、漂移块前（**同在 try 体内**——evaluation_result 存活域内）；独立降级网（内层 except EvaluationHistoryError——见 AC-2 Then）；**共享 catch 元组零改动**（450/332/451 三元组不动，452 由 record 块专属内层 catch 承载） |
 | 组合根 def 工厂 | `src/composition_root.py` `_build_agent_workflow_use_case`（resolve_optional + ConfigurationError 防护降级 None） | **原地扩展**——工厂尾部追加 `resolve_optional("agent_checkpoint")` 第八依赖注入 |
 | EvaluationResult | `src/application/ports/agent_evaluation.py` L84-138 | **直接消费**——record 形参类型；frozen 实例直传，四分数不重算 |
 | 异常风格模板 | `src/domain/exceptions/evaluation_exceptions.py`（AgentEvaluationError/DriftDetectionError 构造 + context dict） | **续段追加**——EvaluationHistoryError 452 同款构造（agent_id/phase/reason + context_extra） |
@@ -104,19 +104,19 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 集成委托计时模式 | `tests/integration/test_integration_drift_detection.py`（_PERF_CACHE 双 key + 常量单源 + xdist_group 同组 + quantiles exclusive [18] P95） | **参考照抄**——P95 双锚版本：快照创建/评估历史查询两 key；常量 `CHECKPOINT_SAVE_P95_LIMIT_SECONDS = 0.1` + `CHECKPOINT_QUERY_P95_LIMIT_SECONDS = 0.05` |
 | Fake LLM 手工装配链 | `tests/acceptance/test_acceptance_agent_evaluation.py` `_assemble_evaluation_workflow_chain`（真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + Fake LLM Schema 身份分派 + 手写零 IO stub） | **参考照抄 + 第八依赖扩展**——AC-2 链级场景装配（+ checkpoint_recorder 真实 Recorder 注入） |
 | 手写零 IO 替身族 | `_RecordingEventPublisher`（全仓 15+ 文件同款）/ `_StubAgentRepository`（duck-typing 返回真实 Agent 实体） | **参考照抄**——验收替身；存储替身 `_RecordingSnapshotRepo`（duck-typing 实现 SnapshotRepositoryProtocol 捕获 save 快照列表——集成 MockSnapshotRepo 先例 tests/integration/test_integration_execute.py L242） |
-| xdist 组清单（14 组实名） | agent-workflow-perf / agent-isolation-perf / agent-triple-isolation-perf / isolation-switch-log-perf / phoenix-tracer-perf / agent-evaluation-perf / drift-detection-perf / agent-instantiation / agent-profile-loading / data-source-cache / sandbox-daemon / tool-executions-pg / tool-versions-pg / validation-feedback-pg | **新组 `checkpoint-evaluation-perf` 与 14 组互异**（全仓 grep 断言——5-9 AC-5 同款）；**存量同步义务**：核实 5-9 验收 xdist 组断言形态（test_acceptance_drift_detection.py 全仓扫描），若为穷举等值断言则同步登记新组 |
+| xdist 组清单（14 组实名） | agent-workflow-perf / agent-isolation-perf / agent-triple-isolation-perf / isolation-switch-log-perf / phoenix-tracer-perf / agent-evaluation-perf / drift-detection-perf / agent-instantiation / agent-profile-loading / data-source-cache / sandbox-daemon / tool-executions-pg / tool-versions-pg / validation-feedback-pg | **新组 `checkpoint-evaluation-perf` 与 14 组互异**（全仓 grep 断言——5-9 AC-5 同款）；**存量同步义务（创建期已实证消解）**：5-9 验收组断言实测为**子集断言**（`expected_existing <= existing_groups` + 自组存在性 + 自组消费方恰 2——test_acceptance_drift_detection.py L1586-1617，非穷举等值），新增第 15 组零破坏、**零同步动作** |
 
-**明确不存在、本 Story 需新建**（全仓 grep 验证：`CheckpointWithEvaluation|AgentCheckpointPort|EvaluationCheckpointRecorder|EvaluationHistoryError|EXCEPTION_452|evaluation_history` 在 `src/` 零命中[仅规划性注释锚点——evaluation_harness.py L70「无 eval_history 累积——5.9/5.10 范围」、composition_root.py L2991 同款、agent_evaluation.py L102-104 注记]；`get_trend` 零代码命中[仅设计文档伪码]；application/ports 下无 checkpoint 端口）：
+**明确不存在、本 Story 需新建**（全仓 grep 验证：`CheckpointWithEvaluation|AgentCheckpointPort|EvaluationCheckpointRecorder|EvaluationHistoryError|EXCEPTION_452|evaluation_history` 在 `src/` 零命中[仅规划性注释锚点——evaluation_harness.py L70「无 eval_history 累积——5.9/5.10 范围」、composition_root.py L2991 同款]；`get_trend` 零代码命中[仅设计文档伪码]；application/ports 下无 checkpoint 端口）：
 
 1. `AgentCheckpointPort` + `EvaluationCheckpoint` DTO + `CheckpointWithEvaluation` 聚合（src/application/ports/agent_checkpoint.py——端口聚合文件）
 2. `EvaluationCheckpointRecorder`（src/application/services/evaluation_checkpoint_recorder.py——AgentCheckpointPort 实现，组合注入 SnapshotRepositoryProtocol）
 3. `EvaluationHistoryError`（EXCEPTION_452——src/domain/exceptions/evaluation_exceptions.py 追加 + 注册四件套）
 4. 主链 record 块（修改：run_agent_workflow.py——第八可选依赖 + record 调用 + 内层降级 catch；纯附加 None 默认向后兼容）
 5. 组合根 `# === Story 5.10 ===` 区段（agent_checkpoint 注册 + use case 工厂第八依赖）
-6. 测试资产（新建九件[.feature/.py 分计]）：`tests/unit/application/test_agent_checkpoint_model.py` / `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` / `tests/contracts/test_port_contract_agent_checkpoint.py` / `tests/integration/test_integration_checkpoint_evaluation.py` / `tests/unit/architecture/test_arch_checkpoint_evaluation.py` / `tests/acceptance/test_acceptance_checkpoint_evaluation.feature` + `test_acceptance_checkpoint_evaluation.py`；追加：`tests/unit/domain/exceptions/test_evaluation_exceptions.py`（452 用例）
-7. 异常注册三件：`_code_ranges.py`（_CLASS_TO_SUBDOMAIN 增 EvaluationHistoryError → evaluation 行——CODE_RANGES evaluation 行已存在零改动）+ `domain/exceptions/__init__.py`（导出）+ `interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 452→500）
+6. 测试资产（新建七件[.feature/.py 分计]）：`tests/unit/application/test_agent_checkpoint_model.py` / `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` / `tests/contracts/test_port_contract_agent_checkpoint.py` / `tests/integration/test_integration_checkpoint_evaluation.py` / `tests/unit/architecture/test_arch_checkpoint_evaluation.py` / `tests/acceptance/test_acceptance_checkpoint_evaluation.feature` + `test_acceptance_checkpoint_evaluation.py`；追加：`tests/unit/domain/exceptions/test_evaluation_exceptions.py`（452 用例）
+7. 异常注册四件套之注册三动作（四件套 = 定义文件[见 item 3] + 以下三件——File List 同口径）：`_code_ranges.py`（_CLASS_TO_SUBDOMAIN 增 EvaluationHistoryError → evaluation 行——CODE_RANGES evaluation 行已存在零改动）+ `domain/exceptions/__init__.py`（导出）+ `interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 452→500）
 8. 端口导出：`src/application/ports/__init__.py`（AgentCheckpointPort/EvaluationCheckpoint/CheckpointWithEvaluation 聚合导出）
-9. 存量触碰（构造签名八依赖联动——**断言同步全清单[创建期 grep 实证 `grep -rn "inspect.signature(RunAgentWorkflowUseCase\|inspect.signature(use_case_cls" tests/`，当前 13 行命中归七处]**）：①`tests/acceptance/test_acceptance_phoenix_tracer.py`（L1367 参数清单 + L1375 字面行——尾部追加第八行）②`tests/unit/application/use_cases/test_run_agent_workflow.py`（L261/L685/L693/L695 六七依赖清单 + L915/L923/L925 漂移块用例七依赖清单——第八参数追加，record 块用例同文件追加）③`tests/unit/architecture/test_arch_phoenix_tracer.py`（L108 `_USE_CASE_INIT_PARAMS` 常量 + L305 签名断言）④`tests/acceptance/test_acceptance_agent_evaluation.py`（L1308/L1310/L1327——5.8 自身验收资产）⑤`tests/acceptance/test_acceptance_drift_detection.py`（L1188 签名 + L1207 字面行——**5.9 自身验收资产，最易漏处**）⑥`tests/unit/architecture/test_arch_evaluation.py`（L234/L236）⑦`tests/unit/architecture/test_arch_drift_detection.py`（L245——5.9 架构验证器签名基线）⑧`tests/unit/interfaces/api/test_exception_handlers.py`（expected_types 集合追加 452——穷举等值断言）；**回执耦合防线（P0 级处方——5-9 教训延续）**：①③文件中 `"drift_detector",  # Story 5.9 第七可选依赖` 字面行被 5-9 验收 L1228-1229/L1709-1710 文本断言锁死——更新一律**尾部追加** `"checkpoint_recorder",  # Story 5.10 第八可选依赖` 行、禁改写/重排既有行；核验命令：`grep -rn "inspect.signature(RunAgentWorkflowUseCase\|inspect.signature(use_case_cls" tests/` + `grep -rn '"drift_detector",' tests/`；**行号锚漂移知悉（5-9 R3-1 教训）**：上列行号是创建期 grep 实证，dev 时以 grep 重新定位为准
+9. 存量触碰（构造签名八依赖联动——**断言同步全清单[创建期 grep 实证：`grep -rn "inspect.signature(RunAgentWorkflowUseCase\|inspect.signature(use_case_cls" tests/` 当前 **16 行命中归七处**（__init__ 签名相关 14 行 + execute 签名 2 行[L1377/L312——不受第八参影响]）；字面行口径 `grep -rn '"drift_detector",' tests/` 12 行/7 文件]**）：①`tests/acceptance/test_acceptance_phoenix_tracer.py`（L1367 参数清单 + L1375 字面行——尾部追加第八行）②`tests/unit/application/use_cases/test_run_agent_workflow.py`（L261/L685/L693/L695 六七依赖清单 + L915/L923/L925 漂移块用例七依赖清单——第八参数追加，record 块用例同文件追加）③`tests/unit/architecture/test_arch_phoenix_tracer.py`（L108 `_USE_CASE_INIT_PARAMS` 常量 + L305 签名断言）④`tests/acceptance/test_acceptance_agent_evaluation.py`（L1308/L1310/L1327——5.8 自身验收资产）⑤`tests/acceptance/test_acceptance_drift_detection.py`（L1188 签名 + L1207 字面行——**5.9 自身验收资产，最易漏处**；其 targets dict 另以裸 `'"drift_detector"'` 锚锁 ①③②④⑥ 字面[L1230-1232/L1711-1713]——尾部追加策略下天然满足零改动）⑥`tests/unit/architecture/test_arch_evaluation.py`（L234/L236 断言行 + **L54-62 `_USE_CASE_INIT_PARAMS` 常量本体——追第八项否则断言红**）⑦`tests/unit/architecture/test_arch_drift_detection.py`（L245 断言行 + **L50-58 `_USE_CASE_INIT_PARAMS` 常量本体——追第八项**——5.9 架构验证器签名基线）⑧`tests/unit/interfaces/api/test_exception_handlers.py`（expected_types 集合追加 452——穷举等值断言[插入点 L354/L355 之间]——**⑧ 属异常注册面不计入签名同步 ×7**）；**回执耦合防线（P0 级处方——5-9 教训延续）**：①③文件中 `"drift_detector",  # Story 5.9 第七可选依赖` 字面行被 5-9 验收 L1228-1229/L1709-1710 文本断言锁死——更新一律**尾部追加** `"checkpoint_recorder",  # Story 5.10 第八可选依赖` 行、禁改写/重排既有行；核验命令：`grep -rn "inspect.signature(RunAgentWorkflowUseCase\|inspect.signature(use_case_cls" tests/` + `grep -rn '"drift_detector",' tests/`；**行号锚漂移知悉（5-9 R3-1 教训）**：上列行号是创建期 grep 实证，dev 时以 grep 重新定位为准
 
 ---
 
@@ -125,41 +125,41 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 ### AC-1: CheckpointWithEvaluation 聚合与快照转换（DTO 域守卫 + 三序列累积滚动 + 打包/恢复往返）
 
 **Given** 真实 `EvaluationCheckpoint` / `CheckpointWithEvaluation` frozen DTO（手工构造——纯数据类零外部依赖；**每场景新实例**）与模块常量单源（`MAX_HISTORY_SIZE = 100`——OD-8 窗口上限锚）
-**When** 构造 `EvaluationCheckpoint`（七字段：`recorded_at: datetime` / `agent_id: str` / `hallucination_score: float` / `context_relevance: float` / `confidence_accuracy: float` / `overall_score: float` / `predicted_confidence: float`——**V1-EV3 兑现：predicted 必存**）与 `CheckpointWithEvaluation` 聚合（`agent_id: str` + `evaluation_history: tuple[EvaluationCheckpoint, ...]` + `hallucination_trend: tuple[float, ...]` + `confidence_accuracy_trend: tuple[float, ...]`），并调用 `to_checkpoint_snapshot(session_id)` 打包 / `CheckpointWithEvaluation.from_snapshot(snapshot)` 解包
-**Then** ①**DTO 域守卫**：EvaluationCheckpoint 四分数 + predicted_confidence 六 [0,1] 数值域守卫（越界/bool/非数值抛 `ValidationError` EXCEPTION_201——`context` 携 `{字段名: 实际值}`，DriftAssessment 守卫同款形态）；agent_id 非空守卫；`CheckpointWithEvaluation.__post_init__` 三序列等长守卫（history 长度 == 两 trend 长度——不等抛 201）；②**打包**：`to_checkpoint_snapshot()` 返回 `CheckpointSnapshot`（既有实体构造——session_id 形参承载 + `stage_id="evaluation"` + `state_version ≥ 1` 递增语义 + `state_data` 四键：`agent_id`/`evaluation_history`（记录 dict 列表——recorded_at 经 isoformat 字符串化）/`hallucination_trend`/`confidence_accuracy_trend`，OD-3 键契约）；③**往返**：`from_snapshot(to_checkpoint_snapshot(...))` 三序列逐值相等（float 经 json 序列化往返保真——Python json repr 往返保证，断言用精确等式禁 approx[仓内无 approx 先例]）+ recorded_at datetime isoformat 往返相等 + agent_id 相等
-**And** **窗口滚动**（Recorder 行为经端口方法验证——见 AC-2/AC-3，本 AC 锚定常量与语义）：`MAX_HISTORY_SIZE == 100` 模块常量单源断言（防参数漂移）；滚动语义 = 最旧丢弃（deque maxlen 形态——docstring 注记「窗口外历史经 DriftDetected 事件通道与 OTel span 留存——三通道互补」）；**手算锚钦定**：构造 3 条评估记录（分数取 0.1/0.3/0.5 类一位小数——避开浮点边界）→ 打包 → 快照 state_data 三序列长度 == 3 + 逐值断言；**退化锚**：空历史聚合（零记录）→ 打包快照 state_data 三序列为空列表 + from_snapshot 恢复空聚合（restore 边界态——首次评估前无历史是正常态）
+**When** 构造 `EvaluationCheckpoint`（七字段：`recorded_at: datetime` / `agent_id: str` / `hallucination_score: float` / `context_relevance: float` / `confidence_accuracy: float` / `overall_score: float` / `predicted_confidence: float`——**V1-EV3 兑现：predicted 必存**）与 `CheckpointWithEvaluation` 聚合（`agent_id: str` + `evaluation_history: tuple[EvaluationCheckpoint, ...]` + `hallucination_trend: tuple[float, ...]` + `confidence_accuracy_trend: tuple[float, ...]`），并调用 `to_checkpoint_snapshot(session_id, state_version=1)` 打包 / `CheckpointWithEvaluation.from_snapshot(snapshot)` 解包
+**Then** ①**DTO 域守卫**：EvaluationCheckpoint 四分数 + predicted_confidence 共**五分数字段** [0,1] 数值域守卫（越界/bool/非数值抛 `ValidationError` EXCEPTION_201——`context` 携 `{字段名: str(实际值)}`，DriftAssessment/EvaluationResult 守卫同款形态[agent_evaluation.py L127-138 实测形态]；recorded_at 是 datetime、agent_id 是非空守卫——均非 [0,1] 分数域）；agent_id 非空守卫；`CheckpointWithEvaluation.__post_init__` 三序列等长守卫（history 长度 == 两 trend 长度——不等抛 201）；②**打包**：`to_checkpoint_snapshot()` 返回 `CheckpointSnapshot`（既有实体构造——session_id 形参承载 + `stage_id="evaluation"` + `state_version` 形参默认 1（聚合纯转换无状态——递增语义归 Recorder：内存计数器初始 1、record 打包传当前值后 +1、restore 续接 `snapshot.state_version + 1`，AC-1 断言默认值 1）+ `state_data` 四键：`agent_id`/`evaluation_history`（记录 dict 列表——recorded_at 经 isoformat 字符串化）/`hallucination_trend`/`confidence_accuracy_trend`，OD-3 键契约）；③**往返**：`from_snapshot(to_checkpoint_snapshot(...))` 三序列逐值相等（**纯内存往返同值传递恒等**——json 序列化双程保真验证由 AC-3 真实 Redis 场景承载[Python json repr 往返保证]；断言一律精确等式禁 approx[仓内无 approx 先例]）+ recorded_at datetime isoformat 往返相等 + agent_id 相等
+**And** **窗口滚动**（Recorder 行为经端口方法验证——滚动覆盖在 **Task 2 单测②（灌 101 条）**，AC-2 验证累积跨 run、AC-3 验证恢复延续，本 AC 锚定常量与语义）：`MAX_HISTORY_SIZE == 100` 模块常量单源断言（防参数漂移）；滚动语义 = 最旧丢弃（deque maxlen 形态——docstring 注记「窗口外完整序列的留存通道是 OTel span（eval.* 三键 per-run 留痕——Phoenix 查询面）；DriftDetected 事件仅留存确认漂移的稀疏锚点——通道语义分述[OD-8④]」）；**手算锚钦定**：构造 3 条评估记录（分数取 0.1/0.3/0.5 类一位小数——避开浮点边界）→ 打包 → 快照 state_data 三序列长度 == 3 + 逐值断言；**退化锚**：空历史聚合（零记录）→ 打包快照 state_data 三序列为空列表 + from_snapshot 恢复空聚合（restore 边界态——首次评估前无历史是正常态）
 
 **验证标准/Validation Criteria:**
-- [ ] EvaluationCheckpoint 域守卫：六分数字段 [-0.01/1.01/True/"0.5"] 参数化 → 201 三段式断言（raises → code EXCEPTION_201 → context 携字段名）；agent_id 空串 → 201
+- [ ] EvaluationCheckpoint 域守卫：五分数字段（hallucination_score/context_relevance/confidence_accuracy/overall_score/predicted_confidence）[-0.01/1.01/True/"0.5"] 参数化 → 201 三段式断言（raises → code EXCEPTION_201 → context 携字段名）；agent_id 空串 → 201
 - [ ] frozen 不可变断言（setattr 抛 FrozenInstanceError——EvaluationResult/DriftAssessment 同款）
 - [ ] 三序列等长守卫：构造长度不齐聚合（history 3 + trend 2）→ 201
-- [ ] to_checkpoint_snapshot：stage_id=="evaluation" + state_data 四键存在 + 三序列逐值断言（手算锚 3 记录）+ snapshot_id 非空 UUID + ttl_seconds 为实体默认（86400）
+- [ ] to_checkpoint_snapshot：stage_id=="evaluation" + state_data 四键存在 + 三序列逐值断言（手算锚 3 记录）+ snapshot_id 非空 UUID + ttl_seconds 为实体默认（86400）+ state_version == 1（默认值断言——递增语义归 Recorder 计数器，AC-2/AC-3 承载）
 - [ ] 往返一致性：from_snapshot 解包三序列逐值精确相等 + recorded_at 相等 + 空历史退化锚
 - [ ] MAX_HISTORY_SIZE==100 常量单源断言
 
 ### AC-2: 主链接入——第八可选依赖 + record 块（predicted 持久化）+ 独立降级网 + None 默认向后兼容
 
-**Given** 工作流链 = 5.8/5.9 手工装配形态（Fake LLM Schema 身份分派[幻觉分注入控制评估分数] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + 手写零 IO stub 仓储）+ use case 构造注入 `checkpoint_recorder`（真实 `EvaluationCheckpointRecorder` + 手写零 IO `_RecordingSnapshotRepo` 替身[duck-typing 实现 SnapshotRepositoryProtocol，save 捕获快照列表——test_integration_execute.py MockSnapshotRepo 先例形态]）
+**Given** 工作流链 = 5.8/5.9 手工装配形态（Fake LLM Schema 身份分派[幻觉分注入控制评估分数] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + 手写零 IO stub 仓储 + **OTel 观测通道**[场景级 initialize + InMemorySpanExporter + teardown 双复位——eval 三键 span 与 drift.detected 断言的观测面，5-9 验收同款；NoOp tracer 下 is_recording False 无属性可断]）+ use case 构造注入 `checkpoint_recorder`（真实 `EvaluationCheckpointRecorder` + 手写零 IO `_RecordingSnapshotRepo` 替身[duck-typing 实现 SnapshotRepositoryProtocol，save 捕获快照列表——test_integration_execute.py MockSnapshotRepo 先例形态]）
 **When** 调用 `RunAgentWorkflowUseCase.execute(agent_id, task)` 执行工作流
 **Then** 评估块内（`evaluate` 成功 + 三键写入之后、**漂移块之前**——顺序钦定：record 失败不得阻断漂移检测、漂移失败不得丢评估历史，两独立可观测附加面）record 块执行：`if self._checkpoint_recorder is not None:` → `await self._checkpoint_recorder.record(agent_id=str(agent_id), evaluation_result=evaluation_result, predicted=result.evidence.confidence)`（**V1-EV3 兑现锚——predicted 从 result.evidence.confidence 取**）→ record 内层独立降级网 `except EvaluationHistoryError:` → logger.warning 继续漂移块（**共享 catch 元组零改动**——外层 `(AgentEvaluationError, LLMConfigError, DriftDetectionError)` 三元组不动，452 由 record 块专属内层 catch 承载：漂移检测与历史持久化互不牵连）；工作流返回值与 record 块零耦合（result 原样返回）
-**And** **降级路径**（可观测附加面哲学——两级 catch 形态）：①record 失败（`_RaisingSnapshotRepo` save 抛 452 注入）→ 主链正常返回 + **eval 三键仍在**（record 前已写）+ **漂移块仍执行**（drift.detected 确认路径不受影响——独立降级网验证锚）+ warning 日志（caplog 断言存在 WARNING 级记录且文本含 452 异常 str——**断言锚同 5-9 R3 教训：消息模板按实际写死文本断言，禁按直觉断言「历史」子串**）；②评估降级联动（evaluate 抛 450 → record 块天然跳过——evaluation_result 未定义域外）+ 452 零捕获（外层 catch 不含 452——评估失败时 record 块在 try 体外不可达[结构保证]）；③漂移失败联动（漂移块抛 451 → 外层 catch 降级 → **record 已完成**[record 在漂移块前]——`_RecordingSnapshotRepo` 捕获断言快照已保存，漂移失败不丢评估历史）；**未注入路径**（`checkpoint_recorder=None`——八参默认）：record 块整体跳过 + 行为与 5.9 交付态完全一致（存量零破坏前提）；**构造签名扩展**：use case 第八可选依赖 `checkpoint_recorder: AgentCheckpointPort | None = None`（尾部追加——存量七参构造调用零破坏）；**存量断言同步 ×7**（创建期 grep 实证清单见「现有代码继承」第 9 条——含 5-9 自身验收资产 L1188/L1207 最易漏处）；**回执耦合防线**：①③文件追加一律尾部追加禁改写既有行
+**And** **降级路径**（可观测附加面哲学——两级 catch 形态）：①record 失败（`_RaisingSnapshotRepo` save 抛 **StorageError** 注入——Recorder 捕获包装 452 上抛，完整真实路径[Redis 故障在存储面即 StorageError——redis_snapshot_store L131-133；替身直抛 452 会跳过包装环节，与 Task 2 单测⑥统一 StorageError 口径]）→ 主链正常返回 + **eval 三键仍在**（record 前已写——InMemorySpanExporter 断言三键属性存在）+ **漂移块仍执行**（drift.detected 确认路径不受影响——独立降级网验证锚）+ warning 日志（caplog 断言存在 WARNING 级记录且文本含注入异常的 str——`any(str(injected) in text for text in warning_texts)` 形态[5-9 451 用例同款——红绿皆可写不依赖模板]；消息模板字面锚可选加严）；②评估降级联动（evaluate 抛 450 → record 块天然跳过）+ 452 零捕获（外层 catch 不含 452——**record 块位于 evaluate 之后同一 try 体内，evaluate 抛出时控制流直接跳转外层 catch，record 块不执行[结构保证]**）；③漂移失败联动（漂移块抛 451 → 外层 catch 降级 → **record 已完成**[record 在漂移块前]——`_RecordingSnapshotRepo` 捕获断言快照已保存，漂移失败不丢评估历史）；**未注入路径**（`checkpoint_recorder=None`——八参默认）：record 块整体跳过 + 行为与 5.9 交付态完全一致（存量零破坏前提）；**构造签名扩展**：use case 第八可选依赖 `checkpoint_recorder: AgentCheckpointPort | None = None`（尾部追加——存量七参构造调用零破坏）；**存量断言同步 ×7**（创建期 grep 实证清单见「现有代码继承」第 9 条——含 5-9 自身验收资产 L1188/L1207 最易漏处）；**回执耦合防线**：①③文件追加一律尾部追加禁改写既有行
 
 **验证标准/Validation Criteria:**
 - [ ] 主链 record 断言：execute 后 `_RecordingSnapshotRepo` 捕获 1 个 CheckpointSnapshot + state_data 四键 + evaluation_history 末条记录七字段与 Fake LLM 注入的评估分数逐值相等（**predicted_confidence == result.evidence.confidence 断言**——V1-EV3 兑现锚）+ stage_id=="evaluation" + session_id=="agent-evaluation-{agent_id}"（命名空间锚）
 - [ ] 连续执行累积：同 agent 连续 execute 2 次 → 第二次快照 evaluation_history 长度 == 2 + hallucination_trend 长度 == 2（Recorder 内存累积跨 run 保持——SINGLETON 语义）
-- [ ] record 失败降级：save 抛 452 → 主链正常返回 + 三键仍在 + 漂移块仍执行（drift 预填充场景的 drift.detected==True 断言——独立降级网验证锚）+ WARNING 日志断言
+- [ ] record 失败降级：save 抛 StorageError → record 包装 452 上抛 → 内层降级 → 主链正常返回 + 三键仍在 + 漂移块仍执行（drift 预填充场景的 drift.detected==True 断言——独立降级网验证锚）+ WARNING 日志断言
 - [ ] 漂移失败联动：漂移块抛 451 → record 已完成（替身捕获非空）+ 主链正常返回
 - [ ] 评估降级联动：evaluate 抛 450 → record 零调用（替身零捕获）+ 主链正常返回
 - [ ] None 默认路径：七参构造（不注入 checkpoint_recorder）→ execute 行为与 5.9 基线一致（回归锚）+ record 块零执行
-- [ ] 构造签名：八依赖签名断言（inspect.signature 参数清单尾部 == checkpoint_recorder + 默认 None）+ 存量断言同步 ×7 更新后全绿 + 核验 grep 双命令零漏
+- [ ] 构造签名：八依赖签名断言（inspect.signature 参数清单尾部 == checkpoint_recorder + 默认 None）+ 外层共享 catch 三元组不变断言 + 存量断言同步 ×7 更新后全绿 + 核验 grep 双命令零漏
 - [ ] **5-3/5-7/5-8/5-9 存量全家回归绿**：逐一登记（5.3 全家 / 5.7 全家[AC-4.3 签名断言更新后 15 场景] / 5.8 全家[13 场景] / 5.9 全家[14 场景]）
 
 ### AC-3: 持久化与恢复——真实 Redis 往返 + 命名空间隔离 + 从 Checkpoint 恢复评估历史
 
 **Given** 真实 Redis 服务（本地 .env Redis 连接——`RedisSnapshotStore` 经组合根 `snapshot_repository` resolve 或手工构造 `RedisAdapter` 装配；**场景级独立客户端**——session 级客户端跨循环不可用[记忆：acceptance_redis_client_cross_loop_issue]；Redis 不可用 → `pytest.skip` 动态跳过）与 TestTenant/UUID 前缀隔离（session_id 含唯一前缀——`agent-evaluation-{agent_id}`，agent_id 用 `uuid.uuid4()` 测试实体，多测试零键冲突）
-**When** ①`record()` 多次（≥3 次——累积后持久化）→ 真实 Redis `hget(build_key("snapshot", session_id), "latest")` 验证落键；②新构造 Recorder 实例（**模拟重启**——内存累积清零）→ `restore(session_id)` 从快照恢复
-**Then** ①**落键验证**：Redis 中快照 JSON 可解析 + 三序列与 record 传入逐值相等（save 真实路径——json_dumps 序列化 + pipeline 原子写）；②**恢复语义**（epics AC「支持从 Checkpoint 恢复评估历史」承载）：restore 返回 `CheckpointWithEvaluation` 非空 + evaluation_history 长度 == 最后一次快照的历史长度 + 逐值精确相等（**重启存活验证锚**——内存清零后历史完整恢复）+ restore 后继续 record → 新快照历史 = 恢复历史 + 新记录（**累积延续语义**——restore 是累积的恢复不是只读查询）；③**恢复后趋势可回溯**：hallucination_trend 序列单调时序断言（记录顺序保持——deque 追加序即时间序）
-**And** **快照不存在**：restore 未 record 过的 session_id → 返回 None（AutoExecuteService.load 同款 None 语义——首次评估前无历史是正常态，非异常）；**自清理**：场景 teardown `delete(session_id)`（只清理自己创建的键——snapshot namespace 键级隔离，禁 delete/truncate 全局模式）；**TTL 语义**：快照携带实体默认 ttl_seconds=86400（24h——评估历史 MVP 生命周期；30 天窗口是 6.3 BLM 面参数，本 Story 用实体默认不动）；**SCOPED 注入注记**：组合根 lambda 内 `resolver.resolve("snapshot_repository")` 在 SINGLETON 端口首次 resolve 时执行一次并固定实例——RedisSnapshotStore 无状态（委托 adapter，连接由 adapter 持有）固定实例安全，docstring 注记生命周期匹配论证
+**When** ①`record()` 多次（≥3 次——累积后持久化）→ 真实 Redis `hget(build_key("snapshot", session_id), "latest")` 验证落键；②新构造 Recorder 实例（**模拟重启**——内存累积清零）→ `restore(session_id)` 从快照恢复（**恢复式语义**——restore 同时灌回新实例内部三 deque，OD-7③）
+**Then** ①**落键验证**：Redis 中快照 JSON 可解析 + 三序列与 record 传入逐值相等（save 真实路径——json_dumps 序列化 + pipeline 原子写；**"latest" field 值是 7 字段 dict 的 JSON 串、其中 state_data 已是内层 JSON 字符串——断言需两层 json_loads**）；②**恢复语义**（epics AC「支持从 Checkpoint 恢复评估历史」承载）：restore 返回 `CheckpointWithEvaluation` 非空 + evaluation_history 长度 == 最后一次快照的历史长度 + 逐值精确相等（**重启存活验证锚**——内存清零后历史完整恢复）+ restore 后继续 record → 新快照历史 = 恢复历史 + 新记录（**累积延续语义**——restore 是累积的恢复不是只读查询[机制：restore 灌回三 deque + state_version 计数器续接 snapshot.state_version + 1——Task 2 单测③b 红前置锚]）；③**恢复后趋势可回溯**：hallucination_trend 序列**顺序保持**断言（值序 == record 注入序——deque 追加序即时间序；非值单调性）
+**And** **快照不存在**：restore 未 record 过的 session_id → 返回 None（AutoExecuteService.load 同款 None 语义——首次评估前无历史是正常态，非异常；**知悉注记**：store.load 侧任何异常含 Redis 故障均捕获返回 None[redis_snapshot_store L162-164]——故障与不存在不可区分，restore 返 None 双义下「故障静默为空历史」是既定行为，风险 #9 登记）；**自清理**：场景 teardown `delete(session_id)`（只清理自己创建的键——snapshot namespace 键级隔离，禁 delete/truncate 全局模式）；**TTL 语义**：快照携带实体默认 ttl_seconds=86400（24h——评估历史 MVP 生命周期；30 天窗口是 6.3 BLM 面参数，本 Story 用实体默认不动；评估间隔 >24h 的低频 agent 历史整键过期 → restore 返 None 走正常态路径静默清零——边界知悉注记）；**SCOPED 注入注记**：组合根 lambda 内 `resolver.resolve("snapshot_repository")` 在 SINGLETON 端口首次 resolve 时执行一次并固定实例——RedisSnapshotStore 无状态（委托 adapter，连接由 adapter 持有）固定实例安全，docstring 注记生命周期匹配论证
 
 **验证标准/Validation Criteria:**
 - [ ] 真实落键：record ≥3 次后 Redis hget latest 非空 + JSON 解析 + 三序列逐值相等
@@ -167,7 +167,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 - [ ] 恢复后累积延续：restore 后 record 1 次 → 新快照历史 == 恢复历史 + 1
 - [ ] 快照不存在 → None（未 record 的 UUID session_id）
 - [ ] 趋势时序：hallucination_trend 顺序 == record 注入顺序
-- [ ] 自清理：teardown 后 exists(session_id) is False（替身 exists 或真实验证）
+- [ ] 自清理：teardown 后真实 `RedisSnapshotStore.exists(session_id) is False`（exists 是 store 具体类方法[L185-195]非协议面——duck-typing 替身不加协议外方法）
 - [ ] TTL：快照 ttl_seconds == 86400 断言（实体默认不动）
 
 ### AC-4: 端口接线、架构合规与组合根注册
@@ -175,7 +175,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **Given** 端口、实现、主链 record 块全部交付
 **When** 验证接线与合规
 **Then** 新端口经组合根 `# === Story 5.10 ===` 区段注册且 resolve 可达（PortSpec 元数据对齐 5.9 形态）：`agent_checkpoint`：v1.0.0 / `AgentCheckpointPort` / lambda 注入 `EvaluationCheckpointRecorder(snapshot_repository=resolver.resolve("snapshot_repository"))` / module=src.application.services.evaluation_checkpoint_recorder / **SINGLETON**（跨 run 累积——状态即功能，5.9 DC-6 同款论证[检测器有状态 SINGLETON]；SCOPED snapshot_repository 固定实例注入论证见 AC-3）/ owner=platform / tags=("agent", "checkpoint", "observability")；use case 工厂 `_build_agent_workflow_use_case` 扩展：`resolve_optional("agent_checkpoint")` 注入第八依赖（接线失败降级 None 不阻断 bootstrap——5.6/5.8/5.9 可选依赖先例延续）；**同窗落地纪律（5-8 R1-F1/5-9 两连教训）**：组合根 lambda 与第八构造参数必须同一 Task 同窗落地（提前注入 kwarg 在参数未交付窗口每次 resolve 即 TypeError）；契约测试（端口维度——test_port_contract_agent_checkpoint.py：PORT_NAME/EXPECTED_TAGS/REQUIRED_METHODS=["record", "restore"] 等 11 维度 + _DummyResolver 分发 snapshot_repository）
-**And** **接线测试场景覆盖工厂降级防护面**（CR1-DF2[5.8] 家族延续）：_DummyResolver 未注册 agent_checkpoint → resolve_optional None → use case 构造成功 + `_checkpoint_recorder` is None；架构合规：application 触碰文件第三方白名单（agent_checkpoint.py / evaluation_checkpoint_recorder.py / run_agent_workflow.py——**零新增第三方**：agent_checkpoint.py 纯标准库、evaluation_checkpoint_recorder.py 纯标准库[asyncio + dataclass——存储委托注入端口，无 redis import]、run_agent_workflow.py 既有面零新 import[AgentCheckpointPort 同层 import]）；domain 触碰面（evaluation_exceptions.py 追加 + _code_ranges.py + __init__.py——**零 events 触碰**[OD-6：无新事件——本 Story 与 5.9 的差异面：5.9 新增 DriftDetected 事件，5.10 事件零改动]）；组合根外零实例化（EvaluationCheckpointRecorder 构造点仅 composition_root.py + tests/）；依赖方向：EvaluationCheckpointRecorder（application）→ AgentCheckpointPort（application 同层）+ SnapshotRepositoryProtocol/CheckpointSnapshot（domain）合法 ✓（application→domain 允许面）；`.env.example` 零改动（无新环境变量——MAX_HISTORY_SIZE 是代码常量）；**xdist 组登记**：`checkpoint-evaluation-perf` 与既有 14 组互异（全仓 grep 断言）+ 5-9 验收 xdist 组断言形态核实（穷举等值则同步登记——存量同步义务）
+**And** **接线测试场景覆盖工厂降级防护面**（CR1-DF2[5.8] 家族延续）：_DummyResolver 未注册 agent_checkpoint → resolve_optional None → use case 构造成功 + `_checkpoint_recorder` is None；架构合规：application 触碰文件第三方白名单（agent_checkpoint.py / evaluation_checkpoint_recorder.py / run_agent_workflow.py——**零新增第三方**：agent_checkpoint.py 纯标准库、evaluation_checkpoint_recorder.py 纯标准库[asyncio + dataclass——存储委托注入端口，无 redis import]、run_agent_workflow.py 既有面零新 import[AgentCheckpointPort 同层 import]）；domain 触碰面（evaluation_exceptions.py 追加 + _code_ranges.py + __init__.py——**零 events 触碰**[OD-6：无新事件——本 Story 与 5.9 的差异面：5.9 新增 DriftDetected 事件，5.10 事件零改动；AST 验证器 B 回落 5.8 五目录扫描形态（含 events 目录全域扫描——非 5.9 的 events 白名单差分面）]）；组合根外零实例化（EvaluationCheckpointRecorder 构造点仅 composition_root.py + tests/）；依赖方向：EvaluationCheckpointRecorder（application）→ AgentCheckpointPort（application 同层）+ SnapshotRepositoryProtocol/CheckpointSnapshot（domain）合法 ✓（application→domain 允许面）；`.env.example` 零改动（无新环境变量——MAX_HISTORY_SIZE 是代码常量）；**xdist 组登记**：`checkpoint-evaluation-perf` 与既有 14 组互异（全仓 grep 断言）+ 5-9 组断言为子集断言实证（L1586-1617——新增组零破坏，无同步动作）
 
 **验证标准/Validation Criteria:**
 - [ ] 组合根注册 + resolve 四件断言（可达/isinstance/PortSpec 元数据/lifetime==SINGLETON——5.9 AC-4.1 同款）
@@ -191,16 +191,16 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 **Given** ①快照创建口径 = **record 全路径**（内存累积 + to_checkpoint_snapshot 打包 + RedisSnapshotStore.save 持久化——真实 Redis 写路径含网络 RTT；**本地 Redis 口径**[单机 RTT <1ms——100ms 门宽松；网络 Redis 部署形态 RTT 依赖知悉注记——5.8 DC-8④ 诚实注记同款：门定位是回归绊线非容量预算]）；②评估历史查询口径 = **restore 全路径**（RedisSnapshotStore.load + from_snapshot 解包——epics L1884「评估历史查询延迟」语义锚定读路径）；③委托计时三件（常量单源 `CHECKPOINT_SAVE_P95_LIMIT_SECONDS = 0.1` + `CHECKPOINT_QUERY_P95_LIMIT_SECONDS = 0.05` 定义于集成模块验收 import 禁双真源 / `_PERF_CACHE` 双 key["save_p95"/"query_p95"] cache-or-compute / `xdist_group("checkpoint-evaluation-perf")` 同 worker 串行——组名与既有 14 组互异）
 **When** ①测量快照创建延迟（warmup 1 + **20 采样**——P95 需 95 分位 `statistics.quantiles(latencies, n=20)[18]` exclusive[5-8 EVALUATION_SAMPLE_ROUNDS=20 同款口径]；单次采样 = 完整 record 调用[Recorder 预填充至窗口常态——每采样含累积+打包+真实 Redis save]）②测量查询延迟（同批 20 采样 = 完整 restore 调用[load+解包]）
-**Then** ①save P95 < 0.1s（epics L1883 钦定 100ms）②query P95 < 0.05s（epics L1884 钦定 50ms）；**正向锚**：采样轮 save/load 调用计数 == warmup + 采样数（21——防静默跳过假绿；Redis 不可达时采样前置探测 skip 而非静默零采样）；**满窗锚**（性能真实性）：采样前 Recorder 历史预填充至 MAX_HISTORY_SIZE（100 条——满窗快照是最大体积形态，P95 门在满窗下成立才是有效锚——OD-8 窗口与性能的耦合验证）
-**And** 采样入口自包含（每采样批次独立 session_id——UUID 前缀隔离，批次间零键冲突；teardown 清理）；口径声明落 docstring（save 路径含 Redis RTT vs 纯内存管线分述 + 满窗锚口径 + 网络部署形态知悉——防后续误读）；Redis 不可用 → `pytest.skip`（动态跳过禁写死）
+**Then** ①save P95 < 0.1s（epics L1883 钦定 100ms）②query P95 < 0.05s（epics L1884 钦定 50ms）；**正向锚**：采样轮 save/load 调用计数 == warmup + 采样数（21——防静默跳过假绿；计数形态 = 采样循环内手工递增计数[每轮恰一次 record 内一次 save / 一次 restore 内一次 load——5-9 L116-134 同款，真实 Redis 路径下循环计数即调用计数]；Redis 不可达时采样前置探测 skip 而非静默零采样）；**满窗锚**（性能真实性）：采样前 Recorder 历史预填充至 MAX_HISTORY_SIZE（100 条——满窗快照是最大体积形态，P95 门在满窗下成立才是有效锚——OD-8 窗口与性能的耦合验证；**预填充经 record 公共路径 ×100**——不计时不计入采样轮调用计数[5-9 预填充口径同款]，禁直灌私有 deque[测试形态污染]）
+**And** 采样入口自包含（每采样批次独立 session_id——UUID 前缀隔离，批次间零键冲突；teardown 清理）；口径声明落 docstring（save 路径含 Redis RTT vs 纯内存管线分述 + 满窗锚口径 + 网络部署形态知悉 + 20 样本 P95 估计量方差大知悉[绊线口径——门与实测差两个数量级，估计噪声不淹没数量级劣化检出]——防后续误读）；Redis 不可用 → `pytest.skip`（动态跳过禁写死）
 
 **验证标准/Validation Criteria:**
 - [ ] save P95<100ms：常量单源（集成定义/验收 import）+ 委托形态对齐 5-8/5-9 先例「命中或首次采样」+ 20 采样 quantiles[18] exclusive 口径 docstring 声明
 - [ ] query P95<50ms：同批采样口径 + 常量单源
 - [ ] 正向锚：采样批次 save/load 调用计数 == warmup + 采样数
 - [ ] 满窗锚：预填充 100 条历史下双锚成立 + MAX_HISTORY_SIZE 耦合注记落 docstring
-- [ ] xdist 组 checkpoint-evaluation-perf 与既有 14 组互异（全仓 grep 断言）
-- [ ] 口径声明落 docstring（save 含 RTT / 满窗 / 本地 Redis 前提三注记）
+- [ ] xdist 组 checkpoint-evaluation-perf 与既有 14 组互异（全仓 grep 断言）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
+- [ ] 口径声明落 docstring（save 含 RTT / 满窗 / 本地 Redis 前提 / 20 样本方差知悉五注记）
 
 ---
 
@@ -217,12 +217,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 #### 数据模型 (Data Models)
 - [ ] `EvaluationCheckpoint` frozen dataclass 七字段（recorded_at/agent_id + 四分数 + predicted_confidence——V1-EV3 兑现）定义于 `src/application/ports/agent_checkpoint.py`（应用层 DTO——评估是可观测应用面非领域概念，EvaluationResult 同层同论证）
-- [ ] `CheckpointWithEvaluation` frozen 聚合（agent_id + evaluation_history/hallucination_trend/confidence_accuracy_trend 三 tuple 序列）+ `to_checkpoint_snapshot(session_id)` 打包 + `from_snapshot()` classmethod 解包（OD-3——state_data 四键契约：agent_id/evaluation_history/hallucination_trend/confidence_accuracy_trend）
+- [ ] `CheckpointWithEvaluation` frozen 聚合（agent_id + evaluation_history/hallucination_trend/confidence_accuracy_trend 三 tuple 序列）+ `to_checkpoint_snapshot(session_id, state_version=1)` 打包（state_version 默认 1——递增语义归 Recorder 计数器，AC-1 Then②）+ `from_snapshot()` classmethod 解包（OD-3——state_data 四键契约：agent_id/evaluation_history/hallucination_trend/confidence_accuracy_trend）
 - [ ] 序列化边界：recorded_at 经 isoformat 字符串化（JSON 可序列化）；float 经 json_dumps/json_loads 往返保真（Python json repr 保证——精确等式断言）
 
 #### 统一端口定义注册与管理 (Port Contract)
 - [ ] `AgentCheckpointPort` Protocol 定义于 `src/application/ports/agent_checkpoint.py`（Agent 可观测族第四端口——文件名=端口名先例：agent_tracing[5.7]/agent_evaluation[5.8]/agent_drift[5.9]/agent_checkpoint[5.10]）
-- [ ] 端口方法：`async def record(agent_id: str, evaluation_result: EvaluationResult, predicted: float) -> CheckpointSnapshot`（OD-7 原子形态）+ `async def restore(session_id: str) -> CheckpointWithEvaluation | None`
+- [ ] 端口方法：`async def record(agent_id: str, evaluation_result: EvaluationResult, predicted: float) -> CheckpointSnapshot`（OD-7 原子形态；Recorder 内存 state_version 计数器初始 1——record 打包传当前值后 +1）+ `async def restore(session_id: str) -> CheckpointWithEvaluation | None`（**恢复式语义**——load → 解包 → 灌回内部三 deque[deque maxlen 同窗裁剪] → 返回聚合；state_version 计数器续接 snapshot.state_version + 1；端口 docstring 注记状态恢复副作用[OD-7③——AC-3② 累积延续的机制承载]）
 - [ ] 端口注册中心 `src/domain/ports/registry.py` PortSpec 登记（经 composition_root.py register_port——name=agent_checkpoint / v1.0.0 / SINGLETON / owner=platform / tags）
 - [ ] 实现仅 `src/application/services/evaluation_checkpoint_recorder.py`（组合注入 SnapshotRepositoryProtocol——R2 应用端口组合注入领域基础端口）
 - [ ] 端口契约测试 `tests/contracts/test_port_contract_agent_checkpoint.py`（REQUIRED_METHODS=["record", "restore"] + _DummyResolver 分发 snapshot_repository）
@@ -238,8 +238,8 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 - [ ] 构造器参数设计：`agent_id: str` + `phase: str`（"record"/"restore"/"serialize"/"deserialize"）+ `reason: str` + context_extra 携带 session_id/记录数（AgentEvaluationError 构造签名同款——context dict 纪律 dict[str,str]）
 - [ ] 触发场景（BDD Edge Cases 覆盖）：①record 时存储 save 失败（StorageError 链路透传包装）；②restore 时快照结构不完整（state_data 缺键/类型错误——反序列化失败）；③打包时序列化域违规（不可序列化值——防御性，正常路径 DTO 守卫已拦截）
 - [ ] 消息安全性审查：错误消息面向调用方可理解（不泄露 Redis 内部细节——StorageError cause 链保留）
-- [ ] 编码注册：`_code_ranges.py` `_CLASS_TO_SUBDOMAIN` 增 EvaluationHistoryError → evaluation 行（CODE_RANGES evaluation 行已存在零改动）+ `sisys-uni-exception-design.md §3.3.2` 编码分配表更新（452 取用）
-- [ ] 导出完整性：`evaluation_exceptions.py` __all__ + `domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 452→500（450/451 同族映射）
+- [ ] 编码注册：`_code_ranges.py` `_CLASS_TO_SUBDOMAIN` 增 EvaluationHistoryError → evaluation 行（CODE_RANGES evaluation 行已存在零改动）+ `sisys-uni-exception-design.md §3.3.2` **两处**更新（①编码分配表：L743/L744 预留行之间插 452 具体行 + 预留行收缩为 453~459；②子域范围表 L823 evaluation 行尾「452-459 预留 5.10 评估历史」说明同步——5.9 先例两处同更手法）
+- [ ] 导出完整性：`evaluation_exceptions.py` __all__ + `domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 452→500（450/451 同族映射——**452 休眠映射注记**：主链内层 catch 降级 warning 无 HTTP 浮现路径，登记是注册完备性要求[与 450/451 同构——expected_types 穷举等值断言硬约束]）；docstring 措辞限定「452-459 预留段首个取用」（451 已自封 450-459 段首个取用——避免撞语）
 - [ ] 测试覆盖：`tests/unit/domain/exceptions/test_evaluation_exceptions.py` 追加 452 用例（构造/属性/to_dict/context）+ `tests/unit/interfaces/api/test_exception_handlers.py` expected_types 集合追加（穷举等值断言——**不更新即 CI 红**）+ 编码唯一性/子域范围 8 项自动通过
 - [ ] BDD 验收场景：452 降级路径 Gherkin 场景（AC-2.2）+ restore 失败场景（AC-3 边界）
 
@@ -277,7 +277,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.feature`（功能性命名禁故事编号后缀；`# language: zh-CN`；AC 注释块分隔；无 @tag 无背景[5-8/5-9 先例]；场景命名 `AC-N.M - 描述`；收尾场景固定「收尾 - 完成清单逐项确认」）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.py`（@scenario 逐场景显式绑定[5-7/5-8/5-9 路线，**不用** scenarios() 批量]；模块 docstring 三属性分档表开篇[场景|外部服务依赖|前置装配|断言面]；context fixture + 模块级 event_loop + _run_async 三件套；BDD 步骤禁 @pytest.mark.asyncio；pytestmark=[acceptance, xdist_group("checkpoint-evaluation-perf")]；延迟 import 纪律[新交付模块函数体内 import——红阶段 ModuleNotFoundError 承载]；真实服务自包含创建→执行→清理；Redis 不可用 pytest.skip 动态跳过）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.py`（@scenario 逐场景显式绑定[5-7/5-8/5-9 路线，**不用** scenarios() 批量]；模块 docstring 三属性分档表开篇[场景|外部服务依赖|前置状态（Given 装配）|断言面（Then）——5-9 表头同款]；context fixture + 模块级 event_loop + _run_async 三件套；BDD 步骤禁 @pytest.mark.asyncio；**pytestmark=[acceptance, redis, xdist_group("checkpoint-evaluation-perf")]**——`pytest.mark.redis` 显式声明[文件名 checkpoint_evaluation 不命中 conftest 服务关键词映射、AC-3/AC-5 场景用真实 Redis——isolation_switch_log 先例验收 L76-80 同处境同款]；延迟 import 纪律[新交付模块函数体内 import——红阶段 ModuleNotFoundError 承载]；真实服务自包含创建→执行→清理；Redis 不可用 pytest.skip 动态跳过）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases——14 场景：AC-1×3 + AC-2×3 + AC-3×3 + AC-4×2 + AC-5×2 + 收尾×1）
 
@@ -325,7 +325,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | EvaluationCheckpoint/CheckpointWithEvaluation DTO | 七字段构造/[0,1] 域守卫/frozen/三序列等长/打包解包往返/常量单源 | `tests/unit/application/test_agent_checkpoint_model.py` | Task 1 |
 | **TDD 单元测试** | EvaluationHistoryError 452 | 构造/属性/to_dict/context/HTTP 映射 | `tests/unit/domain/exceptions/test_evaluation_exceptions.py`（追加） | Task 1 |
-| **TDD 单元测试** | EvaluationCheckpointRecorder | record 原子路径/窗口滚动/restore 解包/452 包装/None 语义/StorageError 透传 | `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` | Task 2 |
+| **TDD 单元测试** | EvaluationCheckpointRecorder | record 原子路径/窗口滚动/restore 恢复式（灌回+version 续接+累积延续）/452 包装/None 语义/StorageError 包装 | `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` | Task 2 |
 | **TDD 单元测试** | RunAgentWorkflowUseCase record 块 | 三键后漂移前顺序/452 独立降级/漂移失败不丢记录/评估降级联动/None 默认/第八参默认 | `tests/unit/application/use_cases/test_run_agent_workflow.py`（追加 TestExecuteCheckpointBlock） | Task 3 |
 | **TDD 契约测试** | AgentCheckpointPort / registry / resolver | 端口注册、版本、兼容性、实现解析、方法签名 | `tests/contracts/test_port_contract_agent_checkpoint.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收（14 场景） | `test_acceptance_checkpoint_evaluation.feature` | Task 0 |
@@ -384,18 +384,18 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | DTO 域守卫（七字段 [0,1] + agent_id + 三序列等长） | Task 1 | 1.1-1.3 | test_agent_checkpoint_model.py |
+| AC-1 | DTO 域守卫（五分数字段 [0,1] + agent_id 非空 + 三序列等长） | Task 1 | 1.1-1.3 | test_agent_checkpoint_model.py |
 | AC-1 | to_checkpoint_snapshot 打包（state_data 四键契约） | Task 1 | 1.2-1.3 | test_agent_checkpoint_model.py |
 | AC-1 | from_snapshot 往返一致性 + 空历史退化锚 | Task 1 | 1.3 | test_agent_checkpoint_model.py |
 | AC-1 | MAX_HISTORY_SIZE 常量单源 | Task 1 | 1.2 | test_agent_checkpoint_model.py |
 | AC-2 | 第八可选依赖 + record 块（三键后漂移前 + predicted） | Task 3 | 3.1-3.3 | test_run_agent_workflow.py + 验收 AC-2.* |
 | AC-2 | 452 独立降级网（漂移不丢记录/记录不阻漂移） | Task 3 | 3.2 | test_run_agent_workflow.py + 验收 AC-2.2 |
-| AC-2 | None 默认向后兼容 + 构造签名 ×7 同步 | Task 3 | 3.3-3.4 | ×7 存量文件 + 验收 AC-2.3 |
-| AC-3 | 真实 Redis 落键 + 重启恢复 + 累积延续 | Task 4 | 4.1-4.2 | test_integration_checkpoint_evaluation.py + 验收 AC-3.* |
+| AC-2 | None 默认向后兼容 + 构造签名 ×7 同步 + 存量全家回归 | Task 3 | 3.3-3.5 | ×7 存量文件 + 验收 AC-2.3 |
+| AC-3 | 真实 Redis 落键 + 重启恢复 + 累积延续 | Task 4 | 4.1 | test_integration_checkpoint_evaluation.py + 验收 AC-3.* |
 | AC-3 | restore None 语义 + 命名空间隔离 + 自清理 | Task 4 | 4.1 | 同上 |
-| AC-4 | 组合根注册 + 工厂注入 + 降级防护 + 契约测试 | Task 2/3 | 2.4/3.4 | test_port_contract_agent_checkpoint.py + 验收 AC-4.1 |
+| AC-4 | 组合根注册 + 工厂注入 + 降级防护 + 契约测试 | Task 2/3 | 2.3/3.4 | test_port_contract_agent_checkpoint.py + 验收 AC-4.1 |
 | AC-4 | AST 架构合规（events 零触碰 + 主链静态锚） | Task 5 | 5.1-5.3 | test_arch_checkpoint_evaluation.py + 验收 AC-4.2 |
-| AC-5 | 快照创建 P95<100ms + 查询 P95<50ms（满窗锚） | Task 4 | 4.3 | test_integration_checkpoint_evaluation.py + 验收 AC-5.* |
+| AC-5 | 快照创建 P95<100ms + 查询 P95<50ms（满窗锚） | Task 4 | 4.2-4.4 | test_integration_checkpoint_evaluation.py + 验收 AC-5.* |
 | 收尾 | 完成清单逐项确认 | Task 6 | 6.1-6.4 | 验收收尾场景 |
 
 ---
@@ -441,13 +441,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 🔴 红 | 编写 `tests/unit/domain/exceptions/test_evaluation_exceptions.py` 追加 452 用例（构造/属性/to_dict/context dict/cause 链） |
 | 🟢 绿 | `src/domain/exceptions/evaluation_exceptions.py` 追加 EvaluationHistoryError（SystemException 子类，agent_id/phase/reason 构造——AgentEvaluationError 签名同款） |
 | 🟡 变异 | 删 context_extra 键 → to_dict 断言红 → 还原 |
-| 🔄 重构 | docstring 全中文 Google 风格 + 注册四件套（_code_ranges/_code_ranges 表/exceptions __init__/EXCEPTION_HTTP_MAP 452→500）+ `test_exception_handlers.py` expected_types 追加 |
+| 🔄 重构 | docstring 全中文 Google 风格 + 注册四件套（evaluation_exceptions.py 定义/_code_ranges.py `_CLASS_TO_SUBDOMAIN` 增行[CODE_RANGES evaluation 行已存在零改动]/exceptions `__init__.py` 导出/EXCEPTION_HTTP_MAP 452→500——File List 同口径）+ `sisys-uni-exception-design.md` §3.3.2 两处更新（编码分配表插行 + 子域范围表 L823 行说明——5.9 先例同款）+ `test_exception_handlers.py` expected_types 追加 |
 
 #### TDD 循环 B：EvaluationCheckpoint + CheckpointWithEvaluation DTO + AgentCheckpointPort
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_agent_checkpoint_model.py`（七字段构造/六分数 [0,1] 参数化 201/agent_id 非空/frozen/三序列等长 201/to_checkpoint_snapshot 四键打包/手算锚 3 记录逐值/from_snapshot 往返精确等式/空历史退化/MAX_HISTORY_SIZE==100） |
+| 🔴 红 | 编写 `tests/unit/application/test_agent_checkpoint_model.py`（七字段构造/五分数 [0,1] 参数化 201/agent_id 非空/frozen/三序列等长 201/to_checkpoint_snapshot 四键打包[state_version 默认 1 断言]/手算锚 3 记录逐值/from_snapshot 往返精确等式/空历史退化/MAX_HISTORY_SIZE==100） |
 | 🟢 绿 | 实现 `src/application/ports/agent_checkpoint.py`（模块 docstring R1-R4 落地声明 + Protocol + 双 frozen DTO + 域守卫 + __all__——agent_drift.py 风格模板）+ `src/application/ports/__init__.py` 导出 |
 | 🟡 变异 | state_data 键名改错一字 → 往返断言红；MAX_HISTORY_SIZE 改 101 → 常量断言红 → 还原 |
 | 🔄 重构 | docstring + 序列化边界注记（isoformat/json 保真）+ ruff/mypy |
@@ -471,10 +471,10 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_evaluation_checkpoint_recorder.py`（AsyncMock(spec=SnapshotRepositoryProtocol) 存储替身——unit 层合法：①record 单调：累积→打包→save 委托→返回快照 ②窗口滚动：灌 101 条 → history 长度 100 + 最旧丢弃 + 三序列同窗 ③restore：save 捕获快照 → 新 Recorder → restore 逐值恢复 ④restore 快照不存在（load 返 None）→ None ⑤restore 结构不完整（state_data 缺键 dict）→ EvaluationHistoryError 452 ⑥save 抛 StorageError → record 包装 452 上抛[内存累积保留断言——最终一致 docstring 语义] ⑦session_id 构造 =="agent-evaluation-{agent_id}"） |
-| 🟢 绿 | 实现 `src/application/services/evaluation_checkpoint_recorder.py`（class EvaluationCheckpointRecorder: `_history: deque[EvaluationCheckpoint]`/`_h_trend: deque[float]`/`_ca_trend: deque[float]` 全 maxlen=MAX_HISTORY_SIZE + `async def record(...)` 原子三步 + `async def restore(...)` 解包 + StorageError→452 包装 + 结构校验→452） |
-| 🟡 变异 | deque maxlen 改 99 → 滚动断言红；restore 缺键校验删 → 452 用例红 → 还原 |
-| 🔄 重构 | docstring（SCOPED 注入注记 + 三通道互补注记 + 最终一致语义）+ ruff/mypy |
+| 🔴 红 | 编写 `tests/unit/application/services/test_evaluation_checkpoint_recorder.py`（AsyncMock(spec=SnapshotRepositoryProtocol) 存储替身——unit 层合法：①record 单调：累积→打包→save 委托→返回快照 + **连续 record 2 次第二次快照 state_version == 2**（计数器递增锚）②窗口滚动：灌 101 条 → history 长度 100 + 最旧丢弃 + 三序列同窗 ③restore 恢复式：save 捕获快照 → 新 Recorder → restore 逐值恢复 + **③b restore 后 record 1 次 → 新快照 evaluation_history 长度 == 恢复历史长度 + 1 且首条 == 恢复首条 + state_version == 恢复快照 state_version + 1**（累积延续——AC-3② 红前置锚，防纯查询式 restore 假绿）④restore 快照不存在（load 返 None）→ None ⑤restore 结构不完整（state_data 缺键 dict）→ EvaluationHistoryError 452 ⑥save 抛 StorageError → record 包装 452 上抛[内存累积保留断言——最终一致 docstring 语义] ⑦session_id 构造 =="agent-evaluation-{agent_id}"） |
+| 🟢 绿 | 实现 `src/application/services/evaluation_checkpoint_recorder.py`（class EvaluationCheckpointRecorder: `_history: deque[EvaluationCheckpoint]`/`_h_trend: deque[float]`/`_ca_trend: deque[float]` 全 maxlen=MAX_HISTORY_SIZE + **`_state_version: int = 1` 内存计数器**（record 打包传当前值后 +1；restore 续接 snapshot.state_version + 1——重启后版本延续递增）+ `async def record(...)` 原子三步 + `async def restore(...)` 解包并**灌回三 deque**（`deque(聚合序列, maxlen=MAX_HISTORY_SIZE)`——恢复式语义非只读查询[OD-7③]，恢复聚合 ≤ 窗口上限由快照产出端 maxlen 结构保证）+ StorageError→452 包装 + 结构校验→452） |
+| 🟡 变异 | deque maxlen 改 99 → 滚动断言红；restore 缺键校验删 → 452 用例红；restore 灌回删（改纯查询式）→ ③b 累积延续用例红；_state_version 递增删 → ①计数器断言红 → 还原 |
+| 🔄 重构 | docstring（SCOPED 注入注记 + 通道语义分述注记[窗口外留存通道是 OTel span、DriftDetected 仅稀疏锚点——OD-8④] + 最终一致语义 + 多进程边界注记[SINGLETON 累积是进程内的——多 worker 分叉知悉，风险 #9]）+ ruff/mypy |
 
 #### TDD 循环 B：组合根注册 + 端口契约测试
 
@@ -516,7 +516,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 - [ ] Subtask 3.1: 🔴 红 — TestExecuteCheckpointBlock 六场景失败测试
 - [ ] Subtask 3.2: 🟢 绿 — 第八依赖 + record 块 + 工厂同窗
-- [ ] Subtask 3.3: 🟡 变异实证（顺序锚 + catch 面两变异）
+- [ ] Subtask 3.3: 🟡🔄 变异实证（顺序锚 + catch 面两变异）+ 重构（注释块全中文——5.9 漂移块注释形态延续）
 - [ ] Subtask 3.4: 存量断言同步 ×7 文件（尾部追加防线——grep 双命令核验：`inspect.signature` 命中行 + `"drift_detector",` 字面行受 5-9 锁死的两文件）+ test_exception_handlers expected_types（Task 1 已做则核验）
 - [ ] Subtask 3.5: 5-3/5-7/5-8/5-9 存量全家回归（逐一登记：单测/契约/架构/集成/验收全文件清单）
 
@@ -537,8 +537,8 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 #### 集成与性能实现
 
 - [ ] Subtask 4.1: `tests/integration/test_integration_checkpoint_evaluation.py`——TestRealRedisCheckpointRoundtrip（真实 RedisAdapter+RedisSnapshotStore 装配：①record ≥3 次落键验证[hget latest + JSON 解析 + 三序列逐值] ②重启恢复[新 Recorder restore 逐值] ③累积延续[restore 后 record → 历史+1] ④restore None ⑤趋势时序 ⑥自清理[teardown delete + exists False]——session_id UUID 前缀隔离 + Redis 探测 skip）
-- [ ] Subtask 4.2: TestCheckpointPerformance（`pytestmark=[integration, xdist_group("checkpoint-evaluation-perf")]`；常量单源 CHECKPOINT_SAVE_P95_LIMIT_SECONDS=0.1 / CHECKPOINT_QUERY_P95_LIMIT_SECONDS=0.05 / 采样 20[warmup 1 + 20]；`_PERF_CACHE` 双 key["save_p95"/"query_p95"] cache-or-compute helper；**满窗锚**：采样前预填充 100 条历史；正向锚：save/load 调用计数 == 21；quantiles(latencies, n=20)[18] exclusive P95 口径 docstring）+ 全仓 xdist 组 grep 断言（与 14 组互异）+ 5-9 验收组断言形态核实（穷举等值则同步登记）
-- [ ] Subtask 4.3: 口径声明落 docstring（save 含 Redis RTT / 满窗口径 / 本地 Redis 前提 / 门=回归绊线四注记——5.8 DC-8④ 诚实注记形态）
+- [ ] Subtask 4.2: TestCheckpointPerformance（`pytestmark=[integration, redis, xdist_group("checkpoint-evaluation-perf")]`——redis marker 显式声明[isolation_switch_log 集成 L51 同款]；常量单源 CHECKPOINT_SAVE_P95_LIMIT_SECONDS=0.1 / CHECKPOINT_QUERY_P95_LIMIT_SECONDS=0.05 / 采样 20[warmup 1 + 20]；`_PERF_CACHE` 双 key["save_p95"/"query_p95"] cache-or-compute helper；**满窗锚**：采样前预填充 100 条历史[经 record 公共路径 ×100——不计时不计入调用计数，5-9 预填充口径同款]；正向锚：save/load 调用计数 == 21[采样循环内手工递增——每轮恰一次 record/restore]；quantiles(latencies, n=20)[18] exclusive P95 口径 docstring）+ 全仓 xdist 组 grep 断言（与 14 组互异）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
+- [ ] Subtask 4.3: 口径声明落 docstring（save 含 Redis RTT / 满窗口径 / 本地 Redis 前提 / 门=回归绊线 / 20 样本方差知悉五注记——5.8 DC-8④ 诚实注记形态）
 - [ ] Subtask 4.4: 验收 AC-5.* 场景接线（委托计时消费——import 集成常量与 helper 禁双真源）
 
 **完成标准/Definition of Done:**
@@ -584,11 +584,11 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 🟢 绿 | BDD 步骤实现（收尾场景断言面——文件清单与「待创建」清单一致性；套件型豁免条款知悉[首跑即绿——红由 Task 0 前置承担]）
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 6.1: 收尾场景——src 完成清单逐项确认（2 新建 + 5 修改 + 组合根区段 + 注册四件套）
-- [ ] Subtask 6.2: 收尾场景——tests 四目录完成清单逐项确认（9 新建 + 3 追加）
+- [ ] Subtask 6.1: 收尾场景——src 完成清单逐项确认（**2 新建**：agent_checkpoint.py / evaluation_checkpoint_recorder.py；**7 修改**：evaluation_exceptions.py / _code_ranges.py / domain/exceptions/__init__.py / exception_handlers.py / run_agent_workflow.py / composition_root.py / application/ports/__init__.py；另 docs 面：sisys-uni-exception-design.md §3.3.2 两处 + sisys-core-domain-design.md §17.3.8 注记）
+- [ ] Subtask 6.2: 收尾场景——tests 四目录完成清单逐项确认（**7 新建** + **3 追加**[test_run_agent_workflow.py（追加块+签名同步重叠）/ test_evaluation_exceptions.py（452 用例）/ test_exception_handlers.py（expected_types）] + **6 存量签名同步文件**[phoenix 验收/run_agent unit 已含/arch phoenix/arch evaluation/arch drift/agent_evaluation 验收/drift 验收——见继承清单第 9 条 ×7]）
 - [ ] Subtask 6.3: 运行开发结束验收测试并确认通过（14 场景全绿）
 - [ ] Subtask 6.4: 收尾校验三件套：`poetry run pytest tests/ -n 8`（并行 + 连续 5 次无随机失败）+ `poetry run ruff check src/ tests/` + `poetry run mypy .`（**全仓含 tests**——5-9 教训）+ 三条 grep 自查零输出
-- [ ] Subtask 6.5: 文档同步（sisys-core-domain-design.md §17.3.8 追加 Story 5.10 实现注记[5.9 注记形态延续——OD-2/3/4/7 落地口径] + deferred-work.md 五条注记核验[Task 0.7 已落] + sprint-status 状态流转 + 本故事文件变更日志）
+- [ ] Subtask 6.5: 文档同步（sisys-uni-exception-design.md §3.3.2 两处[编码分配表 + 子域范围表——Task 1 重构行已列] + sisys-core-domain-design.md §17.3.8 追加 Story 5.10 实现注记[5.9 注记形态延续——OD-2/3/4/7 落地口径] + deferred-work.md 五条注记核验[Task 0.7 已落] + sprint-status 状态流转 + 本故事文件变更日志）
 
 **完成标准/Definition of Done:**
 - [ ] src 完成清单已逐项验证确认
@@ -618,8 +618,8 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | DC-3 | record 块位序：三键后、漂移块前 + 独立内层 452 catch | 两独立可观测附加面互不牵连：record 失败不阻漂移、漂移失败不丢记录；共享 catch 元组零改动（对 5-9 交付形态最小侵入） | record 放漂移块后共享 catch（弃——漂移 451 抛出丢记录）；平级双 try（弃——evaluation_result 存活域破坏 NameError） |
 | DC-4 | 趋势序列 Recorder 自持（OD-4） | 检测器窗口是算法态非历史源；检测器零改动；与 V1-EV12 解耦 | cusum_detector.get_trend()（弃——窗口语义不匹配且职责纠缠） |
 | DC-5 | 窗口上限 100 常量单源（OD-8） | Redis latest 覆盖写语义下防快照体积线性膨胀；满窗性能锚有效化 | 无界历史（弃——IO 延迟击穿 P95 门） |
-| DC-6 | session_id 命名空间 `agent-evaluation-{agent_id}` | 与 AutoExecuteService 路由快照同 namespace 不同前缀隔离；per-agent 历史聚合语义 | 直接 str(agent_id)（弃——与路由快照键冲突风险） |
-| DC-7 | SINGLETON 生命周期 + SCOPED snapshot_repository 固定实例注入 | Recorder 跨 run 累积（进程生命周期=历史生命周期）；RedisSnapshotStore 无状态委托 adapter 固定实例安全（docstring 注记论证） | TRANSIENT（弃——每 resolve 新累积器历史清零） |
+| DC-6 | session_id 命名空间 `agent-evaluation-{agent_id}` | 实测 AutoExecuteService 路由快照用 per-run session_id（UUID 形态无前缀——auto_execute_service L62/L93）：前缀 vs 无前缀、per-agent 聚合滚动 vs per-run 单发的基数差异——键冲突面为零；docstring 注记防按 run 查评估快照 | 直接 str(agent_id)（弃——语义混入路由快照键空间） |
+| DC-7 | SINGLETON 生命周期 + SCOPED snapshot_repository 固定实例注入 | Recorder 跨 run 累积（进程生命周期=历史生命周期）；RedisSnapshotStore 无状态委托 adapter 固定实例安全（docstring 注记论证——论证靠「无状态」而非 clear_scoped 未接线环境巧合）；**MVP 单进程前提显式声明**（多 worker 下各进程累积器分叉 + Redis latest 覆盖写最后写者胜——风险 #9；per-agent 键控/粘性路由是 V1 多进程面） | TRANSIENT（弃——每 resolve 新累积器历史清零） |
 | DC-8 | 不发布 CheckpointReached / 不引入 CHECKPOINTED（OD-5/OD-6） | BLM 审批语义 vs 可观测附加面语义分立；无状态转换可达路径；锚位 6.3 | 照设计字面引入（弃——无消费方守卫扩展+语义误植） |
 | DC-9 | restore 返回 None 非异常 | 快照不存在是正常态（首次评估前）；AutoExecuteService.load 同款 | 抛 452（弃——正常态异常化） |
 | DC-10 | predicted 从 result.evidence.confidence 主链直传 | V1-EV3 钦定兑现（只存 EvaluationResult 会丢 predicted）；span `eval.confidence` 键同源（L202） | 快照只存 EvaluationResult（弃——V1-EV3 明示缺陷形态） |
@@ -631,11 +631,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 1 | **真实 Redis 环境依赖**（验收/集成 AC-3/AC-5 需本地 Redis——.env 配置；CI 无 Redis 时 skip） | 场景级 Redis 探测（TCP ping）→ pytest.skip 动态跳过；单元面（Task 2）AsyncMock 存储替身全绿不依赖 Redis |
 | 2 | **主链同步路径新增 Redis IO**（record 内联 save——每评估一次网络往返） | 本地 Redis RTT<1ms vs P95<100ms 门（两个数量级余量）；452 独立降级网兜底（Redis 故障不阻断主链——评估链其余面照常）；部署形态知悉注记（远程 Redis RTT 是 V1 容量评估面） |
 | 3 | **组合根工厂与参数同窗**（R1-F1/5-9 两连重演面） | Task 3 显式同窗纪律（参数+工厂+record 块三件一 Task）；Task 2 只注册端口不碰工厂 |
-| 4 | **存量断言同步遗漏**（×7 文件——5-8 预登记 2 实施发现 3 / 5-9 预登记 3 grep 补全 5 的教训） | 创建期已 grep 实证 13 行命中归 7 处（含 5-9 自身资产 L1188/L1207 最易漏处）；dev 时重新 grep 定位（行号锚漂移知悉）；核验双命令写入 AC-2 |
+| 4 | **存量断言同步遗漏**（×7 文件——5-8 预登记 2 实施发现 3 / 5-9 预登记 3 grep 补全 5 的教训） | 创建期已 grep 实证 16 行命中归 7 处（inspect.signature 口径 + 字面行 12 行/7 文件双清单——含 5-9 自身资产 L1188/L1207 最易漏处与 ⑥⑦ `_USE_CASE_INIT_PARAMS` 常量本体）；dev 时重新 grep 定位（行号锚漂移知悉）；核验双命令写入 AC-2 |
 | 5 | **浮点往返保真**（state_data JSON 序列化 float 往返） | Python json repr 往返保证（float→str→float 精确）；断言纪律精确等式 + 手算锚用一位小数避开边界；Task 1 往返测试锚定 |
 | 6 | **SINGLETON 累积器跨场景污染**（验收/集成并行） | 每场景手工新实例（不走 resolve）；「连续累积」场景显式同实例；xdist 组串行隔离计时面 |
 | 7 | **_PERF_CACHE 与 xdist 分发**（缓存命中依赖同 worker） | 集成/验收逐字同组 checkpoint-evaluation-perf（loadgroup）；组名 14 组互异 grep 断言；「命中或首次采样」形态禁先跑断言 |
-| 8 | **evaluations 域语义膨胀**（CheckpointWithEvaluation 与 6.3 BLM 快照的边界） | 范围边界表显式切分（BLM 面全列 ❌ 不做）；state_data 键命名空间（evaluation_* 前缀键）为 6.3 留净空间 |
+| 8 | **evaluations 域语义膨胀**（CheckpointWithEvaluation 与 6.3 BLM 快照的边界） | 范围边界表显式切分（BLM 面全列 ❌ 不做）；边界真实依据 = state_data 四键契约显式钦定（OD-3）+ stage_id="evaluation" 语义分界——6.3 BLM 键经新键扩展进入零冲突（R1-E 修正：四键中仅 evaluation_history 带 evaluation_ 前缀，原「evaluation_* 前缀键留净空间」表述与 OD-3 键名不符） |
+| 9 | **多 worker 部署累积器分叉 + Redis 故障双义**：SINGLETON 累积是进程内的——uvicorn 多 worker 下各进程累积器分叉、Redis latest 覆盖写（最后写者胜）使其他 worker 的窗口外谱系静默丢失；store.load 任何异常（含 Redis 故障）均返回 None（L162-164）——restore 返 None 双义下「故障静默为空历史」是既定行为 | MVP 单进程前提显式声明（Recorder docstring 注记——DC-7）；per-agent 键控/粘性路由是 V1 多进程面（6.3/容量评估再议）；同 agent 并发 record 的落盘序竞争后果良性（打包含对方记录后落盘收敛、仅服务端到达序反转时 Redis 短暂少一条且下次 record 自愈——内存是全窗真源） |
+| 10 | **state_data 键结构演进向后兼容**：6.3 改键结构/增键后，旧快照经 from_snapshot 严格四键校验会 452（restore 失败）；state_data 内无 schema 版本标记（state_version 是排序语义非 schema 版本） | 旧快照读兼容策略随 6.3 定（当前既定行为：缺键 → 452 fail-loud）；TTL 24h 自然收窄旧快照存量（>24h 历史整键过期） |
 
 ### 项目结构说明 Project Structure
 
@@ -646,7 +648,8 @@ src/
 │   │   ├── agent_tracing.py          # 5.7 追踪端口（零改动）
 │   │   ├── agent_evaluation.py       # 5.8 评估端口（零改动——EvaluationResult 消费）
 │   │   ├── agent_drift.py            # 5.9 漂移端口（零改动）
-│   │   └── agent_checkpoint.py       # ★ 5.10 新建：AgentCheckpointPort + EvaluationCheckpoint + CheckpointWithEvaluation
+│   │   ├── agent_checkpoint.py       # ★ 5.10 新建：AgentCheckpointPort + EvaluationCheckpoint + CheckpointWithEvaluation
+│   │   └── __init__.py               # ▲ 修改：三符号导出（agent_checkpoint 组按字母序插导入块最前——c<d）
 │   ├── services/
 │   │   ├── evaluation_harness.py     # 5.8（零改动）
 │   │   └── evaluation_checkpoint_recorder.py  # ★ 5.10 新建：EvaluationCheckpointRecorder（组合注入 SnapshotRepositoryProtocol）
@@ -657,10 +660,13 @@ src/
 │   ├── ports/snapshot_repository_protocol.py  # 零改动（直接消费）
 │   ├── exceptions/
 │   │   ├── evaluation_exceptions.py  # ▲ 修改：EvaluationHistoryError 452 追加
+│   │   ├── __init__.py               # ▲ 修改：EvaluationHistoryError 导出
 │   │   └── _code_ranges.py           # ▲ 修改：_CLASS_TO_SUBDOMAIN 一行
 │   └── events/                       # 零改动（OD-6——events 零触碰）
 ├── infrastructure/
 │   └── storage/redis/redis_snapshot_store.py  # 零改动（直接消费）
+├── interfaces/
+│   └── api/exception_handlers.py     # ▲ 修改：EXCEPTION_HTTP_MAP 452→500
 └── composition_root.py               # ▲ 修改：Story 5.10 区段 + 工厂第八依赖
 
 tests/
@@ -671,7 +677,7 @@ tests/
 │   │   └── use_cases/test_run_agent_workflow.py    # ▲ 追加 TestExecuteCheckpointBlock + 签名同步
 │   ├── domain/exceptions/test_evaluation_exceptions.py  # ▲ 追加 452
 │   ├── architecture/test_arch_checkpoint_evaluation.py  # ★ 新建（AST 验证器 A/B/C）
-│   └── architecture/test_arch_phoenix_tracer.py 等四件  # ▲ 签名同步 ×4
+│   └── architecture/test_arch_phoenix_tracer.py 等三件  # ▲ 签名同步 ×3（arch phoenix/arch evaluation/arch drift）
 ├── contracts/test_port_contract_agent_checkpoint.py  # ★ 新建
 ├── integration/test_integration_checkpoint_evaluation.py  # ★ 新建（真实 Redis + P95 双锚）
 ├── acceptance/
@@ -702,6 +708,8 @@ tests/
 - [x] 独立降级网两级 catch 形态（DC-3——附加面独立性的结构化承载）
 - [x] mypy 全仓口径写入 TDD 重构行与 Task 6.4
 - [x] 行号锚漂移知悉写入存量触碰清单尾注
+- [x] [R1] restore 恢复式语义机制显式定稿（防纯查询式实现假绿——Task 2 红③b/绿灌回/变异三锚 + state_version 计数器续接）
+- [x] [R1] 计数可对账纪律（四处计数实证修正：9→7 件/六→五分数/13→16 行/2+5→2+7 修改）
 
 ---
 
@@ -760,6 +768,7 @@ tests/
 - `src/application/ports/__init__.py`（导出）
 - `tests/unit/domain/exceptions/test_evaluation_exceptions.py`（452 用例）+ `tests/unit/interfaces/api/test_exception_handlers.py`（expected_types）
 - 存量断言同步 ×7（test_acceptance_phoenix_tracer / test_run_agent_workflow / test_arch_phoenix_tracer / test_acceptance_agent_evaluation / test_acceptance_drift_detection / test_arch_evaluation / test_arch_drift_detection）
+- `docs/architecture/sisys-uni-exception-design.md` §3.3.2 **两处**（编码分配表 452 行插入 + 子域范围表 L823 行说明——5.9 先例同款）
 - `docs/architecture/sisys-core-domain-design.md` §17.3.8（5.10 实现注记）+ `deferred-work.md`（五条注记）
 
 ---
@@ -791,7 +800,20 @@ tests/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | （待审查后登记） | — | — |
+| R1-1 | restore「累积延续」语义缺机制处方：端口 restore 返回纯 DTO，AC-3②「restore 后 record → 历史=恢复+1」要求 restore 灌回内部三 deque——Task 2 按字面实现纯查询式会让 Task 4 首跑即红（破坏套件型豁免前提） | P1 | OD-7③ 升格恢复式语义 + 端口契约 docstring 注记副作用 + Task 2 红补 ③b 用例（restore 后 record 断言）+ 绿明写灌回三 deque + 变异补第三锚；联动定稿 state_version 机制（Recorder 内存计数器初始 1 / restore 续接 snapshot.state_version+1——AC-1 Then② 与 to_checkpoint_snapshot(session_id, state_version=1) 签名同步） |
+| R1-2 | 测试资产计数错位：「新建九件」枚举仅 7 件（9 混入 2 个 src 文件）；Subtask 6.2「9 新建+3 追加」漏 6 个签名同步文件——Task 6.2 收尾按「9 新建」断言必红 | P1 | item 6 改「七件」；Subtask 6.2 改「7 新建 + 3 追加 + 6 存量签名同步（run_agent_workflow 重叠）」；Subtask 6.1 同步改枚举式「2 新建 + 7 修改」（原「2 新建 + 5 修改」任何读法对不到 7） |
+| R1-3 | sisys-uni-exception-design.md §3.3.2 更新仅异常契约节一处承诺——File List/Subtask 6.5/Task 1 重构行/项目结构全部缺失（注册文档面会被执行遗漏）；且该文档有双同号 3.3.2 节、5.9 先例是分配表+子域范围表两处同更 | P1 | 四处传播补齐（File List/6.5/Task 1 重构行明确两处更新点：编码分配表 L743/L744 插行 + 子域范围表 L823 行说明） |
+| R1-4 | agent_evaluation.py L102-104 被列为 5.10 规划注释锚——实证该处是 5.9 CUSUM 消费注记（全文件 grep "5.10" 零命中），引用错位 | P1 | 「明确不存在」节 grep 锚点清单删除该项（真锚点 evaluation_harness.py L70 与 composition_root.py L2991 保留） |
+| R1-5 | 验收/集成 pytestmark 疑缺 pytest.mark.redis：文件名 checkpoint_evaluation 不命中 conftest 服务关键词映射、AC-3/AC-5 场景用真实 Redis——同处境先例 isolation_switch_log 两侧均显式声明 | P1 | 两侧 pytestmark 补 redis marker（验收骨架节 + Task 4.2，附先例锚） |
+| R1-6 | 「六分数字段」计数错：EvaluationCheckpoint 七字段中 [0,1] 数值字段是 5 个（四分数+predicted），「六」无字段支撑且与 SDD 数据模型节自相矛盾 | P2 | 三处「六」→「五」+ 参数化钦定 5 字段名清单 + 矩阵行「七字段 [0,1]」→「五分数字段 [0,1] + agent_id 非空」 |
+| R1-7 | 「13 行命中归七处」计数失实：实测 inspect.signature 16 行/7 文件（execute 签名 2 行不受影响）；清单编号列到 ⑧ 与 ×7 打架；⑥⑦ 漏登 _USE_CASE_INIT_PARAMS 常量本体（只改断言行漏常量则架构测试红） | P2 | 头部改 16 行口径 + 两 grep 分列；⑧ 注记「异常注册面不计入 ×7」；⑥⑦ 补常量本体行号（L54-62/L50-58）+ ⑤ targets dict 裸锚信息补全 |
+| R1-8 | OD-8④「窗口外历史经 DriftDetected 事件通道留存」论证半失实：事件仅在确认漂移时发布且只携带单确认样本——绝大多数窗口外评估不出现在任何事件里（真留存通道只有 OTel span/Phoenix） | P2 | OD-8④/AC-1 And docstring 注记/Task 2 重构行三处改「通道语义分述」（span 留存/事件稀疏锚点）——保持窗口裁定不动 |
+| R1-9 | 多 worker 部署累积器分叉 + Redis latest 覆盖写边界未声明；store.load 吞一切异常返 None（故障≠不存在）双义未登记；state_data 演进向后兼容未登记 | P2 | 风险表补 #9（多进程分叉 + load 双义 + 并发落盘序良性论证）与 #10（state_data 演进兼容 + TTL 收窄）；DC-7 补 MVP 单进程前提声明 |
+| R1-10 | 风险 #8「evaluation_* 前缀键为 6.3 留净空间」与 OD-3 四键名矛盾（agent_id/hallucination_trend 无该前缀） | P2 | 改真实边界依据（四键契约钦定 + stage_id 语义分界 + 6.3 新键扩展零冲突） |
+| R1-11 | AC-2 可观测面与注入深度：Given 装配未列 OTel 通道（三键 span 断言无观测面）；「_RaisingSnapshotRepo save 抛 452」跳过 Recorder 包装环节（真实路径是 StorageError→Recorder 包装 452）；「按实际写死文本断言」在红阶段循环指涉；「record 块在 try 体外不可达」措辞倒置（实际在体内） | P2/P3 | Given 补 OTel 通道（InMemorySpanExporter + 双复位）；注入统一 StorageError 口径（与 Task 2⑥ 一致）；WARNING 断言改 str 包含形态（5-9 451 同款——红绿皆可写）；措辞改正「同一 try 体内控制流跳转」 |
+| R1-12 | 杂项澄清批：评估块口径 L220-237（L238 是块外 return）；L202 属根 span 十属性块；Redis latest 单 field 双层 JSON（两层 json_loads）；实体时间字段名 timestamp/state_version 默认 0 显式传参/load 吞异常/exists 是具体类方法非协议面（删「替身 exists」）；AC-1③ json 机理错位（纯内存往返 vs AC-3 json 双程）；AC-3「单调时序」→「顺序保持」；满窗预填充路径钦定（record 公共路径 ×100 不计时）；P95 20 样本方差注记；矩阵 Task 4 指派错格修正 + 3.5/4.4 漏行补 + AC-4 行 2.4→2.3；结构树 ×4→×3 + 补 3 个 src 修改文件；checkbox 补齐（state_version/catch 三元组不变）；Subtask 3.3 🔄 标记；「注册四件套」三口径统一（File List 四文件口径）；「存量同步义务」条件落空改实证结论（5-9 子集断言零动作）；452 休眠映射注记 + docstring 撞语限定；DC-6 per-agent/per-run 基数注记；业务价值句 V1-EV12 括注；AC-2 窗口滚动指向改 Task 2 | P2/P3 | 各出现位逐一修正（本表合并登记） |
+
+> Round 1 审查投入：D1 四视角调研（Checkpoint 基建/主链评估块/异常端口体系/测试基建——P0 全零）+ D2 三视角审查（一致性传播/可行性可测试性/科学性业界对标）。总计发现：P0×0 + P1×5 + P2×约12 + P3×约15；修复如上（全部文档级，零设计变更——F 视角确认 DC-1~10 与异常契约/性能锚全部科学成立）。
 
 ---
 
@@ -826,11 +848,13 @@ tests/
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v1.0.0 | 2026-10-29 | 创建故事文件（create-story——多 Agent 四视角调研 + OD×8 偏离声明 + 留项处置五条 + 存量断言 ×7 实证） |
+| v1.1.0 | 2026-10-29 | 文档审查 Round 1（四调研+三审查——P0×0/P1×5/P2×12/P3×15）：restore 恢复式语义机制定稿（灌回三 deque + state_version 计数器——Task 2 红绿变异三锚落地）+ 计数对账批修（9→7/六→五/13→16 行/2+5→2+7）+ §3.3.2 两处传播 + redis marker 补 + OD-8④ 通道分述修正 + 风险表扩 #9/#10 + 杂项澄清批（Docs Review Fixes R1-1~R1-12） |
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**
 - v1.0.0: 创建故事文件——Ultimate context engine analysis completed（comprehensive developer guide created）
+- v1.1.0: 文档审查 Round 1——D1 四视角调研 + D2 三视角审查（P0×0 + P1×5 + P2×12 + P3×15，修复见 Docs Review Fixes 表 R1-1~R1-12；零设计变更）
