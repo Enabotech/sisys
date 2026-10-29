@@ -132,6 +132,13 @@ class TestRealRedisCheckpointRoundtrip:
             assert state_data["confidence_accuracy_trend"] == scores
             assert len(state_data["evaluation_history"]) == 3
             assert state_data["evaluation_history"][0]["predicted_confidence"] == predicted[0]
+            for i, record in enumerate(state_data["evaluation_history"]):
+                # history 逐值对账（record 对四分数原样透传——_make_evaluation_result 四分数同值简化）
+                assert record["hallucination_score"] == scores[i], f"第 {i} 条 hallucination_score 应逐值相等"
+                assert record["context_relevance"] == scores[i]
+                assert record["confidence_accuracy"] == scores[i]
+                assert record["overall_score"] == scores[i]
+                assert record["predicted_confidence"] == predicted[i]
             assert last_snapshot is not None and last_snapshot.ttl_seconds == 86400, "TTL 实体默认 86400"
         finally:
             await redis_client.delete(build_key("snapshot", f"agent-evaluation-{agent_id}"))
@@ -150,8 +157,8 @@ class TestRealRedisCheckpointRoundtrip:
                     await recorder.record(agent_id=agent_id, evaluation_result=_make_evaluation_result(score), predicted=0.5)
                 )
 
-            # 模拟重启：新实例（内存累积清零——Redis 落键仍在）
-            restarted, _, _ = await _make_real_stack()
+            # 模拟重启：新实例（内存累积清零——Redis 落键仍在）——第二客户端随用随关（连接泄漏防线）
+            restarted, _, restarted_client = await _make_real_stack()
             try:
                 restored = await restarted.restore(session_id)
                 assert restored is not None, "重启存活锚：restore 应返回非空聚合"
@@ -166,7 +173,7 @@ class TestRealRedisCheckpointRoundtrip:
                 assert history[0]["hallucination_score"] == 0.1, "首条 == 恢复首条（灌回三 deque）"
                 assert follow_up.state_version == snapshots[-1].state_version + 1, "state_version 续接"
             finally:
-                pass
+                await restarted_client.close()
         finally:
             await redis_client.delete(build_key("snapshot", f"agent-evaluation-{agent_id}"))
             await redis_client.close()

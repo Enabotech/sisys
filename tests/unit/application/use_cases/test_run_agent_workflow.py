@@ -1058,6 +1058,7 @@ class TestExecuteCheckpointBlock:
             "predicted 从 result.evidence.confidence 直传（V1-EV3 兑现锚——0.85）"
         )
         assert last_record["hallucination_score"] == eval_result.hallucination_score
+        assert last_record["overall_score"] == eval_result.overall_score, "overall_score 透传锚（record 四分数不重算）"
 
     async def test_record_failure_degrades_independently(self, caplog: pytest.LogCaptureFixture) -> None:
         """②452 独立降级：save 抛 StorageError → 主链正常 + eval 三键仍在 + 漂移块仍执行 + WARNING。"""

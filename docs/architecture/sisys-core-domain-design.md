@@ -1790,6 +1790,13 @@ class CheckpointWithEvaluation:
 > 纯附加接入（record 块内嵌评估块、三键后漂移前、452 独立内层降级网——共享 catch
 > 三元组零改动）。性能双锚实测：满窗（100 条）快照创建 P95 ~1ms（<100ms 门）、
 > 评估历史查询 P95 ~1ms（<50ms 门——本地 Redis 口径）。
+> **代码审查 R1 修正（per-agent 键控窗口）**：Recorder 累积窗口按落盘命名空间
+> `agent-evaluation-{agent_id}` 键控（`_windows` dict——各 Agent 三 deque + 窗口级
+> state_version 计数器互不混串；修复前全局单窗口使同进程多 Agent 共享 SINGLETON
+> Recorder 时 B 键快照混入 A 的记录、全局计数器跨键顶号）；restore 的结构异常
+> 收敛面补 ValidationError（腐坏快照分数值域/trend 元素/等长破坏 → 452 非 201
+> 泄漏）+ record 输入域违规收敛 452（端口唯一异常契约）；trend 元素 [0,1] 数值域
+> 守卫与 history 五分数守卫对称（NaN 经 json allow_nan 穿越存储的静默灌回防线）。
 
 ---
 

@@ -820,13 +820,15 @@ def _construct_checkpoint(kwargs: dict[str, Any]) -> Any:
 
 @then("agent_id 非空守卫断言通过（空串抛 201）")
 def then_agent_id_nonempty_guard(context: dict[str, Any]) -> None:
-    """agent_id 空串 201 断言。"""
+    """agent_id 空串 201 三段式断言（raises → code → context——姊妹步骤同款形态）。"""
     import pytest as pytest_module
 
     from src.domain.exceptions import ValidationError
 
-    with pytest_module.raises(ValidationError):
+    with pytest_module.raises(ValidationError) as exc_info:
         _construct_checkpoint(context["empty_agent_id_kwargs"])
+    assert exc_info.value.code == "EXCEPTION_201"
+    assert exc_info.value.context["agent_id"] == ""
 
 
 @then("frozen 不可变断言通过（setattr 抛 FrozenInstanceError）")
@@ -1019,10 +1021,22 @@ def then_record_invocation_truth(context: dict[str, Any]) -> None:
         assert key in snapshot.state_data, f"state_data 应含 {key}"
     last_record = snapshot.state_data["evaluation_history"][-1]
     # Fake LLM 幻觉分 0.2 + 零工具链 cr=0.0 → actual=(1-0.2)*0.5+0*0.5=0.4，
-    # ca=1-|predicted 0.85 - actual 0.4|=0.55（5-8 compute_confidence_accuracy 同款链式手算锚）
+    # ca=1-|predicted 0.85 - actual 0.4|=0.55（5-8 compute_confidence_accuracy 同款链式手算锚）；
+    # overall 三维加权 (1-h)*0.4+cr*0.35+ca*0.25——权重常量 import 镜像同式表达式
+    # （5-8 验收先例形态：IEEE 同表达式确定性保证 bit-exact，禁 approx 禁字面量）
+    from src.application.ports.agent_evaluation import (
+        CONFIDENCE_ACCURACY_WEIGHT,
+        CONTEXT_RELEVANCE_WEIGHT,
+        HALLUCINATION_WEIGHT,
+    )
+
     assert last_record["hallucination_score"] == 0.2
     assert last_record["context_relevance"] == 0.0
     assert last_record["confidence_accuracy"] == 0.55
+    expected_overall = (1 - 0.2) * HALLUCINATION_WEIGHT + 0.0 * CONTEXT_RELEVANCE_WEIGHT + 0.55 * CONFIDENCE_ACCURACY_WEIGHT
+    assert last_record["overall_score"] == expected_overall, (
+        "overall_score 三维加权同式断言（代码审查 R1 补强——五分数完整断言闭环）"
+    )
     assert last_record["agent_id"] == str(context["agent"].agent_id)
     recorded_at = datetime.fromisoformat(last_record["recorded_at"])
     now = datetime.now(UTC)
@@ -1277,6 +1291,15 @@ def then_real_redis_key_landing(context: dict[str, Any]) -> None:
     assert state_data["confidence_accuracy_trend"] == context["recorded_scores"]
     assert len(state_data["evaluation_history"]) == 3
     assert state_data["evaluation_history"][0]["predicted_confidence"] == context["recorded_predicted"][0]
+    for i, record in enumerate(state_data["evaluation_history"]):
+        # history 逐值对账（代码审查 R1 补强——两层 json 落键真值面；record 对
+        # 四分数原样透传，_make_result_for_record 四分数同值构造 → 逐值即注入分数）
+        score = context["recorded_scores"][i]
+        assert record["hallucination_score"] == score, f"第 {i} 条 hallucination_score 应逐值相等"
+        assert record["context_relevance"] == score
+        assert record["confidence_accuracy"] == score
+        assert record["overall_score"] == score
+        assert record["predicted_confidence"] == context["recorded_predicted"][i]
 
 
 @then("TTL 语义断言通过（快照 ttl_seconds == 86400 实体默认）")

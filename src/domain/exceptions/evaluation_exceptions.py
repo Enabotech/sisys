@@ -153,12 +153,13 @@ class EvaluationHistoryError(SystemException):
         - record 时存储 save 失败（SnapshotRepositoryProtocol.save 抛
           StorageError 的链路透传包装——Redis 故障在存储面即 103，Recorder
           捕获后包装本码携 cause 链上抛）；
+        - record 时输入域违规（EvaluationCheckpoint 构造守卫的 ValidationError
+          收敛——主链三重上游守卫下不可达的防御层，451 同款哲学；直调消费方
+          触发即达——端口「唯一异常」契约成立锚）；
         - restore 时快照结构不完整（state_data 缺 evaluation_history/
-          hallucination_trend/confidence_accuracy_trend/agent_id 任一键或
-          类型不符——反序列化 fail-loud 防御面，正常路径快照由本管线产出
-          必含四键）；
-        - 打包时序列化域违规（不可序列化值——防御性，正常路径 DTO 域守卫
-          已在构造期拦截）。
+          hallucination_trend/confidence_accuracy_trend/agent_id 任一键、
+          类型不符、分数值域违规、trend 元素非法或三序列等长破坏——
+          反序列化 fail-loud 防御面，正常路径快照由本管线产出必含四键）。
 
     独立降级网语义（区别于 450/451 的共享 catch 面）：use case 评估块内
     record 块专属内层 ``except EvaluationHistoryError`` 捕获（三键 span 写入
@@ -170,8 +171,9 @@ class EvaluationHistoryError(SystemException):
         message: 默认消息（静态文案——str(本异常) 恒等于 message，cause 动态
             文案只进 to_dict 不进 str，主链 warning 文本断言锚）
         context: 领域上下文（agent_id/phase/reason——reason 取值 save_failed/
-            missing_keys/type_mismatch/serialize 标识失败环节；phase 取值
-            record/restore/serialize/deserialize）
+            invalid_structure/invalid_input 标识失败环节[save_failed=存储失败、
+            invalid_structure=restore 快照结构异常族收敛、invalid_input=record
+            输入域违规收敛]；phase 取值 record/restore）
     """
 
     code = "EXCEPTION_452"
@@ -190,11 +192,14 @@ class EvaluationHistoryError(SystemException):
 
         Args:
             agent_id: 评估历史归属的 Agent 标识（record 主链路径恒可得——
-                execute 形参透传）。
-            phase: 失败环节名（record/restore/serialize/deserialize——
-                record 是累积+打包+save 原子主路径）。
-            reason: 面向调用方可理解的失败环节摘要（save_failed/missing_keys/
-                type_mismatch/serialize 之一）。
+                execute 形参透传；restore 路径不可得时空串——450「不可得时
+                空串」同款形态，诊断以 context.session_id 为准）。
+            phase: 失败环节名（record/restore——record 是累积+打包+save
+                原子主路径）。
+            reason: 面向调用方可理解的失败环节摘要（save_failed/
+                invalid_structure/invalid_input 之一——结构异常族含缺键/
+                类型错/分数值域违规/trend 元素非法/等长破坏，收敛单值不
+                再细分[防御路径消费面仅日志，cause 链已携精确原异常]）。
             message: 覆盖默认消息（可选）。
             cause: 原始异常（可选，用于异常链——StorageError 包装链锚）。
             context_extra: 额外诊断键（如 session_id/记录数——合并进

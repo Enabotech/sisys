@@ -3068,8 +3068,9 @@ def bootstrap() -> None:
     # 同窗落地——本区段仅端口注册（R1-F1 时序约束：第八参数不存在时注入 kwarg
     # 必 TypeError）。Recorder lambda 无 env 依赖（MAX_HISTORY_SIZE 是代码常量
     # 单源，.env.example 零改动）。MVP 单进程前提（多 worker 累积器分叉 +
-    # Redis latest 覆盖写最后写者胜——Recorder docstring 注记，per-agent 键控
-    # 是 V1 多进程面）。
+    # Redis latest 覆盖写最后写者胜——Recorder docstring 注记；进程内
+    # per-agent 窗口键控已落地[代码审查 R1——同进程多 Agent 各窗隔离]，
+    # 跨进程键控/粘性路由是 V1 多进程面）。
     register_port(
         name="agent_checkpoint",
         version="v1.0.0",

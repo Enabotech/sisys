@@ -36,6 +36,7 @@ from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.exceptions import ValidationError
 
 __all__ = [
+    "EVALUATION_SESSION_PREFIX",
     "MAX_HISTORY_SIZE",
     "AgentCheckpointPort",
     "CheckpointWithEvaluation",
@@ -48,6 +49,10 @@ __all__ = [
 #: 留痕——Phoenix 查询面）；DriftDetected 事件仅留存确认漂移的稀疏锚点，非历史序列
 #: 通道——通道语义分述。上限值 V1 可调（配置化非本 Story 面））
 MAX_HISTORY_SIZE: int = 100
+
+#: 评估快照会话命名空间前缀（DC-6 per-agent 聚合键——``agent-evaluation-{agent_id}``；
+#: record 构造落盘键与消费方 restore 查键共用单源，禁两处字面量漂移[漂移即静默错键]）
+EVALUATION_SESSION_PREFIX: str = "agent-evaluation-"
 
 #: 五分数域守卫字段闭集（[0,1] 数值域——bool 排除，域守卫形态与 EvaluationResult/
 #: DriftAssessment 同款）
@@ -70,8 +75,11 @@ class EvaluationCheckpoint:
     （EvaluationResult 同层同论证）。
 
     Attributes:
-        recorded_at: 记录时刻（timezone-aware datetime——序列化边界经 isoformat
-            字符串化，恢复侧 fromisoformat 还原）。
+        recorded_at: 记录时刻（timezone-aware datetime——生产侧保证恒
+            ``datetime.now(UTC)``：record 主链路径唯一生成点；isoformat →
+            fromisoformat 往返保偏移。aware 是生产侧保证而非构造期守卫——
+            naive 直构被静默接受[无下游比较消费方，deque 追加序即时间序；
+            naive 唯一入口是外力腐坏快照的无时区 ISO 串——知悉注记]）。
         agent_id: 评估归属的 Agent 标识（非空守卫）。
         hallucination_score: 幻觉分（[0,1]——EvaluationResult 同名透传）。
         context_relevance: 上下文相关性（[0,1]）。
@@ -123,8 +131,8 @@ class CheckpointWithEvaluation:
     Attributes:
         agent_id: 聚合归属的 Agent 标识。
         evaluation_history: 评估历史记录序列（tuple——有序，deque 追加序即时间序）。
-        hallucination_trend: 幻觉分趋势序列（与 history 等长）。
-        confidence_accuracy_trend: 置信度准确性趋势序列（与 history 等长）。
+        hallucination_trend: 幻觉分趋势序列（与 history 等长，元素 [0,1] 数值域）。
+        confidence_accuracy_trend: 置信度准确性趋势序列（与 history 等长，元素 [0,1] 数值域）。
     """
 
     agent_id: str
@@ -133,7 +141,15 @@ class CheckpointWithEvaluation:
     confidence_accuracy_trend: tuple[float, ...]
 
     def __post_init__(self) -> None:
-        """三序列等长守卫（history 长度 == 两 trend 长度——不等抛 201）。"""
+        """聚合域守卫（等长先验 + trend 元素数值域后验——均抛 201）。
+
+        校验顺序钦定：等长守卫（O(1)）先、trend 元素扫描（O(n)）后——
+        便宜先行 fail-fast；等长不齐时元素值不参与判定（双违规形态以
+        等长守卫文案抛出）。trend 元素与 history 五分数守卫对称（趋势值
+        语义上是已守卫分数的镜像——合法值不可能越界；NaN 经链式比较
+        为 False 天然拦截：json 序列化 allow_nan=True 可使 NaN 穿越存储
+        往返，恢复侧不得静默灌回[代码审查 R1]）。
+        """
         history_len = len(self.evaluation_history)
         if not (history_len == len(self.hallucination_trend) == len(self.confidence_accuracy_trend)):
             raise ValidationError(
@@ -144,6 +160,16 @@ class CheckpointWithEvaluation:
                 ),
                 context={"history_len": str(history_len)},
             )
+        for trend_name, trend in (
+            ("hallucination_trend", self.hallucination_trend),
+            ("confidence_accuracy_trend", self.confidence_accuracy_trend),
+        ):
+            for value in trend:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0:
+                    raise ValidationError(
+                        message=f"趋势序列 {trend_name} 元素必须为 [0,1] 数值（实际 {value!r}）",
+                        context={trend_name: str(value)},
+                    )
 
     def to_checkpoint_snapshot(self, session_id: str = "", state_version: int = 1) -> CheckpointSnapshot:
         """打包为 CheckpointSnapshot（结构化字段 → state_data 四键——OD-3 键契约）。
@@ -227,9 +253,13 @@ class AgentCheckpointPort(Protocol):
     注册（SINGLETON——跨 run 累积，状态即功能）。
 
     窗口语义：三序列 deque maxlen=MAX_HISTORY_SIZE 同窗滚动（最旧丢弃）；
-    SINGLETON 累积是进程内的——多 worker 部署下各进程累积器分叉 + Redis latest
-    覆盖写最后写者胜（MVP 单进程前提，风险登记——per-agent 键控/粘性路由是
-    V1 多进程面）。
+    **per-agent 键控**（代码审查 R1 修正）：累积窗口按落盘命名空间
+    ``agent-evaluation-{agent_id}`` 键控——同进程多 Agent（SINGLETON 共享
+    Recorder 的常态路径）各窗隔离互不混串；restore 传入非规范 session_id
+    时返回聚合但内存不续接任何 Agent 窗口（键即入参——record 永不触达该
+    孤儿槽）。SINGLETON 累积仍是进程内的——多 worker 部署下各进程窗口分叉
+    + Redis latest 覆盖写最后写者胜（MVP 单进程前提，风险登记——跨进程
+    键控/粘性路由是 V1 多进程面）。
     """
 
     async def record(
@@ -252,7 +282,10 @@ class AgentCheckpointPort(Protocol):
 
         Raises:
             EvaluationHistoryError: 存储失败（StorageError 包装 452——内存累积
-            保留，最终一致语义：下次 record 打包含本条后落盘收敛）。
+            保留，最终一致语义：下次 record 打包含本条后落盘收敛）或输入域
+            违规（EvaluationCheckpoint 构造守卫的 ValidationError 收敛 452
+            reason=invalid_input——端口唯一异常契约；主链路径三重上游守卫下
+            不可达，直调消费方触发即达）。
         """
         ...
 
@@ -272,7 +305,8 @@ class AgentCheckpointPort(Protocol):
             None——故障与不存在不可区分的双义知悉，恢复后累积从空窗起步）。
 
         Raises:
-            EvaluationHistoryError: 快照结构不完整（state_data 缺键/类型错误——
-            反序列化 fail-loud 防御面）。
+            EvaluationHistoryError: 快照结构不完整（state_data 缺键/类型错误/
+            分数值域违规/trend 元素非法/三序列等长破坏——反序列化 fail-loud
+            防御面，reason=invalid_structure 收敛全部结构异常族）。
         """
         ...

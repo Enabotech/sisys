@@ -89,12 +89,14 @@ class TestEvaluationCheckpointDomainGuards:
         assert exc_info.value.context[field] == str(bad_value), "context 值应为 str(实际值)"
 
     def test_agent_id_empty_guard(self) -> None:
-        """agent_id 空串 → 201（非 [0,1] 分数域——非空字符串守卫）。"""
+        """agent_id 空串 → 201 三段式（非 [0,1] 分数域——非空字符串守卫）。"""
         from src.application.ports.agent_checkpoint import EvaluationCheckpoint
 
         kwargs = {**_valid_checkpoint_kwargs(), "agent_id": ""}
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             EvaluationCheckpoint(**kwargs)
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert exc_info.value.context["agent_id"] == ""
 
     def test_valid_construction_passes(self) -> None:
         """合法构造通过（七字段全合法域）。"""
@@ -136,6 +138,31 @@ class TestCheckpointWithEvaluationAggregate:
                 confidence_accuracy_trend=anchor.confidence_accuracy_trend[:2],
             )
         assert exc_info.value.code == "EXCEPTION_201"
+
+    @pytest.mark.parametrize("trend_field", ["hallucination_trend", "confidence_accuracy_trend"])
+    @pytest.mark.parametrize("bad_element", [-0.01, 1.01, True, "0.5", float("nan")])
+    def test_trend_element_domain_guard(self, trend_field: str, bad_element: Any) -> None:
+        """trend 元素域守卫（代码审查 R1 补充）——两 trend × 越界/bool/字符串/NaN → 201。
+
+        元素校验与 history 五分数守卫对称（趋势值语义上是已守卫分数的镜像）；
+        bool 显式排除（JSON true 是 int 子类——naive 数值比较会放行）；NaN 经
+        ``0.0 <= v <= 1.0`` 链式比较为 False 天然拦截（json allow_nan=True 可使
+        NaN 穿越存储往返——恢复侧不得静默灌回）。
+        """
+        from src.application.ports.agent_checkpoint import CheckpointWithEvaluation
+
+        anchor = _make_anchor_aggregate("agent-trend-guard-001")
+        kwargs: dict[str, Any] = {
+            "agent_id": "agent-trend-guard-001",
+            "evaluation_history": anchor.evaluation_history,
+            "hallucination_trend": anchor.hallucination_trend,
+            "confidence_accuracy_trend": anchor.confidence_accuracy_trend,
+            trend_field: (bad_element,) + anchor.hallucination_trend[1:],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            CheckpointWithEvaluation(**kwargs)
+        assert exc_info.value.code == "EXCEPTION_201", f"{trend_field}={bad_element!r} 元素应抛 201"
+        assert trend_field in exc_info.value.context, f"context 应携字段名 {trend_field}"
 
     def test_aggregate_frozen(self) -> None:
         """聚合 frozen 不可变。"""
