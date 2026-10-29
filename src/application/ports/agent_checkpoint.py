@@ -297,7 +297,9 @@ class AgentCheckpointPort(Protocol):
         结构保证）→ state_version 计数器续接 snapshot.state_version + 1 → 返回聚合。
 
         Args:
-            session_id: 快照会话标识（``agent-evaluation-{agent_id}`` 命名空间）。
+            session_id: 快照会话标识（``agent-evaluation-{agent_id}`` 命名空间——
+                消费方构造键请 import ``EVALUATION_SESSION_PREFIX`` 单源拼接，
+                禁手写字面量[漂移即静默错键]）。
 
         Returns:
             CheckpointWithEvaluation | None：恢复的聚合；快照不存在返回 None

@@ -231,11 +231,11 @@ class TestEvaluationHistoryErrorConstruction:
         assert error.context["reason"] == "save_failed"
 
     def test_phase_covers_record_and_restore(self) -> None:
-        """phase 支持 record/restore 两主路径取值（serialize/deserialize 防御面同参数面）。"""
+        """phase 支持 record/restore 两主路径取值（restore 防御面同参数面——闭集两值）。"""
         from src.domain.exceptions import EvaluationHistoryError
 
         record_error = EvaluationHistoryError(phase="record", reason="save_failed")
-        restore_error = EvaluationHistoryError(phase="restore", reason="missing_keys")
+        restore_error = EvaluationHistoryError(phase="restore", reason="invalid_structure")
         assert record_error.context["phase"] == "record"
         assert restore_error.context["phase"] == "restore"
 
@@ -288,12 +288,12 @@ class TestEvaluationHistoryErrorConstruction:
         """to_dict 序列化（code/message/context 三段）。"""
         from src.domain.exceptions import EvaluationHistoryError
 
-        error = EvaluationHistoryError(agent_id="agent-003", phase="restore", reason="missing_keys")
+        error = EvaluationHistoryError(agent_id="agent-003", phase="restore", reason="invalid_structure")
         data = error.to_dict()
         assert data["code"] == "EXCEPTION_452"
         assert data["context"]["agent_id"] == "agent-003"
         assert data["context"]["phase"] == "restore"
-        assert data["context"]["reason"] == "missing_keys"
+        assert data["context"]["reason"] == "invalid_structure"
 
 
 class TestEvaluationHistoryErrorHttpMapping:

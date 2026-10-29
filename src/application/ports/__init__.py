@@ -6,6 +6,7 @@
 """
 
 from src.application.ports.agent_checkpoint import (
+    EVALUATION_SESSION_PREFIX,
     AgentCheckpointPort,
     CheckpointWithEvaluation,
     EvaluationCheckpoint,
@@ -40,6 +41,7 @@ from src.application.ports.session_cache_port import SessionCachePort
 from src.application.ports.text_extractor_service import TextExtractorService
 
 __all__ = [
+    "EVALUATION_SESSION_PREFIX",
     "AgentCheckpointPort",
     "AgentEvaluationPort",
     "AgentTracingPort",

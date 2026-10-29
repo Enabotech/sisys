@@ -20,7 +20,8 @@ A 的记录、全局计数器跨键顶号）。
 ——RedisSnapshotStore 无状态（委托 adapter，连接由 adapter 持有）固定实例安全。
 **窗口数无上界知悉**：instantiate 非幂等（agent_cli——每次调用创建新 Agent
 实体），窗口数 = agent 实体数 = instantiate 调用次数，随进程生命周期无界增长
-（满窗 ≈ 60KB/窗的慢泄漏——非爆炸；V1 LRU/TTL 治理锚）。
+（满窗 ≈ 30KB/窗[tracemalloc 实测 26-28KB]的慢泄漏——非爆炸，1000 满窗上界
+≈30MB；V1 LRU/TTL 治理锚——R2 勘误：原 60KB 口径高估约 2.2×）。
 **MVP 单进程前提显式声明**：多 worker 部署下各进程窗口分叉 + Redis latest
 覆盖写（最后写者胜）使其他 worker 的窗口外谱系静默丢失；同 agent 并发 record
 的落盘序竞争后果良性（打包含对方记录后落盘收敛、仅服务端到达序反转时 Redis
@@ -193,7 +194,8 @@ class EvaluationCheckpointRecorder(AgentCheckpointPort):
         时空串」同款形态，诊断以 context.session_id 为准）。
 
         Args:
-            session_id: 快照会话标识（``agent-evaluation-{agent_id}`` 命名空间）。
+            session_id: 快照会话标识（``agent-evaluation-{agent_id}`` 命名空间——
+                消费方构造键请 import ``EVALUATION_SESSION_PREFIX`` 单源拼接）。
 
         Returns:
             CheckpointWithEvaluation | None: 恢复的聚合；快照不存在（或存储故障
