@@ -139,13 +139,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 ### AC-2: 主链接入——第八可选依赖 + record 块（predicted 持久化）+ 独立降级网 + None 默认向后兼容
 
-**Given** 工作流链 = 5.8/5.9 手工装配形态（Fake LLM Schema 身份分派[幻觉分注入控制评估分数] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + 手写零 IO stub 仓储 + **OTel 观测通道**[场景级 initialize + InMemorySpanExporter + teardown 双复位——eval 三键 span 与 drift.detected 断言的观测面，5-9 验收同款；NoOp tracer 下 is_recording False 无属性可断]）+ use case 构造注入 `checkpoint_recorder`（真实 `EvaluationCheckpointRecorder` + 手写零 IO `_RecordingSnapshotRepo` 替身[duck-typing 实现 SnapshotRepositoryProtocol，save 捕获快照列表——test_integration_execute.py MockSnapshotRepo 先例形态]）
+**Given** 工作流链 = 5.8/5.9 手工装配形态（Fake LLM Schema 身份分派[幻觉分注入控制评估分数] + 真实 AgentWorkflowService/LangGraphEngine/RunAgentWorkflowUseCase + 手写零 IO stub 仓储 + **drift_detector 注入**[第七依赖——AC-2.2「漂移块仍执行」断言面：drift 预填充场景依赖真实检测器场景私有实例] + **OTel 观测通道**[场景级 initialize + InMemorySpanExporter + teardown 双复位——eval 三键 span 与 drift.detected 断言的观测面，5-9 验收同款；NoOp tracer 下 is_recording False 无属性可断]）+ use case 构造注入 `checkpoint_recorder`（真实 `EvaluationCheckpointRecorder` + 手写零 IO `_RecordingSnapshotRepo` 替身[duck-typing 实现 SnapshotRepositoryProtocol，save 捕获快照列表——test_integration_execute.py MockSnapshotRepo 先例形态]）
 **When** 调用 `RunAgentWorkflowUseCase.execute(agent_id, task)` 执行工作流
 **Then** 评估块内（`evaluate` 成功 + 三键写入之后、**漂移块之前**——顺序钦定：record 失败不得阻断漂移检测、漂移失败不得丢评估历史，两独立可观测附加面）record 块执行：`if self._checkpoint_recorder is not None:` → `await self._checkpoint_recorder.record(agent_id=str(agent_id), evaluation_result=evaluation_result, predicted=result.evidence.confidence)`（**V1-EV3 兑现锚——predicted 从 result.evidence.confidence 取**）→ record 内层独立降级网 `except EvaluationHistoryError:` → logger.warning 继续漂移块（**共享 catch 元组零改动**——外层 `(AgentEvaluationError, LLMConfigError, DriftDetectionError)` 三元组不动，452 由 record 块专属内层 catch 承载：漂移检测与历史持久化互不牵连）；工作流返回值与 record 块零耦合（result 原样返回）
 **And** **降级路径**（可观测附加面哲学——两级 catch 形态）：①record 失败（`_RaisingSnapshotRepo` save 抛 **StorageError** 注入[定义于 src/domain/exceptions/system_exceptions.py L31、经 src.domain.exceptions 包导出——import 面注记]——Recorder 捕获包装 452 上抛，完整真实路径[Redis 故障在存储面即 StorageError——redis_snapshot_store L131-133；替身直抛 452 会跳过包装环节，与 Task 2 单测⑥统一 StorageError 口径]）→ 主链正常返回 + **eval 三键仍在**（record 前已写——InMemorySpanExporter 断言三键属性存在）+ **漂移块仍执行**（drift.detected 确认路径不受影响——独立降级网验证锚）+ warning 日志（caplog 断言存在 WARNING 级记录且文本含 **452 静态 message 锚**——钦定 `EvaluationHistoryError.message = "评估历史持久化失败"`[Task 1 定义时落定]，断言该文案 in warning 文本；**str(领域异常) 恒等于 message**[DomainError 构造传 message 给 super——cause 链只进 to_dict 不进 str]，注入 StorageError 的动态文案不出现在 warning 文本[R2-A 修正：5-9「注入异常 str 同款」的前提（注入物 == 被记录物）在统一 StorageError 注入深度后不成立——替身直抛形态才有 str 同一]；包装链根因断言 `exc.__cause__ is 注入的 StorageError` 由 Task 2⑥ 单测承载）；②评估降级联动（evaluate 抛 450 → record 块天然跳过）+ 452 零捕获（外层 catch 不含 452——**record 块位于 evaluate 之后同一 try 体内，evaluate 抛出时控制流直接跳转外层 catch，record 块不执行[结构保证]**）；③漂移失败联动（漂移块抛 451 → 外层 catch 降级 → **record 已完成**[record 在漂移块前]——`_RecordingSnapshotRepo` 捕获断言快照已保存，漂移失败不丢评估历史）；**未注入路径**（`checkpoint_recorder=None`——八参默认）：record 块整体跳过 + 行为与 5.9 交付态完全一致（存量零破坏前提）；**构造签名扩展**：use case 第八可选依赖 `checkpoint_recorder: AgentCheckpointPort | None = None`（尾部追加——存量七参构造调用零破坏）；**存量断言同步 ×7**（创建期 grep 实证清单见「现有代码继承」第 9 条——含 5-9 自身验收资产 L1188/L1207 最易漏处）；**回执耦合防线**：①③文件追加一律尾部追加禁改写既有行
 
 **验证标准/Validation Criteria:**
-- [ ] 主链 record 断言：execute 后 `_RecordingSnapshotRepo` 捕获 1 个 CheckpointSnapshot + state_data 四键 + evaluation_history 末条记录七字段与 Fake LLM 注入的评估分数逐值相等（**predicted_confidence == result.evidence.confidence 断言**——V1-EV3 兑现锚）+ stage_id=="evaluation" + session_id=="agent-evaluation-{agent_id}"（命名空间锚）
+- [ ] 主链 record 断言：execute 后 `_RecordingSnapshotRepo` 捕获 1 个 CheckpointSnapshot + state_data 四键 + evaluation_history 末条记录五分数字段与 Fake LLM 注入的评估分数逐值相等 + agent_id 相等 + recorded_at 为近期时刻（**predicted_confidence == result.evidence.confidence 断言**——V1-EV3 兑现锚）+ stage_id=="evaluation" + session_id=="agent-evaluation-{agent_id}"（命名空间锚）
 - [ ] 连续执行累积：同 agent 连续 execute 2 次 → 第二次快照 evaluation_history 长度 == 2 + hallucination_trend 长度 == 2（Recorder 内存累积跨 run 保持——SINGLETON 语义）
 - [ ] record 失败降级：save 抛 StorageError → record 包装 452 上抛 → 内层降级 → 主链正常返回 + 三键仍在 + 漂移块仍执行（drift 预填充场景的 drift.detected==True 断言——独立降级网验证锚）+ WARNING 日志断言
 - [ ] 漂移失败联动：漂移块抛 451 → record 已完成（替身捕获非空）+ 主链正常返回
@@ -471,8 +471,8 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/services/test_evaluation_checkpoint_recorder.py`（AsyncMock(spec=SnapshotRepositoryProtocol) 存储替身——unit 层合法：①record 单调：累积→打包→save 委托→返回快照 + **连续 record 2 次第二次快照 state_version == 2**（计数器递增锚）②窗口滚动：灌 101 条 → history 长度 100 + 最旧丢弃 + 三序列同窗 ③restore 恢复式：save 捕获快照 → 新 Recorder → restore 逐值恢复 + **③b restore 后 record 1 次 → 新快照 evaluation_history 长度 == 恢复历史长度 + 1 且首条 == 恢复首条 + state_version == 恢复快照 state_version + 1**（累积延续——AC-3② 红前置锚，防纯查询式 restore 假绿）④restore 快照不存在（load 返 None）→ None ⑤restore 结构不完整（state_data 缺键 dict）→ EvaluationHistoryError 452 ⑥save 抛 StorageError → record 包装 452 上抛[内存累积保留断言——最终一致 docstring 语义] + **`exc.__cause__ is 注入的 StorageError`**（包装链锚——AC-2 warning 文本断言的根因验证归此） ⑦session_id 构造 =="agent-evaluation-{agent_id}"） |
-| 🟢 绿 | 实现 `src/application/services/evaluation_checkpoint_recorder.py`（class EvaluationCheckpointRecorder: `_history: deque[EvaluationCheckpoint]`/`_h_trend: deque[float]`/`_ca_trend: deque[float]` 全 maxlen=MAX_HISTORY_SIZE + **`_state_version: int = 1` 内存计数器**（record 打包传当前值后 +1；restore 续接 snapshot.state_version + 1——重启后版本延续递增）+ `async def record(...)` 原子三步 + `async def restore(...)` 解包并**灌回三 deque**（`deque(聚合序列, maxlen=MAX_HISTORY_SIZE)`——恢复式语义非只读查询[OD-7③]，恢复聚合 ≤ 窗口上限由快照产出端 maxlen 结构保证）+ StorageError→452 包装 + 结构校验→452） |
+| 🔴 红 | 编写 `tests/unit/application/services/test_evaluation_checkpoint_recorder.py`（AsyncMock(spec=SnapshotRepositoryProtocol) 存储替身——unit 层合法：①record 单调：累积→打包→save 委托→返回快照 + **连续 record 2 次第二次快照 state_version == 2**（计数器递增锚）②窗口滚动：灌 101 条 → history 长度 100 + 最旧丢弃 + 三序列同窗 ③restore 恢复式：save 捕获快照 → 新 Recorder → restore 逐值恢复（**构造恢复历史长度 3——< MAX_HISTORY_SIZE；R3 注记：③b 的「长度+1/首条不变」断言在满窗恢复下数学不可满足[灌回 100 → record 触发滚动 → 长度仍 100 ≠ 101]，满窗边界归 ② 承载**）+ **③b restore 后 record 1 次 → 新快照 evaluation_history 长度 == 恢复历史长度 + 1 且首条 == 恢复首条 + state_version == 恢复快照 state_version + 1**（累积延续——AC-3② 红前置锚，防纯查询式 restore 假绿）④restore 快照不存在（load 返 None）→ None ⑤restore 结构不完整（state_data 缺键 dict）→ EvaluationHistoryError 452 ⑥save 抛 StorageError → record 包装 452 上抛[内存累积保留断言——最终一致 docstring 语义] + **`exc.__cause__ is 注入的 StorageError`**（包装链锚——AC-2 warning 文本断言的根因验证归此） ⑦session_id 构造 =="agent-evaluation-{agent_id}"） |
+| 🟢 绿 | 实现 `src/application/services/evaluation_checkpoint_recorder.py`（class EvaluationCheckpointRecorder: `_history: deque[EvaluationCheckpoint]`/`_h_trend: deque[float]`/`_ca_trend: deque[float]` 全 maxlen=MAX_HISTORY_SIZE + **`_state_version: int = 1` 内存计数器**（record 打包传当前值、**save 成功后 +1**[R3 钦定：失败不消耗版本号——版本数 == 成功落盘数，跳号面归零；与 AutoExecuteService load-derived 惯例同构]；restore 续接 snapshot.state_version + 1——重启后版本延续递增）+ `async def record(...)` 原子三步 + `async def restore(...)` 解包并**灌回三 deque**（`deque(聚合序列, maxlen=MAX_HISTORY_SIZE)`——恢复式语义非只读查询[OD-7③]，恢复聚合 ≤ 窗口上限由快照产出端 maxlen 结构保证）+ StorageError→452 包装 + 结构校验→452） |
 | 🟡 变异 | deque maxlen 改 99 → 滚动断言红；restore 缺键校验删 → 452 用例红；restore 灌回删（改纯查询式）→ ③b 累积延续用例红；_state_version 递增删 → ①计数器断言红 → 还原 |
 | 🔄 重构 | docstring（SCOPED 注入注记 + 通道语义分述注记[窗口外留存通道是 OTel span、DriftDetected 仅稀疏锚点——OD-8④] + 最终一致语义 + 多进程边界注记[SINGLETON 累积是进程内的——多 worker 分叉知悉，风险 #9]）+ ruff/mypy |
 
@@ -823,6 +823,13 @@ tests/
 > | R2-4 | P3 批：AC-5 warmup 轮复合构成未钦定（双锚下 warmup 只 warm 单锚使另一锚计数 20≠21 假红）；6.2 括注「已含」读法费解；redis marker 混合文件（AC-1×3/AC-4×2 纯内存被文件级 marker 覆盖——-m "not redis" 环境会排除纯内存场景）；矩阵 AC-4 行 3.4 半修（工厂注入在 3.2）；结构树 tests/application 双「└──」字符画；StorageError import 面提示缺失；OD-7/Task 3 绿行表格内未转义「\|」（v1.0.0 既有、GFM 渲染裂列但纯文本消费无实害——登记不改） | P3 | 逐一清偿（前六项）；末项登记知悉 |
 >
 > Round 2 审查投入：回归核查（R2-A——git diff 取证 R1-1~R1-12 传播完备性全过 + 新引入矛盾扫描）+ 组合交互（R2-B——七组组合推演五组全过）。总计发现：P0×0 + P1×1 + P2×2 + P3×7（含登记 1）；R1 修复传播完备性零漏网实证。
+>
+> | # | 问题 | 严重度 | 修复方案 |
+> |---|------|--------|----------|
+> | R3-1 | Task 2 单测③b 在满窗恢复构造下断言数学不可满足：③未钦定恢复历史长度——L=100 时「长度==恢复+1 且首条==恢复首条」在正确实现下恒红（deque 滚动），相邻②恰是 101 条灌装存在状态复用路径；死红破坏 TDD 闭环并连带推翻 Task 4 套件型豁免前提（R1-1 修复引入的断言缺构造约束） | P1 | ③ 补「构造恢复历史长度 3（< MAX_HISTORY_SIZE）——③b 断言满窗不可满足，满窗边界归 ② 承载」（AC-3② 由「≥3 次」钦定天然安全——证明缺口是遗漏非设计） |
+> | R3-2 | P3 批：`_state_version` +1 时点相对 save 失败未钦定（α 失败即跳号 / β 失败不消耗两实现均过现有断言——非判别式）；AC-2.1「末条记录七字段与评估分数逐值相等」措辞（七字段中仅 5 个是分数）；AC-2 Given 未显式列第七依赖 drift_detector 注入（AC-2.2 断言依赖，隐式覆盖） | P3 | 逐一清偿：绿行钦定 β「save 成功后 +1（版本数==成功落盘数，跳号面归零）」；断言措辞改五分数字段+agent_id+recorded_at 分述；Given 补 drift_detector 注入 |
+>
+> Round 3 审查投入：单深度推演（14 场景三轴逐个推演全过 + 四时间线状态机逐字段自洽[重复 restore 替换语义幂等实证/降级链内存最终一致/结构不完整零部分灌回事务性] + 数学完备性[唯一条件性不可满足即 R3-1] + TDD 红绿变异链全链可执行 + R2 修复零深化缺陷 + 存量行号锚 HEAD 全真实复核）。总计发现：P0×0 + P1×1 + P2×0 + P3×3。
 
 ---
 
@@ -859,13 +866,15 @@ tests/
 | v1.0.0 | 2026-10-29 | 创建故事文件（create-story——多 Agent 四视角调研 + OD×8 偏离声明 + 留项处置五条 + 存量断言 ×7 实证） |
 | v1.1.0 | 2026-10-29 | 文档审查 Round 1（四调研+三审查——P0×0/P1×5/P2×12/P3×15）：restore 恢复式语义机制定稿（灌回三 deque + state_version 计数器——Task 2 红绿变异三锚落地）+ 计数对账批修（9→7/六→五/13→16 行/2+5→2+7）+ §3.3.2 两处传播 + redis marker 补 + OD-8④ 通道分述修正 + 风险表扩 #9/#10 + 杂项澄清批（Docs Review Fixes R1-1~R1-12） |
 | v1.2.0 | 2026-10-29 | 文档审查 Round 2（回归核查+组合交互双审——P0×0/P1×1/P2×2/P3×7，R1 修复传播完备性零漏网实证）：WARNING 断言锚修正（452 静态 message 钦定 + cause 链断言归 Task 2⑥——R1-11 注入深度变化后断言形式重推导）+ 风险 #9 扩重启回退形态（未 restore 直接 record 双回退知悉）+ AutoExecuteService 机制差异注记（load-derived vs 内存计数器）+ Task 3 红处方 StorageError 限定 + warmup 复合构成钦定 + P3 批清偿（Docs Review Fixes R2-1~R2-4） |
+| v1.3.0 | 2026-10-29 | 文档审查 Round 3（单深度推演——P0×0/P1×1/P2×0/P3×3）：③b 满窗恢复构造约束补钦定（恢复历史长度 3 < MAX_HISTORY_SIZE——满窗下「长度+1/首条不变」数学不可满足，R1-1 引入断言的构造缺口）+ state_version +1 时点钦定（save 成功后——失败不消耗版本号）+ AC-2.1 断言措辞分述（五分数字段+agent_id+recorded_at）+ Given 补 drift_detector 注入显式化；14 场景三轴全过 + 四时间线逐字段自洽 + R2 零深化缺陷（Docs Review Fixes R3-1~R3-2） |
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**
 - v1.0.0: 创建故事文件——Ultimate context engine analysis completed（comprehensive developer guide created）
 - v1.1.0: 文档审查 Round 1——D1 四视角调研 + D2 三视角审查（P0×0 + P1×5 + P2×12 + P3×15，修复见 Docs Review Fixes 表 R1-1~R1-12；零设计变更）
 - v1.2.0: 文档审查 Round 2——回归核查 + 组合交互双审（P0×0 + P1×1 + P2×2 + P3×7，修复见 R2-1~R2-4；R1 修复传播完备性零漏网实证）
+- v1.3.0: 文档审查 Round 3——单深度推演（P0×0 + P1×1 + P2×0 + P3×3，修复见 R3-1~R3-2；③b 满窗不可满足构造缺口清偿——清偿后可进 dev）
