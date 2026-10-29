@@ -929,20 +929,35 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待实施后填写）
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-10-29（Round 1——四视角并行调研 + 双评审门禁）
+**审查模式:** full（视角 A 算法正确性[130 万确认事件暴力搜索 + 6 变异实证] / 视角 B 主链接入降级网 / 视角 C 事件异常端口契约 / 视角 D 测试质量性能回测[三处钦定基准独立复现] + 主会话实测定谳）
 
 #### 需决策 Decision Needed
 
-- [ ] （待实施后填写）
+- [x] **R1-D1（改判不落码）**：视角 A 建议 catch 面补 ValidationError（漂移块 update 抛 201 将中断主链）——经主会话实测定谳**改判**：5.8 已有红测试 `test_evaluation_unexpected_error_propagates`（参数化含 201）明文裁定「201 是文档化兄弟面（理论不可达防御层，真触发说明实现 bug 应显性失败）」且钉死 catch 收窄边界；catch 201 = 吞掉契约违规 bug，违背 fail-loud 哲学与「Fix Root Causes」红线。201 在真实管线双重不可达（上游 EvaluationResult 四分数守卫先行 + overall 凸组合极值 ==1.0 不越界）。双评审员一致同意改判。
 
 #### 已修复 Patch
 
-- [ ] （待实施后填写）
+Round 1 修复 11 项（F1-F11——C3 双评审：评审员①「优秀」+ 评审员②「合格→采纳清单后优秀」，全部意见吸收后落码）：
+
+- [x] **R1-F1（P1·红线）**：test_drift_events.py:36 `# type: ignore[arg-type]` 违反项目硬约束（CI `mypy src/ tests/` 真检查项被掩盖）——根因修复：`**overrides: object`→`Any` + `kwargs: dict[str, object]`→`dict[str, Any]` + 删 ignore；配套守卫 `TestArchNoSuppressionComments` parametrize 从 9 src 文件扩至 25 文件（12 src 触碰面 + 13 测试交付面），排除 3 文件并注释原因（test_arch_drift_detection/test_arch_evaluation 守卫字面量自毙 + test_exception_handlers 存量合法 noqa 债）——测试文件抑制注释盲区是漏网根因
+- [x] **R1-F2（P2·变异存活）**：`_probe_direction` 恒返 "none" 变异下 44 单测全绿（M5 实证——未确认态探测方向零锁定）——补三态探测锚：预热期 "none"（test_warmup_phase）+ 下漂未确认 "down"（test_window_not_full）+ 上漂未确认 "up"（test_upward_margin）——三态契约完整锁定，兼杀「恒 down/up」等价变异
+- [x] **R1-F3（P3·契约符合性）**：4 处夹具 `reason="drift_update"` 违反异常设计文档 L743 钦定闭集 `reason ∈ invalid_state/degenerate_baseline`（非形式一致性——是注册契约违背）——全改 "invalid_state" + L136 断言锁步 + evaluation_exceptions.py Args 行「等」删除（与 Attributes 闭集一致）
+- [x] **R1-F4（P3·自洽）**：集成场景⑥直调 `_run_backtest` 绕过 _PERF_CACHE 与模块「禁双跑」注释矛盾——新增 `sample_synthetic_backtest()` async 委托（与 sync 版共享缓存槽双向命中；直调 sync 版实测 `Cannot run the event loop while another loop is running`——asyncio 禁止同线程嵌套，评审员「嵌套可行」判断被实测推翻，场景⑥走 async 委托）
+- [x] **R1-F5（P3·先例背离）**：P99 采样把 warmup 轮计入延迟池（101 条）与 5.8 先例（warmup 独立循环不计时）相悖且与自身 docstring「100 样本」矛盾——拆分 warmup 独立循环（延迟池恰 100 条对齐 quantiles[98] 口径）；update_call_count == sample_count == 101 双锚保持（验收三处消费零破坏）；L93 docstring「含预填充期」矛盾句修正
+- [x] **R1-F6（P3·注释失实）**：degenerate 防线注释声称「ratio=S/σ₀ ZeroDivisionError 崩溃」——severity 已是乘法比较全文件零除法，论证过时——两处注释更新为真实后果（k=h=0 恒触发误告警风暴）+ 测试名 `test_degenerate_zero_division_defense`→`test_degenerate_defense_blocks_false_alarms`（名携失实论证）
+- [x] **R1-F7（P3·格式）**：event_channels.yaml DriftDetected 条目缺空行（全文件 54 条目唯一例外）——补齐
+- [x] **R1-F8（P3）**：回测 `"fn": 20 - tp` 魔数 → `BACKTEST_SEQUENCE_COUNT // 2 - tp` 常量派生
+- [x] **R1-F9（P3·误读面）**：CONFIRMATION_N/M 与 ISA-18.2「M-of-N」字母习惯相反（本仓 N=次数、M=窗）——常量注释补语序注记（防按 ISA 字母习惯误改）
+- [x] **R1-F10（P3·泄漏）**：`run_synthetic_backtest` 的 `new_event_loop()` 未 close——try/finally 显式关闭
+- [x] **R1-F11（P3·文档）**：451 docstring 补「当前实现零 raise 点（update 状态机 total）——契约预留防御码，降级网/HTTP 映射先行接线，测试经 FakeDriftPort 注入行使；V1 Redis 实现状态检查失败通道即刻可用」注记
+
+**Round 1 回归证据**：5.9 全家 130+1420+21+117 passed（unit/contracts/integration+acceptance 同批/契约邻接）+ mypy 触碰 9 文件零错误 + ruff check/format 全过；集成+验收同轮跑（缓存契约）。
 
 #### 已推迟 Defer
 
-- [ ] （待实施后填写）
+- [x] **R1-DF1**：全仓测试文件抑制注释守卫 tokenize 升格（子串扫描 → AST/tokenize 区分注释与字符串字面量，使守卫可自扫）+ 全仓存量 noqa 债清理（~20 处——conftest/tool_domain_entities/validation_feedback/kubectl/ocr/outbox/token_counter/argocd + test_exception_handlers L1226-1227 合法 N817/N814）——独立卫生任务非本 Story 面（详见 deferred-work.md）
+- [x] **R1 维持项（记录不落码）**：①test_arch_evaluation「六依赖」命名遗留（5.8 资产 + feature 文件契约绑定——改名连带面大）②BDD 步骤文本「六依赖清单」（同上）③组合根工厂 except ConfigurationError 分支无直接测试（3 行镜像已测孪生段）④验收 FakeDriftPort 计数字段验收侧零消费（替身自然接口面，集成侧消费）⑤预热期每样本重算 mean/stdev 冗余（O(30) 无害）⑥AST 验证器 execute 体内注释可满足三子串锚（行为断言兜底，AST 形态升格并入 R1-DF1）⑦组名提取正则不匹配 name= 形态（低风险）⑧σ₀ 与 √(0.3/29) 1ulp 差异文档注记（同式单源无实际影响）⑨agent_id 归因语义（确认样本喂入者非序列主导者——docstring 已知悉）⑩线程不安全知悉（当前纯 async 单循环，V1 线程化时加锁）⑪detection 严格不等式测试名「余量 2.5%」实际锁定语义（S==h bitwise 不可达——名实微偏可接受）
 
 ---
 
@@ -965,10 +980,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-9 状态�
 | v1.3.0 | 2026-10-28 | 文档审查 Round 3（单深度推演）：P1×1（AC-3.2 验收 AsyncMock 违红线→手写 FakeDriftPort）+ P2×2（上漂锚 n≥6 闭式 1ulp 假红形态注记 / V1-EV14 登记无锚）+ P3×2 簇（RNG 调用序/caplog 断言锚/Fake LLM 措辞/severity 乘法实现/第 30 样本统计语义）；12 条证伪留痕 + 时间线 T1-T6 全过 | SM (Claude Code) |
 | v1.3.1 | 2026-10-28 | 文档审查 Round 4 纯验证全过（31 行台账零虚假落地 + 22 组行号锚全精确）+ Round 5 独立终审收敛（五节取证：周期闭合/8 项双向取证/独立快扫无 P0P1/R4 留项清偿/收敛判定）；R5 收敛清偿 P3×4（替身计数口径/OD-3 慢漂移论据/R1-13 位置勘误/免同步命中括注）；收敛声明落入——周期闭环，Status 保持 ready-for-dev | SM (Claude Code) |
 | v2.0.0 | 2026-10-29 | dev-story 实施完成（Task 0-6 全绿）：CUSUMDriftDetector + DriftDetectionPort/DriftAssessment + DriftDetected 事件（reliable 双登记）+ DriftDetectionError 451 + 主链第七依赖漂移块（drift.detected span 兑现 OD-2[5.7]）+ 断言同步 ×5 + AST 验证器 + 集成六场景 + P99<100ms + 合成回测 0.975；14 验收场景全绿；三家存量回归绿（5.3:179/5.7:88/5.8:154）；数学锚全部验算复核（钦定基准独立复现）；Status → review | Dev (Claude Code) |
+| v2.1.0 | 2026-10-29 | 代码审查 Round 1（四视角并行调研[算法暴力搜索+变异实证/主链降级网/事件异常契约/测试质量回测] + 双评审门禁[①优秀+②采纳清单后优秀]）：P0×0 + P1×1（type:ignore 红线根因修复 Any + 守卫 25 文件扩面）+ P2×2（探测方向三态锚杀 M5 变异 / ValidationError catch 改判不落码——5.8 fail-loud 红测试锁定）+ P3 修复 9 项（reason 闭集对齐/场景⑥ async 委托/warmup 先例回归/注释失实 ×2/yaml 空行/fn 派生/语序注记/loop close）；R1-DF1 登记（全仓 noqa 债 + 守卫 tokenize 升格） | CR (Claude Code) |
 
-**故事版本/Story Version:** v2.0.0
+**故事版本/Story Version:** v2.1.0
 **创建日期/Created:** 2026-10-28
-**最后更新/Last Updated:** 2026-10-28
+**最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**
 - v1.0.0: 创建故事文件——CUSUMDriftDetector（双侧累积和 + 预热基线 30 + N中M 3中5 确认 + moderate/severe 分级 + 确认后复位）+ DriftDetected 领域事件（reliable 双登记）+ DriftDetectionError 451 + use case 第七可选依赖主链接入（drift.detected span 填值——OD-2[5.7] 兑现闭环）+ 性能双锚（P99<100ms + 合成回测准确率≥85%）
 - v1.1.0: 文档审查 R1 收敛——P0×6 全清（数学可满足性两处根修 + 断言面 ×5 + 回执耦合防线 + Task 时序重构）+ P1×6（回测定稿/agent_id 维度/N=1 防崩/§3.3.2 三步处方等）+ P2/P3 批量；确认语义升格「当前样本 detection=True」（ISA-18.2 对标）；手算锚全文改 σ₀ 实算同式表达

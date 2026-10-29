@@ -208,6 +208,7 @@ event_channels:
     rabbitmq_routing_key: "sisys.events.reliable.strategic_deviation_warning"
     delivery_mode: "reliable"
     description: "战略偏差警告"
+
   DriftDetected:
     rabbitmq_routing_key: "sisys.events.reliable.drift_detected"
     delivery_mode: "reliable"

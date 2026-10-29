@@ -87,6 +87,8 @@ class TestWarmupBaseline:
             assert assessment.baseline_ready is False, f"样本 {index + 1} 预热期 baseline_ready 应 False"
             assert assessment.is_drifted is False
             assert assessment.sample_count == index + 1
+            # 预热期不累积（Sₕ=Sₗ=0）→ 探测方向恒 none（三态探测契约的 none 档）
+            assert assessment.drift_direction == "none"
 
     def test_warmup_running_statistics(self) -> None:
         """预热统计手算对照（前 i 样本 mean/stdev——逐样本演进）。"""
@@ -176,6 +178,9 @@ class TestNOfMConfirmation:
             assessment = assessments[29 + offset]
             assert assessment.is_drifted is False, f"s{30 + offset} 窗未满不应确认"
             assert assessment.cusum_low > H_MULTIPLIER * sigma0, "detection=True 推导断言（Sₗ 已越线）"
+            # 未确认态方向探测锚（M5 变异锚——_probe_direction 恒 "none" 时红：
+            # 下漂累积中 Sₗ>Sₕ，探测值应为 down——DTO 文档承诺的探测语义）
+            assert assessment.drift_direction == "down", f"s{30 + offset} 未确认态探测方向应 down"
 
     def test_s35_confirms_with_current_sample_true(self) -> None:
         """s35 确认（窗 (F,T,T,T,T) 计数 4≥3 且当前样本 T）。"""
@@ -271,6 +276,8 @@ class TestUpwardDrift:
         assert _up_increment() * 5 < H_MULTIPLIER * _sigma0()
         for n in range(1, 6):
             assert assessments[n - 1].is_drifted is False
+            # 未确认态 up 探测对称锚（Sₕ>Sₗ——探测语义三态完整锁定）
+            assert assessments[n - 1].drift_direction == "up", f"上漂 n={n} 未确认态探测方向应 up"
 
     def test_upward_confirmation_at_s38_moderate(self) -> None:
         """s38 确认 up + moderate（n=6/7 计数不足；s38 区间断言禁闭式精确等式）。"""
@@ -304,10 +311,10 @@ class TestDegenerateBaselineDefense:
         for index, assessment in enumerate(assessments, start=1):
             assert assessment.sample_count == index
 
-    def test_degenerate_zero_division_defense(self) -> None:
-        """防线必要性强于恒触发（确认路径 ratio=S/σ₀ 会 ZeroDivisionError——防线封死该路径）。"""
+    def test_degenerate_defense_blocks_false_alarms(self) -> None:
+        """防线封死 k=h=0 恒触发误告警（乘法 severity 下无除零面——失防后果是告警风暴）。"""
         assessments = _feed(CUSUMDriftDetector(), [0.8] * 30 + [0.4, 0.4, 0.4, 0.4, 0.4])
-        # 连续 5 个偏移样本仍不确认（若防线缺失：detection 恒 True → s35 确认 → ratio 除零崩溃）
+        # 连续 5 个偏移样本仍不确认（若防线缺失：detection 恒 True → s35 起每 5 样本一轮误告警）
         assert all(a.is_drifted is False for a in assessments)
 
 

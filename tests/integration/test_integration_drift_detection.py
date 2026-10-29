@@ -90,10 +90,13 @@ async def sample_drift_p99_perf() -> dict[str, Any]:
 
     单次采样 = 检测器完整 update 调用（预填充至检测态——每采样含双侧计算 + 判定 +
     确认窗更新 + DriftAssessment 构造）；事件发布不在口径内（IO 出栈——见模块
-    docstring 口径声明）。update 调用计数含 warmup 与预填充期。
+    docstring 口径声明）。update 调用计数含 warmup、不含预填充（采样轮口径 ==
+    warmup + 采样数）；warmup 轮不计时（5.8 P95 先例同款——延迟池恰 100 条，
+    quantiles(n=100)[98] exclusive 口径与文档一致）。
 
     Returns:
-        dict[str, Any]: 采样摘要（p99_seconds/update_call_count/sample_count）。
+        dict[str, Any]: 采样摘要（p99_seconds/update_call_count/sample_count——
+        update_call_count == sample_count == warmup + 采样数 101，≠ 延迟池长 100）。
     """
     if "p99" in _PERF_CACHE:
         cached: dict[str, Any] = _PERF_CACHE["p99"]
@@ -106,21 +109,27 @@ async def sample_drift_p99_perf() -> dict[str, Any]:
 
     detector = _make_fresh_detector()
     # 预填充至检测态（30 基线 + 4 漂移——末段检测期：每采样含双侧计算/判定/确认窗更新；
-    # 预填充不计入 update_call_count——采样轮口径 == warmup + 采样数）
+    # 预填充不计时也不计入 update_call_count——采样轮口径 == warmup + 采样数）
     for score in _BASELINE_SEQUENCE + [0.4, 0.4, 0.4, 0.4]:
         await detector.update(score)
 
     update_call_count = 0
+    # warmup 独立循环不计时（5.8 test_integration_agent_evaluation 先例同款——
+    # warmup 轮用 0.4 保持与采样轮奇偶序衔接：采样首轮从 0.6 起）
+    for _ in range(DRIFT_P99_WARMUP_ROUNDS):
+        await detector.update(0.4)
+        update_call_count += 1
+
     latencies: list[float] = []
-    for round_index in range(DRIFT_P99_WARMUP_ROUNDS + DRIFT_P99_SAMPLE_ROUNDS):
-        score = 0.4 if round_index % 2 == 0 else 0.6
+    for round_index in range(DRIFT_P99_SAMPLE_ROUNDS):
+        score = 0.6 if round_index % 2 == 0 else 0.4
         start = time.perf_counter()
         await detector.update(score)
         latencies.append(time.perf_counter() - start)
         update_call_count += 1
 
     summary: dict[str, Any] = {
-        "p99_seconds": statistics.quantiles(latencies, n=100)[98],  # exclusive P99
+        "p99_seconds": statistics.quantiles(latencies, n=100)[98],  # exclusive P99（100 样本池）
         "update_call_count": update_call_count,
         "sample_count": DRIFT_P99_WARMUP_ROUNDS + DRIFT_P99_SAMPLE_ROUNDS,
     }
@@ -177,7 +186,7 @@ async def _run_backtest(sequences: list[tuple[bool, list[float]]]) -> dict[str, 
         "tp": tp,
         "fp": fp,
         "tn": tn,
-        "fn": 20 - tp,
+        "fn": BACKTEST_SEQUENCE_COUNT // 2 - tp,
         "accuracy": (tp + tn) / BACKTEST_SEQUENCE_COUNT,
     }
 
@@ -193,7 +202,31 @@ def run_synthetic_backtest() -> dict[str, Any]:
         cached: dict[str, Any] = _PERF_CACHE["backtest"]
         return cached
     sequences = make_backtest_sequences(BACKTEST_SEED)
-    summary = asyncio.get_event_loop_policy().new_event_loop().run_until_complete(_run_backtest(sequences))
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    try:
+        summary = loop.run_until_complete(_run_backtest(sequences))
+    finally:
+        loop.close()
+    _PERF_CACHE["backtest"] = summary
+    return summary
+
+
+async def sample_synthetic_backtest() -> dict[str, Any]:
+    """回测 async 委托（幂等——与 run_synthetic_backtest() 共享 _PERF_CACHE["backtest"]）。
+
+    async 测试环境专用：sync 版的 run_until_complete 在运行中循环的线程内被
+    asyncio 禁止（Cannot run the event loop while another loop is running），
+    本版本经 await 直跑协程；缓存槽同一——先到者计算、后到者命中（集成场景⑥
+    与验收 AC-5.2 禁双跑契约的双向形态）。
+
+    Returns:
+        dict[str, Any]: 回测摘要（与 run_synthetic_backtest() 同构）。
+    """
+    if "backtest" in _PERF_CACHE:
+        cached: dict[str, Any] = _PERF_CACHE["backtest"]
+        return cached
+    sequences = make_backtest_sequences(BACKTEST_SEED)
+    summary = await _run_backtest(sequences)
     _PERF_CACHE["backtest"] = summary
     return summary
 
@@ -564,7 +597,7 @@ class TestFullChainDriftDetection:
         from src.domain.exceptions import DriftDetectionError
 
         caplog.set_level(logging.WARNING, logger="src.application.use_cases.run_agent_workflow")
-        injected = DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        injected = DriftDetectionError(metric_name="overall_score", reason="invalid_state")
         fake_drift = _FakeDriftPort(update_error=injected)
         use_case, agent, exporter, _ = await _assemble_chain(drift_detector=fake_drift)
 
@@ -614,8 +647,12 @@ class TestDriftDetectionPerformance:
 
     @pytest.mark.benchmark
     async def test_synthetic_backtest_accuracy(self) -> None:
-        """场景⑥：合成回测 (TP+TN)/40 ≥ 0.85（钦定种子基准 TP=20/FP=1/acc=0.975）。"""
-        summary = await _run_backtest(make_backtest_sequences(BACKTEST_SEED))
+        """场景⑥：合成回测 (TP+TN)/40 ≥ 0.85（钦定种子基准 TP=20/FP=1/acc=0.975）。
+
+        走 sample_synthetic_backtest() async 缓存委托（与场景⑤/验收 AC-5.2
+        同批共享 _PERF_CACHE["backtest"]——禁双跑）。
+        """
+        summary = await sample_synthetic_backtest()
         tp, fp, tn = summary["tp"], summary["fp"], summary["tn"]
         assert summary["accuracy"] >= BACKTEST_ACCURACY_THRESHOLD, (
             f"合成回测准确率应 ≥{BACKTEST_ACCURACY_THRESHOLD}（实际 {summary['accuracy']}——"

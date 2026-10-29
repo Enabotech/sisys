@@ -260,15 +260,39 @@ class TestArchNoSuppressionComments:
     @pytest.mark.parametrize(
         "relative",
         [
+            # src 触碰面（9 件）
             "src/application/ports/agent_drift.py",
+            "src/application/ports/__init__.py",
             "src/application/use_cases/run_agent_workflow.py",
             "src/domain/events/drift_events.py",
+            "src/domain/events/__init__.py",
             "src/domain/exceptions/evaluation_exceptions.py",
             "src/domain/exceptions/_code_ranges.py",
             "src/domain/exceptions/__init__.py",
             "src/infrastructure/monitoring/cusum_detector.py",
             "src/infrastructure/messaging/channel_router.py",
             "src/composition_root.py",
+            "src/interfaces/api/exception_handlers.py",
+            # 测试交付面（本 Story 新建 8 件 + 存量触碰 5 件——R1 代码审查扩充：
+            # 测试文件的抑制注释盲区是 type:ignore 漏网根因）
+            "tests/unit/domain/events/test_drift_events.py",
+            "tests/unit/application/test_agent_drift_model.py",
+            "tests/unit/infrastructure/monitoring/test_cusum_drift_detector.py",
+            "tests/unit/application/use_cases/test_run_agent_workflow.py",
+            "tests/unit/domain/exceptions/test_evaluation_exceptions.py",
+            "tests/unit/architecture/test_arch_phoenix_tracer.py",
+            "tests/contracts/test_port_contract_agent_drift.py",
+            "tests/contracts/test_event_contract_drift_events.py",
+            "tests/contracts/test_event_channel_mapping_drift.py",
+            "tests/integration/test_integration_drift_detection.py",
+            "tests/acceptance/test_acceptance_drift_detection.py",
+            "tests/acceptance/test_acceptance_phoenix_tracer.py",
+            "tests/acceptance/test_acceptance_agent_evaluation.py",
+            # 排除（勿「补全」）：本文件与 test_arch_evaluation.py 自身源码含
+            # 抑制注释字符串字面量（断言目标——子串扫描自毙）；
+            # tests/unit/interfaces/api/test_exception_handlers.py 含存量合法
+            # noqa: N817/N814（ruff import 别名豁免债——非本 Story 面，随
+            # 全仓 noqa 债清理任务处置，见 deferred-work）
         ],
     )
     def test_no_suppression_comments(self, relative: str) -> None:

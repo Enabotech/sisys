@@ -850,7 +850,7 @@ class TestExecuteDriftBlock:
         from src.application.ports.agent_drift import DriftDetectionPort
 
         fake_drift = AsyncMock(spec=DriftDetectionPort)
-        injected_error = DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        injected_error = DriftDetectionError(metric_name="overall_score", reason="invalid_state")
         fake_drift.update.side_effect = injected_error
         eval_result = TestExecuteEvaluationBlock._make_eval_result()
         fake_harness = self._make_fake_harness(return_value=eval_result)

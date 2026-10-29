@@ -130,10 +130,10 @@ class TestDriftDetectionErrorConstruction:
 
     def test_context_carries_three_keys(self) -> None:
         """context 三键（metric_name/phase/reason）——漂移检测的定位维度。"""
-        error = DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        error = DriftDetectionError(metric_name="overall_score", reason="invalid_state")
         assert error.context["metric_name"] == "overall_score"
         assert error.context["phase"] == "drift_detection"
-        assert error.context["reason"] == "drift_update"
+        assert error.context["reason"] == "invalid_state"
 
     def test_metric_name_defaults_to_overall_score(self) -> None:
         """metric_name 默认 overall_score（检测器绑定常量同值）。"""

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+from typing import Any
 
 import pytest
 
@@ -19,9 +20,9 @@ from src.domain.events.base import DomainEvent
 from src.domain.events.drift_events import DriftDetected
 
 
-def _make_event(**overrides: object) -> DriftDetected:
+def _make_event(**overrides: Any) -> DriftDetected:
     """构造样本事件（合法必填字段基线 + 覆盖注入）。"""
-    kwargs: dict[str, object] = {
+    kwargs: dict[str, Any] = {
         "metric_name": "overall_score",
         "drift_direction": "down",
         "drift_level": "severe",
@@ -33,7 +34,7 @@ def _make_event(**overrides: object) -> DriftDetected:
         "sample_count": 35,
     }
     kwargs.update(overrides)
-    return DriftDetected(**kwargs)  # type: ignore[arg-type]
+    return DriftDetected(**kwargs)
 
 
 class TestDriftDetectedConstruction:

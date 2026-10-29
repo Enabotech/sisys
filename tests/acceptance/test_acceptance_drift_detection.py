@@ -1108,7 +1108,7 @@ def given_degradation_chain_assembled(context: dict[str, Any]) -> None:
     from src.domain.exceptions import DriftDetectionError
 
     context["fake_drift_port"] = _FakeDriftPort(
-        update_error=DriftDetectionError(metric_name="overall_score", reason="drift_update")
+        update_error=DriftDetectionError(metric_name="overall_score", reason="invalid_state")
     )
     _assemble_drift_workflow_chain(context, drift_detector=context["fake_drift_port"])
 

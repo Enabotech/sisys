@@ -87,7 +87,10 @@ class DriftDetectionError(SystemException):
 
     触发场景：
         - 检测管线状态异常防御面（update 双侧累积/确认窗状态机不可达态——
-          理论不可达的防御层，主链可用性优先于漂移检测完整性）；
+          理论不可达的防御层，主链可用性优先于漂移检测完整性。R1 代码审查
+          注记：当前实现 update 状态机 total、全仓零 raise 点——本码属契约
+          预留防御码，降级网/HTTP 映射先行接线，测试经 FakeDriftPort 注入
+          行使；V1 Redis 持久化实现的状态检查失败通道即刻可用）；
         - degenerate 基线外的管线级异常路径（σ₀ 退化是数据形态降级非管线
           错误——恒走 detection=False 可观测降级，不抛本异常）。
 
@@ -124,7 +127,7 @@ class DriftDetectionError(SystemException):
             phase: 失败环节名（漂移检测管线恒为 "drift_detection"——与 450 的
                 "evaluation" 区分，降级网诊断锚）。
             reason: 面向调用方可理解的失败环节摘要（invalid_state/
-                degenerate_baseline 等）。
+                degenerate_baseline——与 Attributes 行同闭集）。
             message: 覆盖默认消息（可选）。
             cause: 原始异常（可选，用于异常链）。
             context_extra: 额外诊断键（合并进 context，值域 str）。
