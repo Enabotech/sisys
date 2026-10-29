@@ -1,23 +1,27 @@
-"""评估子域异常（evaluation，450-459）——Story 5.8 Agent 输出质量评估 + Story 5.9 漂移检测。
+"""评估子域异常（evaluation，450-459）——Story 5.8 Agent 输出质量评估 + Story 5.9 漂移检测 + Story 5.10 评估历史持久化。
 
 子域范围：Agent 输出质量评估管线（EvaluationHarness：幻觉检测 LLM 调用 +
 证据支撑度计算 + 置信度校准 + overall 加权；评估模型 UDMR in-band 路由解析）+
 CUSUM 漂移检测管线（CUSUMDriftDetector：双侧累积和 + N中M 确认 + DriftDetected
-事件发布）。评估与漂移检测均为 Agent 可观测族的可观测附加面——失败经 use case
-评估块降级 catch（warning 跳过不阻断工作流主链），450/451 与评估路径透传的
-LLMConfigError（332——现实可达源是运行期 env 半配置态，CR1-F1）是三层降级网
-捕获面；主链六阶段的 332 显性失败语义不受影响。
+事件发布）+ 评估历史持久化管线（EvaluationCheckpointRecorder：累积→打包→
+save 委托→restore 恢复式解包）。评估/漂移检测/历史持久化均为 Agent 可观测族的
+可观测附加面——评估与漂移失败经 use case 评估块共享降级 catch（warning 跳过
+不阻断工作流主链），历史持久化失败经 record 块专属内层 catch 独立降级（452
+不进共享 catch 元组——两附加面互不牵连）；450/451/452 与评估路径透传的
+LLMConfigError（332——现实可达源是运行期 env 半配置态，CR1-F1）分属三层
+降级网与内层独立降级网捕获面；主链六阶段的 332 显性失败语义不受影响。
 
 编码段：450-459（evaluation 子域新开——agent 段 440-449 已满后的四代开段先例：
 data_source 410/debate 420/tool_version 430/agent 440 后第五段；451 是预留段
-首个取用——_code_ranges 段注释钦定「5.9 漂移检测/5.10 评估历史如需新码在此段取」）。
+首个取用——_code_ranges 段注释钦定「5.9 漂移检测/5.10 评估历史如需新码在此段取」；
+452 是 452-459 预留段首个取用——5.10 评估历史）。
 """
 
 from __future__ import annotations
 
 from src.domain.exceptions.system_exceptions import SystemException
 
-__all__ = ["AgentEvaluationError", "DriftDetectionError"]
+__all__ = ["AgentEvaluationError", "DriftDetectionError", "EvaluationHistoryError"]
 
 
 class AgentEvaluationError(SystemException):
@@ -134,6 +138,70 @@ class DriftDetectionError(SystemException):
         """
         context: dict[str, str] = {
             "metric_name": metric_name,
+            "phase": phase,
+            "reason": reason,
+        }
+        if context_extra:
+            context.update(context_extra)
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class EvaluationHistoryError(SystemException):
+    """评估历史持久化管线执行失败（Story 5.10 — FR-EV-04 持久化面）
+
+    触发场景：
+        - record 时存储 save 失败（SnapshotRepositoryProtocol.save 抛
+          StorageError 的链路透传包装——Redis 故障在存储面即 103，Recorder
+          捕获后包装本码携 cause 链上抛）；
+        - restore 时快照结构不完整（state_data 缺 evaluation_history/
+          hallucination_trend/confidence_accuracy_trend/agent_id 任一键或
+          类型不符——反序列化 fail-loud 防御面，正常路径快照由本管线产出
+          必含四键）；
+        - 打包时序列化域违规（不可序列化值——防御性，正常路径 DTO 域守卫
+          已在构造期拦截）。
+
+    独立降级网语义（区别于 450/451 的共享 catch 面）：use case 评估块内
+    record 块专属内层 ``except EvaluationHistoryError`` 捕获（三键 span 写入
+    后、漂移块之前）——record 失败不得阻断漂移检测、漂移失败不得丢评估历史，
+    两独立可观测附加面互不牵连；共享 catch 三元组（450/332/451）零改动。
+
+    Attributes:
+        code: EXCEPTION_452（452-459 预留段首个取用）
+        message: 默认消息（静态文案——str(本异常) 恒等于 message，cause 动态
+            文案只进 to_dict 不进 str，主链 warning 文本断言锚）
+        context: 领域上下文（agent_id/phase/reason——reason 取值 save_failed/
+            missing_keys/type_mismatch/serialize 标识失败环节；phase 取值
+            record/restore/serialize/deserialize）
+    """
+
+    code = "EXCEPTION_452"
+    message = "评估历史持久化失败"
+
+    def __init__(
+        self,
+        agent_id: str = "",
+        phase: str = "record",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """初始化评估历史持久化管线异常
+
+        Args:
+            agent_id: 评估历史归属的 Agent 标识（record 主链路径恒可得——
+                execute 形参透传）。
+            phase: 失败环节名（record/restore/serialize/deserialize——
+                record 是累积+打包+save 原子主路径）。
+            reason: 面向调用方可理解的失败环节摘要（save_failed/missing_keys/
+                type_mismatch/serialize 之一）。
+            message: 覆盖默认消息（可选）。
+            cause: 原始异常（可选，用于异常链——StorageError 包装链锚）。
+            context_extra: 额外诊断键（如 session_id/记录数——合并进
+                context，值域 str）。
+        """
+        context: dict[str, str] = {
+            "agent_id": agent_id,
             "phase": phase,
             "reason": reason,
         }

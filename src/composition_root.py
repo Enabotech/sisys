@@ -3059,6 +3059,36 @@ def bootstrap() -> None:
         tags=("agent", "drift", "observability"),
     )
 
+    # === Story 5.10 — CheckpointWithEvaluation 集成（评估历史存入 Checkpoint）===
+    # SINGLETON（DC-7 有状态单例——状态即功能：跨 run 评估历史累积必须跨 execute
+    # 调用存活，5.9 检测器同款论证）。注入的 snapshot_repository 是 SCOPED 注册，
+    # 但 lambda 在本 SINGLETON 端口首次 resolve 时执行一次并固定实例——
+    # RedisSnapshotStore 无状态（委托 adapter，连接由 adapter 持有）固定实例安全。
+    # use case 第八依赖注入（resolve_optional 可选接线）归 Task 3 与第八构造参数
+    # 同窗落地——本区段仅端口注册（R1-F1 时序约束：第八参数不存在时注入 kwarg
+    # 必 TypeError）。Recorder lambda 无 env 依赖（MAX_HISTORY_SIZE 是代码常量
+    # 单源，.env.example 零改动）。MVP 单进程前提（多 worker 累积器分叉 +
+    # Redis latest 覆盖写最后写者胜——Recorder docstring 注记，per-agent 键控
+    # 是 V1 多进程面）。
+    register_port(
+        name="agent_checkpoint",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.ports.agent_checkpoint",
+            fromlist=["AgentCheckpointPort"],
+        ).AgentCheckpointPort,
+        impl=lambda resolver: __import__(
+            "src.application.services.evaluation_checkpoint_recorder",
+            fromlist=["EvaluationCheckpointRecorder"],
+        ).EvaluationCheckpointRecorder(
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+        ),
+        module="src.application.services.evaluation_checkpoint_recorder",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "checkpoint", "observability"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
@@ -3135,6 +3165,15 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
     except ConfigurationError as error:
         logger.warning("漂移检测接线降级跳过（agent_drift 构造失败——漂移检测面损失不阻断主链）: %s", error)
         drift_detector = None
+    # Story 5.10 — 第八依赖同款降级防护（agent_checkpoint resolve_optional 可选
+    # 接线：Recorder 构造失败 → None 不阻断 bootstrap；CR1-DF2[5.8] 家族延续——
+    # 降级路径测试覆盖经 5-10 验收 AC-4.1 承载。同窗纪律（R1-F1）：本注入与第八
+    # 构造参数 + record 块三者同一 Task 落地（参数不存在窗口注入 kwarg 必 TypeError）
+    try:
+        checkpoint_recorder = resolver.resolve_optional("agent_checkpoint")
+    except ConfigurationError as error:
+        logger.warning("评估历史接线降级跳过（agent_checkpoint 构造失败——持久化面损失不阻断主链）: %s", error)
+        checkpoint_recorder = None
     return use_case_cls(
         agent_repository=resolver.resolve("agent_repository"),
         agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
@@ -3143,6 +3182,7 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
         isolation_guard=resolver.resolve("isolation_guard_service"),
         evaluation_harness=evaluation_harness,
         drift_detector=drift_detector,
+        checkpoint_recorder=checkpoint_recorder,
     )
 
 

@@ -75,6 +75,7 @@ from src.domain.exceptions.entity_extraction_exceptions import EntityExtractionE
 from src.domain.exceptions.evaluation_exceptions import (
     AgentEvaluationError,
     DriftDetectionError,
+    EvaluationHistoryError,
 )
 from src.domain.exceptions.event_exceptions import EventPublishError, VersionError
 from src.domain.exceptions.external_exceptions import (
@@ -314,9 +315,10 @@ __all__ = [
     "IsolationStateNotInitializedError",
     "IsolationAccessViolationError",
     "IsolationOperationForbiddenError",
-    # 评估子域异常（Story 5.8 + Story 5.9 漂移检测）
+    # 评估子域异常（Story 5.8 + Story 5.9 漂移检测 + Story 5.10 评估历史持久化）
     "AgentEvaluationError",
     "DriftDetectionError",
+    "EvaluationHistoryError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

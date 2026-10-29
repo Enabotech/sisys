@@ -5,6 +5,11 @@
 - 定义应用层特定方法
 """
 
+from src.application.ports.agent_checkpoint import (
+    AgentCheckpointPort,
+    CheckpointWithEvaluation,
+    EvaluationCheckpoint,
+)
 from src.application.ports.agent_drift import (
     DriftAssessment,
     DriftDetectionPort,
@@ -35,13 +40,16 @@ from src.application.ports.session_cache_port import SessionCachePort
 from src.application.ports.text_extractor_service import TextExtractorService
 
 __all__ = [
+    "AgentCheckpointPort",
     "AgentEvaluationPort",
     "AgentTracingPort",
+    "CheckpointWithEvaluation",
     "CompressorService",
     "DocumentStoragePort",
     "DriftAssessment",
     "DriftDetectionPort",
     "EventSubscriber",
+    "EvaluationCheckpoint",
     "EvaluationModelResolverPort",
     "EvaluationResult",
     "ExceptionMetricsPort",

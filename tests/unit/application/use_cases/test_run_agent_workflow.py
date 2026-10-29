@@ -691,6 +691,7 @@ class TestExecuteEvaluationBlock:
             "isolation_guard",
             "evaluation_harness",
             "drift_detector",
+            "checkpoint_recorder",
         ]
         default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["evaluation_harness"].default
         assert default is None
@@ -921,6 +922,7 @@ class TestExecuteDriftBlock:
             "isolation_guard",
             "evaluation_harness",
             "drift_detector",
+            "checkpoint_recorder",
         ]
         default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["drift_detector"].default
         assert default is None
@@ -940,3 +942,235 @@ class TestExecuteDriftBlock:
             evaluation_harness=None,
         )
         assert getattr(use_case, "_drift_detector", "missing") is None
+
+
+class TestExecuteCheckpointBlock:
+    """Story 5.10 — execute 评估块内 record 块：predicted 持久化 + 452 独立降级网。
+
+    位序钦定（DC-3）：三键 span 写入后、漂移块之前（同一 try 体内——
+    evaluation_result 存活域）；独立内层 ``except EvaluationHistoryError``
+    （record 失败不阻漂移、漂移失败不丢记录——两独立可观测附加面互不牵连）；
+    共享 catch 三元组（450/332/451）零改动。
+
+    测试通道：TestExecuteDriftBlock 同款 function-scope autouse OTel 通道；真实
+    Recorder + AsyncMock(spec=SnapshotRepositoryProtocol) 存储替身（unit 层合法——
+    452 降级走完整真实包装路径）。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _tracing_global_channel(self) -> Any:
+        """装饰器链路测试通道（注入 provider 经 initialize——5-7/5-8/5-9 同款）。"""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from src.infrastructure.config.phoenix import PhoenixConfig
+        from src.infrastructure.monitoring.phoenix_tracer import PhoenixTracer
+
+        PhoenixTracer.reset_for_testing()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = PhoenixTracer(
+            config=PhoenixConfig(enabled=True, project_name="sisys-agent", sampling_ratio=1.0),
+            tracer_provider=provider,
+        )
+        assert tracer.initialize() is True
+        self._exporter = exporter
+        yield exporter
+        PhoenixTracer.reset_for_testing()
+
+    def _assemble_with_checkpoint(
+        self,
+        checkpoint_recorder: Any = None,
+        drift_detector: Any = None,
+        evaluation_harness: Any = None,
+    ) -> tuple[Any, dict[str, Any]]:
+        """装配链（TestExecuteDriftBlock 同款 + 第八依赖注入）。"""
+        from types import SimpleNamespace
+
+        mocks = _make_mocks()
+        agent = mocks["repository"].get_by_id.return_value
+        profile_result = SimpleNamespace(
+            agent_id=agent.agent_id,
+            role=AgentRole.CEO,
+            profile=Mock(),
+            tools_l1=(Mock(), Mock(), Mock()),
+            startup_context_tokens=4321,
+        )
+        mocks["profile_use_case"].execute.return_value = profile_result
+        _wire_engine_success(mocks)
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        use_case = RunAgentWorkflowUseCase(
+            agent_repository=mocks["repository"],
+            agent_profile_use_case=mocks["profile_use_case"],
+            agent_engine=mocks["agent_engine"],
+            agent_workflow_service=mocks["workflow_service"],
+            isolation_guard=mocks["isolation_guard"],
+            evaluation_harness=evaluation_harness,
+            drift_detector=drift_detector,
+            checkpoint_recorder=checkpoint_recorder,
+        )
+        return use_case, {"agent": agent, "profile_result": profile_result, "mocks": mocks}
+
+    @staticmethod
+    def _make_real_recorder(storage: Any = None) -> tuple[Any, Any]:
+        """真实 Recorder + AsyncMock 存储替身（452 走完整真实包装路径）。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.services.evaluation_checkpoint_recorder import EvaluationCheckpointRecorder
+        from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
+
+        repo = storage if storage is not None else AsyncMock(spec=SnapshotRepositoryProtocol)
+        repo.load.return_value = None
+        recorder = EvaluationCheckpointRecorder(snapshot_repository=repo)
+        return recorder, repo
+
+    @staticmethod
+    async def _make_prefilled_detector() -> Any:
+        """真实检测器 + 预填充 34 样本（drift 确认态——「漂移块仍执行」断言锚）。"""
+        from src.infrastructure.monitoring.cusum_detector import CUSUMDriftDetector
+
+        detector = CUSUMDriftDetector(event_publisher=None)
+        baseline = [0.7, 0.9] * 15
+        for score in baseline + [0.4, 0.4, 0.4, 0.4]:
+            await detector.update(score)
+        return detector
+
+    async def test_record_block_executes_with_predicted(self) -> None:
+        """①record 执行：save 委托一次 + predicted == evidence.confidence + 命名空间锚。"""
+        recorder, repo = self._make_real_recorder()
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = TestExecuteDriftBlock._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_checkpoint(checkpoint_recorder=recorder, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "record 块与返回值零耦合"
+        repo.save.assert_awaited_once()
+        snapshot = repo.save.await_args.args[0]
+        assert snapshot.session_id == f"agent-evaluation-{agent.agent_id}", "命名空间锚（DC-6）"
+        assert snapshot.stage_id == "evaluation"
+        last_record = snapshot.state_data["evaluation_history"][-1]
+        assert last_record["predicted_confidence"] == result.evidence.confidence, (
+            "predicted 从 result.evidence.confidence 直传（V1-EV3 兑现锚——0.85）"
+        )
+        assert last_record["hallucination_score"] == eval_result.hallucination_score
+
+    async def test_record_failure_degrades_independently(self, caplog: pytest.LogCaptureFixture) -> None:
+        """②452 独立降级：save 抛 StorageError → 主链正常 + eval 三键仍在 + 漂移块仍执行 + WARNING。"""
+        import logging
+        from unittest.mock import AsyncMock
+
+        from src.domain.exceptions import StorageError
+        from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
+
+        caplog.set_level(logging.WARNING, logger="src.application.use_cases.run_agent_workflow")
+
+        storage = AsyncMock(spec=SnapshotRepositoryProtocol)
+        storage.save.side_effect = StorageError(message="Failed to save snapshot: 注入故障")
+        recorder, _ = self._make_real_recorder(storage)
+        detector = await self._make_prefilled_detector()
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = TestExecuteDriftBlock._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_checkpoint(
+            checkpoint_recorder=recorder, drift_detector=detector, evaluation_harness=fake_harness
+        )
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "452 应降级不阻断主链（独立降级网）"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert attributes["eval.hallucination_score"] == eval_result.hallucination_score, "三键仍在（record 前已写）"
+        assert attributes["drift.detected"] is True, "漂移块仍执行（record 失败不阻漂移——独立降级网锚）"
+        warning_texts = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("评估历史持久化失败" in text for text in warning_texts), (
+            f"WARNING 应含 452 静态 message（实际 {warning_texts}）"
+        )
+        assert not any("注入故障" in text for text in warning_texts), "注入 StorageError 动态文案不进 warning（str≡message）"
+
+    async def test_drift_failure_keeps_recorded_history(self) -> None:
+        """③漂移失败联动：drift 抛 451 → record 已完成（save 非零）+ 主链正常。"""
+        from unittest.mock import AsyncMock
+
+        from src.application.ports.agent_drift import DriftDetectionPort
+        from src.domain.exceptions import DriftDetectionError
+
+        fake_drift = AsyncMock(spec=DriftDetectionPort)
+        fake_drift.update.side_effect = DriftDetectionError(metric_name="overall_score", reason="invalid_state")
+        recorder, repo = self._make_real_recorder()
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = TestExecuteDriftBlock._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_checkpoint(
+            checkpoint_recorder=recorder, drift_detector=fake_drift, evaluation_harness=fake_harness
+        )
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed", "451 降级不阻断主链（共享 catch）"
+        assert repo.save.await_count == 1, "漂移失败时 record 应已完成（record 在漂移块前——不丢评估历史）"
+
+    async def test_evaluation_failure_skips_record_block(self) -> None:
+        """④评估降级联动：evaluate 抛 450 → record 零调用（save 零 await）。"""
+        from src.domain.exceptions import AgentEvaluationError
+
+        recorder, repo = self._make_real_recorder()
+        fake_harness = TestExecuteDriftBlock._make_fake_harness(raises=AgentEvaluationError(reason="llm_call"))
+        use_case, materials = self._assemble_with_checkpoint(checkpoint_recorder=recorder, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed"
+        assert repo.save.await_count == 0, "evaluate 失败时 record 块不执行（同一 try 体内控制流跳外层 catch）"
+
+    async def test_none_recorder_baseline_unchanged(self) -> None:
+        """⑤None 默认：七参构造行为与 5.9 基线一致 + record 块零执行。"""
+        eval_result = TestExecuteEvaluationBlock._make_eval_result()
+        fake_harness = TestExecuteDriftBlock._make_fake_harness(return_value=eval_result)
+        use_case, materials = self._assemble_with_checkpoint(checkpoint_recorder=None, evaluation_harness=fake_harness)
+        agent = materials["agent"]
+
+        result = await use_case.execute(agent_id=agent.agent_id, task="分析任务")
+
+        assert result.workflow_status == "completed"
+        assert getattr(use_case, "_checkpoint_recorder", "missing") is None, "七参构造 _checkpoint_recorder 应为 None"
+        roots = [s for s in self._exporter.get_finished_spans() if s.name == "agent_execution"]
+        attributes = roots[0].attributes
+        assert attributes is not None, "根 span 应有属性集（mypy narrowing——5-7 同款）"
+        assert attributes["eval.hallucination_score"] == eval_result.hallucination_score, "5.9 基线行为一致"
+
+    async def test_constructor_eighth_param_default_none(self) -> None:
+        """⑥八依赖签名 + 默认 None + 共享 catch 三元组不变（inspect + 源码文本锚）。"""
+        import inspect
+        from pathlib import Path
+
+        from src.application.use_cases.run_agent_workflow import RunAgentWorkflowUseCase
+
+        params = list(inspect.signature(RunAgentWorkflowUseCase.__init__).parameters)[1:]
+        assert params == [
+            "agent_repository",
+            "agent_profile_use_case",
+            "agent_engine",
+            "agent_workflow_service",
+            "isolation_guard",
+            "evaluation_harness",
+            "drift_detector",
+            "checkpoint_recorder",
+        ]
+        default = inspect.signature(RunAgentWorkflowUseCase.__init__).parameters["checkpoint_recorder"].default
+        assert default is None
+
+        use_case_source = (Path.cwd() / "src" / "application" / "use_cases" / "run_agent_workflow.py").read_text(
+            encoding="utf-8"
+        )
+        assert "except (AgentEvaluationError, LLMConfigError, DriftDetectionError)" in use_case_source, (
+            "外层共享 catch 三元组应零改动"
+        )
+        assert "except EvaluationHistoryError" in use_case_source, "record 块应有内层 452 独立 catch"

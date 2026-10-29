@@ -1763,6 +1763,34 @@ class CheckpointWithEvaluation:
 > 实测：检测管线 P99 μs 级（<100ms 门）、合成回测准确率 0.975（钦定种子 40
 > 序列——真实历史回测 V2-EV1 数据积累后）。
 
+> **Story 5.10 实现注记（CheckpointWithEvaluation 集成——本节伪码的落地裁定）**：
+> 伪码 `CheckpointWithEvaluation`/`to_checkpoint_snapshot` 已由 Story 5.10 交付，
+> 落地形态经 OD-2/OD-3/OD-4/OD-7 四项裁定映射（详见 5-10 故事文件偏离声明节）：
+> **OD-2 依赖倒置**：规划前置「依赖 Epic 6 Story 6.3」不成立——CheckpointSnapshot
+> 实体 + SnapshotRepositoryProtocol + RedisSnapshotStore 基建已由 1-14a/1-15 交付，
+> 5.10 是评估数据扩展面非 Checkpoint 机制创建面；6.3 BLM 面（持久化笔记/压缩/
+> Replay-Override）届时在评估快照层之上叠加（正交扩展）。**OD-3 state_data 承载**：
+> 三评估序列经 `state_data` 四键承载（evaluation_history/hallucination_trend/
+> confidence_accuracy_trend/agent_id）不扩实体字段——frozen 实体兼容 + 序列化零改动
+> + 6.3 无冲突复用；结构化类型安全由应用层 frozen 聚合 DTO 承担（from_snapshot
+> 取回类型化聚合）。**OD-4 趋势自持**：伪码 `cusum_detector.get_trend()` 不实现——
+> 检测器窗口是算法态非历史源（基线窗冻结/确认窗滚动都不是完整序列）；趋势序列由
+> Recorder 自持累积（每次 record 从 EvaluationResult 逐次追加），检测器零改动。
+> **OD-7 端口原子形态**：`AgentCheckpointPort.record(agent_id, evaluation_result,
+> predicted) -> CheckpointSnapshot` 单方法原子完成「累积→打包→save」（两方法形态
+> 的中间态无消费语义）+ `restore(session_id)` 恢复式语义（load → 解包 → 灌回三
+> deque + state_version 计数器续接——非只读查询）；聚合数据类保留设计命名（frozen
+> DTO + 纯转换），有状态累积归 `EvaluationCheckpointRecorder`（SINGLETON——跨 run
+> 累积）。另：CHECKPOINTED 第六态评估结论 = 不引入（5-1 偏离声明 D-1 的评估义务
+> 兑现——评估快照是可观测附加面非执行中断恢复面，无状态转换可达路径；锚位随 6.3
+> 再评估）；CheckpointReached 事件不发布（BLM 审批语义 vs 可观测附加面语义分立——
+> 6.3 落地时获得真实发布点）；窗口上限 MAX_HISTORY_SIZE=100（deque maxlen 滚动——
+> Redis latest 覆盖写下防快照体积线性膨胀）；predicted=evidence.confidence 随快照
+> 持久化（V1-EV3 兑现——只存 EvaluationResult 会丢 predicted）；主链第八可选依赖
+> 纯附加接入（record 块内嵌评估块、三键后漂移前、452 独立内层降级网——共享 catch
+> 三元组零改动）。性能双锚实测：满窗（100 条）快照创建 P95 ~1ms（<100ms 门）、
+> 评估历史查询 P95 ~1ms（<50ms 门——本地 Redis 口径）。
+
 ---
 
 ### 17.4 战略规划架构设计

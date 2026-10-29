@@ -130,16 +130,18 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 不支持的隔离取值/隔离状态资源缺失/跨主体越权/等级策略禁止操作），物理段独立（遵循独立段先例）
     # agent 段 440-449 至此全分配（Story 5.5 预留位核销）
     "agent": (440, 449),
-    # 评估子域（450-459）—— Story 5.8 注册 1 个 + Story 5.9 取用 1 个（agent 段
-    # 440-449 已满后四代开段先例第五段：data_source 410/debate 420/tool_version
+    # 评估子域（450-459）—— Story 5.8 注册 1 个 + Story 5.9 取用 1 个 + Story 5.10 取用 1 个
+    # （agent 段 440-449 已满后四代开段先例第五段：data_source 410/debate 420/tool_version
     # 430/agent 440 同款「前段满/语义独立 → 开独立段」）:
     # EXCEPTION_450 AgentEvaluationError (Story 5.8, 评估管线执行失败——幻觉检测
     #   LLM 调用包装/Schema 实例守卫/评估模型路由匹配失败收敛面)
     # EXCEPTION_451 DriftDetectionError (Story 5.9, CUSUM 漂移检测管线执行失败——
-    #   检测状态机异常防御面；三层降级网第三层 450/332/451；452-459 预留
-    #   后续评估域异常——5.10 评估历史如需新码在此段取)
-    # 450/451 语义归属 system（SystemException 子类——评估与漂移检测均系统侧
-    # 可观测行为，AgentWorkflowError[444] 同族论证「工作流执行属系统侧行为」）
+    #   检测状态机异常防御面；三层降级网第三层 450/332/451)
+    # EXCEPTION_452 EvaluationHistoryError (Story 5.10, 评估历史持久化管线执行失败——
+    #   record save 失败/restore 结构不完整防御面；record 块专属内层独立降级网
+    #   不进共享 catch 三元组；453-459 预留后续评估域异常)
+    # 450/451/452 语义归属 system（SystemException 子类——评估/漂移检测/历史持久化
+    # 均系统侧可观测行为，AgentWorkflowError[444] 同族论证「工作流执行属系统侧行为」）
     "evaluation": (450, 459),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -304,9 +306,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "IsolationStateNotInitializedError": "agent",
     "IsolationAccessViolationError": "agent",
     "IsolationOperationForbiddenError": "agent",
-    # evaluation_exceptions.py (Story 5.8 新增 1 个 + Story 5.9 追加 1 个异常)
+    # evaluation_exceptions.py (Story 5.8 新增 1 个 + Story 5.9 追加 1 个 + Story 5.10 追加 1 个异常)
     "AgentEvaluationError": "evaluation",
     "DriftDetectionError": "evaluation",
+    "EvaluationHistoryError": "evaluation",
 }
 
 

@@ -106,6 +106,7 @@ _USE_CASE_INIT_PARAMS = [
     "isolation_guard",
     "evaluation_harness",  # Story 5.8 第六可选依赖（None 默认——资产同步②）
     "drift_detector",  # Story 5.9 第七可选依赖（None 默认——资产同步②尾部追加）
+    "checkpoint_recorder",  # Story 5.10 第八可选依赖（None 默认——资产同步②尾部追加）
 ]
 
 #: 六阶段方法名（验证器 C——package_evidence 方法名 + span 名末段 package 的

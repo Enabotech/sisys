@@ -46,7 +46,7 @@ _ALLOWED_THIRD_PARTY = {"opentelemetry"}
 #: Story 5.9 业务符号（验证器 B 词边界扫描——services 域零触碰红线）
 _STORY59_BUSINESS_SYMBOLS = ("CUSUMDriftDetector", "DriftDetectionPort", "DriftAssessment")
 
-#: 验证器 C 七依赖签名基线（use case 构造签名——5-8 六依赖 + 5-9 第七可选依赖）
+#: 验证器 C 八依赖签名基线（use case 构造签名——5-8 六依赖 + 5-9 第七 + 5-10 第八可选依赖）
 _USE_CASE_INIT_PARAMS = [
     "agent_repository",
     "agent_profile_use_case",
@@ -55,6 +55,7 @@ _USE_CASE_INIT_PARAMS = [
     "isolation_guard",
     "evaluation_harness",
     "drift_detector",
+    "checkpoint_recorder",
 ]
 
 

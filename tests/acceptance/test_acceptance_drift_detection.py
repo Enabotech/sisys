@@ -1205,8 +1205,9 @@ def then_seven_dependency_signature(context: dict[str, Any]) -> None:
         "isolation_guard",
         "evaluation_harness",
         "drift_detector",
+        "checkpoint_recorder",
     ]
-    assert context["signature_params"] == expected, f"构造签名应为七依赖: {context['signature_params']}"
+    assert context["signature_params"] == expected, f"构造签名应为八依赖（5-10 扩八）: {context['signature_params']}"
     assert context["signature_default"] is None, "第七参数 drift_detector 应默认 None"
 
 

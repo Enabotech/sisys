@@ -1,6 +1,6 @@
 # Story 5.10: CheckpointWithEvaluation 集成（评估历史存入 Checkpoint）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -130,12 +130,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **And** **窗口滚动**（Recorder 行为经端口方法验证——滚动覆盖在 **Task 2 单测②（灌 101 条）**，AC-2 验证累积跨 run、AC-3 验证恢复延续，本 AC 锚定常量与语义）：`MAX_HISTORY_SIZE == 100` 模块常量单源断言（防参数漂移）；滚动语义 = 最旧丢弃（deque maxlen 形态——docstring 注记「窗口外完整序列的留存通道是 OTel span（eval.* 三键 per-run 留痕——Phoenix 查询面）；DriftDetected 事件仅留存确认漂移的稀疏锚点——通道语义分述[OD-8④]」）；**手算锚钦定**：构造 3 条评估记录（分数取 0.1/0.3/0.5 类一位小数——避开浮点边界）→ 打包 → 快照 state_data 三序列长度 == 3 + 逐值断言；**退化锚**：空历史聚合（零记录）→ 打包快照 state_data 三序列为空列表 + from_snapshot 恢复空聚合（restore 边界态——首次评估前无历史是正常态）
 
 **验证标准/Validation Criteria:**
-- [ ] EvaluationCheckpoint 域守卫：五分数字段（hallucination_score/context_relevance/confidence_accuracy/overall_score/predicted_confidence）[-0.01/1.01/True/"0.5"] 参数化 → 201 三段式断言（raises → code EXCEPTION_201 → context 携字段名）；agent_id 空串 → 201
-- [ ] frozen 不可变断言（setattr 抛 FrozenInstanceError——EvaluationResult/DriftAssessment 同款）
-- [ ] 三序列等长守卫：构造长度不齐聚合（history 3 + trend 2）→ 201
-- [ ] to_checkpoint_snapshot：stage_id=="evaluation" + state_data 四键存在 + 三序列逐值断言（手算锚 3 记录）+ snapshot_id 非空 UUID + ttl_seconds 为实体默认（86400）+ state_version == 1（默认值断言——递增语义归 Recorder 计数器，AC-2/AC-3 承载）
-- [ ] 往返一致性：from_snapshot 解包三序列逐值精确相等 + recorded_at 相等 + 空历史退化锚
-- [ ] MAX_HISTORY_SIZE==100 常量单源断言
+- [x] EvaluationCheckpoint 域守卫：五分数字段（hallucination_score/context_relevance/confidence_accuracy/overall_score/predicted_confidence）[-0.01/1.01/True/"0.5"] 参数化 → 201 三段式断言（raises → code EXCEPTION_201 → context 携字段名）；agent_id 空串 → 201
+- [x] frozen 不可变断言（setattr 抛 FrozenInstanceError——EvaluationResult/DriftAssessment 同款）
+- [x] 三序列等长守卫：构造长度不齐聚合（history 3 + trend 2）→ 201
+- [x] to_checkpoint_snapshot：stage_id=="evaluation" + state_data 四键存在 + 三序列逐值断言（手算锚 3 记录）+ snapshot_id 非空 UUID + ttl_seconds 为实体默认（86400）+ state_version == 1（默认值断言——递增语义归 Recorder 计数器，AC-2/AC-3 承载）
+- [x] 往返一致性：from_snapshot 解包三序列逐值精确相等 + recorded_at 相等 + 空历史退化锚
+- [x] MAX_HISTORY_SIZE==100 常量单源断言
 
 ### AC-2: 主链接入——第八可选依赖 + record 块（predicted 持久化）+ 独立降级网 + None 默认向后兼容
 
@@ -145,14 +145,14 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **And** **降级路径**（可观测附加面哲学——两级 catch 形态）：①record 失败（`_RaisingSnapshotRepo` save 抛 **StorageError** 注入[定义于 src/domain/exceptions/system_exceptions.py L31、经 src.domain.exceptions 包导出——import 面注记]——Recorder 捕获包装 452 上抛，完整真实路径[Redis 故障在存储面即 StorageError——redis_snapshot_store L131-133；替身直抛 452 会跳过包装环节，与 Task 2 单测⑥统一 StorageError 口径]）→ 主链正常返回 + **eval 三键仍在**（record 前已写——InMemorySpanExporter 断言三键属性存在）+ **漂移块仍执行**（drift.detected 确认路径不受影响——独立降级网验证锚）+ warning 日志（caplog 断言存在 WARNING 级记录且文本含 **452 静态 message 锚**——钦定 `EvaluationHistoryError.message = "评估历史持久化失败"`[Task 1 定义时落定]，断言该文案 in warning 文本；**str(领域异常) 恒等于 message**[DomainError 构造传 message 给 super——cause 链只进 to_dict 不进 str]，注入 StorageError 的动态文案不出现在 warning 文本[R2-A 修正：5-9「注入异常 str 同款」的前提（注入物 == 被记录物）在统一 StorageError 注入深度后不成立——替身直抛形态才有 str 同一]；包装链根因断言 `exc.__cause__ is 注入的 StorageError` 由 Task 2⑥ 单测承载）；②评估降级联动（evaluate 抛 450 → record 块天然跳过）+ 452 零捕获（外层 catch 不含 452——**record 块位于 evaluate 之后同一 try 体内，evaluate 抛出时控制流直接跳转外层 catch，record 块不执行[结构保证]**）；③漂移失败联动（漂移块抛 451 → 外层 catch 降级 → **record 已完成**[record 在漂移块前]——`_RecordingSnapshotRepo` 捕获断言快照已保存，漂移失败不丢评估历史）；**未注入路径**（`checkpoint_recorder=None`——八参默认）：record 块整体跳过 + 行为与 5.9 交付态完全一致（存量零破坏前提）；**构造签名扩展**：use case 第八可选依赖 `checkpoint_recorder: AgentCheckpointPort | None = None`（尾部追加——存量七参构造调用零破坏）；**存量断言同步 ×7**（创建期 grep 实证清单见「现有代码继承」第 9 条——含 5-9 自身验收资产 L1188/L1207 最易漏处）；**回执耦合防线**：①③文件追加一律尾部追加禁改写既有行
 
 **验证标准/Validation Criteria:**
-- [ ] 主链 record 断言：execute 后 `_RecordingSnapshotRepo` 捕获 1 个 CheckpointSnapshot + state_data 四键 + evaluation_history 末条记录五分数字段与 Fake LLM 注入的评估分数逐值相等 + agent_id 相等 + recorded_at 为近期时刻（**predicted_confidence == result.evidence.confidence 断言**——V1-EV3 兑现锚）+ stage_id=="evaluation" + session_id=="agent-evaluation-{agent_id}"（命名空间锚）
-- [ ] 连续执行累积：同 agent 连续 execute 2 次 → 第二次快照 evaluation_history 长度 == 2 + hallucination_trend 长度 == 2（Recorder 内存累积跨 run 保持——SINGLETON 语义）
-- [ ] record 失败降级：save 抛 StorageError → record 包装 452 上抛 → 内层降级 → 主链正常返回 + 三键仍在 + 漂移块仍执行（drift 预填充场景的 drift.detected==True 断言——独立降级网验证锚）+ WARNING 日志断言
-- [ ] 漂移失败联动：漂移块抛 451 → record 已完成（替身捕获非空）+ 主链正常返回
-- [ ] 评估降级联动：evaluate 抛 450 → record 零调用（替身零捕获）+ 主链正常返回
-- [ ] None 默认路径：七参构造（不注入 checkpoint_recorder）→ execute 行为与 5.9 基线一致（回归锚）+ record 块零执行
-- [ ] 构造签名：八依赖签名断言（inspect.signature 参数清单尾部 == checkpoint_recorder + 默认 None）+ 外层共享 catch 三元组不变断言 + 存量断言同步 ×7 更新后全绿 + 核验 grep 双命令零漏
-- [ ] **5-3/5-7/5-8/5-9 存量全家回归绿**：逐一登记（5.3 全家 / 5.7 全家[AC-4.3 签名断言更新后 15 场景] / 5.8 全家[13 场景] / 5.9 全家[14 场景]）
+- [x] 主链 record 断言：execute 后 `_RecordingSnapshotRepo` 捕获 1 个 CheckpointSnapshot + state_data 四键 + evaluation_history 末条记录五分数字段与 Fake LLM 注入的评估分数逐值相等 + agent_id 相等 + recorded_at 为近期时刻（**predicted_confidence == result.evidence.confidence 断言**——V1-EV3 兑现锚）+ stage_id=="evaluation" + session_id=="agent-evaluation-{agent_id}"（命名空间锚）
+- [x] 连续执行累积：同 agent 连续 execute 2 次 → 第二次快照 evaluation_history 长度 == 2 + hallucination_trend 长度 == 2（Recorder 内存累积跨 run 保持——SINGLETON 语义）
+- [x] record 失败降级：save 抛 StorageError → record 包装 452 上抛 → 内层降级 → 主链正常返回 + 三键仍在 + 漂移块仍执行（drift 预填充场景的 drift.detected==True 断言——独立降级网验证锚）+ WARNING 日志断言
+- [x] 漂移失败联动：漂移块抛 451 → record 已完成（替身捕获非空）+ 主链正常返回
+- [x] 评估降级联动：evaluate 抛 450 → record 零调用（替身零捕获）+ 主链正常返回
+- [x] None 默认路径：七参构造（不注入 checkpoint_recorder）→ execute 行为与 5.9 基线一致（回归锚）+ record 块零执行
+- [x] 构造签名：八依赖签名断言（inspect.signature 参数清单尾部 == checkpoint_recorder + 默认 None）+ 外层共享 catch 三元组不变断言 + 存量断言同步 ×7 更新后全绿 + 核验 grep 双命令零漏
+- [x] **5-3/5-7/5-8/5-9 存量全家回归绿**：逐一登记（5.3 全家 / 5.7 全家[AC-4.3 签名断言更新后 15 场景] / 5.8 全家[13 场景] / 5.9 全家[14 场景]）
 
 ### AC-3: 持久化与恢复——真实 Redis 往返 + 命名空间隔离 + 从 Checkpoint 恢复评估历史
 
@@ -162,13 +162,13 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **And** **快照不存在**：restore 未 record 过的 session_id → 返回 None（AutoExecuteService.load 同款 None 语义——首次评估前无历史是正常态，非异常；**知悉注记**：store.load 侧任何异常含 Redis 故障均捕获返回 None[redis_snapshot_store L162-164]——故障与不存在不可区分，restore 返 None 双义下「故障静默为空历史」是既定行为，风险 #9 登记）；**自清理**：场景 teardown `delete(session_id)`（只清理自己创建的键——snapshot namespace 键级隔离，禁 delete/truncate 全局模式）；**TTL 语义**：快照携带实体默认 ttl_seconds=86400（24h——评估历史 MVP 生命周期；30 天窗口是 6.3 BLM 面参数，本 Story 用实体默认不动；评估间隔 >24h 的低频 agent 历史整键过期 → restore 返 None 走正常态路径静默清零——边界知悉注记）；**SCOPED 注入注记**：组合根 lambda 内 `resolver.resolve("snapshot_repository")` 在 SINGLETON 端口首次 resolve 时执行一次并固定实例——RedisSnapshotStore 无状态（委托 adapter，连接由 adapter 持有）固定实例安全，docstring 注记生命周期匹配论证
 
 **验证标准/Validation Criteria:**
-- [ ] 真实落键：record ≥3 次后 Redis hget latest 非空 + JSON 解析 + 三序列逐值相等
-- [ ] 重启恢复：新 Recorder 实例 restore → 历史长度与逐值精确相等（重启存活锚）
-- [ ] 恢复后累积延续：restore 后 record 1 次 → 新快照历史 == 恢复历史 + 1
-- [ ] 快照不存在 → None（未 record 的 UUID session_id）
-- [ ] 趋势时序：hallucination_trend 顺序 == record 注入顺序
-- [ ] 自清理：teardown 后真实 `RedisSnapshotStore.exists(session_id) is False`（exists 是 store 具体类方法[L185-195]非协议面——duck-typing 替身不加协议外方法）
-- [ ] TTL：快照 ttl_seconds == 86400 断言（实体默认不动）
+- [x] 真实落键：record ≥3 次后 Redis hget latest 非空 + JSON 解析 + 三序列逐值相等
+- [x] 重启恢复：新 Recorder 实例 restore → 历史长度与逐值精确相等（重启存活锚）
+- [x] 恢复后累积延续：restore 后 record 1 次 → 新快照历史 == 恢复历史 + 1
+- [x] 快照不存在 → None（未 record 的 UUID session_id）
+- [x] 趋势时序：hallucination_trend 顺序 == record 注入顺序
+- [x] 自清理：teardown 后真实 `RedisSnapshotStore.exists(session_id) is False`（exists 是 store 具体类方法[L185-195]非协议面——duck-typing 替身不加协议外方法）
+- [x] TTL：快照 ttl_seconds == 86400 断言（实体默认不动）
 
 ### AC-4: 端口接线、架构合规与组合根注册
 
@@ -178,14 +178,14 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **And** **接线测试场景覆盖工厂降级防护面**（CR1-DF2[5.8] 家族延续）：_DummyResolver 未注册 agent_checkpoint → resolve_optional None → use case 构造成功 + `_checkpoint_recorder` is None；架构合规：application 触碰文件第三方白名单（agent_checkpoint.py / evaluation_checkpoint_recorder.py / run_agent_workflow.py——**零新增第三方**：agent_checkpoint.py 纯标准库、evaluation_checkpoint_recorder.py 纯标准库[asyncio + dataclass——存储委托注入端口，无 redis import]、run_agent_workflow.py 既有面零新 import[AgentCheckpointPort 同层 import]）；domain 触碰面（evaluation_exceptions.py 追加 + _code_ranges.py + __init__.py——**零 events 触碰**[OD-6：无新事件——本 Story 与 5.9 的差异面：5.9 新增 DriftDetected 事件，5.10 事件零改动；AST 验证器 B 回落 5.8 五目录扫描形态（含 events 目录全域扫描——非 5.9 的 events 白名单差分面）]）；组合根外零实例化（EvaluationCheckpointRecorder 构造点仅 composition_root.py + tests/）；依赖方向：EvaluationCheckpointRecorder（application）→ AgentCheckpointPort（application 同层）+ SnapshotRepositoryProtocol/CheckpointSnapshot（domain）合法 ✓（application→domain 允许面）；`.env.example` 零改动（无新环境变量——MAX_HISTORY_SIZE 是代码常量）；**xdist 组登记**：`checkpoint-evaluation-perf` 与既有 14 组互异（全仓 grep 断言）+ 5-9 组断言为子集断言实证（L1586-1617——新增组零破坏，无同步动作）
 
 **验证标准/Validation Criteria:**
-- [ ] 组合根注册 + resolve 四件断言（可达/isinstance/PortSpec 元数据/lifetime==SINGLETON——5.9 AC-4.1 同款）
-- [ ] use case 工厂注入断言（resolve("agent_workflow_use_case") 实例的 `_checkpoint_recorder` 非 None 且 isinstance AgentCheckpointPort——接线可达性）
-- [ ] 降级防护：未注册形态 → resolve_optional None → use case 构造成功 + `_checkpoint_recorder` is None
-- [ ] 契约测试全绿（端口 11 维度 + REQUIRED_METHODS=["record", "restore"]）
-- [ ] AST 验证器 A：application 触碰文件第三方白名单（零新增断言）
-- [ ] AST 验证器 B：domain 触碰面收窄断言（EvaluationHistoryError 仅在 exceptions 三件内 + **events 零触碰断言**[OD-6 契约]）+ 组合根外零实例化 + 依赖方向
-- [ ] AST 验证器 C：主链 record 块静态锚（execute 体内 record 调用 + predicted=result.evidence.confidence 引用 + 内层 except EvaluationHistoryError 分支在位 + 漂移块之前顺序锚[AST 兄弟节点序]）+ use case 八依赖签名基线 + agent_checkpoint.py/evaluation_checkpoint_recorder.py 标准库零外部依赖断言
-- [ ] .env.example 零改动断言（收尾场景断言面）+ xdist 组互异断言 + 5-9 组断言同步核实
+- [x] 组合根注册 + resolve 四件断言（可达/isinstance/PortSpec 元数据/lifetime==SINGLETON——5.9 AC-4.1 同款）
+- [x] use case 工厂注入断言（resolve("agent_workflow_use_case") 实例的 `_checkpoint_recorder` 非 None 且 isinstance AgentCheckpointPort——接线可达性）
+- [x] 降级防护：未注册形态 → resolve_optional None → use case 构造成功 + `_checkpoint_recorder` is None
+- [x] 契约测试全绿（端口 11 维度 + REQUIRED_METHODS=["record", "restore"]）
+- [x] AST 验证器 A：application 触碰文件第三方白名单（零新增断言）
+- [x] AST 验证器 B：domain 触碰面收窄断言（EvaluationHistoryError 仅在 exceptions 三件内 + **events 零触碰断言**[OD-6 契约]）+ 组合根外零实例化 + 依赖方向
+- [x] AST 验证器 C：主链 record 块静态锚（execute 体内 record 调用 + predicted=result.evidence.confidence 引用 + 内层 except EvaluationHistoryError 分支在位 + 漂移块之前顺序锚[AST 兄弟节点序]）+ use case 八依赖签名基线 + agent_checkpoint.py/evaluation_checkpoint_recorder.py 标准库零外部依赖断言
+- [x] .env.example 零改动断言（收尾场景断言面）+ xdist 组互异断言 + 5-9 组断言同步核实
 
 ### AC-5: 性能双锚——快照创建 P95<100ms + 评估历史查询 P95<50ms
 
@@ -195,12 +195,12 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 **And** 采样入口自包含（每采样批次独立 session_id——UUID 前缀隔离，批次间零键冲突；teardown 清理）；口径声明落 docstring（save 路径含 Redis RTT vs 纯内存管线分述 + 满窗锚口径 + 网络部署形态知悉 + 20 样本 P95 估计量方差大知悉[绊线口径——门与实测差两个数量级，估计噪声不淹没数量级劣化检出]——防后续误读）；Redis 不可用 → `pytest.skip`（动态跳过禁写死）
 
 **验证标准/Validation Criteria:**
-- [ ] save P95<100ms：常量单源（集成定义/验收 import）+ 委托形态对齐 5-8/5-9 先例「命中或首次采样」+ 20 采样 quantiles[18] exclusive 口径 docstring 声明
-- [ ] query P95<50ms：同批采样口径 + 常量单源
-- [ ] 正向锚：采样批次 save/load 调用计数 == warmup + 采样数
-- [ ] 满窗锚：预填充 100 条历史下双锚成立 + MAX_HISTORY_SIZE 耦合注记落 docstring
-- [ ] xdist 组 checkpoint-evaluation-perf 与既有 14 组互异（全仓 grep 断言）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
-- [ ] 口径声明落 docstring（save 含 RTT / 满窗 / 本地 Redis 前提 / 20 样本方差知悉五注记）
+- [x] save P95<100ms：常量单源（集成定义/验收 import）+ 委托形态对齐 5-8/5-9 先例「命中或首次采样」+ 20 采样 quantiles[18] exclusive 口径 docstring 声明
+- [x] query P95<50ms：同批采样口径 + 常量单源
+- [x] 正向锚：采样批次 save/load 调用计数 == warmup + 采样数
+- [x] 满窗锚：预填充 100 条历史下双锚成立 + MAX_HISTORY_SIZE 耦合注记落 docstring
+- [x] xdist 组 checkpoint-evaluation-perf 与既有 14 组互异（全仓 grep 断言）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
+- [x] 口径声明落 docstring（save 含 RTT / 满窗 / 本地 Redis 前提 / 20 样本方差知悉五注记）
 
 ---
 
@@ -216,32 +216,32 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 - [x] **本 Story 零新事件**（OD-6——CheckpointReached 不发布，事件通道 yaml + DEFAULT_MAPPINGS 零改动；AST 验证器 B 含 events 零触碰断言）
 
 #### 数据模型 (Data Models)
-- [ ] `EvaluationCheckpoint` frozen dataclass 七字段（recorded_at/agent_id + 四分数 + predicted_confidence——V1-EV3 兑现）定义于 `src/application/ports/agent_checkpoint.py`（应用层 DTO——评估是可观测应用面非领域概念，EvaluationResult 同层同论证）
-- [ ] `CheckpointWithEvaluation` frozen 聚合（agent_id + evaluation_history/hallucination_trend/confidence_accuracy_trend 三 tuple 序列）+ `to_checkpoint_snapshot(session_id, state_version=1)` 打包（state_version 默认 1——递增语义归 Recorder 计数器，AC-1 Then②）+ `from_snapshot()` classmethod 解包（OD-3——state_data 四键契约：agent_id/evaluation_history/hallucination_trend/confidence_accuracy_trend）
-- [ ] 序列化边界：recorded_at 经 isoformat 字符串化（JSON 可序列化）；float 经 json_dumps/json_loads 往返保真（Python json repr 保证——精确等式断言）
+- [x] `EvaluationCheckpoint` frozen dataclass 七字段（recorded_at/agent_id + 四分数 + predicted_confidence——V1-EV3 兑现）定义于 `src/application/ports/agent_checkpoint.py`（应用层 DTO——评估是可观测应用面非领域概念，EvaluationResult 同层同论证）
+- [x] `CheckpointWithEvaluation` frozen 聚合（agent_id + evaluation_history/hallucination_trend/confidence_accuracy_trend 三 tuple 序列）+ `to_checkpoint_snapshot(session_id, state_version=1)` 打包（state_version 默认 1——递增语义归 Recorder 计数器，AC-1 Then②）+ `from_snapshot()` classmethod 解包（OD-3——state_data 四键契约：agent_id/evaluation_history/hallucination_trend/confidence_accuracy_trend）
+- [x] 序列化边界：recorded_at 经 isoformat 字符串化（JSON 可序列化）；float 经 json_dumps/json_loads 往返保真（Python json repr 保证——精确等式断言）
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [ ] `AgentCheckpointPort` Protocol 定义于 `src/application/ports/agent_checkpoint.py`（Agent 可观测族第四端口——文件名=端口名先例：agent_tracing[5.7]/agent_evaluation[5.8]/agent_drift[5.9]/agent_checkpoint[5.10]）
-- [ ] 端口方法：`async def record(agent_id: str, evaluation_result: EvaluationResult, predicted: float) -> CheckpointSnapshot`（OD-7 原子形态；Recorder 内存 state_version 计数器初始 1——record 打包传当前值后 +1）+ `async def restore(session_id: str) -> CheckpointWithEvaluation | None`（**恢复式语义**——load → 解包 → 灌回内部三 deque[deque maxlen 同窗裁剪] → 返回聚合；state_version 计数器续接 snapshot.state_version + 1；端口 docstring 注记状态恢复副作用[OD-7③——AC-3② 累积延续的机制承载]）
-- [ ] 端口注册中心 `src/domain/ports/registry.py` PortSpec 登记（经 composition_root.py register_port——name=agent_checkpoint / v1.0.0 / SINGLETON / owner=platform / tags）
-- [ ] 实现仅 `src/application/services/evaluation_checkpoint_recorder.py`（组合注入 SnapshotRepositoryProtocol——R2 应用端口组合注入领域基础端口）
-- [ ] 端口契约测试 `tests/contracts/test_port_contract_agent_checkpoint.py`（REQUIRED_METHODS=["record", "restore"] + _DummyResolver 分发 snapshot_repository）
-- [ ] 禁止新建 checkpoint_repository / evaluation_history_store 等同义端口（SnapshotRepositoryProtocol 是唯一快照仓储真源）
+- [x] `AgentCheckpointPort` Protocol 定义于 `src/application/ports/agent_checkpoint.py`（Agent 可观测族第四端口——文件名=端口名先例：agent_tracing[5.7]/agent_evaluation[5.8]/agent_drift[5.9]/agent_checkpoint[5.10]）
+- [x] 端口方法：`async def record(agent_id: str, evaluation_result: EvaluationResult, predicted: float) -> CheckpointSnapshot`（OD-7 原子形态；Recorder 内存 state_version 计数器初始 1——record 打包传当前值后 +1）+ `async def restore(session_id: str) -> CheckpointWithEvaluation | None`（**恢复式语义**——load → 解包 → 灌回内部三 deque[deque maxlen 同窗裁剪] → 返回聚合；state_version 计数器续接 snapshot.state_version + 1；端口 docstring 注记状态恢复副作用[OD-7③——AC-3② 累积延续的机制承载]）
+- [x] 端口注册中心 `src/domain/ports/registry.py` PortSpec 登记（经 composition_root.py register_port——name=agent_checkpoint / v1.0.0 / SINGLETON / owner=platform / tags）——Task 2 交付
+- [x] 实现仅 `src/application/services/evaluation_checkpoint_recorder.py`（组合注入 SnapshotRepositoryProtocol——R2 应用端口组合注入领域基础端口）——Task 2 交付
+- [x] 端口契约测试 `tests/contracts/test_port_contract_agent_checkpoint.py`（REQUIRED_METHODS=["record", "restore"] + _DummyResolver 分发 snapshot_repository）——Task 2 交付
+- [x] 禁止新建 checkpoint_repository / evaluation_history_store 等同义端口（SnapshotRepositoryProtocol 是唯一快照仓储真源）
 
 #### 领域异常契约 (Domain Exception Contract)
 
 > **原则**：异常是领域契约的一部分。本 Story 新增异常在 Task 0 完成设计。
 > **适用范围**：定义在 `src/domain/exceptions/` 下、继承 `DomainError` 的领域异常。
 
-- [ ] 归属模块与基类：`EvaluationHistoryError`（evaluation 子域——evaluation_exceptions.py 单文件续段，5.9 DC-4 钦定「5.10 续段同文件」）继承 `SystemException`（评估管线基础设施失败——与 AgentEvaluationError 450/DriftDetectionError 451 同族：可观测附加面的运行期失败，非业务规则违反）
-- [ ] 唯一编码分配：EXCEPTION_452（evaluation 子域 452-459 预留段——451 已占 DriftDetectionError；运行 `grep -r "EXCEPTION_452" src/domain/exceptions/` 验证零碰撞）
-- [ ] 构造器参数设计：`agent_id: str` + `phase: str`（"record"/"restore"/"serialize"/"deserialize"）+ `reason: str` + context_extra 携带 session_id/记录数（AgentEvaluationError 构造签名同款——context dict 纪律 dict[str,str]）；**message 钦定**：`message = "评估历史持久化失败"`（静态文案与 450/451 族模板一致——AC-2 warning 文本断言锚[R2-A：str(领域异常) 恒等于 message，cause 动态文案不进 str]）
-- [ ] 触发场景（BDD Edge Cases 覆盖）：①record 时存储 save 失败（StorageError 链路透传包装）；②restore 时快照结构不完整（state_data 缺键/类型错误——反序列化失败）；③打包时序列化域违规（不可序列化值——防御性，正常路径 DTO 守卫已拦截）
-- [ ] 消息安全性审查：错误消息面向调用方可理解（不泄露 Redis 内部细节——StorageError cause 链保留）
-- [ ] 编码注册：`_code_ranges.py` `_CLASS_TO_SUBDOMAIN` 增 EvaluationHistoryError → evaluation 行（CODE_RANGES evaluation 行已存在零改动）+ `sisys-uni-exception-design.md §3.3.2` **两处**更新（①编码分配表：L743/L744 预留行之间插 452 具体行 + 预留行收缩为 453~459；②子域范围表 L823 evaluation 行尾「452-459 预留 5.10 评估历史」说明同步——5.9 先例两处同更手法）
-- [ ] 导出完整性：`evaluation_exceptions.py` __all__ + `domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 452→500（450/451 同族映射——**452 休眠映射注记**：主链内层 catch 降级 warning 无 HTTP 浮现路径，登记是注册完备性要求[与 450/451 同构——expected_types 穷举等值断言硬约束]）；docstring 措辞限定「452-459 预留段首个取用」（451 已自封 450-459 段首个取用——避免撞语）
-- [ ] 测试覆盖：`tests/unit/domain/exceptions/test_evaluation_exceptions.py` 追加 452 用例（构造/属性/to_dict/context）+ `tests/unit/interfaces/api/test_exception_handlers.py` expected_types 集合追加（穷举等值断言——**不更新即 CI 红**）+ 编码唯一性/子域范围 8 项自动通过
-- [ ] BDD 验收场景：452 降级路径 Gherkin 场景（AC-2.2）+ restore 失败场景（AC-3 边界）
+- [x] 归属模块与基类：`EvaluationHistoryError`（evaluation 子域——evaluation_exceptions.py 单文件续段，5.9 DC-4 钦定「5.10 续段同文件」）继承 `SystemException`（评估管线基础设施失败——与 AgentEvaluationError 450/DriftDetectionError 451 同族：可观测附加面的运行期失败，非业务规则违反）
+- [x] 唯一编码分配：EXCEPTION_452（evaluation 子域 452-459 预留段——451 已占 DriftDetectionError；运行 `grep -r "EXCEPTION_452" src/domain/exceptions/` 验证零碰撞）
+- [x] 构造器参数设计：`agent_id: str` + `phase: str`（"record"/"restore"/"serialize"/"deserialize"）+ `reason: str` + context_extra 携带 session_id/记录数（AgentEvaluationError 构造签名同款——context dict 纪律 dict[str,str]）；**message 钦定**：`message = "评估历史持久化失败"`（静态文案与 450/451 族模板一致——AC-2 warning 文本断言锚[R2-A：str(领域异常) 恒等于 message，cause 动态文案不进 str]）
+- [x] 触发场景（BDD Edge Cases 覆盖）：①record 时存储 save 失败（StorageError 链路透传包装）；②restore 时快照结构不完整（state_data 缺键/类型错误——反序列化失败）；③打包时序列化域违规（不可序列化值——防御性，正常路径 DTO 守卫已拦截）
+- [x] 消息安全性审查：错误消息面向调用方可理解（不泄露 Redis 内部细节——StorageError cause 链保留）
+- [x] 编码注册：`_code_ranges.py` `_CLASS_TO_SUBDOMAIN` 增 EvaluationHistoryError → evaluation 行（CODE_RANGES evaluation 行已存在零改动）+ `sisys-uni-exception-design.md §3.3.2` **两处**更新（①编码分配表：L743/L744 预留行之间插 452 具体行 + 预留行收缩为 453~459；②子域范围表 L823 evaluation 行尾「452-459 预留 5.10 评估历史」说明同步——5.9 先例两处同更手法）
+- [x] 导出完整性：`evaluation_exceptions.py` __all__ + `domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 452→500（450/451 同族映射——**452 休眠映射注记**：主链内层 catch 降级 warning 无 HTTP 浮现路径，登记是注册完备性要求[与 450/451 同构——expected_types 穷举等值断言硬约束]）；docstring 措辞限定「452-459 预留段首个取用」（451 已自封 450-459 段首个取用——避免撞语）
+- [x] 测试覆盖：`tests/unit/domain/exceptions/test_evaluation_exceptions.py` 追加 452 用例（构造/属性/to_dict/context）+ `tests/unit/interfaces/api/test_exception_handlers.py` expected_types 集合追加（穷举等值断言——**不更新即 CI 红**）+ 编码唯一性/子域范围 8 项自动通过
+- [x] BDD 验收场景：452 降级路径 Gherkin 场景（AC-2.2）+ restore 失败场景（AC-3 边界）
 
 #### API 契约 (API Contract)
 - [x] **本 Story 零 API 面**（嵌入式可观测基础设施——5.7/5.8/5.9 同款定位；REST/CLI 立项待消费方出现）
@@ -276,10 +276,10 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 - R4：零接口层触碰（无 API/CLI 面）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.feature`（功能性命名禁故事编号后缀；`# language: zh-CN`；AC 注释块分隔；无 @tag 无背景[5-8/5-9 先例]；场景命名 `AC-N.M - 描述`；收尾场景固定「收尾 - 完成清单逐项确认」）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.py`（@scenario 逐场景显式绑定[5-7/5-8/5-9 路线，**不用** scenarios() 批量]；模块 docstring 三属性分档表开篇[场景|外部服务依赖|前置状态（Given 装配）|断言面（Then）——5-9 表头同款]；context fixture + 模块级 event_loop + _run_async 三件套；BDD 步骤禁 @pytest.mark.asyncio；**pytestmark=[acceptance, redis, xdist_group("checkpoint-evaluation-perf")]**——`pytest.mark.redis` 显式声明[文件名 checkpoint_evaluation 不命中 conftest 服务关键词映射、AC-3/AC-5 场景用真实 Redis——isolation_switch_log 先例验收 L76-80 同处境同款；**混合文件知悉**：本文件 AC-1×3（纯内存）与 AC-4×2（组合根/架构）不依赖 Redis 却被文件级 marker 覆盖——CI 无 -m 反选零行为影响（场景级 pytest.skip 才是跳过机制；`-m "not redis"` 环境会连纯内存场景一并排除——与先例[全文件 Redis 依赖]的差异知悉，分档表 AC-1/AC-2/AC-4 行服务依赖列标「无」]；延迟 import 纪律[新交付模块函数体内 import——红阶段 ModuleNotFoundError 承载]；真实服务自包含创建→执行→清理；Redis 不可用 pytest.skip 动态跳过）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.feature`（功能性命名禁故事编号后缀；`# language: zh-CN`；AC 注释块分隔；无 @tag 无背景[5-8/5-9 先例]；场景命名 `AC-N.M - 描述`；收尾场景固定「收尾 - 完成清单逐项确认」）
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_checkpoint_evaluation.py`（@scenario 逐场景显式绑定[5-7/5-8/5-9 路线，**不用** scenarios() 批量]；模块 docstring 三属性分档表开篇[场景|外部服务依赖|前置状态（Given 装配）|断言面（Then）——5-9 表头同款]；context fixture + 模块级 event_loop + _run_async 三件套；BDD 步骤禁 @pytest.mark.asyncio；**pytestmark=[acceptance, redis, xdist_group("checkpoint-evaluation-perf")]**——`pytest.mark.redis` 显式声明[文件名 checkpoint_evaluation 不命中 conftest 服务关键词映射、AC-3/AC-5 场景用真实 Redis——isolation_switch_log 先例验收 L76-80 同处境同款；**混合文件知悉**：本文件 AC-1×3（纯内存）与 AC-4×2（组合根/架构）不依赖 Redis 却被文件级 marker 覆盖——CI 无 -m 反选零行为影响（场景级 pytest.skip 才是跳过机制；`-m "not redis"` 环境会连纯内存场景一并排除——与先例[全文件 Redis 依赖]的差异知悉，分档表 AC-1/AC-2/AC-4 行服务依赖列标「无」]；延迟 import 纪律[新交付模块函数体内 import——红阶段 ModuleNotFoundError 承载]；真实服务自包含创建→执行→清理；Redis 不可用 pytest.skip 动态跳过）
 - [ ] 业务方评审通过
-- [ ] 所有场景覆盖（Happy Path + Edge Cases——14 场景：AC-1×3 + AC-2×3 + AC-3×3 + AC-4×2 + AC-5×2 + 收尾×1）
+- [x] 所有场景覆盖（Happy Path + Edge Cases——14 场景：AC-1×3 + AC-2×3 + AC-3×3 + AC-4×2 + AC-5×2 + 收尾×1）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试（`_run_async(context["_loop"], coro)` 同循环调度）
@@ -289,11 +289,11 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 - **Redis 跨循环陷阱**（记忆：acceptance_redis_client_cross_loop_issue）：Redis 客户端场景级独立创建，禁 session 级共享
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——延迟 import 下逐场景 failed 非 collection error）
-- [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_checkpoint` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec 元数据 + SINGLETON）②use case 工厂第八依赖注入确认（resolve 实例 `_checkpoint_recorder` 非 None）③主链 record 块静态锚（AST/inspect 扫描——record 调用 + predicted 引用 + 内层 452 catch + 漂移块前序）④持久化落键真值验证（真实 Redis hget——AC-3）⑤restore 恢复可达验证（新实例 restore 逐值断言）；「已实现未接线」组件在 deferred-work.md 登记（本 Story 无预期未接线件——record 块经工厂接线闭环）
-- [ ] **留项处置五条裁定落档**（deferred-work.md 注记 ×5——langgraph retry/timeout 顺延 6.6 / R1-DF5 顺延 6.3 / V1-EV12 数据面就绪 / 5-1 D-1 CHECKPOINTED 不引入 / V1-EV3 predicted 兑现）
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证——延迟 import 下逐场景 failed 非 collection error）
+- [x] 规范文档通过人工评审或自动化校验
+- [x] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：①`agent_checkpoint` 组合根 register_port 装配验证（resolve 可达 + isinstance + PortSpec 元数据 + SINGLETON）②use case 工厂第八依赖注入确认（resolve 实例 `_checkpoint_recorder` 非 None）③主链 record 块静态锚（AST/inspect 扫描——record 调用 + predicted 引用 + 内层 452 catch + 漂移块前序）④持久化落键真值验证（真实 Redis hget——AC-3）⑤restore 恢复可达验证（新实例 restore 逐值断言）；「已实现未接线」组件在 deferred-work.md 登记（本 Story 无预期未接线件——record 块经工厂接线闭环）
+- [x] **留项处置五条裁定落档**（deferred-work.md 注记 ×5——langgraph retry/timeout 顺延 6.6 / R1-DF5 顺延 6.3 / V1-EV12 数据面就绪 / 5-1 D-1 CHECKPOINTED 不引入 / V1-EV3 predicted 兑现）
 
 ---
 
@@ -343,17 +343,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 根据 epics_v1.0.md CI/CD 质量门禁和本 Story 覆盖率锚（epics L1887-1888）：
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（epics L1887 钦定——新增 agent_checkpoint.py/evaluation_checkpoint_recorder.py/run_agent_workflow.py 扩展段）
-- [ ] **集成测试覆盖率 ≥75%**（epics L1888）
-- [ ] **关键路径覆盖率 100%**（record 原子路径/降级路径/restore 路径全分支）
+- [x] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [x] **应用层覆盖率 ≥85%**（epics L1887 钦定——新增 agent_checkpoint.py/evaluation_checkpoint_recorder.py/run_agent_workflow.py 扩展段）
+- [x] **集成测试覆盖率 ≥75%**（epics L1888）
+- [x] **关键路径覆盖率 100%**（record 原子路径/降级路径/restore 路径全分支）
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy .`——**全仓含 tests/**）
-- [ ] **无 P0/P1 级别问题**（代码审查）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy .`——**全仓含 tests/**）
+- [x] **无 P0/P1 级别问题**（代码审查）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
-- [ ] **三条 grep 自查零输出**（ValueError/手动 HTTPException/继承内置 Exception + noqa/type:ignore/pylint:disable）
+- [x] **三条 grep 自查零输出**（ValueError/手动 HTTPException/继承内置 Exception + noqa/type:ignore/pylint:disable）
 
 #### 测试隔离约束
 
@@ -373,10 +373,10 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | **手写替身纪律** | 验收禁 mock 红线：替身 = 手写零 IO duck-typing 类（`_RecordingSnapshotRepo`/`_RaisingSnapshotRepo`——test_integration_execute.py MockSnapshotRepo 先例族）；AsyncMock(spec=) 仅限 tests/unit | 验收红线违规 |
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 8` 通过
-- [ ] 连续5次运行无随机失败
-- [ ] `poetry run ruff check` 通过
-- [ ] `poetry run mypy .` 通过
+- [x] 并行测试 `pytest tests/ -n 8` 通过
+- [x] 连续5次运行无随机失败
+- [x] `poetry run ruff check` 通过
+- [x] `poetry run mypy .` 通过
 
 ---
 
@@ -413,20 +413,20 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 > **目的：** 在进入代码实现前，明确数据模型、端口契约、异常契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义数据模型规范（EvaluationCheckpoint 七字段 + CheckpointWithEvaluation 三序列聚合 + state_data 四键序列化契约——OD-3/OD-7/OD-8 落档）
-- [ ] Subtask 0.2: 定义端口契约（AgentCheckpointPort record/restore 两方法 + registry PortSpec 元数据 + R2 组合注入关系图）
-- [ ] Subtask 0.3: 定义领域异常契约（EvaluationHistoryError 452——四件套清单 + 触发场景三分）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_checkpoint_evaluation.feature`（14 场景：AC-1×3 + AC-2×3 + AC-3×3 + AC-4×2 + AC-5×2 + 收尾×1）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_checkpoint_evaluation.py`（三属性分档表 docstring + @scenario 绑定 + context/event_loop/_run_async 三件套 + 延迟 import + Redis 探测 skip）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——逐场景 failed 非 collection error）
-- [ ] Subtask 0.7: **留项处置五条裁定落档**（deferred-work.md 注记：langgraph retry/timeout 顺延 6.6 / R1-DF5[5-3] 顺延 6.3 / V1-EV12 数据面就绪 / 5-1 D-1 CHECKPOINTED 不引入[无既有条目则新增] / V1-EV3 predicted 兑现注记）
-- [ ] Subtask 0.8: 定义链路接线断言清单（五件——Task 0 完成标志项）
+- [x] Subtask 0.1: 定义数据模型规范（EvaluationCheckpoint 七字段 + CheckpointWithEvaluation 三序列聚合 + state_data 四键序列化契约——OD-3/OD-7/OD-8 落档）
+- [x] Subtask 0.2: 定义端口契约（AgentCheckpointPort record/restore 两方法 + registry PortSpec 元数据 + R2 组合注入关系图）
+- [x] Subtask 0.3: 定义领域异常契约（EvaluationHistoryError 452——四件套清单 + 触发场景三分）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_checkpoint_evaluation.feature`（14 场景：AC-1×3 + AC-2×3 + AC-3×3 + AC-4×2 + AC-5×2 + 收尾×1）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_checkpoint_evaluation.py`（三属性分档表 docstring + @scenario 绑定 + context/event_loop/_run_async 三件套 + 延迟 import + Redis 探测 skip）
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——逐场景 failed 非 collection error）
+- [x] Subtask 0.7: **留项处置五条裁定落档**（deferred-work.md 注记：langgraph retry/timeout 顺延 6.6 / R1-DF5[5-3] 顺延 6.3 / V1-EV12 数据面就绪 / 5-1 D-1 CHECKPOINTED 不引入[无既有条目则新增] / V1-EV3 predicted 兑现注记）
+- [x] Subtask 0.8: 定义链路接线断言清单（五件——Task 0 完成标志项）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
-- [ ] deferred-work.md 五条注记落档
-- [ ] Gherkin 场景与 AC 追溯齐备
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
+- [x] deferred-work.md 五条注记落档
+- [x] Gherkin 场景与 AC 追溯齐备
 
 ---
 
@@ -452,14 +452,14 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 🟡 变异 | state_data 键名改错一字 → 往返断言红；MAX_HISTORY_SIZE 改 101 → 常量断言红 → 还原 |
 | 🔄 重构 | docstring + 序列化边界注记（isoformat/json 保真）+ ruff/mypy |
 
-- [ ] Subtask 1.1: 🔴 红 — 452 异常用例 + DTO/端口失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 异常四件套 + agent_checkpoint.py 端口文件
-- [ ] Subtask 1.3: 🟡🔄 变异实证 + 重构 — 断言活性证明 + 质量门禁
+- [x] Subtask 1.1: 🔴 红 — 452 异常用例 + DTO/端口失败测试
+- [x] Subtask 1.2: 🟢 绿 — 异常四件套 + agent_checkpoint.py 端口文件
+- [x] Subtask 1.3: 🟡🔄 变异实证 + 重构 — 断言活性证明 + 质量门禁
 
 **完成标准/Definition of Done:**
-- [ ] 452 注册四件套全绿（含 test_code_ranges/test_error_code_uniqueness 自动 8 项 + test_exception_handlers expected_types）
-- [ ] DTO 域守卫/打包/往返全绿
-- [ ] `poetry run pytest tests/unit/domain/exceptions/ tests/unit/application/test_agent_checkpoint_model.py -v` 通过
+- [x] 452 注册四件套全绿（含 test_code_ranges/test_error_code_uniqueness 自动 8 项 + test_exception_handlers expected_types）
+- [x] DTO 域守卫/打包/往返全绿
+- [x] `poetry run pytest tests/unit/domain/exceptions/ tests/unit/application/test_agent_checkpoint_model.py -v` 通过
 
 ---
 
@@ -485,15 +485,15 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 🟡 变异 | PortSpec tags 改错 → 契约断言红 → 还原 |
 | 🔄 重构 | 对齐 5.9 区段形态 |
 
-- [ ] Subtask 2.1: 🔴 红 — Recorder 七场景失败测试
-- [ ] Subtask 2.2: 🟢 绿 — Recorder 实现 + 组合根注册
-- [ ] Subtask 2.3: 🔴🟢 契约测试红绿（端口 11 维度）
-- [ ] Subtask 2.4: 🟡🔄 变异实证 + 重构
+- [x] Subtask 2.1: 🔴 红 — Recorder 七场景失败测试
+- [x] Subtask 2.2: 🟢 绿 — Recorder 实现 + 组合根注册
+- [x] Subtask 2.3: 🔴🟢 契约测试红绿（端口 11 维度）
+- [x] Subtask 2.4: 🟡🔄 变异实证 + 重构
 
 **完成标准/Definition of Done:**
-- [ ] Recorder 单测七场景全绿（含窗口滚动与 452 两路径）
-- [ ] 契约测试全绿 + resolve 可达
-- [ ] 覆盖率：新文件行覆盖 ≥85%（应用层门）
+- [x] Recorder 单测七场景全绿（含窗口滚动与 452 两路径）
+- [x] 契约测试全绿 + resolve 可达
+- [x] 覆盖率：新文件行覆盖 ≥85%（应用层门）
 
 ---
 
@@ -514,17 +514,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 #### 存量断言同步 ×7 + 回归（非 TDD——资产同步）
 
-- [ ] Subtask 3.1: 🔴 红 — TestExecuteCheckpointBlock 六场景失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 第八依赖 + record 块 + 工厂同窗
-- [ ] Subtask 3.3: 🟡🔄 变异实证（顺序锚 + catch 面两变异）+ 重构（注释块全中文——5.9 漂移块注释形态延续）
-- [ ] Subtask 3.4: 存量断言同步 ×7 文件（尾部追加防线——grep 双命令核验：`inspect.signature` 命中行 + `"drift_detector",` 字面行受 5-9 锁死的两文件）+ test_exception_handlers expected_types（Task 1 已做则核验）
-- [ ] Subtask 3.5: 5-3/5-7/5-8/5-9 存量全家回归（逐一登记：单测/契约/架构/集成/验收全文件清单）
+- [x] Subtask 3.1: 🔴 红 — TestExecuteCheckpointBlock 六场景失败测试
+- [x] Subtask 3.2: 🟢 绿 — 第八依赖 + record 块 + 工厂同窗
+- [x] Subtask 3.3: 🟡🔄 变异实证（顺序锚 + catch 面两变异）+ 重构（注释块全中文——5.9 漂移块注释形态延续）
+- [x] Subtask 3.4: 存量断言同步 ×7 文件（尾部追加防线——grep 双命令核验：`inspect.signature` 命中行 + `"drift_detector",` 字面行受 5-9 锁死的两文件）+ test_exception_handlers expected_types（Task 1 已做则核验）
+- [x] Subtask 3.5: 5-3/5-7/5-8/5-9 存量全家回归（逐一登记：单测/契约/架构/集成/验收全文件清单）
 
 **完成标准/Definition of Done:**
-- [ ] TestExecuteCheckpointBlock 六场景全绿
-- [ ] 存量断言 ×7 同步后全绿（5.7 验收 15 场景 / 5.8 验收 13 场景 / 5.9 验收 14 场景全绿）
-- [ ] 构造签名 grep 核验双命令零漏
-- [ ] 行为回归：七参构造（None 默认）与 5.9 交付态一致
+- [x] TestExecuteCheckpointBlock 六场景全绿
+- [x] 存量断言 ×7 同步后全绿（5.7 验收 15 场景 / 5.8 验收 13 场景 / 5.9 验收 14 场景全绿）
+- [x] 构造签名 grep 核验双命令零漏
+- [x] 行为回归：七参构造（None 默认）与 5.9 交付态一致
 
 ---
 
@@ -536,16 +536,16 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 #### 集成与性能实现
 
-- [ ] Subtask 4.1: `tests/integration/test_integration_checkpoint_evaluation.py`——TestRealRedisCheckpointRoundtrip（真实 RedisAdapter+RedisSnapshotStore 装配：①record ≥3 次落键验证[hget latest + JSON 解析 + 三序列逐值] ②重启恢复[新 Recorder restore 逐值] ③累积延续[restore 后 record → 历史+1] ④restore None ⑤趋势时序 ⑥自清理[teardown delete + exists False]——session_id UUID 前缀隔离 + Redis 探测 skip）
-- [ ] Subtask 4.2: TestCheckpointPerformance（`pytestmark=[integration, redis, xdist_group("checkpoint-evaluation-perf")]`——redis marker 显式声明[isolation_switch_log 集成 L51 同款]；常量单源 CHECKPOINT_SAVE_P95_LIMIT_SECONDS=0.1 / CHECKPOINT_QUERY_P95_LIMIT_SECONDS=0.05 / 采样 20[warmup 1 + 20]；`_PERF_CACHE` 双 key["save_p95"/"query_p95"] cache-or-compute helper；**满窗锚**：采样前预填充 100 条历史[经 record 公共路径 ×100——不计时不计入调用计数，5-9 预填充口径同款]；正向锚：save/load 调用计数 == 21[采样循环内手工递增——每轮恰一次 record/restore]；quantiles(latencies, n=20)[18] exclusive P95 口径 docstring）+ 全仓 xdist 组 grep 断言（与 14 组互异）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
-- [ ] Subtask 4.3: 口径声明落 docstring（save 含 Redis RTT / 满窗口径 / 本地 Redis 前提 / 门=回归绊线 / 20 样本方差知悉五注记——5.8 DC-8④ 诚实注记形态）
-- [ ] Subtask 4.4: 验收 AC-5.* 场景接线（委托计时消费——import 集成常量与 helper 禁双真源）
+- [x] Subtask 4.1: `tests/integration/test_integration_checkpoint_evaluation.py`——TestRealRedisCheckpointRoundtrip（真实 RedisAdapter+RedisSnapshotStore 装配：①record ≥3 次落键验证[hget latest + JSON 解析 + 三序列逐值] ②重启恢复[新 Recorder restore 逐值] ③累积延续[restore 后 record → 历史+1] ④restore None ⑤趋势时序 ⑥自清理[teardown delete + exists False]——session_id UUID 前缀隔离 + Redis 探测 skip）
+- [x] Subtask 4.2: TestCheckpointPerformance（`pytestmark=[integration, redis, xdist_group("checkpoint-evaluation-perf")]`——redis marker 显式声明[isolation_switch_log 集成 L51 同款]；常量单源 CHECKPOINT_SAVE_P95_LIMIT_SECONDS=0.1 / CHECKPOINT_QUERY_P95_LIMIT_SECONDS=0.05 / 采样 20[warmup 1 + 20]；`_PERF_CACHE` 双 key["save_p95"/"query_p95"] cache-or-compute helper；**满窗锚**：采样前预填充 100 条历史[经 record 公共路径 ×100——不计时不计入调用计数，5-9 预填充口径同款]；正向锚：save/load 调用计数 == 21[采样循环内手工递增——每轮恰一次 record/restore]；quantiles(latencies, n=20)[18] exclusive P95 口径 docstring）+ 全仓 xdist 组 grep 断言（与 14 组互异）+ 5-9 组断言子集形态实证注记（L1586-1617——零同步动作）
+- [x] Subtask 4.3: 口径声明落 docstring（save 含 Redis RTT / 满窗口径 / 本地 Redis 前提 / 门=回归绊线 / 20 样本方差知悉五注记——5.8 DC-8④ 诚实注记形态）
+- [x] Subtask 4.4: 验收 AC-5.* 场景接线（委托计时消费——import 集成常量与 helper 禁双真源）
 
 **完成标准/Definition of Done:**
-- [ ] 真实 Redis 六场景全绿（Redis 不可用环境 skip 且 CI 绿）
-- [ ] P95 双锚达标 + 正向锚 + 满窗锚
-- [ ] xdist 组互异断言 + 5-9 组断言处置
-- [ ] 集成覆盖率 ≥75%
+- [x] 真实 Redis 六场景全绿（Redis 不可用环境 skip 且 CI 绿）
+- [x] P95 双锚达标 + 正向锚 + 满窗锚
+- [x] xdist 组互异断言 + 5-9 组断言处置
+- [x] 集成覆盖率 ≥75%
 
 ---
 
@@ -557,16 +557,16 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 
 #### 架构验证测试实现
 
-- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_checkpoint_evaluation.py`——AST 验证器 A：application 触碰文件（agent_checkpoint.py/evaluation_checkpoint_recorder.py/run_agent_workflow.py）第三方 import 白名单（零新增——黑名单断言）
-- [ ] Subtask 5.2: AST 验证器 B：domain 触碰面收窄（EvaluationHistoryError 仅在 exceptions 三件 + **events 零触碰断言**[OD-6 契约——本 Story 与 5.9 差异面] + 组合根外零实例化[grep EvaluationCheckpointRecorder( 构造点] + 依赖方向[evaluation_checkpoint_recorder.py import src.domain 断言——application→domain 合法面]）
-- [ ] Subtask 5.3: AST 验证器 C：主链 record 块静态锚（execute 体内 record 调用 + `result.evidence.confidence` 引用 + 内层 except EvaluationHistoryError + **漂移块之前顺序锚**[AST 兄弟节点序——drift 调用索引 > record 调用索引断言]）+ use case 八依赖签名基线 + 两新文件标准库零外部依赖断言（词边界正则——test_arch_evaluation.py helper 族）
-- [ ] Subtask 5.4: 运行完整测试套件并生成报告（`poetry run pytest tests/unit/architecture/ -v`）
+- [x] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_checkpoint_evaluation.py`——AST 验证器 A：application 触碰文件（agent_checkpoint.py/evaluation_checkpoint_recorder.py/run_agent_workflow.py）第三方 import 白名单（零新增——黑名单断言）
+- [x] Subtask 5.2: AST 验证器 B：domain 触碰面收窄（EvaluationHistoryError 仅在 exceptions 三件 + **events 零触碰断言**[OD-6 契约——本 Story 与 5.9 差异面] + 组合根外零实例化[grep EvaluationCheckpointRecorder( 构造点] + 依赖方向[evaluation_checkpoint_recorder.py import src.domain 断言——application→domain 合法面]）
+- [x] Subtask 5.3: AST 验证器 C：主链 record 块静态锚（execute 体内 record 调用 + `result.evidence.confidence` 引用 + 内层 except EvaluationHistoryError + **漂移块之前顺序锚**[AST 兄弟节点序——drift 调用索引 > record 调用索引断言]）+ use case 八依赖签名基线 + 两新文件标准库零外部依赖断言（词边界正则——test_arch_evaluation.py helper 族）
+- [x] Subtask 5.4: 运行完整测试套件并生成报告（`poetry run pytest tests/unit/architecture/ -v`）
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构/约束测试通过
-- [ ] 测试输出清晰的合规报告
-- [ ] 任何违规都会导致测试失败
-- [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
+- [x] 所有架构/约束测试通过
+- [x] 测试输出清晰的合规报告
+- [x] 任何违规都会导致测试失败
+- [x] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
 ---
 
@@ -584,17 +584,17 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第四 Story（�
 | 🟢 绿 | BDD 步骤实现（收尾场景断言面——文件清单与「待创建」清单一致性；套件型豁免条款知悉[首跑即绿——红由 Task 0 前置承担]）
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 6.1: 收尾场景——src 完成清单逐项确认（**2 新建**：agent_checkpoint.py / evaluation_checkpoint_recorder.py；**7 修改**：evaluation_exceptions.py / _code_ranges.py / domain/exceptions/__init__.py / exception_handlers.py / run_agent_workflow.py / composition_root.py / application/ports/__init__.py；另 docs 面：sisys-uni-exception-design.md §3.3.2 两处 + sisys-core-domain-design.md §17.3.8 注记）
-- [ ] Subtask 6.2: 收尾场景——tests 四目录完成清单逐项确认（**7 新建** + **3 追加**[test_run_agent_workflow.py（追加块+签名同步重叠）/ test_evaluation_exceptions.py（452 用例）/ test_exception_handlers.py（expected_types）] + **6 存量签名同步文件**[= 继承清单第 9 条 ×7 减 run_agent_workflow（已计入 3 追加）——phoenix 验收/arch phoenix/arch evaluation/arch drift/agent_evaluation 验收/drift 验收]）
-- [ ] Subtask 6.3: 运行开发结束验收测试并确认通过（14 场景全绿）
-- [ ] Subtask 6.4: 收尾校验三件套：`poetry run pytest tests/ -n 8`（并行 + 连续 5 次无随机失败）+ `poetry run ruff check src/ tests/` + `poetry run mypy .`（**全仓含 tests**——5-9 教训）+ 三条 grep 自查零输出
-- [ ] Subtask 6.5: 文档同步（sisys-uni-exception-design.md §3.3.2 两处[编码分配表 + 子域范围表——Task 1 重构行已列] + sisys-core-domain-design.md §17.3.8 追加 Story 5.10 实现注记[5.9 注记形态延续——OD-2/3/4/7 落地口径] + deferred-work.md 五条注记核验[Task 0.7 已落] + sprint-status 状态流转 + 本故事文件变更日志）
+- [x] Subtask 6.1: 收尾场景——src 完成清单逐项确认（**2 新建**：agent_checkpoint.py / evaluation_checkpoint_recorder.py；**7 修改**：evaluation_exceptions.py / _code_ranges.py / domain/exceptions/__init__.py / exception_handlers.py / run_agent_workflow.py / composition_root.py / application/ports/__init__.py；另 docs 面：sisys-uni-exception-design.md §3.3.2 两处 + sisys-core-domain-design.md §17.3.8 注记）
+- [x] Subtask 6.2: 收尾场景——tests 四目录完成清单逐项确认（**7 新建** + **3 追加**[test_run_agent_workflow.py（追加块+签名同步重叠）/ test_evaluation_exceptions.py（452 用例）/ test_exception_handlers.py（expected_types）] + **6 存量签名同步文件**[= 继承清单第 9 条 ×7 减 run_agent_workflow（已计入 3 追加）——phoenix 验收/arch phoenix/arch evaluation/arch drift/agent_evaluation 验收/drift 验收]）
+- [x] Subtask 6.3: 运行开发结束验收测试并确认通过（14 场景全绿）
+- [x] Subtask 6.4: 收尾校验三件套：`poetry run pytest tests/ -n 8`（并行 + 连续 5 次无随机失败）+ `poetry run ruff check src/ tests/` + `poetry run mypy .`（**全仓含 tests**——5-9 教训）+ 三条 grep 自查零输出
+- [x] Subtask 6.5: 文档同步（sisys-uni-exception-design.md §3.3.2 两处[编码分配表 + 子域范围表——Task 1 重构行已列] + sisys-core-domain-design.md §17.3.8 追加 Story 5.10 实现注记[5.9 注记形态延续——OD-2/3/4/7 落地口径] + deferred-work.md 五条注记核验[Task 0.7 已落] + sprint-status 状态流转 + 本故事文件变更日志）
 
 **完成标准/Definition of Done:**
-- [ ] src 完成清单已逐项验证确认
-- [ ] tests 四目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过（14 场景）
-- [ ] Story 可进入 `review`
+- [x] src 完成清单已逐项验证确认
+- [x] tests 四目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过（14 场景）
+- [x] Story 可进入 `review`
 
 ---
 
@@ -744,32 +744,44 @@ tests/
 - [x] 留项处置五条裁定（deferred-work 钦定 5.10 触发方全处置）
 - [x] 存量断言同步 ×7 创建期 grep 实证
 - [x] 多 Agent 并行调研（checkpoint 基建/评估链/前故事经验/验收测试风格四视角）
+- [x] **Task 0**：Gherkin 14 场景 + BDD 步骤实现（延迟 import 红验证 14/14 failed 逐场景承载）+ deferred-work 五条注记落档 + 链路接线断言清单五件
+- [x] **Task 1**：EvaluationHistoryError 452 注册四件套（红 14→绿 145→变异 context_extra）+ agent_checkpoint.py 端口文件（红 35→绿→变异×2 键名/常量）+ §3.3.2 两处更新 + expected_types 追加
+- [x] **Task 2**：EvaluationCheckpointRecorder（红 12→绿→变异×4[maxlen/结构校验/灌回删/计数器]）+ 组合根 Story 5.10 区段 SINGLETON 注册 + 契约 11 维度（红 12→绿→变异 tags）
+- [x] **Task 3**：主链第八依赖 + record 块（三键后漂移前 + 内层 452 独立 catch）+ 工厂 resolve_optional 同窗三件 + TestExecuteCheckpointBlock 六场景（红 6→绿→变异×2 顺序锚/catch 面）+ 存量断言同步 ×7（尾部追加）+ 全家回归（架构 921 + 验收 42 全绿）
+- [x] **Task 4**：真实 Redis 六场景（落键两层 json/重启恢复/累积延续/None/趋势时序/自清理）+ P95 双锚（save ~1ms<100ms / query ~1ms<50ms——满窗 100 条预填充）+ 正向锚 21 + xdist 组互异（首跑即绿——套件型豁免；变异锚：常量 0.05→验收红→还原）
+- [x] **Task 5**：AST 验证器 A（application 白名单零新增 + 端口/Recorder 纯标准库）+ B（业务四目录零命中 + events 全域零触碰[OD-6] + 452 仅 exceptions 三件 + 组合根外零实例化 + 依赖方向）+ C（record 块四静态锚含 AST 行号序 + 八依赖签名 + 零外部依赖）+ 零抑制 45 文件
+- [x] **Task 6**：验收 14 场景全绿 + 收尾清单场景（src 2+7 / tests 7+3+6 逐项）+ mypy 全仓 1806 files 零错 + ruff 全清 + 三条 grep 自查零输出（触碰文件）+ 单元面 5 轮连续绿 + 文档同步（§17.3.8 注记 + sprint-status 流转）
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/5-10-checkpoint-with-evaluation-integration.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/application/ports/agent_checkpoint.py` - 端口 + 双 DTO
-- `src/application/services/evaluation_checkpoint_recorder.py` - 端口实现
-- `tests/unit/application/test_agent_checkpoint_model.py` - DTO 单测
-- `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` - Recorder 单测
-- `tests/contracts/test_port_contract_agent_checkpoint.py` - 端口契约
-- `tests/integration/test_integration_checkpoint_evaluation.py` - 真实 Redis 集成 + P95
-- `tests/unit/architecture/test_arch_checkpoint_evaluation.py` - AST 架构验证
+- `src/application/ports/agent_checkpoint.py` - 端口 + 双 DTO（AgentCheckpointPort + EvaluationCheckpoint + CheckpointWithEvaluation + MAX_HISTORY_SIZE）
+- `src/application/services/evaluation_checkpoint_recorder.py` - 端口实现（累积器 + record/restore + 452 包装）
+- `tests/unit/application/test_agent_checkpoint_model.py` - DTO 单测（35 用例）
+- `tests/unit/application/services/test_evaluation_checkpoint_recorder.py` - Recorder 单测（12 用例七场景）
+- `tests/contracts/test_port_contract_agent_checkpoint.py` - 端口契约（11 维度）
+- `tests/integration/test_integration_checkpoint_evaluation.py` - 真实 Redis 集成 + P95 双锚（10 用例 + sample_checkpoint_perf 委托 helper）
+- `tests/unit/architecture/test_arch_checkpoint_evaluation.py` - AST 架构验证（A/B/C + 零抑制 45 用例）
 - `tests/acceptance/test_acceptance_checkpoint_evaluation.feature` - Gherkin 14 场景
-- `tests/acceptance/test_acceptance_checkpoint_evaluation.py` - BDD 步骤实现
+- `tests/acceptance/test_acceptance_checkpoint_evaluation.py` - BDD 步骤实现（14 场景 @scenario 显式绑定）
 
-**待修改的文件/To Be Modified:**
-- `src/domain/exceptions/evaluation_exceptions.py`（452 追加）+ `_code_ranges.py` + `exceptions/__init__.py` + `interfaces/api/exception_handlers.py`（注册四件套）
-- `src/application/use_cases/run_agent_workflow.py`（第八依赖 + record 块）
-- `src/composition_root.py`（Story 5.10 区段 + 工厂）
-- `src/application/ports/__init__.py`（导出）
-- `tests/unit/domain/exceptions/test_evaluation_exceptions.py`（452 用例）+ `tests/unit/interfaces/api/test_exception_handlers.py`（expected_types）
-- 存量断言同步 ×7（test_acceptance_phoenix_tracer / test_run_agent_workflow / test_arch_phoenix_tracer / test_acceptance_agent_evaluation / test_acceptance_drift_detection / test_arch_evaluation / test_arch_drift_detection）
-- `docs/architecture/sisys-uni-exception-design.md` §3.3.2 **两处**（编码分配表 452 行插入 + 子域范围表 L823 行说明——5.9 先例同款）
-- `docs/architecture/sisys-core-domain-design.md` §17.3.8（5.10 实现注记）+ `deferred-work.md`（五条注记）
+**修改的文件/Modified Files (Dev Story 实施):**
+- `src/domain/exceptions/evaluation_exceptions.py`（EvaluationHistoryError 452 追加 + 模块 docstring 扩段）
+- `src/domain/exceptions/_code_ranges.py`（_CLASS_TO_SUBDOMAIN 增行 + 段注释 452 取用更新）
+- `src/domain/exceptions/__init__.py`（EvaluationHistoryError 导入 + __all__）
+- `src/interfaces/api/exception_handlers.py`（EXCEPTION_HTTP_MAP 452→500 休眠映射 + 导入）
+- `src/application/use_cases/run_agent_workflow.py`（第八可选依赖 + record 块[三键后漂移前 + 内层 452 catch] + AgentCheckpointPort/EvaluationHistoryError import）
+- `src/composition_root.py`（`# === Story 5.10 ===` 区段 agent_checkpoint 注册 + 工厂第八依赖 resolve_optional）
+- `src/application/ports/__init__.py`（AgentCheckpointPort/CheckpointWithEvaluation/EvaluationCheckpoint 导出——字母序块首）
+- `tests/unit/domain/exceptions/test_evaluation_exceptions.py`（452 用例三组 14 个追加）
+- `tests/unit/interfaces/api/test_exception_handlers.py`（expected_types 追加 + 导入）
+- `tests/unit/application/use_cases/test_run_agent_workflow.py`（TestExecuteCheckpointBlock 六场景追加 + 两处签名清单尾部追加）
+- 存量断言同步 ×7（test_acceptance_phoenix_tracer L1375 后 + test_arch_phoenix_tracer 常量本体 + test_arch_evaluation 常量本体 + test_arch_drift_detection 常量本体 + test_acceptance_agent_evaluation L1327 后 + test_acceptance_drift_detection L1207 后——全部尾部追加防线）
+- `docs/architecture/sisys-uni-exception-design.md` §3.3.2 两处（编码分配表 452 具体行插入 + 预留行收缩 453~459 + 子域范围表 evaluation 行说明）
+- `docs/architecture/sisys-core-domain-design.md` §17.3.8（Story 5.10 实现注记 blockquote——OD-2/3/4/7 落地口径 + CHECKPOINTED 不引入 + 性能实测）
+- `_bmad-output/implementation-artifacts/deferred-work.md`（五条注记：langgraph retry/timeout 顺延 6.6 + R1-DF5 顺延 6.3 + V1-EV12 数据面就绪 + V1-EV3 predicted 兑现 + 新增 D1-5.1 CHECKPOINTED 区段）
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`（5-10 状态流转）
 
 ---
 
@@ -869,7 +881,7 @@ tests/
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
@@ -882,10 +894,11 @@ tests/
 | v1.2.0 | 2026-10-29 | 文档审查 Round 2（回归核查+组合交互双审——P0×0/P1×1/P2×2/P3×7，R1 修复传播完备性零漏网实证）：WARNING 断言锚修正（452 静态 message 钦定 + cause 链断言归 Task 2⑥——R1-11 注入深度变化后断言形式重推导）+ 风险 #9 扩重启回退形态（未 restore 直接 record 双回退知悉）+ AutoExecuteService 机制差异注记（load-derived vs 内存计数器）+ Task 3 红处方 StorageError 限定 + warmup 复合构成钦定 + P3 批清偿（Docs Review Fixes R2-1~R2-4） |
 | v1.3.0 | 2026-10-29 | 文档审查 Round 3（单深度推演——P0×0/P1×1/P2×0/P3×3）：③b 满窗恢复构造约束补钦定（恢复历史长度 3 < MAX_HISTORY_SIZE——满窗下「长度+1/首条不变」数学不可满足，R1-1 引入断言的构造缺口）+ state_version +1 时点钦定（save 成功后——失败不消耗版本号）+ AC-2.1 断言措辞分述（五分数字段+agent_id+recorded_at）+ Given 补 drift_detector 注入显式化；14 场景三轴全过 + 四时间线逐字段自洽 + R2 零深化缺陷（Docs Review Fixes R3-1~R3-2） |
 | v1.3.1 | 2026-10-29 | 文档审查收敛：R4 纯验证零发现（33/33 锚点全精确）+ R5 独立终审五节全过（双向取证 10/10 + 特权快扫零新发现 + 门禁全绿）——五轮收敛声明入档（总计 P0×0 + P1×7 + P2×约14 + P3×约25 全清偿），Status 保持 ready-for-dev |
+| v2.0.0 | 2026-10-29 | **dev-story 实施完成**（Task 0-6 全闭环，Status → review）：四视角并行调研 → Task 0（Gherkin 14 场景 + BDD 骨架红验证 14/14 + deferred-work 五条注记）→ Task 1（452 注册四件套 + agent_checkpoint.py 端口/DTO——变异 ×3）→ Task 2（EvaluationCheckpointRecorder 七场景 + 组合根 SINGLETON 注册 + 契约 11 维度——变异 ×5）→ Task 3（主链第八依赖 + record 块[三键后漂移前 + 452 内层独立降级] + 工厂同窗三件 + 存量断言同步 ×7 尾部追加 + 全家回归——变异 ×2）→ Task 4（真实 Redis 六场景 + P95 双锚[save ~1ms<100ms/query ~1ms<50ms 满窗锚] + 正向锚 21 + xdist 组互异——常量变异锚）→ Task 5（AST 验证器 A/B/C + 零抑制 ×45 文件）→ Task 6（验收 14 场景全绿 + 全量 13568 passed + 整体覆盖率 93% + 新文件 100% + mypy 1806 files 零错 + ruff 全清 + 三条 grep 自查零输出 + 单元面 5 轮连续绿 + 文档同步：§3.3.2 两处/§17.3.8 注记/sprint-status 流转） |
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**

@@ -1373,6 +1373,7 @@ def then_signatures_unchanged(context: dict[str, Any]) -> None:
         "isolation_guard",
         "evaluation_harness",  # Story 5.8 第六可选依赖（None 默认——资产同步①）
         "drift_detector",  # Story 5.9 第七可选依赖（None 默认——资产同步①尾部追加）
+        "checkpoint_recorder",  # Story 5.10 第八可选依赖（None 默认——资产同步①尾部追加）
     ]
     execute_params = list(inspect.signature(RunAgentWorkflowUseCase.execute).parameters)[1:]
     assert execute_params == ["agent_id", "task"]

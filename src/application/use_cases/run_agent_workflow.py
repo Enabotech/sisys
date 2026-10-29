@@ -38,6 +38,7 @@ from uuid import UUID
 
 from opentelemetry.trace import get_current_span
 
+from src.application.ports.agent_checkpoint import AgentCheckpointPort
 from src.application.ports.agent_drift import DriftDetectionPort
 from src.application.ports.agent_evaluation import AgentEvaluationPort
 from src.application.ports.agent_tracing import SpanAttributeKeys, SpanNames
@@ -51,6 +52,7 @@ from src.domain.exceptions import (
     AgentNotFoundError,
     AgentRoleNotSupportedError,
     DriftDetectionError,
+    EvaluationHistoryError,
     LLMConfigError,
 )
 from src.domain.ports.agent_engine import AgentEnginePort
@@ -80,8 +82,9 @@ class RunAgentWorkflowUseCase:
         isolation_guard: IsolationGuardPort,
         evaluation_harness: AgentEvaluationPort | None = None,
         drift_detector: DriftDetectionPort | None = None,
+        checkpoint_recorder: AgentCheckpointPort | None = None,
     ) -> None:
-        """初始化执行用例（七依赖注入——编排模板对齐 5-2 六步形态）
+        """初始化执行用例（八依赖注入——编排模板对齐 5-2 六步形态）
 
         Args:
             agent_repository: Agent 仓储端口（存在性守卫）
@@ -96,6 +99,9 @@ class RunAgentWorkflowUseCase:
             drift_detector: 漂移检测端口（Story 5.9——可选依赖 None 默认：漂移
                 检测是可观测附加面，未注入时漂移块整体跳过，存量六参构造零破坏
                 ——尾部追加形态，DC-5 第七依赖向后兼容）
+            checkpoint_recorder: 评估历史检查点端口（Story 5.10——可选依赖 None
+                默认：评估历史持久化是可观测附加面，未注入时 record 块整体跳过，
+                存量七参构造零破坏——尾部追加形态，DC-5 第八依赖向后兼容）
         """
         self._repository = agent_repository
         self._profile_use_case = agent_profile_use_case
@@ -104,6 +110,7 @@ class RunAgentWorkflowUseCase:
         self._isolation_guard = isolation_guard
         self._evaluation_harness = evaluation_harness
         self._drift_detector = drift_detector
+        self._checkpoint_recorder = checkpoint_recorder
 
     @trace(SpanNames.AGENT_EXECUTION)
     async def execute(self, agent_id: UUID, task: str) -> AgentWorkflowResult:
@@ -224,6 +231,21 @@ class RunAgentWorkflowUseCase:
                     span.set_attribute(SpanAttributeKeys.EVAL_HALLUCINATION_SCORE, evaluation_result.hallucination_score)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONTEXT_RELEVANCE, evaluation_result.context_relevance)
                     span.set_attribute(SpanAttributeKeys.EVAL_CONFIDENCE_ACCURACY, evaluation_result.confidence_accuracy)
+                # Story 5.10 评估历史 record 块（None 守卫 → record[agent_id 从
+                # execute 形参透传 + predicted 从 result.evidence.confidence 直传
+                # ——V1-EV3 兑现锚]。位序钦定：三键写入后、漂移块之前——record
+                # 失败不得阻断漂移检测、漂移失败不得丢评估历史（两独立可观测
+                # 附加面互不牵连）；内层独立降级网 except EvaluationHistoryError
+                # （452 由 record 块专属 catch 承载——共享 catch 三元组零改动））
+                if self._checkpoint_recorder is not None:
+                    try:
+                        await self._checkpoint_recorder.record(
+                            agent_id=str(agent_id),
+                            evaluation_result=evaluation_result,
+                            predicted=result.evidence.confidence,
+                        )
+                    except EvaluationHistoryError as error:
+                        logger.warning("评估历史持久化降级跳过（可观测附加面——历史失败不阻断工作流与漂移检测）: %s", error)
                 # Story 5.9 漂移检测块（None 守卫 → update → is_drifted 分支 →
                 # DRIFT_DETECTED 写入[is_recording 守卫] → trigger_recalibration
                 # [agent_id 从 execute 形参透传——DriftDetected 人工介入定位维度]）

@@ -1325,7 +1325,8 @@ def then_sixth_param_default_none(context: dict[str, Any]) -> None:
         "isolation_guard",
         "evaluation_harness",
         "drift_detector",
-    ], f"构造签名应为七依赖（5-9 扩七）: {context['signature_params']}"
+        "checkpoint_recorder",
+    ], f"构造签名应为八依赖（5-10 扩八）: {context['signature_params']}"
     assert context["signature_default"] is None
 
 
