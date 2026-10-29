@@ -99,10 +99,15 @@ class EvaluationCheckpoint:
     predicted_confidence: float
 
     def __post_init__(self) -> None:
-        """域守卫（agent_id 非空 + 五分数 [0,1] 数值域——201 三段式形态）。"""
-        if not self.agent_id:
+        """域守卫（agent_id 非空且为 str + 五分数 [0,1] 数值域——201 三段式形态）。
+
+        agent_id 类型守卫（R3 补）：非 str 真值（如腐坏快照的数字 agent_id）
+        静默通过会污染聚合类型面——与 trend 元素守卫（F4）对称的腐坏数据
+        防御（restore 收敛面经 Recorder 包装 452）。
+        """
+        if not isinstance(self.agent_id, str) or not self.agent_id:
             raise ValidationError(
-                message="评估记录 agent_id 必须非空",
+                message=f"评估记录 agent_id 必须为非空字符串（实际 {type(self.agent_id).__name__}）",
                 context={"agent_id": str(self.agent_id)},
             )
         for field_name in _SCORE_FIELDS:

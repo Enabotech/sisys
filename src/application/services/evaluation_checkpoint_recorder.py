@@ -65,8 +65,10 @@ __all__ = ["EvaluationCheckpointRecorder"]
 class _AgentWindow:
     """单 Agent 评估历史窗口（per-agent 键控单元——三 deque 同窗 + 版本计数器）。
 
-    三 deque 与 state_version 内聚于同一单元（版本数 == 该窗成功落盘数——
-    per-agent 不变量）；deque maxlen=MAX_HISTORY_SIZE 同窗滚动（最旧丢弃）。
+    三 deque 与 state_version 内聚于同一单元；deque maxlen=MAX_HISTORY_SIZE
+    同窗滚动（最旧丢弃）。版本不变量双口径[R3 精确化]：已落盘快照所携版本号
+    == 该窗成功落盘数（第 k 次成功落盘 v==k，无跳号无重号）；计数器当前值
+    == 成功落盘数 + 1（下一快照将携带的版本号——失败不消耗）。
     """
 
     history: deque[EvaluationCheckpoint] = field(default_factory=lambda: deque(maxlen=MAX_HISTORY_SIZE))
@@ -185,7 +187,10 @@ class EvaluationCheckpointRecorder(AgentCheckpointPort):
         替换式构造——恢复聚合 ≤ 窗口上限由快照产出端 maxlen 结构保证）→
         窗口 state_version 计数器续接 snapshot.state_version + 1 → 返回聚合。
         灌回严格后置于解包成功——失败路径窗口零触碰（事务性）；其他 Agent
-        窗口不受扰（per-agent 键控）。
+        窗口不受扰（per-agent 键控）。**替换语义知悉（R3 点破）**：灌回是
+        替换式——同进程窗内已有未落盘尾部（save 曾失败的条目）会被快照态
+        覆盖丢弃（restore = 显式请求以持久化态为准重同步，与「重启回退
+        知悉」同族语义——非新缺陷）。
 
         知悉注记：store.load 侧任何异常（含 Redis 故障）均捕获返回 None
         （redis_snapshot_store L162-164）——故障与快照不存在不可区分，restore

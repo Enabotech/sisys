@@ -175,12 +175,46 @@ class TestRestoreRecoverySemantics:
 
     async def test_restore_missing_snapshot_returns_none(self) -> None:
         """场景④restore 快照不存在（load 返 None）→ None（正常态非异常）。"""
+
         repo = _make_mock_repo()
         recorder = _make_recorder(repo)
 
         result = await recorder.restore("agent-evaluation-agent-missing-001")
 
         assert result is None
+
+    async def test_restore_discards_unsaved_tail_replacement_semantics(self) -> None:
+        """替换语义锚（R3 补）：同进程窗内未落盘尾部被快照态覆盖丢弃。
+
+        save 失败的条目保留在内存（最终一致），但同进程 restore 是替换式
+        重同步——显式请求以持久化态为准，未落盘尾部（0.9）被丢弃且不再
+        随后续 record 落盘收敛。
+        """
+        repo = _make_mock_repo()
+        recorder = _make_recorder(repo)
+
+        # 落盘 1 条（v1）→ save 失败 1 条（内存 2 条——最终一致保留）
+        saved = await recorder.record(
+            agent_id="agent-replace-001", evaluation_result=_make_evaluation_result(0.1), predicted=0.2
+        )
+        repo.save.side_effect = StorageError(message="Failed to save snapshot: 注入故障")
+        with pytest.raises(EvaluationHistoryError):
+            await recorder.record(agent_id="agent-replace-001", evaluation_result=_make_evaluation_result(0.9), predicted=0.5)
+        repo.save.side_effect = None
+
+        # 同进程 restore：灌回已落盘快照（1 条）——未落盘尾部 0.9 被替换丢弃
+        repo.load.return_value = saved
+        restored = await recorder.restore("agent-evaluation-agent-replace-001")
+        assert restored is not None
+        assert len(restored.evaluation_history) == 1, "替换语义：窗内回到快照态（未落盘尾部被丢弃）"
+
+        follow_up = await recorder.record(
+            agent_id="agent-replace-001", evaluation_result=_make_evaluation_result(0.7), predicted=0.5
+        )
+        history = follow_up.state_data["evaluation_history"]
+        assert len(history) == 2, "restore 后从快照态续积（1 + 新 1 == 2——0.9 不再出现）"
+        assert history[0]["hallucination_score"] == 0.1
+        assert history[1]["hallucination_score"] == 0.7
 
 
 class TestRestoreStructureGuard:

@@ -164,6 +164,37 @@ class TestCheckpointWithEvaluationAggregate:
         assert exc_info.value.code == "EXCEPTION_201", f"{trend_field}={bad_element!r} 元素应抛 201"
         assert trend_field in exc_info.value.context, f"context 应携字段名 {trend_field}"
 
+    def test_equal_length_guard_precedes_element_scan(self) -> None:
+        """校验顺序锚（R3 补——M7 判别缺口闭合）：双违规输入以等长守卫文案抛出。
+
+        ``__post_init__`` 钦定顺序：等长先验（O(1)）→ trend 元素后验（O(n)）——
+        双违规（长度不齐 + 元素非法）形态以等长守卫文案抛出（便宜先行 fail-fast）。
+        """
+        from src.application.ports.agent_checkpoint import CheckpointWithEvaluation
+
+        anchor = _make_anchor_aggregate("agent-order-001")
+        with pytest.raises(ValidationError) as exc_info:
+            CheckpointWithEvaluation(
+                agent_id="agent-order-001",
+                evaluation_history=anchor.evaluation_history,
+                hallucination_trend=("0.5",) + anchor.hallucination_trend[1:2],  # 长度 2 ≠ 3 且首元素非法——真双违规
+                confidence_accuracy_trend=anchor.confidence_accuracy_trend,
+            )
+        assert exc_info.value.code == "EXCEPTION_201"
+        assert "等长" in exc_info.value.message, "双违规形态应以等长守卫文案抛出（顺序锚——元素扫描后验）"
+        assert "history_len" in exc_info.value.context
+
+    @pytest.mark.parametrize("bad_agent_id", [12345, True, None])
+    def test_agent_id_type_guard(self, bad_agent_id: Any) -> None:
+        """agent_id 类型守卫（R3 补）：非 str 真值 → 201（腐坏快照数字 agent_id 防御——与 trend 守卫对称）。"""
+        from src.application.ports.agent_checkpoint import EvaluationCheckpoint
+
+        kwargs = {**_valid_checkpoint_kwargs(), "agent_id": bad_agent_id}
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationCheckpoint(**kwargs)
+        assert exc_info.value.code == "EXCEPTION_201", f"agent_id={bad_agent_id!r} 应抛 201"
+        assert exc_info.value.context["agent_id"] == str(bad_agent_id)
+
     def test_aggregate_frozen(self) -> None:
         """聚合 frozen 不可变。"""
         aggregate = _make_anchor_aggregate()
