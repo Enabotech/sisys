@@ -638,9 +638,11 @@ class TestExecuteEvaluationBlock:
     async def test_evaluation_unexpected_error_propagates(self, unexpected_error: Exception) -> None:
         """evaluate 抛非降级网异常（RuntimeError/ValidationError 201）→ 击穿主链。
 
-        钉死 catch 收窄边界（CR1-F1 测试面）：降级网仅 (AgentEvaluationError, LLMConfigError)
-        ——201 是文档化兄弟面（理论不可达防御层，真触发说明实现 bug 应显性失败）；
-        本用例红 = catch 被放宽为 except Exception（吞掉契约外异常）。
+        钉死 catch 收窄边界（CR1-F1 测试面；5.9 R5 终审同步注记——漂移块入网后
+        元组扩为 (AgentEvaluationError, LLMConfigError, DriftDetectionError)，本用例
+        钉死的「收窄」语义不变）：201 是文档化兄弟面（理论不可达防御层，真触发
+        说明实现 bug 应显性失败）；本用例红 = catch 被放宽为 except Exception
+        （吞掉契约外异常）。
         """
 
         fake_harness = self._make_fake_harness(raises=unexpected_error)
