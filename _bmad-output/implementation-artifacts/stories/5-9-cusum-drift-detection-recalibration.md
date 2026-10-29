@@ -174,7 +174,7 @@ Epic 5「单 Agent 战略规划能力」价值组可观测性族第三 Story：5
 **Given** 端口、实现、事件、主链漂移块全部交付
 **When** 验证接线与合规
 **Then** 新端口经组合根 `# === Story 5.9 ===` 区段注册且 resolve 可达（PortSpec 元数据对齐 5.8 形态；**R1 实测注记**：resolve 链会真实构造 DualChannelEventBus——其构造器纯依赖注入零连接[dual_channel_event_bus.py L36-42 + Redis/RabbitMQ 总线同形态]，连接惰性在 publish 面——验收「零外部服务依赖」前提成立）：`agent_drift`：v1.0.0 / `DriftDetectionPort` / lambda 注入 `CUSUMDriftDetector(event_publisher=resolver.resolve("event_publisher"))` / module=src.infrastructure.monitoring.cusum_detector / **SINGLETON**（有状态检测器——状态即功能：跨 run 序列累积是设计意图，与 5.8 无状态 SINGLETON 论证分立[DC-6]）/ owner=platform / tags=("agent", "drift", "observability")；use case 工厂 `_build_agent_workflow_use_case` 扩展：`resolve_optional("agent_drift")` 注入第七依赖（可选依赖先例——5.6 audit_service/5.8 evaluation 同款；接线失败降级 None 不阻断 bootstrap）；契约测试 ×3（端口 11 维度 + 事件契约 + 通道映射契约）
-**And** **CR1-DF2[5.8] 一并处置**：接线测试场景覆盖工厂降级防护面（agent_drift 注册缺失/构造失败注入 → `_drift_detector` None + use case 正常构造——与评估接线降级同窗断言）；架构合规：application 触碰文件第三方白名单（agent_drift.py / run_agent_workflow.py——**零新增第三方**：agent_drift.py 纯标准库、run_agent_workflow.py 既有 opentelemetry + 新增 agent_drift import[application 同层] 均在 5.8 验证器 A+ 基线内）；domain 触碰面（drift_events.py[标准库零依赖——DomainEvent 基类同族] + evaluation_exceptions.py 追加 + _code_ranges.py + __init__.py 两处——**events 触碰是本 Story 与 5.8 的差异面**：5.8 零 events 触碰，本 Story 新增 DriftDetected[漂移是领域告警语义——与 StrategicDeviationWarning 同族论证：数值偏离告警是领域概念；评估是应用可观测面 vs 漂移告警是领域事件的分界——评估结果服务于单 run 观测、漂移确认是跨 run 聚合的领域级异常状态]）；组合根外零实例化（CUSUMDriftDetector 构造点仅 composition_root.py + tests/）；依赖方向：CUSUMDriftDetector（infrastructure）→ DriftDetectionPort（application）+ EventPublisher/DriftDetected（domain）合法 ✓；`.env.example` 零改动（无新环境变量——CUSUM 参数是代码常量）
+**And** **CR1-DF2[5.8] 一并处置**：接线测试场景覆盖工厂降级防护面（agent_drift 注册缺失 → `_drift_detector` None + use case 正常构造——与评估接线降级同窗断言。R3 注记：落地形态即未注册形态；「构造失败注入」半边未落测试——工厂 except ConfigurationError 分支与评估接线孪生段同覆盖形态，零直接测试知悉）；架构合规：application 触碰文件第三方白名单（agent_drift.py / run_agent_workflow.py——**零新增第三方**：agent_drift.py 纯标准库、run_agent_workflow.py 既有 opentelemetry + 新增 agent_drift import[application 同层] 均在 5.8 验证器 A+ 基线内）；domain 触碰面（drift_events.py[标准库零依赖——DomainEvent 基类同族] + evaluation_exceptions.py 追加 + _code_ranges.py + __init__.py 两处——**events 触碰是本 Story 与 5.8 的差异面**：5.8 零 events 触碰，本 Story 新增 DriftDetected[漂移是领域告警语义——与 StrategicDeviationWarning 同族论证：数值偏离告警是领域概念；评估是应用可观测面 vs 漂移告警是领域事件的分界——评估结果服务于单 run 观测、漂移确认是跨 run 聚合的领域级异常状态]）；组合根外零实例化（CUSUMDriftDetector 构造点仅 composition_root.py + tests/）；依赖方向：CUSUMDriftDetector（infrastructure）→ DriftDetectionPort（application）+ EventPublisher/DriftDetected（domain）合法 ✓；`.env.example` 零改动（无新环境变量——CUSUM 参数是代码常量）
 
 **验证标准/Validation Criteria:**
 - [ ] 组合根注册 + resolve 四件断言（可达/isinstance/PortSpec 元数据/lifetime==SINGLETON——5.8 AC-4.1 同款）
@@ -971,7 +971,18 @@ Round 1 修复 11 项（F1-F11——C3 双评审：评审员①「优秀」+ 评
 #### 已推迟 Defer
 
 - [x] **R1-DF1**：全仓测试文件抑制注释守卫 tokenize 升格（子串扫描 → AST/tokenize 区分注释与字符串字面量，使守卫可自扫）+ 全仓存量 noqa 债清理（~20 处——conftest/tool_domain_entities/validation_feedback/kubectl/ocr/outbox/token_counter/argocd + test_exception_handlers L1226-1227 合法 N817/N814）——独立卫生任务非本 Story 面（详见 deferred-work.md）
-- [x] **R1 维持项（记录不落码）**：①test_arch_evaluation「六依赖」命名遗留（5.8 资产 + feature 文件契约绑定——改名连带面大）②BDD 步骤文本「六依赖清单」（同上）③组合根工厂 except ConfigurationError 分支无直接测试（3 行镜像已测孪生段）④验收 FakeDriftPort 计数字段验收侧零消费（替身自然接口面，集成侧消费）⑤预热期每样本重算 mean/stdev 冗余（O(30) 无害）⑥AST 验证器 execute 体内注释可满足三子串锚（行为断言兜底，AST 形态升格并入 R1-DF1）⑦组名提取正则不匹配 name= 形态（低风险）⑧σ₀ 与 √(0.3/29) 1ulp 差异文档注记（同式单源无实际影响）⑨agent_id 归因语义（确认样本喂入者非序列主导者——docstring 已知悉）⑩线程不安全知悉（当前纯 async 单循环，V1 线程化时加锁）⑪detection 严格不等式测试名「余量 2.5%」实际锁定语义（S==h bitwise 不可达——名实微偏可接受）
+- [x] **R1 维持项（记录不落码——R3 逐项复核无一升格，③⑧理由勘误）**：①test_arch_evaluation「六依赖」命名遗留（5.8 资产 + feature 文件契约绑定——改名连带面大）②BDD 步骤文本「六依赖清单」（同上）③组合根工厂 except ConfigurationError 分支无直接测试（R3 勘误：孪生评估分支同样零直接测试，已测形态是「未注册→resolve_optional None」非 except 形态；3 行语义简单 + 可达性是 env 毒化窗口——维持）④验收 FakeDriftPort 计数字段验收侧零消费（替身自然接口面，集成侧消费）⑤预热期每样本重算 mean/stdev 冗余（O(30) 无害）⑥AST 验证器 execute 体内注释可满足三子串锚（行为断言兜底，AST 形态升格并入 R1-DF1）⑦组名提取正则不匹配 name= 形态（全仓 14 组均装饰器形态零 name= 用例——缺口 moot）⑧σ₀ 与 √(0.3/29) 差异（R3 勘误：实测 2 ulp 非 1 ulp——同式单源无实际影响）⑨agent_id 归因语义（确认样本喂入者非序列主导者——docstring 已知悉）⑩线程不安全知悉（R3 强化：update 变异段全同步零 await 点，async 并发下原子性天然成立，仅线程是隐患——现状纯单循环维持）⑪detection 严格不等式测试名「余量 2.5%」（R3 复核实测 2.52%——名实相符维持）
+
+**Round 3（单深度推演——时间线全推演/生产链实测/跨层一致性/维持项复核/数学完备性）：**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R3-1 | 故事表行号锚 dev 后漂移未回刷（前置依赖表 L63「L201-210」实 L220；继承表 L90「L180-191」实 L192-203；AC-3「L683-693」实 L677 等——dev 追加漂移块后整体 +12/+19/-6） | P3·文档 | 登记不回刷（行号锚持续漂移是常态——后续引用以 grep 定位法替代：`grep -n "get_current_span" src/application/use_cases/run_agent_workflow.py` 类结构化锚；本轮台账即处置） |
+| R3-2 | AC-4 正文「构造失败注入」半边承诺超出测试面（落地仅未注册形态；工厂 except 分支与孪生评估分支同覆盖形态） | P3·文档 | 正文措辞对齐验证标准复选框（未注册形态）+ 知悉注记 |
+| R3-3 | 维持项③理由措辞失准（孪生段非「已测」）+ ⑧计数 1ulp→2ulp 勘误 | P3·台账 | R1 维持项清单原地勘误（本轮台账） |
+| R3-4 | cusum_detector docstring 两处量化注记缺失：①预热期值域跳变使 h 膨胀 3.77×/确认延迟 5→8/severity 降档（实测 T4）②degenerate 盲区进程永久性且静默（实测 T5——σ₀=0 冻结永不重估、盲态零日志面） | P3·文档 | docstring 补两句量化注记 + V1-EV13 附盲区可观测注记（本轮落码） |
+
+> **R3 审查配置**：单 Agent 深度推演（六条时间线 T1-T6 逐字段实测——T1 再确认间隔恒 5 逐位吻合/T2 回稳零误触发/T3 反转检测延迟恰 5 无跨侧残留/T4 污染代价量化/T5 盲区锁定/T6 七点全域确认 + 解析域上界 1.6372 复算）+ 生产链实测（bootstrap→resolve 真实 DualChannelEventBus 构造成功/SINGLETON 同实例跨 execute 状态存活/PG 缺席 publish 降级 17ms 不上抛）+ 跨层一致性 10 组抽验全过 + 数学完备性（6000 条蒙特卡洛：FP 率 6.78%、σ̂₀ 低估使能占 79% vs 基线 51%、五分位单调梯度——「FP 主因 σ̂₀ 低估」文档论断获反事实验证；准确率门二项尾 ~1e-4）+ 12 条证伪留痕；零 P0/P1/P2，版本 v2.2.0 → v2.3.0。
 
 ---
 
@@ -996,8 +1007,9 @@ Round 1 修复 11 项（F1-F11——C3 双评审：评审员①「优秀」+ 评
 | v2.0.0 | 2026-10-29 | dev-story 实施完成（Task 0-6 全绿）：CUSUMDriftDetector + DriftDetectionPort/DriftAssessment + DriftDetected 事件（reliable 双登记）+ DriftDetectionError 451 + 主链第七依赖漂移块（drift.detected span 兑现 OD-2[5.7]）+ 断言同步 ×5 + AST 验证器 + 集成六场景 + P99<100ms + 合成回测 0.975；14 验收场景全绿；三家存量回归绿（5.3:179/5.7:88/5.8:154）；数学锚全部验算复核（钦定基准独立复现）；Status → review | Dev (Claude Code) |
 | v2.1.0 | 2026-10-29 | 代码审查 Round 1（四视角并行调研[算法暴力搜索+变异实证/主链降级网/事件异常契约/测试质量回测] + 双评审门禁[①优秀+②采纳清单后优秀]）：P0×0 + P1×1（type:ignore 红线根因修复 Any + 守卫 25 文件扩面）+ P2×2（探测方向三态锚杀 M5 变异 / ValidationError catch 改判不落码——5.8 fail-loud 红测试锁定）+ P3 修复 9 项（reason 闭集对齐/场景⑥ async 委托/warmup 先例回归/注释失实 ×2/yaml 空行/fn 派生/语序注记/loop close）；R1-DF1 登记（全仓 noqa 债 + 守卫 tokenize 升格） | CR (Claude Code) |
 | v2.2.0 | 2026-10-29 | 代码审查 Round 2（回归核查 + 组合交互双视角 + 主会话四目录全量）：R1 修复零功能性回归（传播三清零/守卫 25 文件零命中/F5 值流逐位等价/F4 缓存双向实测/F2 变异杀死实证/八组合互拆全安全/恰一笔提交闭合）；四目录全量 13421 passed（docker sandbox 2 失败隔离绿=预存抖动）；发现 P3×7（R1 自引入计数失实×2 + F8 传播漏网 + ruff 指令伪影稳健化 + 锚消息补齐 + 台账计数勘误 + HYG-1 补漏）落码 6 + 维持 2 | CR (Claude Code) |
+| v2.3.0 | 2026-10-29 | 代码审查 Round 3（单深度推演）：零 P0/P1/P2——六条时间线 T1-T6 逐字段实测全吻合（再确认间隔恒 5/回稳零误触发/反转延迟恰 5/污染代价 3.77× 量化/degenerate 永久盲区锁定/七点全域确认）+ 生产链实测（真实总线构造/降级 17ms 不上抛）+ 跨层 10 组抽验 + 6000 条蒙特卡洛强证实「FP 主因 σ̂₀ 低估」（79% 使能率/五分位单调梯度）；12 条证伪留痕；维持 11 项无一升格（③⑧理由勘误）；P3×4 文档级清偿（docstring 量化注记 ×2/AC-4 措辞对齐/行号漂移登记） | CR (Claude Code) |
 
-**故事版本/Story Version:** v2.2.0
+**故事版本/Story Version:** v2.3.0
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**
