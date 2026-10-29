@@ -1563,10 +1563,13 @@ def when_read_delegated_backtest(context: dict[str, Any]) -> None:
 @then("回测准确率不低于 85% 断言通过（(TP+TN)/40 ≥ 0.85 + 分项计数可观测）")
 def then_backtest_accuracy(context: dict[str, Any]) -> None:
     """准确率断言（钦定种子基准 TP=20/FP=1/acc=0.975——失败消息携带分项计数可诊断）。"""
+    from tests.integration.test_integration_drift_detection import BACKTEST_SEQUENCE_COUNT
+
     tp, fp, tn = context["backtest_tp"], context["backtest_fp"], context["backtest_tn"]
     accuracy = context["backtest_accuracy"]
-    assert accuracy >= 0.85, f"合成回测准确率应 ≥0.85（实际 {accuracy}——分项 TP={tp} FP={fp} TN={tn} FN={20 - tp}）"
-    assert tp + tn + fp == 40, f"分项计数应覆盖 40 序列（TP={tp} TN={tn} FP={fp}）"
+    fn = BACKTEST_SEQUENCE_COUNT // 2 - tp
+    assert accuracy >= 0.85, f"合成回测准确率应 ≥0.85（实际 {accuracy}——分项 TP={tp} FP={fp} TN={tn} FN={fn}）"
+    assert tp + tn + fp == BACKTEST_SEQUENCE_COUNT, f"分项计数应覆盖 {BACKTEST_SEQUENCE_COUNT} 序列（TP={tp} TN={tn} FP={fp}）"
 
 
 @then("确定性断言通过（同种子重跑同结果）")

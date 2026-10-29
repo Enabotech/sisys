@@ -952,7 +952,21 @@ Round 1 修复 11 项（F1-F11——C3 双评审：评审员①「优秀」+ 评
 - [x] **R1-F10（P3·泄漏）**：`run_synthetic_backtest` 的 `new_event_loop()` 未 close——try/finally 显式关闭
 - [x] **R1-F11（P3·文档）**：451 docstring 补「当前实现零 raise 点（update 状态机 total）——契约预留防御码，降级网/HTTP 映射先行接线，测试经 FakeDriftPort 注入行使；V1 Redis 实现状态检查失败通道即刻可用」注记
 
-**Round 1 回归证据**：5.9 全家 130+1420+21+117 passed（unit/contracts/integration+acceptance 同批/契约邻接）+ mypy 触碰 9 文件零错误 + ruff check/format 全过；集成+验收同轮跑（缓存契约）。
+**Round 1 回归证据**：5.9 全家 129 passed（unit 新建四文件 14+26+44+45）+ contracts 全目录 1391 passed + 集成+验收同批双序 21+21 passed + 邻接面（phoenix/arch_evaluation/agent_evaluation/exception_handlers）passed + mypy 全仓（src/+tests/ CI 同口径 1682 文件）零错误 + ruff check/format 全过；R2 回归核查复验全过（F5 值流逐位等价/F4 缓存双向/F2 变异杀死实证/传播三清零 grep）。
+
+**Round 2（回归核查 + 组合交互双视角——cb34a5e3 修复的回归面）：**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-1 | 守卫注释「src 触碰面（9 件）」实列 12 条——R1 扩面时计数未同步（双 Agent 独立互证） | P3 | 改「12 件——新建 3 + 存量触碰 9」 |
+| R2-2 | 守卫排除注释 `noqa:` 紧跟井号形态是潜在工具指令伪影（当前 ruff 版本实测不告警——评审员报告不可复现，改写为稳健形态消除版本敏感面） | P3 | 措辞改写（豁免关键字不紧跟井号后书写 + 注记原因） |
+| R2-3 | warmup 探测锚（L91）无自定义失败消息（邻行先例形态有消息） | P3 | 补 `f"样本 {index + 1} 预热期探测方向应 none"` |
+| R2-4 | F8 传播漏网：验收 then_backtest_accuracy 的 `FN={20 - tp}` 与 `== 40` 魔数残留（集成侧已改常量派生） | P3 | 延迟 import BACKTEST_SEQUENCE_COUNT（1513/1521/1548/1575 先例形态）派生 FN 与覆盖断言 |
+| R2-5 | 故事 R1 台账回归证据计数「130」不可复现（实为 129=14+26+44+45；1420/117 为当时环境口径） | P3 | 台账修正为 129 + 计数口径标注（本行） |
+| R2-6 | deferred-work HYG-1 noqa 枚举漏 tests/contracts/test_port_contract_tool_chain_orchestrator.py:35（# noqa: D401） | P3 | HYG-1 清单补列 |
+| R2-维持 | 集成文件 REPO_ROOT/SRC_DIR 死常量（699cadbe 既有——parents[1] 语义误导）/验收 feature L127「src 七件」文本漂移（v2.0.0 遗留——存在性断言不依赖计数文本） | P3·观察 | 维持不落码（非 R1 面；前者下次触碰该文件时清理，后者涉及 BDD 三联动改面） |
+
+> **R2 审查配置**：双 Agent 并行（回归核查视角[R1 修复传播完备性/守卫扩面自引入/F5 行为等价性/F4 缓存双向/F2 锚脆弱性/运行验证/游离提交七项全过] + 组合交互推演视角[F4×F10 四消费方执行序矩阵双序实测/F5×AC-5.1 消费面/F1×CI 门禁/F3×断言链/F6×改名/修复×维持项八组合全安全]）+ 主会话四目录全量回归（13421 passed + docker sandbox 2 失败隔离复跑绿=预存抖动）+ 互证门禁（P3 批不需完整 C3 往返——5-8 周期先例）；发现 P3×7 落码 6 + 维持 2，版本 v2.1.0 → v2.2.0。
 
 #### 已推迟 Defer
 
@@ -981,8 +995,9 @@ Round 1 修复 11 项（F1-F11——C3 双评审：评审员①「优秀」+ 评
 | v1.3.1 | 2026-10-28 | 文档审查 Round 4 纯验证全过（31 行台账零虚假落地 + 22 组行号锚全精确）+ Round 5 独立终审收敛（五节取证：周期闭合/8 项双向取证/独立快扫无 P0P1/R4 留项清偿/收敛判定）；R5 收敛清偿 P3×4（替身计数口径/OD-3 慢漂移论据/R1-13 位置勘误/免同步命中括注）；收敛声明落入——周期闭环，Status 保持 ready-for-dev | SM (Claude Code) |
 | v2.0.0 | 2026-10-29 | dev-story 实施完成（Task 0-6 全绿）：CUSUMDriftDetector + DriftDetectionPort/DriftAssessment + DriftDetected 事件（reliable 双登记）+ DriftDetectionError 451 + 主链第七依赖漂移块（drift.detected span 兑现 OD-2[5.7]）+ 断言同步 ×5 + AST 验证器 + 集成六场景 + P99<100ms + 合成回测 0.975；14 验收场景全绿；三家存量回归绿（5.3:179/5.7:88/5.8:154）；数学锚全部验算复核（钦定基准独立复现）；Status → review | Dev (Claude Code) |
 | v2.1.0 | 2026-10-29 | 代码审查 Round 1（四视角并行调研[算法暴力搜索+变异实证/主链降级网/事件异常契约/测试质量回测] + 双评审门禁[①优秀+②采纳清单后优秀]）：P0×0 + P1×1（type:ignore 红线根因修复 Any + 守卫 25 文件扩面）+ P2×2（探测方向三态锚杀 M5 变异 / ValidationError catch 改判不落码——5.8 fail-loud 红测试锁定）+ P3 修复 9 项（reason 闭集对齐/场景⑥ async 委托/warmup 先例回归/注释失实 ×2/yaml 空行/fn 派生/语序注记/loop close）；R1-DF1 登记（全仓 noqa 债 + 守卫 tokenize 升格） | CR (Claude Code) |
+| v2.2.0 | 2026-10-29 | 代码审查 Round 2（回归核查 + 组合交互双视角 + 主会话四目录全量）：R1 修复零功能性回归（传播三清零/守卫 25 文件零命中/F5 值流逐位等价/F4 缓存双向实测/F2 变异杀死实证/八组合互拆全安全/恰一笔提交闭合）；四目录全量 13421 passed（docker sandbox 2 失败隔离绿=预存抖动）；发现 P3×7（R1 自引入计数失实×2 + F8 传播漏网 + ruff 指令伪影稳健化 + 锚消息补齐 + 台账计数勘误 + HYG-1 补漏）落码 6 + 维持 2 | CR (Claude Code) |
 
-**故事版本/Story Version:** v2.1.0
+**故事版本/Story Version:** v2.2.0
 **创建日期/Created:** 2026-10-28
 **最后更新/Last Updated:** 2026-10-29
 **更新说明/Description:**

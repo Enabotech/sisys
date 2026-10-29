@@ -260,7 +260,7 @@ class TestArchNoSuppressionComments:
     @pytest.mark.parametrize(
         "relative",
         [
-            # src 触碰面（9 件）
+            # src 触碰面（12 件——新建 3 + 存量触碰 9）
             "src/application/ports/agent_drift.py",
             "src/application/ports/__init__.py",
             "src/application/use_cases/run_agent_workflow.py",
@@ -291,8 +291,9 @@ class TestArchNoSuppressionComments:
             # 排除（勿「补全」）：本文件与 test_arch_evaluation.py 自身源码含
             # 抑制注释字符串字面量（断言目标——子串扫描自毙）；
             # tests/unit/interfaces/api/test_exception_handlers.py 含存量合法
-            # noqa: N817/N814（ruff import 别名豁免债——非本 Story 面，随
-            # 全仓 noqa 债清理任务处置，见 deferred-work）
+            # 抑制豁免（N817/N814 ruff import 别名债——非本 Story 面，随
+            # 全仓豁免债清理任务处置，见 deferred-work。措辞注记：豁免关键字
+            # 不紧跟井号后书写，防被工具解析为指令伪影）
         ],
     )
     def test_no_suppression_comments(self, relative: str) -> None:

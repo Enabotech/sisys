@@ -88,7 +88,7 @@ class TestWarmupBaseline:
             assert assessment.is_drifted is False
             assert assessment.sample_count == index + 1
             # 预热期不累积（Sₕ=Sₗ=0）→ 探测方向恒 none（三态探测契约的 none 档）
-            assert assessment.drift_direction == "none"
+            assert assessment.drift_direction == "none", f"样本 {index + 1} 预热期探测方向应 none"
 
     def test_warmup_running_statistics(self) -> None:
         """预热统计手算对照（前 i 样本 mean/stdev——逐样本演进）。"""
