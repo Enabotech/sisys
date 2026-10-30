@@ -1300,3 +1300,28 @@ class TestBlackboardBridge:
         assert len(slow.post_calls) == 1, "黑板桥已写入的内容保留（持久面与投递面分离）"
         await asyncio.sleep(0.1)
         assert received == [], "close 后消息不投递（在途丢弃语义）"
+
+    async def test_broadcast_snapshot_during_bridge_includes_mid_bridge_subscriber(self) -> None:
+        """BROADCAST 快照边界 = 入队分发时刻（R3-1）：桥挂起期间的新订阅者含入快照。
+
+        钦定边界（bus.py 分发注释）：visible=True 时接收方集合求值点在黑板桥 await
+        之后——桥期间 subscribe 者会收到该广播（探针实证 mid-bridge-sub 1/1）；
+        send 返回后订阅者不收到（既有快照用例承载零让渡形态）。
+        """
+        from src.interfaces.sap.types import MessageType
+
+        slow = _SlowBlackboard()
+        guard = _RecordingIsolationGuard()
+        bus = InProcessSAPBus(blackboard=slow, guard=guard)
+        _ACTIVE_BUSES.append(bus)
+        early_received: list[SAPMessage] = []
+        mid_bridge_received: list[SAPMessage] = []
+        bus.subscribe(str(uuid.uuid4()), lambda message: early_received.append(message))
+        message = _make_message(receiver_id="broadcast", message_type=MessageType.BROADCAST, blackboard_visible=True)
+        send_task = asyncio.ensure_future(bus.send(message))
+        await asyncio.sleep(0.05)  # send 已挂起在慢桥 post 的 await 上
+        bus.subscribe(str(uuid.uuid4()), lambda message: mid_bridge_received.append(message))  # 桥期间订阅
+        await send_task  # 恢复后入队分发——快照在此刻求值（含桥期间订阅者）
+        await _wait_delivery([early_received, mid_bridge_received], 2)
+        assert len(early_received) == 1, "桥前订阅者应收到广播"
+        assert len(mid_bridge_received) == 1, "桥期间新订阅者应含入入队快照（快照=入队分发时刻非 send 入口时刻）"

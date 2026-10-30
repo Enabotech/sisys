@@ -126,7 +126,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官族 Story（SAP 协议面
 
 **Given** 真实 `InProcessSAPBus`（手工构造——组合注入 `_StubBlackboard`[duck-typing 实现 PublicBlackboard 捕获 post] + `_RecordingIsolationGuard`[duck-typing 放行形态]；**每场景新实例**——SINGLETON 组件验收手工新实例惯例）与真实 `SAPMessage`（15 字段 Pydantic——5-3 交付，`sender_id`/`receiver_id` 用 `str(uuid.uuid4())` 测试标识[OD-5 UUID 形态]）
 **When** ①单播：receiver 方 `subscribe(receiver_id, handler)` 注册后，另一方 `send(SAPMessage(message_type=T))`（T ∈ {REQUEST, RESPONSE, NOTIFICATION, DEBATE} 四种非广播类型逐一）②广播：N≥3 个接收方各自 subscribe 后 `send(SAPMessage(message_type=BROADCAST, receiver_id="broadcast"))` ③优先级：同一接收方队列内乱序 send 六条消息——四级各一条（LOW/NORMAL/HIGH/URGENT 乱序注入）+ 追加两条 NORMAL（同级 FIFO 观测对——v1.1.0 补：创建期「四条互异优先级」构造下同级 FIFO 不可观测）④校验面：向未注册 `receiver_id` 单播 / `sender_id` 非 UUID 字符串 / `receiver_id` 非 UUID 非 "broadcast" 约定值 / BROADCAST 组合违规（BROADCAST+receiver≠"broadcast" 与 非 BROADCAST+receiver=="broadcast" 双向——**BROADCAST 方向用例的 receiver 取合法 UUID ≠ "broadcast"（v1.3.0 构造注记：非 UUID 形态按校验次序先撞 invalid_receiver_id，reason 断言错位红）**）各发一条⑤关闭态：`close()` 后 `send`
-**Then** ①**单播送达**：handler 收到的消息与发送实例 15 字段 Pydantic 实例全等（`==`——全字段含 timestamp/subject/context）+ epics L1944-1947 点名十键（message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）逐键显式断言 + 总线行为输入键 `requires_response`/`timeout_seconds` 显式点名（v1.1.0 补：创建期「十键点名+逐字段相等」两种强度混写——十键是 epics 验收点名面，15 字段全等是投递保真面）②**广播全员**：N 个接收方 handler 各收到同一 message_id（全员送达零遗漏——接收方集合快照在 send 时刻定格，send 后 subscribe 者不收到；跨接收方不保证同序——各自独立队列异步出队）③**优先级出队**：接收方收到顺序 == URGENT > HIGH > NORMAL×3（三条 NORMAL 按入队序——同级 FIFO 可观测）> LOW（乱序注入实证插队语义；分发是异步消费任务形态，等待队列清空后断言序）④**校验面 fail-loud**：未注册接收方单播 → `SAPBusStateError`（EXCEPTION_461——send 抛出即失败，消息零入队零投递[发送方拿到明确错误自行处置——比静默入队后无人消费更诚实]）；非 UUID sender → 461（reason=invalid_sender_id）；非 UUID 且非 "broadcast" 的 receiver → 461（reason=invalid_receiver_id——v1.1.0 补：闭集成员创建期无触发用例）；BROADCAST 组合双向违规 → 461（OD-8）⑤**关闭态**：close 后 send/subscribe/wait_for_response → 461（reason=bus_closed）；**close 动作清单钦定（v1.1.0，v1.2.0 补第五动作）**：幂等 + 取消全部消费任务 + 清空 per-receiver 队列 + 挂起 correlation Future `set_exception(SAPBusStateError 461 bus_closed)`[**仅对未 done 条目——`future.done()` 守卫（DC-11 同款，v1.2.0 补：resolve 不移除条目使登记表含已 done Future，字面全量 set_exception 必炸 InvalidStateError 破坏幂等）**] + **清空登记表/Future 表**（二次 close 空表幂等）——**在途等待者收 461** 非 CancelledError，与「close 后新调用 → 461」结局统一；**消息丢弃语义注记（v1.3.0 补——R3 时间线 5 结局格）**：close 丢弃在途（已出队未完成）与滞留（未出队）消息，**无 redelivery**——V1 总线非持久语义（优雅排空归 V2+ 知悉注记）
+**Then** ①**单播送达**：handler 收到的消息与发送实例 15 字段 Pydantic 实例全等（`==`——全字段含 timestamp/subject/context）+ epics L1944-1947 点名十键（message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible）逐键显式断言 + 总线行为输入键 `requires_response`/`timeout_seconds` 显式点名（v1.1.0 补：创建期「十键点名+逐字段相等」两种强度混写——十键是 epics 验收点名面，15 字段全等是投递保真面）②**广播全员**：N 个接收方 handler 各收到同一 message_id（全员送达零遗漏——接收方集合快照在**入队分发时刻**定格[R3-1 勘误：原「send 时刻」字面读作 send 入口时刻会得出相反实现——visible=True 时求值点在黑板桥 await 之后，桥期间 subscribe 者含入快照并收到；快照边界守护用例 test_broadcast_snapshot_during_bridge_includes_mid_bridge_subscriber]，send 返回后 subscribe 者不收到；跨接收方不保证同序——各自独立队列异步出队）③**优先级出队**：接收方收到顺序 == URGENT > HIGH > NORMAL×3（三条 NORMAL 按入队序——同级 FIFO 可观测）> LOW（乱序注入实证插队语义；分发是异步消费任务形态，等待队列清空后断言序）④**校验面 fail-loud**：未注册接收方单播 → `SAPBusStateError`（EXCEPTION_461——send 抛出即失败，消息零入队零投递[发送方拿到明确错误自行处置——比静默入队后无人消费更诚实]）；非 UUID sender → 461（reason=invalid_sender_id）；非 UUID 且非 "broadcast" 的 receiver → 461（reason=invalid_receiver_id——v1.1.0 补：闭集成员创建期无触发用例）；BROADCAST 组合双向违规 → 461（OD-8）⑤**关闭态**：close 后 send/subscribe/wait_for_response → 461（reason=bus_closed）；**close 动作清单钦定（v1.1.0，v1.2.0 补第五动作）**：幂等 + 取消全部消费任务 + 清空 per-receiver 队列 + 挂起 correlation Future `set_exception(SAPBusStateError 461 bus_closed)`[**仅对未 done 条目——`future.done()` 守卫（DC-11 同款，v1.2.0 补：resolve 不移除条目使登记表含已 done Future，字面全量 set_exception 必炸 InvalidStateError 破坏幂等）**] + **清空登记表/Future 表**（二次 close 空表幂等）——**在途等待者收 461** 非 CancelledError，与「close 后新调用 → 461」结局统一；**消息丢弃语义注记（v1.3.0 补——R3 时间线 5 结局格）**：close 丢弃在途（已出队未完成）与滞留（未出队）消息，**无 redelivery**——V1 总线非持久语义（优雅排空归 V2+ 知悉注记）
 **And** `SAPBus` Protocol 方法面四方法（send/subscribe/wait_for_response/close——`@runtime_checkable`，契约测试锚）；**积压口径注记**：per-receiver 队列长度可观测（NFR-IF-03「积压<100 条」是部署容量面——测试断言并发场景队列最终清空[AC-5.2 承载]，不设阈值门）；**异步 handler 支持**：handler 形态 `Callable[[SAPMessage], Awaitable[None] | None]`（协程 await 后再出队下一条——串行保序）；**handler 异常处置钦定 deliver-continue（v1.1.0）**：消费任务捕获 handler 异常（同步 raise 与异步异常等效）→ log warning（含 message_id 与异常摘要）→ **继续出队下一条**（单条 handler 崩溃不冻结该接收方队列——Actor supervision 隔离惯例）；**捕获边界 `except Exception`（v1.2.0 钦定：CancelledError 属 BaseException 非 handler 异常——close 的 task.cancel() 落在 await handler 处时放行传播，防宽捕获吞取消信号使消费任务永候）**；**校验次序钦定**：`_validate` 开闭态检查首位（closed bus 上任何载荷违规均报 bus_closed——状态先于载荷）；**订阅语义钦定（v1.1.0）**：subscribe 侧同样校验 UUID（非法拒绝 461 reason=invalid_receiver_id——防「永远无法合法收到消息」的死订阅）；同 receiver_id 重复 subscribe **覆盖**（后注册 handler 生效——dict 语义一致）；sender 订阅自身 id 时收到自己的消息（自收合法）；零订阅者 BROADCAST 静默成功零投递（全员=当前空集）
 
 **验证标准/Validation Criteria:**
@@ -602,6 +602,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官族 Story（SAP 协议面
 - **架构测试 baseline 空集与白名单 {pydantic} 双层张力**：有意防漂移设计（5-7 OD-1 家族）——引入白名单内依赖须同步改 baseline 断言（受控变更点）
 - **AC-5.2「队列清空」断言与零丢失同义反复**：串行消费语义（test_async_handler_serial_order 守护）下逻辑等价——形式冗余名实不符，无假绿风险
 - **裸 RESPONSE「非 warning 路径」未断言**：correlation_id=None 跳过 resolve 的日志语义面（噪声区分）无独立断言——行为面（零崩溃+送达）已守，日志语义属可观测性细节
+- **close 后三内部表键集保留**（R3-2 知悉）：close 清值不清键——`_handlers`/`_queues`/`_consumer_tasks` 三表条目保留（任务已取消/队列已清空）；V1 无重开语义且三方法 461 拦截全部后续消费，残留不可达不可观测，无行为后果（未来 V2+ 若引入重开/restart 语义须显式清理三表）
 
 ### 项目结构说明 Project Structure
 
@@ -851,6 +852,17 @@ tests/
 
 **组合交互矩阵结论**（R2-B 实测）：①close+在途 send+无条目等待者三方并发 → 闭环 ✓（六断言全立）；②竞态放弃后 RESPONSE 三子路径 → 闭环 ✓（查表 miss 静默/入口 461 闸门/复查先于 resolve）；③多等待者 × close → 主路径 ✓（双等待者收 461、消化零副作用）+ 变体缺口（R2-F1）；④_closed_event × 二次 close → 闭环 ✓（_closed 守卫先 return，event.set 幂等双防线）。**运行面**：单元+异常+架构+契约 157 passed（132+25 既有 test_message.py）/集成+验收 21 passed/既有被改 126 passed/门禁三项全过/**3 连跑零 flaky**（R1-F7 与 R1-F1 新用例时序余量充足，波动 <1.3s）。
 
+#### Round 3（2026-10-30——单深度推演 Agent 四件套；基线 HEAD=1b397b0a）
+
+**四件套结论**：①14 Gherkin 场景三轴推演 **14✅+0⚠️+0❌**（文档周期 R3 的两处 ⚠️ 经正交性计数锚落码后独立复核收敛为唯一可写）；②六协议时间线逐字段终态全闭合（T1 竞态两子形态收敛同终态/T2 多等待者三形态/T3 close 生命周期/T4 超时清理/T5 cancel 三落点/T6 快照精确边界=入队分发时刻）；③断言数学可满足性全过（六元组注入-堆序同构复算 True/计时锚 δ 实测 2ms 双侧余量消耗 0.5%/三锚结构未触碰仍精确/R1 新用例可满足性复演通过）；④R1+R2 叠加 9 格全路径闭合矩阵（send/wait/close × open/closing/closed——探针补证 closing 三格，除已登记 R2-F1 盲点外零未闭合交点）+ R2 八处文档落点 grep 实证全在位。
+
+| # | 发现 | 级别 | 处置（单深度推演独立发现 + 主会话核验直落——文字面+一行级用例） |
+|---|---|---|---|
+| R3-F1 | R3-1：**T6 快照精确边界零测试守护 + 故事措辞粒度差**——visible=True 时「桥挂起期间新订阅者含入入队快照并收到广播」是已钦定语义（bus.py 分发注释）且实现正确（探针实证 mid-bridge-sub received 1/1），但该分支零用例（既有快照用例均为 visible=False 零让渡形态）；故事 L129「快照在 send 时刻定格」字面读作 send 入口时刻会得出相反实现 | P3 | **双落点清偿**：①补单元用例 test_broadcast_snapshot_during_bridge_includes_mid_bridge_subscriber（慢桥替身 + 桥期间 subscribe + 双方各收 1——快照边界唯一可写断言）；②L129 措辞改「入队分发时刻定格」+ 勘误括注 |
+| R3-F2 | R3-2：close 动作清单未声明三内部表残留语义（`_handlers`/`_queues`/`_consumer_tasks` 键集保留仅清值/取消——V1 无重开语义且三方法 461 拦截，残留不可达不可观测） | P3（知悉级） | Dev Notes 知悉注记登记（不落码——无行为后果；V2+ 重开语义须显式清理三表） |
+
+**证伪不成立的疑点 12 条留痕**（推演排除——防下轮重推，全文见审查过程记录）：late 460 与 R2-F1 登记逐字一致复证 / closing 态三方法探针证伪漏拦截 / send 复查后全段零 yield 原子不可交叠 / FIFO 双收判别力 + TypeError 第三杀背书 / 无条目 461 覆盖分配自洽 / AC-2.2「零 resolve」行为断言口径内 / _PERF_CACHE 命中顺序无关 / exception() 消化零副作用双证 / 模块级 loop 与 pytest-asyncio 零冲突 / 内部表残留不可利用 / marker 自动挂载不含 sap / AC-3.3 reject_with 置位顺序无影响。
+
 ---
 
 ### 下一步 Next Steps
@@ -862,7 +874,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.6.0（代码审查周期 Round 2）
+**故事版本/Story Version:** v1.7.0（代码审查周期 Round 3）
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-30
 **更新说明/Description:**
@@ -874,3 +886,4 @@ tests/
 - v1.3.1: 文档审查周期收敛终态（R4 纯验证六维全过零修复 1 P3 留项登记 + R5 独立终审五节全过零新发现——周期闭合 4 提交零游离/关键修复双向取证 8/8 全立/特权快扫 12 处绝对化断言抽验全过/门禁三项全绿/递减曲线 21→15→9→零修复→零新发现严格单调）——R4 留项清偿（OD-7 引文逐字化勘误）+ 五轮收敛声明入档；修复表 33 行（R5-F33）；Status 保持 ready-for-dev
 - v1.5.0: **代码审查周期 Round 1**（四视角并行调研 A 总线实现/B 接线合规/C 测试判别力/D 运行面实测——零 P0，P1×5 + P2×5 + P3×12）——落码 9 项：代码 3 处（send/close 竞态幽灵条目复查[P1·实测证实·变异杀] / close 无等待者 Future retrieved 消化[P2] / _closed_event 无条目等待者 461 结局统一[P2·变异杀]）+ 测试 6 新用例（FIFO 内序[F1·变异双杀] / close done 守卫+登记表清空 / CancelledError 放行守护 / 计时锚延迟回发判别形态 1.6/0.8/1.2 / 事件赢 461+超时赢 460 双分支 / 慢桥竞态）+ 4 改造（验收 content 序断言/BROADCAST+False 全员送达/空 caplog 块/docstring 缩进与措辞）+ teardown 双机制（单元 _ACTIVE_BUSES + 验收 _buses——unraisable warning 15→0）；双评审员合格→修订 6 点吸收→单复评员优秀放行（三步门禁）；文档勘误 2 + 知悉注记 6 入 Dev Notes + 留项 2；回归全绿（132+21+126 passed/ruff/mypy/红线零命中）
 - v1.6.0: **代码审查周期 Round 2**（回归核查 A + 组合交互与运行面 B 双 Agent）——R1 修复回归核查行为级零回归（「R1 自引入 P1」历史模式未复现；F1 docstring 落位与 F4 双收形态两项部分落地判别力等价）+ 组合矩阵四组三闭环一变体缺口 + 运行面全绿（157+21+126/门禁三项/3 连跑零 flaky）+ D-2 清偿关闭；修复 6 项全文字面（R2-F1 多等待者×close 组合缺口 docstring 收窄+知悉深化[P2·实测变体·预存非 R1 回归·单等待者惯例下不可达] / R2-F2 send docstring 双侧补竞态放弃契约披露 / R2-F3 Attributes 补 _closed_event / R2-F4 单元 FIFO 改双收六元组 / R2-F5 close 措辞统一 / R2-F6 AC-2 两处 461 注记）——双 Agent 互证+主会话核验直落（5-9 轻量化门禁先例，全批次零行为变更）
+- v1.7.0: **代码审查周期 Round 3**（单深度推演 Agent 四件套）——零 P0/P1/P2 + P3×2：①14 Gherkin 场景三轴推演 14✅+0⚠️+0❌（文档周期两 ⚠️ 经正交性计数锚落码后独立复核收敛）②六协议时间线逐字段终态全闭合（T6 快照精确边界=入队分发时刻探针实证）③断言数学可满足性全过（六元组同构复算/计时锚 δ 实测 2ms 余量消耗 0.5%）④R1+R2 叠加 9 格全路径闭合矩阵+R2 八处文档落点 grep 实证全在位；修复 2 项（R3-F1 快照边界守护用例+L129 措辞勘误 / R3-F2 close 三内部表残留知悉登记）+ 证伪留痕 12 条；单深度推演独立发现+主会话核验直落（文字面+一行级用例）
