@@ -205,7 +205,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官 Story（计算能力面�
 - [ ] **本 Story 零领域事件**（确定性计算服务无事件——cost_calculator/rrf_fusion 先例；event_channels.yaml/ChannelRouter/domain/events 零改动——AC-4 零事件断言面）
 
 #### 数据模型 (Data Models)
-- [ ] VO 族定义位于 `src/domain/value_objects/financial_valuation.py`（frozen dataclass；**守卫分层钦定**：输入类[CashFlow/CashFlowSchedule/DcfAssumptions/ComparableCompany/ComparableSet/PrecedentTransaction/PrecedentTransactionSet 七类]带 `__post_init__` 242 守卫，**结果类[DcfValuationResult/MultiplesStats/ComparableValuationResult/PrecedentValuationResult 四类]纯载体零守卫**——负 NPV/weight 越界是合法计算结果非构造违例）：`CashFlow`（period: int≥1[违例 context field="period"——成员级守卫] / amount: Decimal）/ `CashFlowSchedule`（**字段名钦定 `cash_flows`**——与守卫锚 context field="cash_flows"/Schema 段名/AC-1④ 一致[数据模型节原「items」措辞作废——R3 台账 G-1 勘误]；非空 + period 从 1 严格连续 + **至少一次符号变更——非零子序列上计数**[IRR 可解必要条件；零语义钦定：Descartes 忽略零系数，禁「相邻元素异号」实现——对 [−100,0,110] 误拒、对 [−100,0.0001,−110] 误放]；period 非连续/重复类违规同归 field="cash_flows"[schedule 级守卫]）/ `DcfAssumptions`（discount_rate 0<r<1 + terminal_value_method **str 字段 + `__post_init__` 闭集判等**[{"perpetual_growth","exit_multiple"}——与 Schema 层 Literal 对应；domain 层零 typing.Literal 依赖的判等守卫形态] + 法配套参数守卫[g≥0 且 g<r / exit_multiple>0 且 terminal_exit_metric>0=终年 EBITDA 口径] + 法-参数互斥配套）/ `DcfValuationResult`（present_values/npv/terminal_value/terminal_value_weight/irr 五字段）/ `ComparableCompany`（name 非空 + ev_ebitda>0）/ `ComparableSet`（**字段名 `comparables`**——与 Schema 段名一致；非空 min 1）/ `MultiplesStats`（min/median/mean/max 四 Decimal）/ `ComparableValuationResult`（multiples_stats + implied_ev_low/median/high）/ `PrecedentTransaction`（target_name 非空 + ev_ebitda>0）/ `PrecedentTransactionSet`（**字段名 `transactions`**；非空）/ `PrecedentValuationResult`（同 Comparable 结果形态）
+- [ ] VO 族定义位于 `src/domain/value_objects/financial_valuation.py`（frozen dataclass；**守卫分层钦定**：输入类[CashFlow/CashFlowSchedule/DcfAssumptions/ComparableCompany/ComparableSet/PrecedentTransaction/PrecedentTransactionSet 七类]带 `__post_init__` 242 守卫，**结果类[DcfValuationResult/MultiplesStats/ComparableValuationResult/PrecedentValuationResult 四类]纯载体零守卫**——负 NPV/weight 越界是合法计算结果非构造违例）：`CashFlow`（period: int≥1[违例 context field="period"——成员级守卫] / amount: Decimal）/ `CashFlowSchedule`（**字段名钦定 `cash_flows`**——与守卫锚 context field="cash_flows"/Schema 段名/AC-1④ 一致[数据模型节原「items」措辞作废——台账 R3-1 勘误]；非空 + period 从 1 严格连续 + **至少一次符号变更——非零子序列上计数**[IRR 可解必要条件；零语义钦定：Descartes 忽略零系数，禁「相邻元素异号」实现——对 [−100,0,110] 误拒、对 [−100,0.0001,−110] 误放]；period 非连续/重复类违规同归 field="cash_flows"[schedule 级守卫]）/ `DcfAssumptions`（discount_rate 0<r<1 + terminal_value_method **str 字段 + `__post_init__` 闭集判等**[{"perpetual_growth","exit_multiple"}——与 Schema 层 Literal 对应；domain 层零 typing.Literal 依赖的判等守卫形态] + 法配套参数守卫[g≥0 且 g<r / exit_multiple>0 且 terminal_exit_metric>0=终年 EBITDA 口径] + 法-参数互斥配套）/ `DcfValuationResult`（present_values/npv/terminal_value/terminal_value_weight/irr 五字段）/ `ComparableCompany`（name 非空 + ev_ebitda>0）/ `ComparableSet`（**字段名 `comparables`**——与 Schema 段名一致；非空 min 1）/ `MultiplesStats`（min/median/mean/max 四 Decimal）/ `ComparableValuationResult`（multiples_stats + implied_ev_low/median/high）/ `PrecedentTransaction`（target_name 非空 + ev_ebitda>0）/ `PrecedentTransactionSet`（**字段名 `transactions`**；非空）/ `PrecedentValuationResult`（同 Comparable 结果形态）
 - [ ] 值对象不可变（frozen——schema_validator.py SchemaValidationResult L158-169 先例）；Decimal 类型注解全程
 
 #### 统一端口定义注册与管理 (Port Contract)
@@ -279,7 +279,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官 Story（计算能力面�
 | TDD 单元测试 | financial 异常族 | 470 构造/属性/to_dict/context/cause 链/BusinessException 继承 | `tests/unit/domain/exceptions/test_financial_exceptions.py` | Task 1 |
 | TDD 单元测试 | VO 族 | 11 类 VO 构造/不变量守卫 242/冻结性/Decimal 注解 | `tests/unit/domain/value_objects/test_financial_valuation.py` | Task 2 |
 | TDD 单元测试 | DCF 引擎 | NPV/终值两法/IRR/Excel 基准对齐/bracket 失败 470 | `tests/unit/domain/services/test_financial_modeling.py`（第一/二批） | Task 3 |
-| TDD 单元测试 | 可比+先例引擎 | 统计四值/隐含区间/偶数 median/异常 | 同上文件（第三批） | Task 4 |
+| TDD 单元测试 | 可比+先例引擎 | 统计四值/隐含区间/偶数 median | 同上文件（第三批） | Task 4 |
 | TDD 单元测试 | 应用层 Schema | 三段请求/字符串数字/六类非法/跨字段校验器 | `tests/unit/application/use_cases/test_financial_modeling_use_case.py`（Schema 用例类） | Task 5 |
 | TDD 单元测试 | 估值用例 | 编排零变换/fail-loud/部分请求跳过 | 同上文件（用例用例类） | Task 5 |
 | TDD 契约测试 | use_case 端口 | 11 维度 + REQUIRED_METHODS + service 可达 | `tests/contracts/test_port_contract_financial_modeling.py` | Task 5 |
@@ -337,7 +337,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官 Story（计算能力面�
 | AC-1④/AC-4 | FinancialCalculationError 470 异常契约 + 注册四件套 | Task 1 | 1.1-1.3 | test_financial_exceptions.py + test_exception_handlers.py |
 | AC-2 | 可比统计+隐含区间 | Task 4 | 4.1-4.2 | test_financial_modeling.py + 验收 AC-2.1 |
 | AC-2 | 先例统计+参考区间 | Task 4 | 4.1-4.2 | 同上 + 验收 AC-2.2 |
-| AC-2 | 空集合/非正倍数 242 | Task 2/4 | 2.2/4.1 | test_financial_valuation.py + 验收 AC-2.3 |
+| AC-2 | 空集合/非正倍数 242 | Task 2 | 2.1-2.2 | test_financial_valuation.py + 验收 AC-2.3[守卫全在 VO 层——Task 4 红批次零异常用例，归属修正注] |
 | AC-3 | 三段 Schema 合法构造+精确解析 | Task 5 | 5.1-5.2 | Schema 用例类 + 验收 AC-3.1 |
 | AC-3 | 六类非法 pydantic 拒绝 + wire 契约 | Task 5 | 5.1-5.2 | 同上 + 验收 AC-3.2 |
 | AC-4 | 组合根两注册+注入链+契约 11 维度+service 方法断言 | Task 5 | 5.3 | test_port_contract + 验收 AC-4.1 |
@@ -717,6 +717,9 @@ tests/
 - `src/application/services/financial_schemas.py` - 三段请求 Schema
 - `src/application/use_cases/financial_modeling.py` - 估值用例
 - `src/composition_root.py`（修改）- Story 5.12 区段
+- `src/domain/exceptions/__init__.py`（修改）- FinancialCalculationError 导出（import 字母序 + __all__ 子域分组两处）
+- `src/domain/exceptions/_code_ranges.py`（修改）- CODE_RANGES "financial": (470, 479) + 段注释 + _CLASS_TO_SUBDOMAIN 一行
+- `src/interfaces/api/exception_handlers.py`（修改）- EXCEPTION_HTTP_MAP 470→422 一行
 - `tests/unit/domain/value_objects/test_financial_valuation.py` - VO 单测
 - `tests/unit/domain/services/test_financial_modeling.py` - 引擎单测
 - `tests/unit/domain/services/financial_test_cases.json` - Excel 基准（OD-7）
@@ -816,6 +819,10 @@ tests/
 | R3-11 | VO 三处形态自由度未钦定：terminal_value_method 类型形态/ComparableSet/PrecedentTransactionSet 字段名 | P3 | str+闭集判等（零 Literal 依赖）/comparables/transactions 三处钦定 |
 | R3-12 | v1.2.0 尾句「Round 1 修订 30 项」不可复算（台账口径 28——R2-4 刚勘误同型）+ v1.1.0 P2 子枚举 11 项 vs 声明 12（缺 R1-16） | P3 | 「台账 28 项」修正 + 子枚举补「矩阵 Subtask 编号」 |
 | R3-13 | 并发确定性锚串行基线获取方式未写 | P3 | 钦定「同 10 路请求先串行执行一遍存结果再并发比对」 |
+| R4-1 | File List 修改文件集合与项目结构树不一致（树列 4 个 src 修改，File List 仅列 composition_root.py——异常注册三动作的 __init__.py/_code_ranges.py/exception_handlers.py 漏列，同表 test/docs 修改却列入——索引口径不自洽） | P3 | File List 补列 3 个 src 修改文件（Task 1 重构阶段与继承表本就完整承载，纯索引漏项零执行风险） |
+| R4-2 | v1.3.0 日志汇总数「1 P2 + 13 P3」off-by-one（台账实为 1 P2 + 12 P3 = 13 项）——R2-4/R3-12 同型第三现 | P3 | 勘误为「1 P2 + 12 P3」（本轮回归核查与独立终审双 agent 同报） |
+| R4-3 | L208「R3 台账 G-1 勘误」悬空 ID（全文编号体系无 G-n——审查方自有编号未转写，所指为 R3-1）——R2-12 R-F1 同型 | P3 | 改「台账 R3-1 勘误」 |
+| R4-4 | 矩阵 AC-2 集合异常行标 Task 2/4 但 Task 4 红批次零异常用例、DoD 自言「无空集合防御分支」（跨表归属噪声——守卫全在 VO 层 Task 2） | P3 | 矩阵行归 Task 2（2.1-2.2）+ 测试分类表 Task 4 行「异常」字样同步删除 + 归属修正注 |
 
 ---
 
@@ -834,11 +841,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-10-30
 **最后更新/Last Updated:** 2026-10-30
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四视角并行调研 + OD-1~OD-8 偏离声明 + AC-1~AC-5 + Task 0-7）
 - v1.1.0: 文档审查 Round 1 修订（4 视角代码调研 + 3 视角文档审查：2 P0 + 9 P1 + 12 P2 + 4 P3[子项展开 13] + 1 证伪留痕 = 台账 28 项——P0：weight 断言口径统一[折现终值比]/分解锚测试侧 prec=50 钦定；P1：基准双源生成法[Fraction 复算主源+Excel 交叉对照+循环自证红线]/零现金流符号语义[非零子序列计数+正向用例]/period int 口径/IRR 求解对象+签名/cash_flows min_length/验证器 B grep 口径/矩阵补 Task 1 行/AgentEvaluationError SystemException 勘误[BusinessException+422 声明为新形态]/基准填充归属 Task 3.1/4.1；P2：结果类 4 个零守卫/四元组/39 个 test_arch/矩阵 Subtask 编号/统计面 prec=50/service 方法契约断言/收尾转绿措辞/#NUM! 改 fail-loud 语义/t=0 口径注记/终年 EBITDA 口径/Decimal 先例勘误/pydantic 机理修正；P3：行号锚四处/weight 充分条件/残留问号等；风险表 R2/R3 重写 + R11-R14 新增；台账 28 项入档）
 - v1.2.0: 文档审查 Round 2 修订（修订核验+回归核查+对抗全新审查+业务消费面审查四视角：3 P2 + 13 P3 修复——P2：R1-18 向 Task 级三执行面传播闭环/范围边界表归宿锚群修正[LLM 推荐 V2+ prd L528 语义锚统一·估值深度幻影锚换具名·REST 补 FR 真源 20-1/20-2+P0/P2 冲突知悉·CFO 改 Epic 9 七角色语义·单变量孤儿承诺治理登记]/组合根零私有函数「纪律」失实勘误[实测 4 私有函数——改两形态合法落位]；P3：版本日志汇总数字复算修复/Task 3 prec 变异红机制钦定[分解自洽锚]/Task 4 行为变异改写/Task 1 补两锚/8 项自动口径/IRR 余量按双源纪律改写[引擎 ~1e-11 对 1e-4 约 7 数量级]+percent 限定词/验收禁 mock 层级澄清/零值用例归属注/R-F1 悬空引用+括号四处+管道符/or.md 三.3[1] challenge 面对照论证/prd [or.md 五.3] 悬空勘误+L2794 文档间分歧注/Epic 21-1 消费方补登/OD-4 口径化承载措辞；Round 1 修订台账 28 项回归核查八面零不一致；台账 R2-1~R2-16 入档）
-- v1.3.0: 文档审查 Round 3 修订（dev 模拟执行走查 + 结构完整性机器扫描双视角：1 P2 + 13 P3 修复——P2：R3-1 CashFlowSchedule 字段名矛盾[数据模型节「items」vs 守卫锚 field="cash_flows"——R1-1 同型病灶两轮漏网，钦定 cash_flows 三处一致]；P3：病态例载体钦定[不入 JSON inline 测试代码]/dcf_cases ≥3→≥4/_solve_irr 收敛判据唯一化[删中点近零 OR 支路免容差钦定]/CashFlow period≥1 违例用例补列[DoD 分支 100% 自洽]/register_port module= 填值+interface __import__ 形态注记/FinancialValuationRequest 顶层三字段名钦定[dcf/comparables/precedents]/Fraction 复算运行时点双消费路径分工[单测实时重算+集成 JSON 汇总]/AC-2 亏损标的拦截落点口径[Schema gt=0 非 242]/Task 4 DoD 措辞/VO 三处形态钦定[str 闭集判等+comparables/transactions]/版本日志 30→28 与子枚举补 R1-16/串行基线获取钦定；结构扫描六大机器面全过[括号 777/777·22 表列数一致·44 条台账全在位·锚点零悬空·语法零缺陷·修复存续 10/10]；dev 走查结论「达到无歧义执行标准[零 P0/P1，44 项已修台账抽验无回归，全部仓内侧写核实为真]」；台账 R3-1~R3-13 入档）
+- v1.3.0: 文档审查 Round 3 修订（dev 模拟执行走查 + 结构完整性机器扫描双视角：1 P2 + 12 P3 修复——P2：R3-1 CashFlowSchedule 字段名矛盾[数据模型节「items」vs 守卫锚 field="cash_flows"——R1-1 同型病灶两轮漏网，钦定 cash_flows 三处一致]；P3：病态例载体钦定[不入 JSON inline 测试代码]/dcf_cases ≥3→≥4/_solve_irr 收敛判据唯一化[删中点近零 OR 支路免容差钦定]/CashFlow period≥1 违例用例补列[DoD 分支 100% 自洽]/register_port module= 填值+interface __import__ 形态注记/FinancialValuationRequest 顶层三字段名钦定[dcf/comparables/precedents]/Fraction 复算运行时点双消费路径分工[单测实时重算+集成 JSON 汇总]/AC-2 亏损标的拦截落点口径[Schema gt=0 非 242]/Task 4 DoD 措辞/VO 三处形态钦定[str 闭集判等+comparables/transactions]/版本日志 30→28 与子枚举补 R1-16/串行基线获取钦定；结构扫描六大机器面全过[括号 777/777·22 表列数一致·44 条台账全在位·锚点零悬空·语法零缺陷·修复存续 10/10]；dev 走查结论「达到无歧义执行标准[零 P0/P1，44 项已修台账抽验无回归，全部仓内侧写核实为真]」；台账 R3-1~R3-13 入档）
+- v1.3.1: 文档审查 Round 4 修订（Round 3 修订回归核查 + 逐节摘要对照独立终审双视角：R3 修复 13/13 落位零编辑事故·八项节间对照矩阵核心执行面全闭合·20+ 外部锚点实证零失效；4 P3 清偿：File List 补列 3 个 src 修改文件[exceptions/__init__.py·_code_ranges.py·exception_handlers.py——与项目结构树口径对齐]/v1.3.0 汇总数「13 P3」off-by-one 勘误[实为 12——R2-4/R3-12 同型第三现，本轮顺带清偿]/L208 悬空 ID「G-1」→「台账 R3-1」/矩阵 AC-2 集合异常行 Task 归属修正[Task 2/4→Task 2——Task 4 红批次零异常用例，守卫全在 VO 层，测试分类表「异常」字样同步]；零 P0/P1/P2，递减曲线 2P0+9P1→3P2→1P2→纯 4P3 收敛成立；台账 R4-1~R4-4 入档）
