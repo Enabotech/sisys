@@ -393,6 +393,29 @@ class TestDcfIrr:
         assert exc_info.value.context["method"] == "dcf"
         assert exc_info.value.context["detail"], "detail 应携求解失败描述"
 
+    def test_underflow_both_endpoints_zero_raises_470(self, service: Any) -> None:
+        """全下溢显性现金流 → IRR 两端同零特判 470（CR3-1③——防静默错误 IRR：
+        显性 CF=[−1E-1000460, +1E-1000460] 全下溢为 ±0 时，无特判则二分退化收敛
+        rate_low 端点返回 IRR=−0.99 而数学真值 0；exit_multiple 法使 TV 正常
+        npv≠0 走到 IRR 路径[perpetual 法同构造会被 npv==0 守卫先行拦截]）。"""
+        from src.domain.exceptions import FinancialCalculationError
+
+        case_input = {
+            "cash_flows": [
+                {"period": 1, "amount": "-1E-1000460"},
+                {"period": 2, "amount": "1E-1000460"},
+            ],
+            "discount_rate": "0.1",
+            "terminal_value_method": "exit_multiple",
+            "exit_multiple": "8.5",
+            "terminal_exit_metric": "70",
+        }
+        with pytest.raises(FinancialCalculationError) as exc_info:
+            service.calculate_dcf(_build_schedule(case_input), _build_assumptions(case_input))
+        assert exc_info.value.code == "EXCEPTION_470"
+        assert exc_info.value.context["method"] == "dcf"
+        assert "同时为零" in exc_info.value.context["detail"], "detail 应陈述端点同零双因（全下溢或双根歧义）"
+
     def test_max_iterations_defense_branch(self, service: Any, monkeypatch: pytest.MonkeyPatch) -> None:
         """迭代上限防御分支（monkeypatch 压缩 _IRR_MAX_ITERATIONS=2 → 区间未收敛即 470——
         正常收敛约 44 次，256 是防御分支经本路径触发覆盖）。"""

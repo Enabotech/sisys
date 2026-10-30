@@ -41,6 +41,14 @@ class FinancialValuationResult:
 
     与请求三段同名（dcf/comparables/precedents——AC-3 顶层三字段名钦定对应）。
 
+    Decimal 序列化警示（CR3-2）：三段嵌套结果全部 Decimal 字段不可直接
+    JSON 序列化（json.dumps 抛 TypeError；FastAPI jsonable_encoder 会静默
+    Decimal→float 截断到 17 位有效数字——反噬 str wire 精度纪律且违反
+    「金融计算禁止浮点误差」红线）。消费方 JSON 化时钦定逐 Decimal 叶子
+    字段 str()（嵌套 VO/元组递归遍历——与请求 str wire 对称往返，str→Decimal
+    构造恒精确）；禁用 float()。本 DTO 不内建序列化方法（警示非保证——
+    to_wire_dict 辅助函数归 Story 20-1 REST 面立项时定）。
+
     Attributes:
         dcf: DCF 估值结果（未请求该段为 None）
         comparables: 可比公司估值结果（未请求该段为 None）
@@ -130,6 +138,9 @@ class FinancialModelingUseCase:
 
     def execute(self, request: FinancialValuationRequest) -> FinancialValuationResult:
         """执行估值编排（转换 → 按段分派服务方法 → 组装 DTO——零捕获零降级）。
+
+        同步契约注记（CR3-5）：纯 Decimal 计算 ms 级无 IO——async 消费方
+        （LangGraph/Prefect）经 asyncio.to_thread 包装或直接同步调用。
 
         Args:
             request: 财务估值请求（至少一段非 None）

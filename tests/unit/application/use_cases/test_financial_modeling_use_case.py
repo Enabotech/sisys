@@ -198,6 +198,72 @@ class TestFinancialSchemas:
         assert request.comparables is not None and len(request.comparables.comparables) == 100
         assert request.precedents is not None and len(request.precedents.transactions) == 100
 
+    def test_magnitude_bound_rejected(self) -> None:
+        """量级界超限拒绝（CR3-1②——amount 双侧 ±1E+15[负向巨值是单侧 le 的
+        实证漏洞面]/倍数 1E+9/EBITDA 1E+15：封大量级 decimal.Overflow 非领域
+        逃逸与 statistics.mean 挂死残余面——Schema 层资源策略单层钦定）。"""
+        over_limit_payloads: list[dict[str, Any]] = [
+            # amount 正向巨值（双侧界上侧）
+            {
+                "dcf": {
+                    **_FULL_PAYLOAD["dcf"],
+                    "cash_flows": [{"period": 1, "amount": "1E+16"}, {"period": 2, "amount": "1E+16"}],
+                }
+            },
+            # amount 负向巨值（双侧界下侧——单侧 le 放行 -1E+999999999 的实测漏洞面）
+            {
+                "dcf": {
+                    **_FULL_PAYLOAD["dcf"],
+                    "cash_flows": [{"period": 1, "amount": "-1E+16"}, {"period": 2, "amount": "1E+16"}],
+                }
+            },
+            # 可比倍数巨值（statistics.mean 挂死面——1E+10 已超 1E+9 界）
+            {"comparables": {"comparables": [{"name": "巨值可比", "ev_ebitda": "1E+10"}], "target_ebitda": "120"}},
+            # 先例倍数巨值
+            {"precedents": {"transactions": [{"target_name": "巨值标的", "ev_ebitda": "1E+10"}], "target_ebitda": "120"}},
+            # 可比 target_ebitda 巨值
+            {"comparables": {"comparables": [{"name": "c", "ev_ebitda": "8.5"}], "target_ebitda": "1E+16"}},
+            # exit 法两字段巨值
+            {
+                "dcf": {
+                    "cash_flows": [{"period": 1, "amount": "-100"}, {"period": 2, "amount": "110"}],
+                    "discount_rate": "0.1",
+                    "terminal_value_method": "exit_multiple",
+                    "exit_multiple": "1E+10",
+                    "terminal_exit_metric": "110",
+                }
+            },
+            {
+                "dcf": {
+                    "cash_flows": [{"period": 1, "amount": "-100"}, {"period": 2, "amount": "110"}],
+                    "discount_rate": "0.1",
+                    "terminal_value_method": "exit_multiple",
+                    "exit_multiple": "8.5",
+                    "terminal_exit_metric": "1E+16",
+                }
+            },
+        ]
+        for payload in over_limit_payloads:
+            with pytest.raises(ValidationError):
+                FinancialValuationRequest.model_validate(payload)
+
+    def test_magnitude_bound_boundary_accepted(self) -> None:
+        """量级界边界恰过锚（±1E+15 amount / 1E+9 倍数——CR3-1②：防界值手误漂移）。"""
+        request = FinancialValuationRequest.model_validate(
+            {
+                "dcf": {
+                    **_FULL_PAYLOAD["dcf"],
+                    "cash_flows": [{"period": 1, "amount": "-1E+15"}, {"period": 2, "amount": "1E+15"}],
+                },
+                "comparables": {
+                    **_FULL_PAYLOAD["comparables"],
+                    "comparables": [{"name": "边界可比", "ev_ebitda": "1E+9"}],
+                },
+            }
+        )
+        assert request.dcf is not None and request.dcf.cash_flows[0].amount == Decimal("-1E+15")
+        assert request.comparables is not None and request.comparables.comparables[0].ev_ebitda == Decimal("1E+9")
+
     def test_perpetual_with_exit_fields_rejected(self) -> None:
         """终值两法字段配套：perpetual 法带 exit_multiple → 拒绝（法-参数互斥）。"""
         payload = {

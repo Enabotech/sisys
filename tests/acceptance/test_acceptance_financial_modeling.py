@@ -418,7 +418,7 @@ def when_run_comparable_cases(context: dict[str, Any]) -> None:
 
 @then("统计四值相对误差均在 0.0001 内（Excel MIN/MEDIAN/AVERAGE/MAX 对齐）")
 def then_multiples_stats_aligned(context: dict[str, Any]) -> None:
-    """统计四值对齐（min/median/mean/max——statistics 原生 Decimal 域）。"""
+    """统计四值对齐（min/median/mean/max——median 用 statistics.median 纯索引、mean 为 Decimal 域自实现[CR3-1①]。）。"""
     from decimal import Decimal
 
     from tests.integration.test_integration_financial_modeling import EXCEL_ALIGNMENT_TOLERANCE

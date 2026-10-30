@@ -70,6 +70,11 @@ class FinancialModelingService:
     SINGLETON 注册前提：无状态纯计算零共享可变状态（同输入同输出——DC-9 并发
     安全论证：VO in / VO out 全 frozen，localcontext 线程隔离）。
 
+    消费指引（CR3-5）：推荐经 financial_modeling_use_case 编排入口消费
+    （Schema 契约校验含 max_length/量级界资源防御 + 可读的 pydantic 异常面）；
+    直调本引擎绕过 Schema 资源上限（超长现金流/巨量级输入的 DoS 面在直调面
+    复现）且异常面为 VO 242/引擎 470——属内部信任边界，直调方自负输入约束。
+
     三方法：
     - calculate_dcf：DCF 现金流折现（NPV + 终值两法 + IRR 二分法）
     - calculate_comparable_valuation：可比公司倍数统计 + 隐含企业价值区间
@@ -185,7 +190,18 @@ class FinancialModelingService:
         # npv_lo 捕获式缓存[CR2-3]：rate_low 端 NPV 值全程复用，仅更新点重算——
         # 44 轮收敛由 90 次 NPV 全扫描降至 46 次，1.82x 冗余消除，结果逐位一致）
         npv_lo = npv_at_rate(rate_low)
-        if npv_lo * npv_at_rate(rate_high) > 0:
+        npv_hi = npv_at_rate(rate_high)
+        # 两端同零特判（CR3-1③）：双端 NPV 同时精确为零 ⟹ 双根歧义（精确设计
+        # 输入可达——两相异端点根）或全下溢病态（极小量级显性现金流）——两者均
+        # fail-loud 470 防静默错误 IRR（下溢面实测：显性 CF 全 ±0 时二分退化收敛
+        # 到 rate_low 端点值 −0.99 而真值 0）；单端为零是真根恰在端点的合法形态
+        # （实测 [100, −1] 唯一根 −0.99 正确返回）不拦
+        if npv_lo == 0 and npv_hi == 0:
+            raise FinancialCalculationError(
+                method="dcf",
+                detail="IRR 数值求解失败：支持域端点净现值同时为零（全下溢或双根歧义病态序列）",
+            )
+        if npv_lo * npv_hi > 0:
             raise FinancialCalculationError(
                 method="dcf",
                 detail="IRR 数值求解失败：支持域端点净现值同号（无符号变更的根或根歧义病态序列）",
@@ -266,9 +282,13 @@ class FinancialModelingService:
     def _multiple_stats(values: tuple[Decimal, ...]) -> MultiplesStats:
         """倍数描述统计（两引擎共享私有 helper——数学同构，语义入口分立）。
 
-        statistics.mean/median 原生支持 Decimal（Python 3.11 官方语义——median
-        偶数样本取中间两数均值）；本 helper 调用方均在 localcontext prec=50 内
-        （statistics.mean 的除法在默认 prec=28 下舍入——精度纪律全程一致）。
+        median 用 statistics.median（纯排序+索引，无有理转换路径——偶数样本取
+        中间两数均值的 Decimal 域算术）；mean 是 Decimal 域自实现
+        sum/Decimal(len)（CR3-1①：statistics.mean 内部经 as_integer_ratio()
+        →Fraction 精确有理转换——巨指数值二次方耗时挂死[实测 1E+6=10.8s、
+        1E+999999999 挂死] + 隐藏的「Decimal 全程」纪律破口；自实现同 prec=50
+        精度域且巨量级微秒级快速 Overflow）；本 helper 调用方均在 localcontext
+        prec=50 内（除法受当前 context 精度约束——精度纪律全程一致）。
 
         Args:
             values: 倍数元组（VO 已守卫非空 + 正值）
@@ -279,7 +299,7 @@ class FinancialModelingService:
         return MultiplesStats(
             min=min(values),
             median=statistics.median(values),
-            mean=statistics.mean(values),
+            mean=sum(values, Decimal(0)) / Decimal(len(values)),
             max=max(values),
         )
 

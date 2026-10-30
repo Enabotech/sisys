@@ -53,7 +53,10 @@ class FinancialCalculationError(BusinessException):
         Args:
             method: 估值方法诊断标注（闭集语义 {"dcf", "comparable", "precedent"}——
                 docstring 语义非闭集校验，自由字符串容错：诊断标注面与 SAPBusStateError
-                reason 协议契约错误面的差异钦定）
+                reason 协议契约错误面的差异钦定；单复数对照注[CR3-8]：method 取
+                单数 comparable/precedent，而结果 DTO/Schema 段名是复数
+                comparables/precedents——两个命名域非笔误，消费方按 method 分支
+                时勿照抄段名复数形态）
             detail: 失败描述（面向调用方的计算语义——零内部实现细节）
             message: 自定义消息（缺省回落类属性静态文案）
             cause: 底层异常
