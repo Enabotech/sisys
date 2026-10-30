@@ -143,6 +143,20 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 450/451/452 语义归属 system（SystemException 子类——评估/漂移检测/历史持久化
     # 均系统侧可观测行为，AgentWorkflowError[444] 同族论证「工作流执行属系统侧行为」）
     "evaluation": (450, 459),
+    # SAP 协议子域（460-469）—— Story 5.11 注册 3 个
+    # （evaluation 段 450-459 之后五代开段先例第六段：data_source 410/debate 420/
+    #  tool_version 430/agent 440/evaluation 450 同款「前段满/语义独立 → 开独立段」
+    #  ——SAP 协议域与事件总线/评估域语义分立，MessageBusError 与 SAP 分立先例同款）:
+    # EXCEPTION_460 SAPTimeoutError (Story 5.11, 请求-响应关联等待超时——
+    #   wait_for_response 等满 timeout 无 resolve/未挂起条目超时路径；ToolExecutionTimeoutError
+    #   385「business+超时+504」三合一先例)
+    # EXCEPTION_461 SAPBusStateError (Story 5.11, 总线状态违规——未注册接收方/非 UUID 标识/
+    #   BROADCAST 组合双向违规/关闭后操作；reason 闭集五成员)
+    # EXCEPTION_462 SAPBlackboardWriteError (Story 5.11, 公共黑板写入失败——post 返 0 检测点
+    #   fail-loud[OD-7]；与 StorageError 103 系统资源族同族但不复用[子域分立]；463-469 预留 sap 域)
+    # 460 语义归属 business（协议交互超时是调用方可处理结果）；461/462 语义归属 system
+    # （SystemException 子类——协议契约违规/基础设施写失败）
+    "sap": (460, 469),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -310,6 +324,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "AgentEvaluationError": "evaluation",
     "DriftDetectionError": "evaluation",
     "EvaluationHistoryError": "evaluation",
+    # sap_exceptions.py (Story 5.11 新增 3 个异常——SAP 协议运行时三码)
+    "SAPTimeoutError": "sap",
+    "SAPBusStateError": "sap",
+    "SAPBlackboardWriteError": "sap",
 }
 
 

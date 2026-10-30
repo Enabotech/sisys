@@ -3090,6 +3090,34 @@ def bootstrap() -> None:
         tags=("agent", "checkpoint", "observability"),
     )
 
+    # === Story 5.11 — SAP 协议支持（内部 Agent 通信运行时）===
+    # SAPBus 总线（接口层横向协议——architecture L2172 钦定位；SAP 非领域事件，
+    # 不进事件通道体系[5-3 职责边界]）。SINGLETON（DC-6 有状态：订阅表 +
+    # correlation 索引 + per-receiver 优先级队列跨 send/wait/subscribe 共享，
+    # 状态即功能——5-9 DC-6/5-10 DC-7 同族论证）。captive 依赖知悉：SINGLETON
+    # 捕获 SCOPED public_blackboard 快照，RedisPublicBlackboard 无状态包装（客户端
+    # 经 redis_client 端口间接持有）快照无害——未来实现引入状态后需防 clear_scoped
+    # 击穿（docstring 注记）。fail-fast 装配（DC-12）：两依赖 resolve 失败 →
+    # ConfigurationError（与 5.6/5.8/5.9 可选依赖 resolve_optional→None 降级族相反
+    # 裁定——SAP 总线是功能主面且零存量消费方，无 None 兼容包袱）；翻译三元组
+    # (KeyError, RuntimeError, ImportError)——resolver fallback_on 仓内规范形态
+    # （isolation_guard_service 是内联 __import__ lambda，import 失败抛裸 ImportError
+    # 逃出二元组）；lambda 单表达式装不下 try/except 故提 _build_sap_bus 工厂
+    # （_build_agent_workflow_use_case 先例同款）。
+    register_port(
+        name="sap_bus",
+        version="v1.0.0",
+        interface=__import__(
+            "src.interfaces.sap.bus",
+            fromlist=["SAPBus"],
+        ).SAPBus,
+        impl=lambda resolver: _build_sap_bus(resolver),
+        module="src.interfaces.sap.bus",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "sap", "collaboration"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
@@ -3185,6 +3213,31 @@ def _build_agent_workflow_use_case(resolver: Any) -> Any:
         drift_detector=drift_detector,
         checkpoint_recorder=checkpoint_recorder,
     )
+
+
+def _build_sap_bus(resolver: Any) -> Any:
+    """Story 5.11 — sap_bus lambda 工厂（fail-fast 装配，DC-12 翻译形态）。
+
+    lambda 单表达式装不下 try/except 故提工厂（_build_agent_workflow_use_case
+    先例同款）；与可选依赖降级族相反的裁定：SAP 总线是功能主面且零存量消费方，
+    装配失败应立即暴露（raise ConfigurationError——无 None 降级消费方）。翻译
+    三元组 (KeyError, RuntimeError, ImportError)：resolver 对未注册名抛 KeyError、
+    字符串 impl 加载失败包装 RuntimeError、isolation_guard_service 内联 __import__
+    lambda 的 import 失败抛裸 ImportError——resolver resolve_optional 的
+    fallback_on 三元组是仓内「依赖缺失」规范形态。
+    """
+    from src.domain.exceptions import ConfigurationError
+    from src.interfaces.sap.bus import InProcessSAPBus
+
+    try:
+        blackboard = resolver.resolve("public_blackboard")
+        guard = resolver.resolve("isolation_guard_service")
+    except (KeyError, RuntimeError, ImportError) as error:
+        raise ConfigurationError(
+            message="sap_bus 装配失败：public_blackboard/isolation_guard_service 依赖不可用",
+            cause=error,
+        ) from error
+    return InProcessSAPBus(blackboard=blackboard, guard=guard)
 
 
 def _wire_agent_tracing() -> None:

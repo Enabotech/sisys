@@ -122,6 +122,11 @@ from src.domain.exceptions.sandbox_exceptions import (
     SandboxResourceLimitExceededError,
     SandboxTimeoutError,
 )
+from src.domain.exceptions.sap_exceptions import (
+    SAPBlackboardWriteError,
+    SAPBusStateError,
+    SAPTimeoutError,
+)
 from src.domain.exceptions.service_exceptions import (
     AuditError,
     ComplianceLockError,
@@ -319,6 +324,10 @@ __all__ = [
     "AgentEvaluationError",
     "DriftDetectionError",
     "EvaluationHistoryError",
+    # SAP 协议子域异常（Story 5.11 SAP 协议运行时——460 超时/461 总线状态/462 黑板写失败）
+    "SAPTimeoutError",
+    "SAPBusStateError",
+    "SAPBlackboardWriteError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

@@ -1278,6 +1278,9 @@ def when_scan_triple_isolation_architecture(context: dict[str, Any]) -> None:
         "src/application/services/isolation_guard_service.py",
         "src/application/ports/isolation_guard.py",
         "src/domain/value_objects/__init__.py",
+        # Story 5.11 黑板桥（SAP 总线）：仅消费 IsolationResource/AccessOperation 枚举作
+        # 守卫参数传递（经 IsolationGuardPort 判定——不自建判定面，矩阵唯一真源纪律不变）
+        "src/interfaces/sap/bus.py",
     }
     for py_file in (REPO_ROOT / "src").rglob("*.py"):
         rel = py_file.relative_to(REPO_ROOT).as_posix()

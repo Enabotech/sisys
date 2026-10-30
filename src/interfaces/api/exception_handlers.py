@@ -96,6 +96,9 @@ from src.domain.exceptions import (
     SandboxQuotaExceededError,
     SandboxResourceLimitExceededError,
     SandboxTimeoutError,
+    SAPBlackboardWriteError,
+    SAPBusStateError,
+    SAPTimeoutError,
     ServiceUnavailableError,
     SkillLoadError,
     SkillNotFoundError,
@@ -286,6 +289,10 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     AgentEvaluationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 450 — 评估管线执行失败（系统可观测语义，精确注册防回退歧义）
     DriftDetectionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 451 — CUSUM 漂移检测执行失败（精确注册防回退歧义）
     EvaluationHistoryError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 452 — 评估历史持久化失败（休眠映射——注册是完备性要求）
+    # SAP 协议子域异常（Story 5.11 SAP 协议运行时——语义就近映射：DebateLowDivergenceError 422 先例）
+    SAPTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,  # 460 — 请求-响应关联等待超时（385 三合一先例）
+    SAPBusStateError: status.HTTP_409_CONFLICT,  # 461 — 总线状态违规（协议契约冲突；预留映射面）
+    SAPBlackboardWriteError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 462 — 黑板写入失败（fail-loud OD-7）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

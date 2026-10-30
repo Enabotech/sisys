@@ -102,6 +102,9 @@ from src.domain.exceptions import (
     SandboxQuotaExceededError,
     SandboxResourceLimitExceededError,
     SandboxTimeoutError,
+    SAPBlackboardWriteError,
+    SAPBusStateError,
+    SAPTimeoutError,
     ServiceUnavailableError,
     SkillLoadError,
     SkillNotFoundError,
@@ -354,6 +357,9 @@ class TestExceptionHttpMap:
             AgentEvaluationError,  # 450 — Story 5.8 评估管线执行失败（500）
             DriftDetectionError,  # 451 — Story 5.9 CUSUM 漂移检测执行失败（500）
             EvaluationHistoryError,  # 452 — Story 5.10 评估历史持久化执行失败（500——休眠映射）
+            SAPTimeoutError,  # 460 — Story 5.11 SAP 请求-响应关联等待超时（504）
+            SAPBusStateError,  # 461 — Story 5.11 SAP 总线状态违规（409）
+            SAPBlackboardWriteError,  # 462 — Story 5.11 SAP 公共黑板写入失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
