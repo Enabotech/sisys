@@ -153,9 +153,9 @@ development_status:
   epic-4-retrospective: done
 
   # ===========================================================================
-  # Epic 5: Agent 协作系统（含 EV-01/02 P0 + EV-03/04 P1 扩展）- 🚧 进行中
+  # Epic 5: Agent 协作系统（含 EV-01/02 P0 + EV-03/04 P1 扩展）- ✅ 已完成
   # ===========================================================================
-  epic-5: in-progress
+  epic-5: done  # 12/12 Story done（2026-10-30）+ 终局审查五轮 C1~C5 收敛（2026-10-31——epic-5-final-review-2026-10-30.md：四视角调研+遗留项终局收口+独立终审收敛判定成立）
   5-1-ceo-agent-instantiation-mvp: done
   5-2-agent-identity-profile-loading: done
   5-3-single-agent-workflow: done
@@ -169,7 +169,7 @@ development_status:
   # 迁移自 Epic 4: SAP 协议 + 财务建模
   5-11-sap-protocol-support: done
   5-12-financial-modeling-valuation: done  # 代码审查五轮 C1~C5 收敛（2026-10-30——38 项台账+独立终审收敛判定成立）
-  epic-5-retrospective: optional
+  epic-5-retrospective: done  # 承载认定（F9 显式裁定）：遗留项收口/孤儿承诺处置/Epic 级审查已由 epic-5-final-review-2026-10-30.md 终局审查承载（2026-10-31）；经验萃取面（Lessons/流程改进）后续可选补充
 
   # ===========================================================================
   # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始

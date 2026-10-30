@@ -119,6 +119,34 @@ M1 工厂进程级单例复用 + 激活环 loop close + 注释修正 + wiring �
 
 
 
-## Round 4 —（待执行）
+## Round 4 — 纯验证轮（2026-10-31）
 
-## Round 5 —（待执行）
+**门禁实跑**：全仓 ruff 零输出；mypy src/ 719 文件零问题；monitoring 200 passed（R3 后）；四段全量等效绿（R2 后证据：unit 10391/integration 800+2s/contracts 1431/acceptance 1304——R3 仅注释级改动零行为面）。
+
+**锚点存续核查**：R1~R3 修复锚点全部在位（_metrics_port_instance/激活环 loop close 双处/_get_impl get_resolver/wiring 三用例名/5-7 Status done/五 Story 版本号 v2.2.2·v1.14.1·v1.4.4·v2.2.2·v2.3.2）。
+
+**CI 状态核查与预存 flaky 定性**：R1/R2 提交 CI state=failure，失败 job=jobs/3（integration-tests）；本地完整复现 CI 命令形态（`pytest tests/integration tests/contracts` 同 session）捕获唯一失败：`test_integration_phoenix_tracer.py::test_scenario_7_tracing_overhead_below_1_percent`——tracing 开销比例 1.84%>1% 阈值（untraced=0.283s/traced=0.289s：绝对开销 6ms 健康，比例分母 0.28s 过小噪声敏感）；**三重甄别定性预存 CI flaky**：①隔离复跑绿（8 passed）；②CI 历史先例——3281b79d（5-12 R3 修复，早于本周期两提交）同 jobs/3 failure、c0f060d9 success（间歇=flaky 特征）；③语义零关联（该测试测 @trace span 边际开销，与本周期组合根 metrics/激活环改动面零交集）。5-7 R1-F11 两轮复测机制已在工作（失败消息即其输出），CI runner 持续负载期两轮均超。处置：预存项登记（5-7 资产维护——分母基线增大可根治），不在本周期扩面修复（Surgical 纪律 + 5-7 已收敛 done）。
+
+**R4 结论**：零代码级修复、零新发现——纯验证通过（R3 清偿提交 5e5be3f3 已承载本轮前所有修复）。CI flaky 预存定性移交 R5 终审记录。
+
+
+
+## Round 5 — 独立终审 + 收敛判定（2026-10-31）
+
+### 终审五节结论（独立终审员双向取证，不采信自报）
+
+1. **周期闭合**：c0f060d9..5e5be3f3 恰三提交零游离（R1×11/R2×5/R3×3 文件清单与轮次声称逐一吻合）；工作树仅本审查文档 R4/R5 记录待收口提交（5-12 收敛提交先例同款工序）。
+2. **关键修复双向取证 4/4 零偏差**：F6 幽灵 impl 修复（impl=_build_metrics_port+TYPE_CHECKING+resolver 形参+_get_impl get_resolver）/ M1 进程级单例（模块缓存+幂等早返回+identity 断言）/ N2 双通道分述注释 / F2 注册≠消费（docstring 诚实注记+R1-DF2 第五件）——文档声称 vs 代码现实全部一致。
+3. **门禁独立复跑全绿**：ruff 零违例 / monitoring **200 passed**（与声称逐位吻合）/ 引爆组合重放 8 passed / mypy **719 文件**零问题（逐位吻合）/ flaky 隔离复跑 8 passed（R4 定性独立复现）。
+4. **留项台账完整**：deferred-work 12 处内联锚 + 终局审查专段全部在位；R3-N3/N4 留痕载体为本文档 R3 节（记录级自洽）。
+5. **事实抽验 11/11 零失实**：41 字符串 impl / 7 幽灵全在册 / 174 注册 / 五 Story 版本号 / 12-12 done / agent.py 五迁移方法 / 719 / 200 / F2 锚点 / sprint-status 状态 / 补勾注记。
+
+### 🏁 收敛声明（Epic 5 终局审查，2026-10-31）
+
+> **Epic 5 终局审查五轮 C1~C5 收敛**：R1 四视角调研（遗留项台账/跨 Story 一致性/epics 范围符合性/运行面验证——发现 16 项：P2×7+P3×9，核心为「触发=Epic 5」族台账未终局收口 + 组合根幽灵 impl 活缺陷）+ C3 双评审员/单复评「优秀」三步门禁 → R1 落码（唯一运行时修复 F6 metrics impl + 台账终局收口）→ R2 回归核查+组合交互（全量首跑抓 P1 clear_singleton 重建炸——M1 进程级单例修复；P2 注册≠消费语义诚实修正）→ R3 单深度推演零 P1/P2（M1 免疫性/九路绕过全不可达/时间线终态一致）→ R4 纯验证零发现（CI flaky 三重甄别定性预存）→ R5 独立终审五节全过（4 修复零偏差/门禁精确数字吻合/11 抽验零失实）。
+>
+> **总账**：三提交（231572ee/fca466a1/5e5be3f3 + 本收敛提交），处置 R1-N1~N15 全部闭环（修复/登记/证伪三分类）；修复清单：1 项 P1 级运行时缺陷族（metrics 幽灵 impl + 激活链恢复 + 重建幂等——三合一）、1 项 P2 语义失实修正（注册≠消费）、1 项 P2 状态终局翻转（5-7）、台账终局收口 8 条 + 新登记 2 条（R1-F13/F16）+ V1-EV14 死锚改写、Story 维护 5 件（版本步进+补勾+注记）。**遗留项解决质量终局判定：核销 7 项一致率 100%、兑现注记 3 组全部实证、顺延链引用事实 100% 成立、静默遗留 4 项全部收口——EPIC 5 交付件科学、合理、正确解决了相关遗留项（视角 A/C/D 三方独立印证：FR 13/13 兑现、静默缺口 0、四条链契约健康、门禁全绿）。**
+>
+> **遗留移交**：CI flaky（phoenix tracer 比例分母噪声——5-7 资产预存，R4 定性在案）；R3-N3/N4 理论留痕（本文档 R3 节）；消费循环接线（Epic 6 首个事件消费 Story——R1-DF2 锚）。
+>
+> **F9 随本提交执行**：sprint-status epic-5 → done + epic-5-retrospective → done（承载认定：遗留项收口/孤儿承诺处置已由本终局审查承载，经验萃取面可选补充）。
