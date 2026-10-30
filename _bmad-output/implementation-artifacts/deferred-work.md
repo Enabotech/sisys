@@ -3,7 +3,7 @@
 ## 剩余项触发条件时间线（2026-10-10 具备度评定）
 
 > 判定框架：决策触发（材料已具备只欠立项）/ 路线图触发（等特定 Story）/ 数据触发（等生产流量）。
-> 锚点：Epic 1-4 done、Epic 5 未启动、V1 覆盖 Epic 1-8。A 类 7 项已于 2026-10-10 启动清偿（见各 RESOLVED 行）。
+> 锚点：Epic 1-5 done（Epic 5 十二 Story 全交付，2026-10-30 完结——终局审查与遗留项收口见 epic-5-final-review-2026-10-30.md）、V1 覆盖 Epic 1-8。A 类 7 项已于 2026-10-10 启动清偿（见各 RESOLVED 行）。
 
 **决策触发型**：
 - ~~SessionMiddleware 接线~~ → **RESOLVED 2026-10-10**（原最佳窗口「Epic 5 启动前」已抓住）
@@ -15,9 +15,9 @@
 
 **路线图触发型**：
 - langgraph retry/timeout 字段 → **触发 = Story 5.10（CheckpointWithEvaluation）或 6.6（Checkpoint 摘要查看）实施**（epics :2016 规划在案、story 文件未创建——两处是 checkpoint_table/编排引擎行为的规划消费方，届时字段语义定稿）。**5-10 Task 0 处置（2026-10-29）：锚位顺延 6.6**——5.10 评估快照携带的执行上下文是 use case 层 `AgentWorkflowResult.retry_count/executed_phases`（主链已组装的既有字段，快照经 state_data 通用 KV 承载），零图引擎 per-node retry/timeout 字段级语义需求；规划消费方 checkpoint_table 是 BLM 阶段面（6.6 Checkpoint 摘要查看），届时字段语义定稿
-- 工具熔断 → **触发 = Epic 5 sprint planning 重估归属**（epics 无直接对应 Story——FR-CP-07 是 Epic 11.3 成本熔断非工具执行域；建议 5.4/5.5 EIP 弹性隔离实施时评估挂点或独立小 Story）。**5-4 Task 0 评估（2026-10-22）：挂点不成立**——工具熔断（连续校验失败熔断）属 tool_execution 域装饰链语义，与 EIP 隔离等级无协议耦合；维持 deferred 归 Epic 5 sprint planning 重估/独立小 Story
+- 工具熔断 → **触发 = 独立小 Story 立项或 V1 弹性需求驱动**（epics 无直接对应 Story——FR-CP-07 是 Epic 11.3 成本熔断非工具执行域；建议 5.4/5.5 EIP 弹性隔离实施时评估挂点或独立小 Story）。**5-4 Task 0 评估（2026-10-22）：挂点不成立**——工具熔断（连续校验失败熔断）属 tool_execution 域装饰链语义，与 EIP 隔离等级无协议耦合。**Epic 5 终局审查再锚定（2026-10-31，R1-N5）**：原触发「Epic 5 sprint planning 重估归属」已随 Epic 5 十二 Story 全 done（2026-10-30）消亡且全程无熔断 Story 创建、circuit_breaker 组合根零接线——改锚为独立小 Story 立项或 V1 弹性需求驱动（材料依赖度低：ToolExecutionQuery.state 过滤已就绪，纯范围决策）
 
-**数据触发型**（共同链：Epic 5-8 交付 → V1 上线 → 真实失败流量 → 案例库积累；**上线前可提前部署观测脚本**——判据全可由 `EvolutionLogQuery.list_by_tool` + `get_by_natural_key` 量化）：
+**数据触发型**（共同链：Epic 5-8 交付 → V1 上线 → 真实失败流量 → 案例库积累；**Epic 5 已交付 2026-10-30**，链上第一步完成——下一步依赖 V1 上线；**上线前可提前部署观测脚本**——判据全可由 `EvolutionLogQuery.list_by_tool` + `get_by_natural_key` 量化）：
 - fast-fail 尝试缩减 → 就绪判据：每签名 ≥30 次观测且 NEGATIVE_CASE_GUIDED 组样本充足（按 fix_strategy 分组恢复率对照——R8-32）｜上线后 +2~4 周
 - fix_summary 进阶聚合 → 判据：高频签名 top-N occurrence 分布稳定｜+4 周
 - 采样多样化/去重 → 判据：suggested_fix_excerpt 重复率可测量且偏高｜+2~4 周
@@ -89,7 +89,7 @@
 - 签名分裂低频形态（R8-30） — dict/set repr 键序不稳定、异常链层数漂移；随真实语料评估。
 - 真实修复能力观察基准（R8-31/R8-32） — mock 基准度量编排机制正确性；真实观测需更大样本/序贯设计 + 按 fix_strategy 分组对照统计。
 - 多案例加权检索与向量相似检索（L3 Qdrant） — V1 精确签名匹配；签名泛化不足时再立项。
-- 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。（**2026-10-15 全量台账审查去重注记**：与时间线节 L18 同项重复登记——触发「Epic 5 sprint planning 重估」已到期（Epic 5 已启动、5.1 done），评估窗口=5.2+ create-story 时随行；主登记位定为时间线节 L18）
+- 工具熔断（or.md 四.7.(3)） — 建议挂 Story 5.x Agent 弹性隔离；ToolExecutionQuery.state 过滤材料已齐备（纯范围决策）。（**2026-10-15 全量台账审查去重注记**：与时间线节 L18 同项重复登记——主登记位定为时间线节 L18。**Epic 5 终局审查同步注记（2026-10-31）**：主登记位触发锚已再锚为「独立小 Story 立项或 V1 弹性需求驱动」——「Epic 5 sprint planning 重估」窗口与「5.2+ 随行评估」窗口均已随 Epic 5 完结消亡）
 - 自动灰度推进与 per-version 统计视图 — 演进日志数据面已就绪（tool_evolution_logs + list_by_tool）。
 - FAIL_FAST 同波取消优化 — 纯算力节约可选优化（CONTINUE/SKIP 场景本不该取消，禁做成无条件）。
 - ~~mid-attempt 389-Schema 新 violations 进跨尝试反馈（代码审查 CR-R1-22）~~ — **RESOLVED**（2026-10-10 技术债清偿）：具备度调查证「演进日志 schema 联动」论据在 DB 层失实（fix_attempts 为 JSONB，`_attempt_from_dict` 全 `.get()` 缺省读，旧行向后兼容零迁移）——FixAttempt 加 `violations_excerpt` 字段（条数≤3/message≤200 截断）+ service mid-attempt 捕获 + prior_summaries/render_prior_attempts 渲染。
@@ -113,29 +113,30 @@
 
 ### 入口面缺口（最高优先）
 - create_app() 仅挂 7 路由，5 个已实现 router 未挂载：**auth（登录端点缺失——最大单点风险）**、audit（1.10 交付）、crawler、monitoring（/metrics）、equilibrium_security — 触发=V1 API 可用性立项时统一接线（auth 建议先行）
-- exception_metrics 端口零消费 + register_exception_handlers(app) 未传 metrics — 异常遥测静默关闭；接线成本一行
+- exception_metrics 端口零消费 + register_exception_handlers(app) 未传 metrics — 异常遥测静默关闭；接线成本一行。**metrics 端口 impl 修复注记（2026-10-31，Epic 5 终局审查 R1-N6）**：metrics 端口幽灵 impl（metrics_adapter.PrometheusMetricsAdapter——模块不存在）已修复为组合根工厂 `_build_metrics_port`（指向真实 metrics_port_impl.MetricsPortImpl），cost_metrics_handler 激活链恢复（handler_names 循环 resolve 成功→async register 订阅 RoutingDecided——1-19 成本追踪自 d49261b0「激活」以来首次真实生效）；本行 exception_metrics 的未接线现状不变
 - RabbitMQConsumer/RabbitMQEventListener/EventBusFactory 零接线 — reliable 通道只发不收；触发=首个消费方 Story
 
 ### 事件 handler 未激活（注册≠激活——UDMR F2 同款）
-- AutoTriggerHandler 有 register_handlers 但不在 handler_names — Story 1.14 trigger→route→execute 管线三 handler + heartbeat_scheduler + session_namespace_manager 整体生产休眠；触发=Epic 5 Agent 编排
+- AutoTriggerHandler 有 register_handlers 但不在 handler_names — Story 1.14 trigger→route→execute 管线三 handler + heartbeat_scheduler + session_namespace_manager 整体生产休眠；触发=Epic 5 Agent 编排。**Epic 5 终局收口注记（2026-10-31，R1-N4——既有普查条目到期收口，非新建条目）**：Epic 5 十二 Story 已完结，1.14 自动触发管线全程未被消费（5-3 单 Agent 工作流走 CLI 显式 run-task 通道，零自动触发语义）；5-7 story L78 已有「不接线、归其消费语义立项」决策记录（当时裁定不进本台账——本注记为普查条目「触发=Epic 5」到期后的终局对齐）。再锚定：触发 = 首个自动触发消费语义 Story 立项（Epic 13 heartbeat 规划位或 13-6 类定时任务 Story）
 - MemoryChangedHandler（1.15a）未注册端口零引用；ToolExecutedEventHandler（4.1a AC-5 工具统计投影）零引用 — Tool.reliability_score 生产永不更新
 - CacheInvalidationHandler 构造期自注册+端口惰性实例化=永不注册（结构性陷阱）— Story 3-9 缓存失效失效
 
 ### 端口链路休眠（实现完整、无入口）
-- **Epic 4 工具执行链零入口**：tool_execution_service/tool_execution_engine/validation_feedback_service/StrategicAnalysisUseCase/run_tool_chain_use_case/red_blue_debate_service/sandbox 链/12 个 data_source_* 适配器/schema_validation_record_repository — 触发=Epic 5；sandbox_session_reaper 接线时须补启动挂点
-- 等保三级合规 11 端口 + permission/role_repo/password_validation/token_blacklist 休眠（**token_blacklist 死=JWT 吊销不存在**）— 触发=equilibrium_security/auth 路由接线
+- **Epic 4 工具执行链零入口**：tool_execution_service/tool_execution_engine/validation_feedback_service/StrategicAnalysisUseCase/run_tool_chain_use_case/red_blue_debate_service/sandbox 链/12 个 data_source_* 适配器/schema_validation_record_repository — 触发=Epic 5；sandbox_session_reaper 接线时须补启动挂点。**Epic 5 终局收口注记（2026-10-31，R1-N2）——「零入口」表述已部分失实，现实分裂为两态**：①**7 项已经 Story 5-3 主链接线激活**（tool_execution_service/tool_execution_engine/validation_feedback_service/sandbox 链/12 个 data_source_* 适配器——激活链：agent_cli.py:493 → agent_workflow_use_case → agent_workflow_service（composition_root.py:2816 resolve tool_execution_service）→ 装饰链 VFD>Sandbox>Validator>Engine + engine 构建时注入 data_source_resolver（tool_execution_engine.py:651））；②**5 项仍休眠再锚定**：StrategicAnalysisUseCase（组合根未注册——Epic 6 规划评审/首个 BLM Story 立项时评估注册或废弃）、run_tool_chain_use_case/red_blue_debate_service/schema_validation_record_repository（注册但组合根外零 resolve——Epic 6+ 首个编排消费方或 Story 10-6 红蓝全量立项时接线）、sandbox_session_reaper（无启动挂点——V1 部署专项，与部署面注记节 L138 同锚）
+- 等保三级合规 11 端口 + permission/role_repo/password_validation/token_blacklist 休眠（**token_blacklist 死=JWT 吊销不存在**）— 触发=equilibrium_security/auth 路由接线。**impl 路径失效注记（2026-10-31，Epic 5 终局审查 R1-N6——L175 l0_storage 同族形态）**：storage_encryption_service/api_security_service/container_security_service 三端口的字符串 impl 类全仓不存在（组合根重构期 19fbf461 脚手架遗留）——激活接线时必 RuntimeError，届时需先重建或核实实现；归宿：等保安全接线专项（equilibrium_security/auth 路由接线 Story 立项时一并核实）；承接方：等保合规接线 Story
 - unified_storage + L0/memory 子系统 12 端口休眠 — 触发=Epic 6
 - semantic_cache_middleware/cache_metrics/semantic_cache 休眠 — Story 3-9 缓存整体未运行；触发=检索性能需求
-- orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5
+- orchestration_service/workflow_engine/agent_engine 休眠 — document_tasks.py 随之死链；触发=Epic 5。**Epic 5 终局收口注记（2026-10-31，R1-N3）**：agent_engine 已被 Story 5-3 消费激活（组合根 :1551 注册注入 agent_workflow_service + :3254 use case 工厂 resolve——5-3 工作流经 langgraph_engine 编排）；orchestration_service（组合根内外零 resolve）与 workflow_engine（仅 orchestration_service 注册 lambda 内自引用——自锚死链）仍休眠，再锚定：触发 = Epic 6+ 工作流编排消费需求立项，或 6-1 BLM 流程 Story 立项决策时点一并做废弃评估（document_tasks.py 死链同批处置）
 - session_storage 端口 + RedisSessionStorage 休眠（2026-10-12 普查遗漏项，Story 5-1 Task 0 补登记）— Story 5.1 Agent 状态持久化用新建 AgentRepository（决策 DC-1：session_id 主键语义不匹配 Agent 聚合仓储，且其吞连接异常的优雅降级语义与状态持久化确定性冲突）；触发=Story 5.3（会话状态消费方）。**5-3 Task 0 处置（2026-10-20）：续期**——触发移至 5-4+/多轮会话需求 Story（5-3 DC-9：MVP 单次 CLI 调用内会话闭合，无跨调用状态需求；九步可选步「持久化沙箱内存变量」同批续期见 5-3 D-6）。**5-4 Task 0 处置（2026-10-22）：再续期**——5-4 隔离状态（IsolationState）是 EIP 协议状态非会话状态（5-4 DC-1：独立聚合 + 独立键空间 sisys:isolation:*，不经 session_storage）；触发移至真正的多轮会话需求 Story
 - uow_factory/saga_repository 零 resolve — 事务子系统待首个真实事务用例
-- compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线
+- compressor/text_extractor/context_compressor/persistent_note_taker/compression_quality_evaluator — 检索-压缩循环待接线。**impl 路径失效注记（2026-10-31，Epic 5 终局审查 R1-N6——L175 l0_storage 同族形态）**：compressor（impl 指向不存在模块 src/infrastructure/storage/compressor_impl.py）与 text_extractor（src/infrastructure/document/text_extractor_impl.py 同样不存在）两端口是「实现完整」表述的例外——impl 为不存在的字符串路径，激活接线时必 RuntimeError，届时需先核实真实实现位或确认该两端口为脚手架占位（组合根重构期 19fbf461 遗留）；归宿：检索-压缩循环接线 Story 立项时一并核实（Epic 6+）；承接方：检索-压缩循环专项
 
 ### 配置类零消费
 - AutoExecuteConfig/AutoTriggerConfig/MetricsConfig from_env 零调用；MemoryConfig 零生产 from_env — 随对应链路接线或确认废弃
 
 ### 部署面注记
 - deploy/app/docker-compose.yml 无 sisys-api 服务（create_app 零部署引用）— V1 上线前需补
+- 组合根连接类 8 处注册 `module=` 元数据串指向不存在模块（redis_connection_manager/redis_client/postgresql_connection_manager/postgresql_async_engine/qdrant_connection_manager/qdrant_client/neo4j_connection_manager/neo4j_driver——真实实现模块为 redis_manager.py/postgresql_manager.py/qdrant_manager.py/neo4j_manager.py 等）— impl 均 lambda 零运行实害，纯诊断面元数据漂移（Epic 5 终局审查 R1-N13 登记）；修复归组合根元数据卫生专项（验收测试有 spec.module 字面断言先例——改串有契约锁定风险，不动）；触发=组合根元数据卫生专项立项或下次 PortSpec 治理
 
 ## Deferred from: Epic 4 专题回顾——数据源可用性 (2026-10-13)
 
@@ -281,7 +282,7 @@
 - 【V1-EV11·P3】自动重校准通道（OD-6「提示人工介入」单通道的 V1 演化）— 描述：MVP trigger_recalibration 仅发布 DriftDetected 事件（recommended_action="manual_review"——人工介入通知）+ logger.warning，不做模型配置自动变更；自动重校准风险面 = 误报驱动的自动模型切换比人工确认更危险（无归因数据前置） — 触发条件：漂移归因基建（V1-EV4 golden set）+ UDMR 运行时配置变更面（cloud_configs 热生效）双前提齐备 — 归宿：V1 按需 — 承接方：重校准自动化专项（依赖：漂移归因 + UDMR 运行时配置面）
 - 【V1-EV12·P3】检测器状态 Redis 持久化（重启存活通道）— 描述：MVP 检测器状态（基线窗/Sₕ/Sₗ/确认窗/样本计数）进程内驻留——重启归零重新预热 30 样本（漂移监控盲区 ≈ 预热期）；组合根 SINGLETON 生命周期 = 进程生命周期 — 触发条件：进程重启频繁的部署形态使盲区不可接受、或 5.10 评估历史持久化落地时一并评估 — 归宿：V1 按需（随 5.10/监控域评估） — 承接方：漂移检测 V1 专项。**5-10 Task 0 处置（2026-10-29）：检测器状态持久化本体不做，数据面就绪注记**——①检测器状态（算法态）与评估历史（数据序列）是两个状态体，5.10 持久化的是后者（EvaluationCheckpointRecorder 累积 + Redis latest 快照——`agent-evaluation-{agent_id}` 命名空间）；②V1-EV12 的实质（重启后从持久化数据回放重建基线）所需的评估历史序列经 5.10 落地——**数据面就绪**，重建通道（检测器启动时从 restore 的历史回放 update 或直接统计基线）是本专项实现面；③MVP 检测器重启归零重新预热 30 样本的盲区知悉不变；检测器本体零改动（5-10 OD-4——趋势序列 Recorder 自持累积）
 - 【V1-EV13·P3】序列缺口计数器（评估降级缺口可观测 + degenerate 盲区可观测）— 描述：MVP 序列缺口策略 = 跳过（评估失败 run 漂移块不执行——缺口不入累积；CUSUM 连续性假设知悉：高失败率期漂移检出延迟/漏检，缺口期间检测灵敏度下降是跳过策略的代价）；5.8 风险 #6② 移交处置；R3 推演附注：degenerate 基线（全同值样本 σ₀=0 冻结）的检测盲区是进程永久性且静默的（仅 sample_count 可观测、盲态无日志面）——盲区可观测性并入本条 — 触发条件：缺口率可观测需求（评估降级频率监控/缺口与漂移检出延迟关联分析）— 归宿：V1 按需 — 承接方：漂移检测 V1 专项
-- 【V1-EV14·P3】per-agent 检测器键控（SINGLETON 跨 Agent 混流对策）— 描述：MVP 单检测器实例跨 Agent 共享 overall_score 序列——多 Agent 质量分布差异会膨胀 σ₀（基线混流）/伪造漂移（Agent 间分布差异被误判为时间漂移）；agent_id 维度本 Story 已落（DriftDetected 事件 agent_id 字段——调用方 execute 形参透传，None=未知/混合），键控是 V1 形态 — 触发条件：多 Agent 并发运行形态落地（MVP 单 CEO Agent 独占——混流实际不可达；Epic 5 CFO/CTO 等角色开放时触发）— 归宿：V1 按需 — 承接方：多 Agent 可观测专项（形态：Dict[agent_id, detector] 键控或 per-agent 序列路由）
+- 【V1-EV14·P3】per-agent 检测器键控（SINGLETON 跨 Agent 混流对策）— 描述：MVP 单检测器实例跨 Agent 共享 overall_score 序列——多 Agent 质量分布差异会膨胀 σ₀（基线混流）/伪造漂移（Agent 间分布差异被误判为时间漂移）；agent_id 维度本 Story 已落（DriftDetected 事件 agent_id 字段——调用方 execute 形参透传，None=未知/混合），键控是 V1 形态 — 触发条件：多 Agent 并发运行形态落地（**Epic 5 终局审查注记 2026-10-31[R1-N7]**：原「MVP 单 CEO Agent 独占——混流实际不可达」论证有偏差——5-1 instantiate 非幂等[agent_instantiation.py:26 docstring 明示]，CLI 连续 instantiate+run-task 两实例即混流，MVP 内真实可达[人工单发操作面、低概率]；且 DriftDetected.agent_id 恒传当次 run 的具体 agent 而 CUSUM 统计量为全 agent 混流——事件消费者会把混流漂移误读为该 agent 个体漂移；**修复形态成熟可直接复用**：5-10 EvaluationCheckpointRecorder per-agent 键控先例[evaluation_checkpoint_recorder.py `agent-evaluation-{agent_id}` 命名空间 + Dict 键控窗口]，升格时同款）——Epic 9 多 Agent 编排 / V1 CFO 开放 Story 立项（原锚「Epic 5 CFO/CTO 等角色开放」已随 Epic 5 完结死亡，SUPPORTED_ROLES 现仍仅 CEO）— 归宿：V1 按需 — 承接方：多 Agent 可观测专项（形态：Dict[agent_id, detector] 键控或 per-agent 序列路由——5-10 先例同款）
 - 【V2-EV1·P3】真实历史数据回测（漂移检测准确率的 V2 本义承载）— 描述：epics L1839「漂移检测准确率≥85%（V2 指标，回测历史数据验证）」——MVP 无生产历史序列，以合成序列回测承载（固定种子 40 序列确定性回测——合成形态下的统计检出能力验证，合成 uniform ≠ 真实多峰形态[5-8 风险 #6④ 知悉]）— 触发条件：生产环境评估历史序列积累（数千 run 量级——覆盖真实漂移事件更佳）— 归宿：V2 数据积累后 — 承接方：漂移检测 V2 回测专项
 - 【HYG-1·P3】全仓测试文件抑制注释守卫 tokenize 升格 + 存量 noqa 债清理（5-9 代码审查 R1-DF1 登记）— 描述：5.9 交付的 test_drift_events.py `# type: ignore` 漏网根因是守卫 parametrize 仅扫 src/（测试面盲区）——R1 已扩至 25 文件（12 src + 13 tests），但守卫是纯子串扫描（含守卫自身的字符串字面量文件不可自扫）且全仓 tests/ 存量 `# noqa` ~20 处（conftest/tool_domain_entities/validation_feedback/kubectl/ocr/outbox/token_counter/argocd/tool_chain_orchestrator L35 + test_exception_handlers L1226-1227 合法 N817/N814 别名豁免）未纳入守护 — 触发条件：全仓测试卫生专项立项（或新增 noqa 时连带清理）— 归宿：V1 按需 — 承接方：测试基建卫生专项（升格形态：tokenize/AST 区分注释与字符串字面量使守卫可自扫 + 存量 noqa 逐处根因修复[N817/N814 需改 import 别名形态]）
 
@@ -297,3 +298,10 @@
 
 - 【CR1-DF1·P3】strategic_archive.py 存量 pydantic 校验器 ValueError 清偿（CR1-2 连带登记——pre-existing 非 5.12 引入）— 描述：`src/interfaces/api/strategic_archive.py` L79/L89 两处 pydantic 校验器内 `raise ValueError`（Story 3-10 交付面——与 5.12 CR1-2 同形态：pydantic v2 捕获包装为 ValidationError 零逃逸，逃逸面合规，但红线自查命令 `grep 'raise ValueError' src/` 恒命中 2 处）；5.12 已裁定本 Story 交付面统一 AssertionError 形态（CR1-2——pydantic 官方双形态 + 红线字面归零 + type=assertion_error 锁定断言防回退），存量 2 处按 surgical 原则不在 5.12 scope 扩面修复，本登记使后续自查命中时有章可循（预期恒含 2 处已登记存量） — 触发条件：任一后续 Story 触碰 strategic_archive.py / 测试基建卫生专项立项 — 归宿：V1 按需（两处改 `raise AssertionError` 同款形态——该文件测试不断言 msg 文案，零连带适配） — 承接方：Story 3-10 档案面维护（或测试基建卫生专项连带——见 HYG-1 区段）
 - 【CR3-DF1·P2】21-1 决策舱财务量化摘要条三字段扩展（投资回收期/加权 IRR/总预算——CR3-3 登记）— 描述：5.12 范围边界表登记 Epic 21-1（MVP P0 消费方——epics L80 FR-UI-04）所需三字段不在引擎面「消费时经后续 Story 扩展」，但 epics Epic 21 Story 21.1 依赖列不含财务扩展 Story、全文零 carrier——孤儿承诺无具名承接（OD-8 对单变量敏感性的同款治理登记先例）；扩展缝评估：引擎 method 自由字符串 + context_extra + DTO 增量字段三扩展点齐备，最短路径 = 总预算[输入侧负现金流求和——消费方本地可解]/投资回收期[引擎加 calculate_payback 方法或结果 VO 加字段——PortSpec v1.0.0→v1.1.0 增量升级天然容纳]/加权 IRR[需先规格化加权语义——按投入资本加权？此为 21-1 侧规格缺口非纯工程缺口] — 触发条件：Epic 21-1 立项（决策舱 MVP P0）或任一消费方需要三字段 — 归宿：21-1 立项时定（或 Epic 21 规划件补财务扩展 Story；加权 IRR 语义需先规格化） — 承接方：Epic 21 规划（21-1 立项时经 contract_gate 扩展引擎端口）
+
+## Deferred from: Epic 5 终局审查 Round 1 (2026-10-31)
+
+> Epic 5（Agent 协作系统，12 Story 全 done 2026-10-30）全交付件终局审查（epic-5-final-review-2026-10-30.md）——四视角调研（遗留项台账/跨 Story 一致性/epics 范围符合性/运行面验证）+ C3 双评审员 + 单复评「优秀」放行。本区段为**新增登记**两条（R1-F13/R1-F16）；其余 Round 1 修复为既有条目终局收口注记（见上文各条内联注记——工具执行链 L125 区段/编排引擎/AutoTriggerHandler/工具熔断/幽灵 impl 族/module= 元数据/V1-EV14）。
+
+- 【R1-F13·P3】AgentStatus 五值状态机全仓零调用（双状态体系并行、其一长眠）— 描述：`src/domain/entities/agent.py` L99-173 的五值状态机（IDLE/RUNNING/WAITING/COMPLETED/FAILED）及四迁移方法（start/complete/fail/reset）全仓零调用方（src+tests grep 零命中——仅实体自身单测消费）；5-3 工作流执行状态经 `evidence.status`（str "completed"/"failed"）独立承载（agent_workflow.py L229-236 同源口径），Redis 中 Agent 实体 status 恒 IDLE——实体状态机先于 EPIC 5 存在（5-1「复用不修改」纪律），组合后形成双状态体系并行的记录级事实 — 触发条件：V1 多 Agent 编排 Story 立项（届时 AgentStatus 状态机 vs evidence.status 双体系择一归一；与 D1-5.1【CHECKPOINTED 第六态不引入——触发 6.3】同族互链，状态机演化时两登记一并评估）— 归宿：V1 — 承接方：Epic 9 多 Agent 编排 Story（状态体系归一设计）
+- 【R1-F16·P3】单变量敏感性分析孤儿承诺（5-12 OD-8 移交锚闭环——Epic 5 retrospective 职责由终局审查承载）— 描述：prd.md L492 V1 里程碑表「NPV/IRR 自动计算 + 基础敏感性分析（单变量）」的单变量敏感性面——epics 全文零具名 Story 承接（FR-SP-14 龙卷风图归 Story 20-2[V2]，单变量无 carrier），5-12 范围权威裁定不做（epics L1964-1967 AC 四项 + Gherkin 均无敏感性面）且显式移交「交 Epic 5 retrospective 处置，V1 立项时需 sprint-change 定锚」 — 触发条件：V1 立项规划（sprint-change 定锚：或并入 Story 20-2 扩展单变量档、或独立微 Story、或显式裁撤）— 归宿：V1 — 承接方：规划专项（具名承接候选 Story 20-2 sensitivity-analysis-api-tornado-chart[backlog]——立项时评估扩展单变量档）

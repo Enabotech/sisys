@@ -1,6 +1,6 @@
 # Story 5.7: Phoenix Evaluation Harness 基础（全链路追踪）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -948,12 +948,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 | 2026-10-27 | v2.1.2 | 代码审查周期 Round 3 单深度推演（生命周期 7 时间线 + R1/R2 修复组合 5 组 + 数学完备性 3 项——全部源码级 + /tmp 实验实证；零 P0/P1；P2×1 + P3×9，落码 6 + 留痕 3。核心：①shutdown 机制归因重写 P2——OTel 1.44.0 BatchProcessor.force_flush 静默忽略超时[#4568 TODO 实证]，R1-F18「~35s 上限」系统性低估勘误[黑洞端点最坏百秒级] + 运维封顶通道披露[OTEL_EXPORTER_OTLP_TIMEOUT/OTEL_BSP_* 暗消费] + flush 饿死后续清理排序面披露；②三处披露补全[initialize False 不门控 create_span/OTEL_PYTHON_TRACER_PROVIDER 第三面治理注记/SpanAttributeValue list 运行时行为 5.8 提示]；③AC-5.2 补 t_untraced 下限守卫；④OD-1 补 5.8 白名单前瞻；⑤四疑点证伪留痕[TRACES 双消费证伪/CLI atexit 证伪/外来 set 主线证伪[生产实为 event-bus→Phoenix 反向串流]/flush 封顶证伪]；⑥七时间线全闭合 + F1×F9 六格矩阵正交 + 复测统计特性安全方向论证） |
 | 2026-10-27 | v2.2.0 | 代码审查周期收敛（R4 纯验证零修复[四目录全量 13055 passed + 1 预存抖动隔离复跑绿 + 2 skipped；七维度快扫全过——红线零引入/lint-imports 5 kept/版本链一致] + R5 独立终审五节全过[周期闭合核对——恰 dev+三审查提交无游离；12 项关键修复双向取证成立 + 3 项行为实跑；独立快扫台账计数终验精确；门禁实跑 90+10 绿 + ruff/mypy 零问题；终审判定「周期收敛——建议流转 done」]；收敛清偿终审特权发现 3 项 P3[N1 验收注释 R3-4→R3-5 编号错位/N2 R1 口径注分节归属精化/N3 R2-R3 节口径注补]；收敛声明入 Story；Status: review → done——Story 5.7 交付闭环） |
 | 2026-10-27 | v2.2.1 | 收敛后回归修复：@trace 装饰器泛型宽化勘误（`Awaitable[R]`→`Coroutine[Any, Any, R]` 三处签名）——全仓 `mypy .` 暴露 10 处 arg-type（被装饰方法返回类型宽化破坏 AgentWorkflowServicePort 六阶段协议结构化子类型；三消费方测试文件非本周期触碰面属 pre-commit 暂存检查盲区）；根因修复后 `mypy .` 1771 文件零问题 + 行为面 66 passed 零影响；门禁盲区登记（装饰器类跨文件类型影响组件改签名后必须全仓 mypy） |
+| 2026-10-31 | v2.2.2 | Epic 5 终局审查 Round 1 修复 F1：头部 Status `review` → `done` 终态翻转（v2.2.0 收敛时漏更——与自身 v2.2.0 变更日志「Status: review → done」、sprint-status done、收敛提交 1d339a91 三方对齐；Epic 5 终局审查四视角互证发现 R1-N1，台账见 epic-5-final-review-2026-10-30.md） |
 
 ---
 
-**故事版本/Story Version:** v2.2.1
+**故事版本/Story Version:** v2.2.2
 **创建日期/Created:** 2026-10-27
-**最后更新/Last Updated:** 2026-10-27
+**最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查周期 Round 1 修订（P0×1 + P1×8 + P2×11 + P3 批量——span 可观测机制 SSOT 重写/Once 闩锁双复位/SpanHandle 两方法化/AC-3·AC-5 口径重钉，详见 Docs Review Fixes）
@@ -966,6 +967,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-7 状态�
 - v2.1.2: 代码审查周期 Round 3 深度推演（7 时间线 + 5 组合 + 3 数学全实证闭合；零 P0/P1，P2×1 + P3×9——落码 6 + 留痕 3；shutdown force_flush 超时失实勘误/三处披露补全/AC-5.2 守卫/OD-1 前瞻/四疑点证伪留痕，详见 Review Findings Round 3 节）
 - v2.2.0: 代码审查周期收敛（R4 纯验证 + R5 独立终审五节全过 + 特权发现 3 项 P3 清偿；收敛声明见下——Status: review → done）
 - v2.2.1: 收敛后回归修复（@trace 泛型宽化勘误 Awaitable→Coroutine——全仓 mypy 10 处 arg-type 消除；门禁盲区登记）
+- v2.2.2: Epic 5 终局审查 Round 1 修复 F1（头部 Status 终态翻转 review→done——v2.2.0 收敛时漏更，三方记录对齐；台账见 epic-5-final-review-2026-10-30.md R1-N1）
 
 ---
 

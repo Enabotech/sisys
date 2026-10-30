@@ -509,12 +509,14 @@ Epic 5「单 Agent 战略规划能力」价值组的合规闭环 Story：5-4 交
 |------|------|
 | 🔴→🟢 | 全仓 grep `IsolationManagementService(` 构造点逐一登记修补（**实测基准 14 处**，见 AC-6.4 清单）：组合根 lambda（L2893）/ 单测工厂 / 集成三链（agent_isolation / triple / isolation_security）/ 验收 8 处五文件（agent_isolation ×3 / triple / workflow ×2 / **agent_instantiation / agent_profile_loading——易漏**）/ 契约一处（test_port_contract_agent_instantiation_use_case L60）；另有 isolation_management 契约测试 _DummyResolver 补两依赖分发（依赖分发面非构造点）——**实施时以 grep 实际清单为准逐一修补并登记**；5-4/5-5 存量测试全量回归绿 |
 
-- [ ] Subtask 3.1: 🔴 红 — 服务接线失败测试（顺序/零调用计数/降级/参数）
-- [ ] Subtask 3.2: 🟢 绿 — 五/六依赖 + audit-first 插位 + 联动
-- [ ] Subtask 3.3: 🟡 变异 — 顺序对调/降级删除实证
-- [ ] Subtask 3.4: 🔴🟢 — 枚举扩展 + lambda + CLI 子命令
-- [ ] Subtask 3.5: 🟡 变异 — 接线内省锚（漏注入红——resolve 服务实例属性内省，禁发命令）
+- [x] Subtask 3.1: 🔴 红 — 服务接线失败测试（顺序/零调用计数/降级/参数）
+- [x] Subtask 3.2: 🟢 绿 — 五/六依赖 + audit-first 插位 + 联动
+- [x] Subtask 3.3: 🟡 变异 — 顺序对调/降级删除实证
+- [x] Subtask 3.4: 🔴🟢 — 枚举扩展 + lambda + CLI 子命令
+- [x] Subtask 3.5: 🟡 变异 — 接线内省锚（漏注入红——resolve 服务实例属性内省，禁发命令）
 - [x] Subtask 3.6: 🟢 — 回归面构造点全量同步 + 5-4/5-5 存量全绿
+
+> 补勾注记（2026-10-31）：Subtask 3.1~3.5 勾选为 Epic 5 终局审查补勾（R1-N10）——dev 期漏勾，与 3.6 同属 Task 3 交付（证据锚：isolation-logs CLI 子命令 agent_cli.py:329 + ISOLATION_SWITCH 审计事件 audit_events.py:75 + 五轮审查收敛全绿），台账见 epic-5-final-review-2026-10-30.md。
 - [x] Subtask 3.7: 🔄 重构 — docstring/门禁
 
 **完成标准/Definition of Done:**
@@ -989,12 +991,13 @@ R4 移交三项记录级留项随本声明清偿：①**红线预存债口径定
 | 2026-10-26 | v1.4.1 | **循环代码审查 Round 2 回归核查轮**（R2-A 回归核查 + R2-B 传播完备性双视角 + C3 单评审门禁——P2×3 + P3×9，见「Round 2 审查发现」节）：**P2**——①RESTRICTIVE 兜底传播缺口三处同族位点（after_create/双 ensure 补 AS RESTRICTIVE + ensure 形态核验自愈 + 双侧 permissive=='RESTRICTIVE' 钉死断言——R1×并行修复组合破口）；②AC-1.1 存量恒真式删除（D 视角漏网）；③owner skip 集转述失实四处勘误 + 「互有高低非超集」定谳。**P3 落码**——单测计数 16→15 勘误（第 4 次算术笔误复发）/ F 编号 8 处按汇总表顺位修正（他 Story 同名编号禁触甄别先行）/ CheckConstraint 按名定位双断言 / clear_session 3 用例补测 / INFO 第 4 投影单源 / 两处 dispose。**全量回归甄别闭环**：13254 passed + 18 failed = 17 rebase 时序伪影（隔离复跑全绿）+ OCR 预存。**deferred +1**（R2-DF1 清理 try/finally 化） |
 | 2026-10-27 | v1.4.2 | **循环代码审查 Round 3 单深度推演轮**（五轴推演 + 经验定谳——P2×1 + P3×4 + 证伪留痕 6，见「Round 3 审查发现」节）：①P2 approval_chain 入口守卫收紧 tuple/list 白名单（None 裸 TypeError/dict 静默取键丢值/bytes 爆裂/int 四形态全封——R1-F1 漏网面）；②Query 分页字段补 isinstance(int) 守卫（bool 显式拒——R1-F5 哲学贯彻）；③双侧 ensure 扩双 deny 列核验（自愈承诺 100% 兑现）；④ORM 值域断言改 IsolationLevel 同源派生（枚举扩展防漂移锚）。五轴定谳：RESTRICTIVE 三路径矩阵闭合/审计时间线七节点+故障双分支良定义/分页数学正确/六异常全可达/脏行 fail-loud |
 | 2026-10-27 | v1.4.3 | **循环代码审查 Round 4 纯验证 + Round 5 独立终审收敛**（R4 零改动三总判定全过[存续 20+ 锚点/门禁 9625 全绿/台账一致]，3 记录级留项移交；R5 六节取证[周期闭合/8 项双向取证 8 属实/门禁独立复跑全绿含本故事面 76 passed 0 skipped/留项无僵尸/文档-仓库一致/**零 P0/P1 残留**]——收敛声明入 Story，见「代码审查周期收敛声明」节）。收敛清偿 8 项 P3 记录级：端口 Raises docstring 随 R3 白名单同步 / 改判计数 5→6 勘误 / ci.yaml -rs 补记 + L715 表述修正 / 632f7bc5 SHA 补位 / test_session_context.py 入 File List / R4 三项口径定谳（红线预存债/计数粒度注记）。**Status: review → done** |
+| 2026-10-31 | v1.4.4 | Epic 5 终局审查 Round 1 修复 F11：Task 3 Subtask 3.1~3.5 补勾（dev 期漏勾，带补勾注记+证据锚——非静默翻勾；台账见 epic-5-final-review-2026-10-30.md R1-N10） |
 
 ---
 
-**故事版本/Story Version:** v1.4.3
+**故事版本/Story Version:** v1.4.4
 **创建日期/Created:** 2026-10-25
-**最后更新/Last Updated:** 2026-10-27
+**最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.0.1: 偏离声明同步动作对标审查修复（OD 登记/承接方链接/编号 OD-n 重命名）
@@ -1009,3 +1012,4 @@ R4 移交三项记录级留项随本声明清偿：①**红线预存债口径定
 - v1.4.1: 循环代码审查 Round 2 回归核查轮（P2×3 + P3×9 + 台账勘误——详版见变更日志表）
 - v1.4.2: 循环代码审查 Round 3 单深度推演轮（P2×1 + P3×4 + 证伪留痕 6——详版见变更日志表）
 - v1.4.3: 循环代码审查 Round 4 纯验证 + Round 5 独立终审收敛（零 P0/P1 残留，收敛声明入 Story，Status → done——详版见变更日志表）
+- v1.4.4: Epic 5 终局审查 Round 1 修复 F11（Task 3 Subtask 3.1~3.5 补勾+注记；台账 epic-5-final-review-2026-10-30.md R1-N10）

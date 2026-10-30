@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as aioredis
 
@@ -19,6 +19,9 @@ from src.domain.ports.registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
 
 
 # 工厂函数已迁移至对应 infrastructure/config/ 模块；组合根仅做装配，不包含业务逻辑
@@ -890,8 +893,8 @@ def bootstrap() -> None:
         name="metrics",
         version="v1.0.0",
         interface=MetricsPort,
-        impl="src.infrastructure.monitoring.metrics_adapter.PrometheusMetricsAdapter",
-        module="src.infrastructure.monitoring.metrics_adapter",
+        impl=_build_metrics_port,
+        module="src.infrastructure.monitoring.metrics_port_impl",
         lifetime=Lifetime.SINGLETON,
         owner="monitoring-team",
     )
@@ -3200,6 +3203,43 @@ def bootstrap() -> None:
                 asyncio.new_event_loop().run_until_complete(async_register())
             except Exception as e:
                 logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
+
+
+def _build_metrics_port(resolver: Any) -> "MetricsPortImpl":
+    """metrics 端口注册工厂（Epic 5 终局审查修复——原字符串 impl 指向不存在的 metrics_adapter 模块）。
+
+    BusinessMetricsCollector 单实例共享是结构性必需而非防御：其构造器即向
+    Prometheus 默认 REGISTRY 注册 sisys_* 指标，二次构造必抛 Duplicated
+    timeseries——aggregator 与 MetricsPortImpl 两依赖位必须注入同一实例。
+
+    历史注记：幽灵 impl 字符串源自 19fbf461（2026-05-12 组合根重构期脚手架），
+    d49261b0（2026-10-12 UDMR 审计修复 F2）将 cost_metrics_handler 加入
+    handler_names 激活清单后缺陷活化——每次 bootstrap resolve 失败被静默吞为
+    warning（1-19 成本追踪「激活」从未生效）。修复后激活链恢复：handler_names
+    循环 → resolve("cost_metrics_handler") 成功 → async register() 订阅
+    RoutingDecided（REALTIME 通道，进程内注册零外部依赖）。
+
+    Args:
+        resolver: 端口解析器（resolver._instantiate 以 spec.impl(resolver=self)
+            约定调用——零参签名会 TypeError 且被 bootstrap except 吞掉）。
+
+    Returns:
+        组合完成的 MetricsPort 单例（15 方法全实现，含 cost_metrics_handler
+        消费的 record_token_usage / record_cost）。
+    """
+    from src.infrastructure.monitoring.aggregator import MetricsAggregator
+    from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
+    from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+    from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
+
+    business = BusinessMetricsCollector()
+    return MetricsPortImpl(
+        aggregator=MetricsAggregator(
+            event_metrics_collector=EventMetricsCollector(),
+            business_metrics_collector=business,
+        ),
+        business_metrics=business,
+    )
 
 
 def _build_agent_workflow_use_case(resolver: Any) -> Any:

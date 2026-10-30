@@ -26,13 +26,20 @@ from src.domain.ports.sandbox_executor import SandboxExecutor
 
 
 def _get_impl(spec, port_name):
-    """Helper to get implementation instance or None if cannot resolve."""
+    """Helper to get implementation instance or None if cannot resolve.
+
+    适配注记（Epic 5 终局审查修复 F6）：改用 get_resolver() 复用全局
+    SINGLETON 缓存——原 Resolver() 新建形态对 SINGLETON 端口绕过生命周期
+    缓存强制重构造，无状态实现无害，但对构造有注册副作用的实现（metrics
+    的 BusinessMetricsCollector 向 Prometheus 默认 REGISTRY 注册 sisys_*）
+    必触发 Duplicated timeseries。
+    """
     impl_cls = spec.impl if isinstance(spec.impl, type) else None
     if impl_cls is None:
         try:
-            from src.domain.ports.resolver import Resolver
+            from src.domain.ports.resolver import get_resolver
 
-            return Resolver().resolve(port_name)
+            return get_resolver().resolve(port_name)
         except (RuntimeError, ImportError, KeyError):
             return None
     return impl_cls

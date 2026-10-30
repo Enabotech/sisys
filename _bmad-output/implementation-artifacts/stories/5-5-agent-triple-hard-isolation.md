@@ -428,14 +428,16 @@ Epic 5「单 Agent 战略规划能力」价值组的安全执行环：5-4 交付
 
 **关联 AC:** 全部
 
-- [ ] Subtask 0.1: 定义数据模型规范——IsolationResource（11 成员两归属）/ AccessOperation / IsolationViolationKind / IsolationAccessDecision / decide_isolation_access 矩阵三步 / decide_tool_access / resource_is_private / AgentConfig.allowed_tools（本文件「数据模型」节为唯一真源）
-- [ ] Subtask 0.2: 定义端口契约——IsolationGuardPort 三方法 + IsolationGuardService 三依赖 + 组合根注册元数据 + 两接线点签名扩展（契约变更登记）
-- [ ] Subtask 0.3: 定义异常契约——448/449（code/parent/context 字段/HTTP 403/双触发场景表 + 448-449 分界原则）
-- [ ] Subtask 0.4: 定义 21 条探针矩阵定稿表 + 对照/透传用例清单（本文件「探针矩阵」节——安全审计资产）
-- [ ] Subtask 0.5: 定义安全测试基建契约——tests/security 四件套 + marker 注册 + CI 挂载 + 覆盖率专项口径（v2.1.0 专项裁撤——该契约交付后推翻，终态见基建契约节注记与 DC-8 修订）
-- [ ] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_triple_isolation.feature`（19 场景——收尾场景按模板归 Task 7 追加）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + 双键清理）+ **19 场景三属性分档表**定稿（docstring）
-- [ ] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
-- [ ] Subtask 0.8: 移交三项处置落盘（DC-12——5-4 风险 #6 核销登记/#7 维持/R1-DF2 维持，deferred-work.md 原条目更新）
+- [x] Subtask 0.1: 定义数据模型规范——IsolationResource（11 成员两归属）/ AccessOperation / IsolationViolationKind / IsolationAccessDecision / decide_isolation_access 矩阵三步 / decide_tool_access / resource_is_private / AgentConfig.allowed_tools（本文件「数据模型」节为唯一真源）
+- [x] Subtask 0.2: 定义端口契约——IsolationGuardPort 三方法 + IsolationGuardService 三依赖 + 组合根注册元数据 + 两接线点签名扩展（契约变更登记）
+- [x] Subtask 0.3: 定义异常契约——448/449（code/parent/context 字段/HTTP 403/双触发场景表 + 448-449 分界原则）
+- [x] Subtask 0.4: 定义 21 条探针矩阵定稿表 + 对照/透传用例清单（本文件「探针矩阵」节——安全审计资产）
+- [x] Subtask 0.5: 定义安全测试基建契约——tests/security 四件套 + marker 注册 + CI 挂载 + 覆盖率专项口径（v2.1.0 专项裁撤——该契约交付后推翻，终态见基建契约节注记与 DC-8 修订）
+- [x] Subtask 0.6: 编写 Gherkin `test_acceptance_agent_triple_isolation.feature`（19 场景——收尾场景按模板归 Task 7 追加）+ BDD 步骤实现骨架 `.py`（@scenario 全显式绑定 + context dict fixture + 双键清理）+ **19 场景三属性分档表**定稿（docstring）
+- [x] Subtask 0.7: 运行验收测试确认失败（🔴 红阶段——ModuleNotFoundError/断言红为合法红）
+- [x] Subtask 0.8: 移交三项处置落盘（DC-12——5-4 风险 #6 核销登记/#7 维持/R1-DF2 维持，deferred-work.md 原条目更新）
+
+> 补勾注记（2026-10-31）：Subtask 0.1~0.8 勾选为 Epic 5 终局审查补勾（R1-N10）——Task 0 汇总行 L909 已勾 `[x] Task 0`、八子项属同批交付（DC-12 三项处置实见于 deferred-work.md 2026-10-23 区段 + 探针矩阵/异常契约/19 场景分档表均在文件内在位 + 五轮审查收敛全绿），台账见 epic-5-final-review-2026-10-30.md。
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义；验收测试红阶段确认；链路接线断言清单 L1-L5 定义
@@ -1125,12 +1127,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml  # 修改：5-5 状态�
 | 2026-10-24 | v2.1.3 | **代码审查 Round 3**（单深度穷举推演五轴——零 P0/P1/P2，P3×6：4 落地 + 2 Defer）：176 格矩阵独立枚举 114/54/8 与文档定谳逐位一致 + 探针 21 条逐格落位核对零矛盾 + 证伪留痕 12 条；R3-F2 T-04 目录真实名守护红哨（test_t04_tool_name_in_catalog + 套件 docstring/验收 _EXPECTED_AUX_CASES/故事四处联动 7→8 条辅用例）；R3-F3 ProbeSpec 字段清单对齐七字段（R3 勘误：原规八字段含 reason）；R3-F4 依赖表锚勘正 L2860-2903；R3-F5 验证器白名单声称对齐三成员集；R3-F1/F6 Defer（畸形串 ValueError 窗口/半写键清理窗口） |
 | 2026-10-24 | v2.2.0 | **代码审查周期收敛（R4 纯验证 + R5 独立终审）——Status → done**：R4 七维度全 PASS（修复存续 10/10 + 全量分段 ~13114 passed/5.5 面 497 全绿 + 2 新失败均定谳非 5.5 面[SaaS 超时 + data_staleness flaky 三重复跑绿实证] + 门禁全过 + 零游离）；R5 终审五节全过（22 笔提交全归属/6/6 双向核验/49 passed 实跑/零 AI 署名/收敛判据全满足）；P4 残余三处随本提交清偿（L930/L470/L317 七→八辅用例口径——R3-F2 联动遗漏位）；周期累计 19 修复落地 + 9 Defer，零 P0/P1/P2/P3 残留 |
 | 2026-10-24 | v2.2.1 | **收敛后 CI 门禁紧急修复（用户反馈——4-6 R6 先例）**：data_staleness test_ac7 本地 flaky 三重绿但 CI（gw3）稳定红。根因实证：`register_handlers()` 仅在 `bootstrap()` 执行一次——同 worker 先前测试 `clear_singleton()`（5.x 验收场景级重建纪律）驱逐 SINGLETON 缓存后，resolve 产生全新 handler/listener 且回调未挂（最小 Python 复现：清后回调 `[]`）；本地 xdist 分发恰好避开污染 worker 故 flaky、CI 分发稳定踩中。修复：test_ac7 `when_resolve_components` 自包含化——空态补调生产同款 `register_handlers()`（消除对全局 bootstrap 副作用的隐式跨测试依赖；非 5.5 面资产，Story 3-12 维护态修正）。验证：单文件 13 绿 + 确定性污染序列修复实证 PASS + 全验收 1203 passed 零失败（此前偶发失败消除）+ ruff 绿 |
+| 2026-10-31 | v2.2.2 | Epic 5 终局审查 Round 1 修复 F11：Task 0 Subtask 0.1~0.8 补勾（dev 期漏勾、汇总行已勾——带补勾注记+证据锚非静默翻勾；台账见 epic-5-final-review-2026-10-30.md R1-N10） |
 
 ---
 
-**故事版本/Story Version:** v2.2.1
+**故事版本/Story Version:** v2.2.2
 **创建日期/Created:** 2026-10-23
-**最后更新/Last Updated:** 2026-10-23
+**最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 文档审查 Round 1——37 项处置（P0×1 + P1×9 + P2×11 + P3×16），详见「文档审查修复」表

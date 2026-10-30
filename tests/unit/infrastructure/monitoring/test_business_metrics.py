@@ -247,28 +247,43 @@ class TestBusinessMetricsCollectorDefaultRegistry:
     """
 
     def test_default_registry_full_lifecycle(self) -> None:
-        """registry=None 时指标注册、记录、导出的完整生命周期."""
+        """registry=None 时指标注册、记录、导出的完整生命周期.
+
+        适配注记（Epic 5 终局审查修复 F6）：metrics 端口 impl 指向真实实现后，
+        session autouse bootstrap 已向默认 REGISTRY 注册 sisys_*（DI 容器
+        SINGLETON 是 docstring 所述单例语义的唯一合法持有者）；直接二构
+        BusinessMetricsCollector(registry=None) 会触发 Duplicated timeseries。
+        本测试改从 resolver 取该单例验证同一生命周期——set 语义字段用绝对
+        断言，累加语义字段用增量断言（共享单例免疫先前值污染）。
+        """
         from prometheus_client import REGISTRY, generate_latest
 
-        from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
+        from src.domain.ports.resolver import get_resolver
+        from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
 
-        collector = BusinessMetricsCollector(registry=None)
+        metrics = get_resolver().resolve("metrics")
+        assert isinstance(metrics, MetricsPortImpl)
+        collector = metrics._business_metrics
 
         assert collector._registry is REGISTRY
 
-        # sessions 指标
+        # sessions 指标（set 语义——绝对断言）
         collector.record_sessions(3)
         assert collector.sessions == 3
 
-        # cache 指标
+        # cache 指标（累加语义——增量断言）
+        hits_before = collector._metrics.cache_hits_total
+        misses_before = collector._metrics.cache_misses_total
         collector.record_cache_hit()
         collector.record_cache_hit()
         collector.record_cache_miss()
-        assert abs(collector.hit_rate - (2.0 / 3.0)) < 0.01
+        total_after = hits_before + 2 + misses_before + 1
+        assert abs(collector.hit_rate - ((hits_before + 2) / total_after)) < 0.01
 
-        # cost 指标
+        # cost 指标（累加语义——增量断言）
+        cost_before = collector._total_cost_cny
         collector.record_cost(cost=0.05, model="test-default-reg", route_type="test")
-        assert abs(collector._total_cost_cny - 0.05) < 0.0001
+        assert abs(collector._total_cost_cny - cost_before - 0.05) < 0.0001
 
         # token 指标
         collector.record_token_usage(prompt=100, completion=50, model="test-default-reg", route_type="test")

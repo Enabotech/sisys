@@ -969,7 +969,7 @@ tests/
 - `src/application/use_cases/agent_instantiation.py`（InstantiateAgentUseCase + AgentInstantiationResult + SUPPORTED_ROLES）
 - `src/infrastructure/agent_orch/yaml_agent_config_loader.py`（YAML 加载器 + DEFAULT_CONFIG_DIR）
 - `src/infrastructure/storage/redis/redis_agent_repository.py`（Redis 仓储 + 序列化静态方法）
-- `src/interfaces/cli/agent_cli.py`（sisys-agent CLI 入口）
+- `src/interfaces/cli/agent_cli.py`（sisys-agent CLI 入口）（**路径迁移注记 2026-10-31**：D1 方案 A 入口上移后现位于 `src/entrypoints/agent_cli.py`——c176da99，本 File List 记录创建时点路径，pyproject 双注册已同步；Epic 5 终局审查 R1-N9）
 - `configs/agents/ceo_agent.yaml`（CEO 基础配置资产）
 - `tests/unit/domain/exceptions/test_agent_exceptions.py`（20 用例）
 - `tests/unit/domain/events/test_agent_events.py`（11 用例）
@@ -1161,9 +1161,9 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.14.0
+**故事版本/Story Version:** v1.14.1
 **创建日期/Created:** 2026-10-14
-**最后更新/Last Updated:** 2026-10-14
+**最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（5 并行调研 Agent 全仓代码/文档/模板/经验调研 + 人工事实核验；含链路接线断言清单 L1-L8、8 项关键架构决策 DC-1~DC-8、4 项偏离声明 D-1~D-4、deferred-work 分流处置）
 - v1.1.0: Round 1 审查修订（正确性视角：5 并行调研 Agent 代码事实核对 + 3 并行审查 Agent 对抗复核/一致性/遗漏扫描；修复 P0×4（EXCEPTION_HTTP_MAP 定位、YAML 断言误伤、session_storage 缺登记、验收模板指向）+ P1×8 + P2×18，详见「文档审查修复」表）
@@ -1180,3 +1180,4 @@ tests/
 - v1.12.0: **留项清偿轮**（2026-10-14：D2/D9(c) 核销 + D11 四子项清偿（②④⑤⑥）范围收窄至①③ + D13 短期缓解落地（.env.example）；TDD 红 7 用例→绿；unit+contracts 10038 + EPO 消费方验收 35 全绿；D1/D11 治理方案件两份入 proposals/（供架构评审与立项））
 - v1.13.0: **D1 方案 A 落地**（2026-10-15：3-body 拍板——同日决策链 B 落地→用户撤销→A 终态实施。入口上移 src/entrypoints/ 组装层（agent_cli/ocr_cli/api_app git mv，interfaces 组合根引用清零）+ 契约还原严格传导禁止（5 kept，注入直接违规仍捕获）+ CI 直接 blocking + pre-commit 钩子 + 12 测试引用面更新 + CLAUDE.md 目录树同步；受影响面 798 passed）
 - v1.14.0: **D8 清偿轮 + D11-a 微 Story + R1-F4 集成层补漏**（2026-10-15：①R1-F4 integration 层两处 str 锚漏网类型化（archive_validity/data_staleness——回归面静态全扫教训入记忆）；②D8 清偿：ocr_cli 6 处 ValueError→ValidationError(201)、circuit_breaker 3 处→ConfigurationError(101)、noqa 死注释×3 文件清除、RedisSnapshotStore pipeline 原子化、FakeRedis 13 用例 fixture 化（strategic_archive 2 处经甄别属 Pydantic validator 契约合法形态剔除）；③D11-a：DLQ dequeue 毒隔离（error 终态）+ outbox count_by_status 巡检面——每项 TDD 红绿；验证：受影响面全绿 + snapshot 真实链路验收 19 passed）
+- v1.14.1: Epic 5 终局审查 Round 1 修复 F10（File List agent_cli.py 行加路径迁移注记——interfaces/cli → entrypoints，D1 方案 A c176da99；台账见 epic-5-final-review-2026-10-30.md R1-N9）
