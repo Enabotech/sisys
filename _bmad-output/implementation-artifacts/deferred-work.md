@@ -290,3 +290,9 @@
 > Story 5.10（CheckpointWithEvaluation 集成——FR-EV-04）Task 0 对钦定触发方的留项处置裁定落档（钦定五条中四条为既有条目追加注记：langgraph retry/timeout[路线图触发型区段] / R1-DF5[5-3][5-3 审查区段] / V1-EV12[5-9 升级通道区段] / V1-EV3[5-8 升级通道区段]；本区段仅登记无既有条目的一条）。
 
 - 【D1-5.1·P3】CHECKPOINTED 第六态不引入（Story 5-1 偏离声明 D-1 钦定的 5.10 评估义务兑现）— 描述：sisys-core-domain-design L1044-1048 钦定「CHECKPOINTED 态延至 Story 5.10（CheckpointWithEvaluation 集成）时随 Checkpoint 机制一并评估引入」；5.10 评估结论 = **不引入**——5.10 的 Checkpoint 是评估历史快照（可观测附加面：评估块内自动触发、每 run 一次、不中断执行、不改变 Agent 执行状态），CHECKPOINTED 规划语义是 WAITING 态中断保存后的状态（执行中断恢复面，规划 L1082 save_checkpoint 在 waiting_user_confirm 分支）——两者语义分立，5.10 引入无状态转换可达路径；AgentStatus 五态改六态需动 start/complete/fail/restart/wait 五守卫 + 既有状态机测试且无消费方（YAGNI） — 触发条件：Story 6.3 BLM 阶段检查点（执行中断恢复面）落地时再评估引入 — 归宿：6.3 — 承接方：Story 6-3（checkpoint-snapshot-creation——epics_v1.0.md L2120 起映射）
+
+## Deferred from: code review of 5-12-financial-modeling-valuation Round 1 (2026-10-30)
+
+> Story 5.12（财务建模与估值基础）代码审查周期 Round 1 留项（四视角调研 + 双评审员；CR1-# 编号见 Story Review Findings 表）。gap 四要素：描述/触发条件/归宿/承接方。
+
+- 【CR1-DF1·P3】strategic_archive.py 存量 pydantic 校验器 ValueError 清偿（CR1-2 连带登记——pre-existing 非 5.12 引入）— 描述：`src/interfaces/api/strategic_archive.py` L79/L89 两处 pydantic 校验器内 `raise ValueError`（Story 3-10 交付面——与 5.12 CR1-2 同形态：pydantic v2 捕获包装为 ValidationError 零逃逸，逃逸面合规，但红线自查命令 `grep 'raise ValueError' src/` 恒命中 2 处）；5.12 已裁定本 Story 交付面统一 AssertionError 形态（CR1-2——pydantic 官方双形态 + 红线字面归零 + type=assertion_error 锁定断言防回退），存量 2 处按 surgical 原则不在 5.12 scope 扩面修复，本登记使后续自查命中时有章可循（预期恒含 2 处已登记存量） — 触发条件：任一后续 Story 触碰 strategic_archive.py / 测试基建卫生专项立项 — 归宿：V1 按需（两处改 `raise AssertionError` 同款形态——该文件测试不断言 msg 文案，零连带适配） — 承接方：Story 3-10 档案面维护（或测试基建卫生专项连带——见 HYG-1 区段）

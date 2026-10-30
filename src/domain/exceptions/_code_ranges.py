@@ -157,6 +157,16 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # 460 语义归属 business（协议交互超时是调用方可处理结果）；461/462 语义归属 system
     # （SystemException 子类——协议契约违规/基础设施写失败）
     "sap": (460, 469),
+    # 财务子域（470-479）—— Story 5.12 注册 1 个
+    # （sap 段 460-469 之后六代开段先例第七段：data_source 410/debate 420/tool_version
+    #  430/agent 440/evaluation 450/sap 460 同款「前段满/语义独立 → 开独立段」
+    #  ——财务估值计算域与 SAP 协议域语义分立，子域分立先例同款）:
+    # EXCEPTION_470 FinancialCalculationError (Story 5.12, 财务计算失败——DCF 数值
+    #   求解失败双路径[V1 实际触发：bracket 端点同号等病态输入 + NPV 为零 weight
+    #   分母失效(CR1-1 补) 均 fail-loud]；语义挂
+    #   BusinessRuleViolationError 422 族「业务约束不可满足」；471-479 预留 financial 域)
+    # 470 语义归属 business（数值求解失败是调用方可处理结果——调整输入/换方法重试）
+    "financial": (470, 479),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -328,6 +338,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "SAPTimeoutError": "sap",
     "SAPBusStateError": "sap",
     "SAPBlackboardWriteError": "sap",
+    # financial_exceptions.py (Story 5.12 新增 1 个异常——财务建模估值计算失败码)
+    "FinancialCalculationError": "financial",
 }
 
 

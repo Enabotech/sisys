@@ -66,6 +66,7 @@ from src.domain.exceptions import (
     EvidenceValidationFailedError,
     ExecutionError,
     ExternalException,
+    FinancialCalculationError,
     HybridSearchError,
     InsufficientTokenError,
     InvalidStateError,
@@ -360,6 +361,7 @@ class TestExceptionHttpMap:
             SAPTimeoutError,  # 460 — Story 5.11 SAP 请求-响应关联等待超时（504）
             SAPBusStateError,  # 461 — Story 5.11 SAP 总线状态违规（409）
             SAPBlackboardWriteError,  # 462 — Story 5.11 SAP 公共黑板写入失败（500）
+            FinancialCalculationError,  # 470 — Story 5.12 财务计算失败（422）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

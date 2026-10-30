@@ -85,6 +85,7 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
+from src.domain.exceptions.financial_exceptions import FinancialCalculationError
 from src.domain.exceptions.hybrid_search_exceptions import HybridSearchError
 from src.domain.exceptions.layered_retrieval_exceptions import (
     LayeredRetrievalError,
@@ -328,6 +329,8 @@ __all__ = [
     "SAPTimeoutError",
     "SAPBusStateError",
     "SAPBlackboardWriteError",
+    # 财务子域异常（Story 5.12 财务建模与估值——470 计算失败[IRR 求解失败 + NPV 为零]）
+    "FinancialCalculationError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

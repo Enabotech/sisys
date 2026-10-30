@@ -60,6 +60,7 @@ from src.domain.exceptions import (
     EvidenceValidationFailedError,
     ExecutionError,
     ExternalException,
+    FinancialCalculationError,
     HybridSearchError,
     InsufficientTokenError,
     InvalidStateError,
@@ -293,6 +294,9 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     SAPTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,  # 460 — 请求-响应关联等待超时（385 三合一先例）
     SAPBusStateError: status.HTTP_409_CONFLICT,  # 461 — 总线状态违规（协议契约冲突；预留映射面）
     SAPBlackboardWriteError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 462 — 黑板写入失败（fail-loud OD-7）
+    # 财务子域异常（Story 5.12 财务建模与估值——语义就近映射：BusinessRuleViolationError 422 惯例锚）
+    # 470 — 财务计算失败（业务约束不可满足——调用方可调整输入重试）
+    FinancialCalculationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

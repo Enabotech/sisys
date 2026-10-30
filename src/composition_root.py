@@ -3118,6 +3118,49 @@ def bootstrap() -> None:
         tags=("agent", "sap", "collaboration"),
     )
 
+    # === Story 5.12 — 财务建模与估值基础（FR-ST-09 确定性计算引擎）===
+    # 财务建模领域服务（无状态纯计算，类即接口——debate_evaluator 字符串 impl
+    # SINGLETON 先例照抄；Decimal 全程精确计算[OD-5]，零 LLM/零沙箱[OD-2 确定性
+    # 裁定]，零事件面[DC-10——计算服务无状态变化事件]。SINGLETON（DC-9 并发
+    # 安全：VO in/VO out 全 frozen，localcontext 线程隔离，10 路并发隔离锚直接
+    # 验证）。零 REST/零 Tool catalog（OD-6/OD-3——嵌入式计算能力，消费面
+    # Epic 6/9/21-1 在范围边界表显式登记）。
+    register_port(
+        name="financial_modeling_service",
+        version="v1.0.0",
+        interface=__import__(
+            "src.domain.services.financial_modeling",
+            fromlist=["FinancialModelingService"],
+        ).FinancialModelingService,
+        impl="src.domain.services.financial_modeling.FinancialModelingService",
+        module="src.domain.services.financial_modeling",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("financial", "valuation", "domain-service"),
+    )
+    # 估值用例（应用层纯编排——interface 绑用例类自身，agent_instantiation_use_case
+    # 先例；lambda 单依赖注入 financial_modeling_service——本区段先行注册，缺依赖
+    # KeyError 自然传播零包装[组合根既有惯例——与 5-11 DC-12 ConfigurationError
+    # 翻译差异钦定：本 Story 无 __import__ 内联无 ImportError 形态]）。
+    register_port(
+        name="financial_modeling_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.financial_modeling",
+            fromlist=["FinancialModelingUseCase"],
+        ).FinancialModelingUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.financial_modeling",
+            fromlist=["FinancialModelingUseCase"],
+        ).FinancialModelingUseCase(
+            service=resolver.resolve("financial_modeling_service"),
+        ),
+        module="src.application.use_cases.financial_modeling",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("financial", "valuation", "usecase"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用 register_handlers()
     # 将处理器订阅到 InMemoryEventListener 事件总线
