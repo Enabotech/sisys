@@ -1,4 +1,4 @@
-"""集成测试：Story 5.12 财务建模与估值——性能三锚（委托计时单源模块）.
+"""集成测试：Story 5.12 财务建模与估值——性能三锚（委托计时单源模块）。
 
 口径声明（四注记——AC-5 And 钦定）：
 1. 进程内绊线定位：纯 Decimal 计算 ms 级，5s 门是回归绊线非容量预算（本地进程
@@ -195,7 +195,7 @@ def _make_concurrency_payload(target_ebitda: str) -> FinancialValuationRequest:
 
 
 def sample_financial_perf() -> dict[str, Any]:
-    """性能三锚委托采样（cache-or-compute——_PERF_CACHE 单 key financial_perf 载三指标 summary）.
+    """性能三锚委托采样（cache-or-compute——_PERF_CACHE 单 key financial_perf 载三指标 summary）。
 
     采样口径：单次全量估值全程（构造请求 → execute → 结果返回 monotonic 计时，
     全同步采样循环）；warmup 1 + 20 采样 exclusive P95 = quantiles(latencies, n=20)[18]

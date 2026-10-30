@@ -152,6 +152,52 @@ class TestFinancialSchemas:
             "跨字段校验器应经 raise AssertionError 形态（CR1-2 钦定——type=assertion_error）"
         )
 
+    @pytest.mark.parametrize(
+        ("section_key", "list_key", "over_limit"),
+        [
+            pytest.param("dcf", "cash_flows", 1201, id="cash_flows_1201"),
+            pytest.param("comparables", "comparables", 101, id="comparables_101"),
+            pytest.param("precedents", "transactions", 101, id="transactions_101"),
+        ],
+    )
+    def test_list_length_upper_bound_rejected(self, section_key: str, list_key: str, over_limit: int) -> None:
+        """三 list 字段 max_length 超限拒绝（CR2-1——超长输入 DoS 防御单层钦定；
+        错误 type=too_long 锁定）。"""
+        base_section = _FULL_PAYLOAD[section_key]
+        section: dict[str, Any] = {**base_section}
+        if list_key == "cash_flows":
+            section[list_key] = [{"period": index + 1, "amount": "-100"} for index in range(over_limit)]
+        else:
+            item_template = base_section[list_key][0]
+            section[list_key] = [{**item_template, "name": f"member-{index}"} for index in range(over_limit)]
+        with pytest.raises(ValidationError) as exc_info:
+            FinancialValuationRequest.model_validate({section_key: section})
+        error_types = {error["type"] for error in exc_info.value.errors()}
+        assert "too_long" in error_types, f"超限应触发 pydantic too_long 错误，实际 {error_types}"
+
+    def test_at_limit_boundary_accepted(self) -> None:
+        """上限恰好通过边界锚（1200/100/100 精确构造——CR2-1：防上限值手误漂移
+        [如误写 120]导致的只红不绿盲区——恰好在上限的合法载荷必须通过）。"""
+        request = FinancialValuationRequest.model_validate(
+            {
+                "dcf": {
+                    **_FULL_PAYLOAD["dcf"],
+                    "cash_flows": [{"period": index + 1, "amount": "100"} for index in range(1200)],
+                },
+                "comparables": {
+                    **_FULL_PAYLOAD["comparables"],
+                    "comparables": [{"name": f"comp-{index}", "ev_ebitda": "8.5"} for index in range(100)],
+                },
+                "precedents": {
+                    **_FULL_PAYLOAD["precedents"],
+                    "transactions": [{"target_name": f"target-{index}", "ev_ebitda": "9.0"} for index in range(100)],
+                },
+            }
+        )
+        assert request.dcf is not None and len(request.dcf.cash_flows) == 1200
+        assert request.comparables is not None and len(request.comparables.comparables) == 100
+        assert request.precedents is not None and len(request.precedents.transactions) == 100
+
     def test_perpetual_with_exit_fields_rejected(self) -> None:
         """终值两法字段配套：perpetual 法带 exit_multiple → 拒绝（法-参数互斥）。"""
         payload = {

@@ -7,13 +7,18 @@
 设计决策：
 - 定义在应用层（src/application/），允许依赖 Pydantic——领域层零外部依赖约束
   不适用于此（summary_schemas.py L8-12 先例）
-- wire 契约：数字字段一律字符串形态（金融工程标准——JSON number 经 float 中转
-  产生二进制近似污染，str→Decimal 解析零损失；FIX 协议价格/数量字段 wire 形态
-  即 ASCII 文本十进制非二进制浮点）；period 是序数索引非量值，int 形态不套
-  字符串契约
+- wire 契约：数字字段钦定字符串形态（金融工程惯例——FIX 协议价格/数量字段
+  wire 形态即 ASCII 文本十进制；str→Decimal 解析零精度损失）；数值形态
+  （int/float）经 pydantic 官方 str 换算兼容接受（AC-3 When② 知悉注记口径：
+  实测 v2.13 经最短表示换算无二进制噪声——55 位噪声仅出现在直接 Decimal(float)
+  构造；>17 位有效数字的 float 表示域截断除外，精度意图显式化是 str 形态的
+  实际价值[CR2-2 措辞对齐钦定——不启用 Strict 拒绝]）；period 是序数索引
+  非量值，int 形态不套字符串契约
 - Schema-VO 约束镜像双层守卫（刻意冗余）：Schema 是外部契约面（pydantic 约束，
   框架异常可读性好），VO 是领域不变量面（__post_init__ 242 独立守卫防绕过
-  Schema 的内部构造——防御纵深，两层测试各自覆盖）
+  Schema 的内部构造——防御纵深，两层测试各自覆盖）；**max_length 单层
+  carve-out（CR2-1）**：三 list 字段的长度上限是资源策略（超长输入 DoS 防御）
+  非领域不变量——仅 Schema 单层拦截，VO 层不加期数上限（内部构造信任边界）
 - 三层异常语义分立：Schema 层 pydantic.ValidationError / VO 层 242 / 引擎层
   470——框架原生异常透传不包装
 - 校验器异常形态（CR1-2 代码审查裁定）：model_validator 内以
@@ -56,7 +61,10 @@ class DcfRequestSection(BaseModel):
     cash_flows: list[DcfCashFlowItem] = Field(
         ...,
         min_length=1,
-        description="逐期现金流（非空——与 CashFlowSchedule VO 非空不变量镜像）",
+        max_length=1200,
+        description=(
+            "逐期现金流（非空——与 CashFlowSchedule VO 非空不变量镜像；上限 1200=月度百年模型量级——超长输入资源防御[CR2-1]）"
+        ),
     )
     discount_rate: Decimal = Field(..., gt=0, lt=1, description="折现率（开区间 (0,1)——年末贴现口径）")
     terminal_value_method: Literal["perpetual_growth", "exit_multiple"] = Field(
@@ -103,7 +111,10 @@ class ComparableRequestSection(BaseModel):
     """可比公司估值请求段（交易市场倍数口径）。"""
 
     comparables: list[ComparableCompanyInput] = Field(
-        ..., min_length=1, description="可比公司集合（非空——与 ComparableSet VO 不变量镜像）"
+        ...,
+        min_length=1,
+        max_length=100,
+        description=("可比公司集合（非空——与 ComparableSet VO 不变量镜像；上限 100=业界 5~20 家惯例的 5 倍裕度[CR2-1]）"),
     )
     target_ebitda: Decimal = Field(
         ...,
@@ -123,7 +134,10 @@ class PrecedentRequestSection(BaseModel):
     """先例交易估值请求段（交易对价倍数口径）。"""
 
     transactions: list[PrecedentTransactionInput] = Field(
-        ..., min_length=1, description="先例交易集合（非空——与 PrecedentTransactionSet VO 不变量镜像）"
+        ...,
+        min_length=1,
+        max_length=100,
+        description="先例交易集合（非空——与 PrecedentTransactionSet VO 不变量镜像；上限 100=业界惯例 5 倍裕度[CR2-1]）",
     )
     target_ebitda: Decimal = Field(..., gt=0, description="目标公司 EBITDA（正值域）")
 

@@ -1,4 +1,4 @@
-"""SDD 架构约束验证：Story 5.12 财务建模与估值（四验证器 A/B/C/D）.
+"""SDD 架构约束验证：Story 5.12 财务建模与估值（四验证器 A/B/C/D）。
 
 验证器 A：domain 两文件第三方 import 白名单空集（纯标准库——decimal/dataclasses/
 statistics/typing 天然过 import-linter，比 sap 的 {pydantic} 更严）。

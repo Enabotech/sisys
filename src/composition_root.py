@@ -3141,7 +3141,9 @@ def bootstrap() -> None:
     # 估值用例（应用层纯编排——interface 绑用例类自身，agent_instantiation_use_case
     # 先例；lambda 单依赖注入 financial_modeling_service——本区段先行注册，缺依赖
     # KeyError 自然传播零包装[组合根既有惯例——与 5-11 DC-12 ConfigurationError
-    # 翻译差异钦定：本 Story 无 __import__ 内联无 ImportError 形态]）。
+    # 翻译差异钦定：interface 参数 bootstrap 期 eager __import__ 已预热
+    # sys.modules，impl lambda 的内联 __import__ 实践中不可再抛 ImportError——
+    # CR2-5 勘误：原注「无 __import__ 内联」与紧邻 lambda 形态失实]）。
     register_port(
         name="financial_modeling_use_case",
         version="v1.0.0",

@@ -519,24 +519,28 @@ def then_precedent_stats_aligned(context: dict[str, Any]) -> None:
 
 @when("构造空可比与空先例集合及含非正倍数的成员（两类集合）")
 def when_prepare_invalid_set_payloads(context: dict[str, Any]) -> None:
-    """非法集合载体登记（触发面在 Then——242 成员级/集合级守卫）。"""
+    """非法集合载体登记（空集合载荷 + 非正倍数成员——When 登记 Then 消费，
+    AC-1.3 When 全量登记形态对齐[CR2-7]；触发面在 Then——242 成员级/集合级守卫）。"""
+    context["empty_comparables"] = ()
+    context["empty_transactions"] = ()
     context["invalid_member_company"] = ("零倍数公司", "0")
     context["invalid_member_transaction"] = ("负倍数标的", "-1.5")
 
 
 @then("两类空集合各抛 242（非空不变量）")
 def then_empty_set_242(context: dict[str, Any]) -> None:
-    """ComparableSet/PrecedentTransactionSet 非空不变量（VO min 1 守卫参数化面）。"""
+    """ComparableSet/PrecedentTransactionSet 非空不变量（VO min 1 守卫参数化面；
+    空集合载荷经 When 登记[CR2-7——When/Then 职责对齐]）。"""
     from src.domain.exceptions import EntityValidationError
     from src.domain.value_objects.financial_valuation import ComparableSet, PrecedentTransactionSet
 
     with pytest.raises(EntityValidationError) as comparable_exc:
-        ComparableSet(comparables=())
+        ComparableSet(comparables=context["empty_comparables"])
     assert comparable_exc.value.code == "EXCEPTION_242"
     assert comparable_exc.value.context["field"] == "comparables"
 
     with pytest.raises(EntityValidationError) as precedent_exc:
-        PrecedentTransactionSet(transactions=())
+        PrecedentTransactionSet(transactions=context["empty_transactions"])
     assert precedent_exc.value.code == "EXCEPTION_242"
     assert precedent_exc.value.context["field"] == "transactions"
 

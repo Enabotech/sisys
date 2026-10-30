@@ -14,9 +14,13 @@ float 先例是精度标准升级差异点）。
   此语义差异，防 CFO 消费方直觉错读。
 - IRR 求解对象：仅显性现金流序列 Σ CF_t/(1+r)^t = 0（与 Excel IRR(CF0:CFn)
   同口径——不含终值；含终值的 total-returns IRR 归 V2+ 完整版）。
-- 计算精度：localcontext prec=50（默认 28 位在十年期 (1+r)^10 连乘下可能截断；
-  localcontext 而非模块级 getcontext()——后者不传播到新建线程，并发路径会
-  静默降精度）。
+- 计算精度：localcontext prec=50（工程裕度钦定[CR2-9]——实测 prec=28 在 300 期内
+  数值等价[相对差 ~1e-28]，50 位裕度服务 IRR 1e-12 收敛判据与病态 r→g 分母
+  余量；rounding 一并钉死 ROUND_HALF_EVEN[CR2-8——decimal 默认值显式化，防
+  调用线程上下文污染；traps 仍继承默认：r∈(0,1) 使底数∈(1,2)、幂值均在
+  Emin/Emax 域内，InvalidOperation/DivisionByZero 被 VO 守卫与 npv==0/bracket
+  前置封死——in-domain 不可达]；localcontext 而非模块级 getcontext()——后者
+  不传播到新建线程，并发路径会静默降精度）。
 - IRR 求解：二分法 + bracket 前提（NPV 端点异号）+ 收敛判据区间宽度 < 1e-12 +
   最大迭代 256 次防御；支持域 (−0.99, 10) 即 IRR∈(−99%, 1000%)。
 - 退出倍数法指标口径：terminal_exit_metric 语义 = 终年 EBITDA（与可比法
@@ -32,7 +36,7 @@ float 先例是精度标准升级差异点）。
 from __future__ import annotations
 
 import statistics
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import cast
 
 from src.domain.exceptions import FinancialCalculationError
@@ -47,7 +51,7 @@ from src.domain.value_objects.financial_valuation import (
     PrecedentValuationResult,
 )
 
-#: 计算精度（OD-5③ 钦定 prec=50——DCF 十年期幂运算连乘位数增长，默认 28 位可能截断）
+#: 计算精度（OD-5③ 钦定 prec=50——工程裕度[CR2-9]：IRR 1e-12 收敛判据 + 病态分母余量）
 _CALC_PRECISION = 50
 
 #: IRR 二分 bracket 下界（支持域 (−0.99, 10)——经济现实覆盖知悉注记）
@@ -97,6 +101,7 @@ class FinancialModelingService:
         """
         with localcontext() as decimal_context:
             decimal_context.prec = _CALC_PRECISION
+            decimal_context.rounding = ROUND_HALF_EVEN  # CR2-8：确定性钉死（防调用线程上下文继承）
             one = Decimal(1)
             discount_base = one + assumptions.discount_rate
             # 逐期现值（年末贴现口径：PV_t = CF_t/(1+r)^t，t=1..n）
@@ -176,8 +181,11 @@ class FinancialModelingService:
             )
 
         rate_low, rate_high = _IRR_RATE_LOW, _IRR_RATE_HIGH
-        # bracket 前置检查（端点异号——同号即 fail-loud 470，不进循环防死循环）
-        if npv_at_rate(rate_low) * npv_at_rate(rate_high) > 0:
+        # bracket 前置检查（端点异号——同号即 fail-loud 470，不进循环防死循环；
+        # npv_lo 捕获式缓存[CR2-3]：rate_low 端 NPV 值全程复用，仅更新点重算——
+        # 44 轮收敛由 90 次 NPV 全扫描降至 46 次，1.82x 冗余消除，结果逐位一致）
+        npv_lo = npv_at_rate(rate_low)
+        if npv_lo * npv_at_rate(rate_high) > 0:
             raise FinancialCalculationError(
                 method="dcf",
                 detail="IRR 数值求解失败：支持域端点净现值同号（无符号变更的根或根歧义病态序列）",
@@ -187,10 +195,12 @@ class FinancialModelingService:
             midpoint = (rate_low + rate_high) / 2
             if rate_high - rate_low < _IRR_INTERVAL_TOLERANCE:
                 return midpoint
-            if npv_at_rate(rate_low) * npv_at_rate(midpoint) <= 0:
+            npv_mid = npv_at_rate(midpoint)
+            if npv_lo * npv_mid <= 0:
                 rate_high = midpoint
             else:
                 rate_low = midpoint
+                npv_lo = npv_mid
         raise FinancialCalculationError(
             method="dcf",
             detail="IRR 数值求解失败：迭代超出上限仍未收敛（防御分支——理论 bracket 下二分必收敛）",
@@ -216,6 +226,7 @@ class FinancialModelingService:
         """
         with localcontext() as decimal_context:
             decimal_context.prec = _CALC_PRECISION
+            decimal_context.rounding = ROUND_HALF_EVEN  # CR2-8：确定性钉死（防调用线程上下文继承）
             stats = self._multiple_stats(tuple(company.ev_ebitda for company in comparables.comparables))
             return ComparableValuationResult(
                 multiples_stats=stats,
@@ -242,6 +253,7 @@ class FinancialModelingService:
         """
         with localcontext() as decimal_context:
             decimal_context.prec = _CALC_PRECISION
+            decimal_context.rounding = ROUND_HALF_EVEN  # CR2-8：确定性钉死（防调用线程上下文继承）
             stats = self._multiple_stats(tuple(txn.ev_ebitda for txn in transactions.transactions))
             return PrecedentValuationResult(
                 multiples_stats=stats,

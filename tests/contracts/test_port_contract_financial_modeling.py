@@ -153,7 +153,7 @@ class TestFinancialModelingPortContract:
         assert isinstance(instance, FinancialModelingService)
 
     def test_service_port_spec_metadata(self) -> None:
-        """service PortSpec 元数据（版本/生命周期/owner/tags/module）。"""
+        """service PortSpec 元数据（版本/生命周期/owner/tags/module/interface——CR2-6 补 interface 绑定维度）。"""
         spec = _global_registry.get(SERVICE_PORT_NAME)
         assert spec is not None, f"端口 {SERVICE_PORT_NAME} 未注册"
         assert spec.version == "v1.0.0"
@@ -162,6 +162,10 @@ class TestFinancialModelingPortContract:
         assert spec.tags == SERVICE_EXPECTED_TAGS
         assert spec.module == SERVICE_MODULE_PATH
         assert isinstance(spec.impl, str), "字符串 impl 延迟加载（debate_evaluator 先例）"
+        # interface 绑定维度（CR2-6：interface 误绑时 resolve_by_interface 路径静默失效）
+        from src.domain.services.financial_modeling import FinancialModelingService
+
+        assert spec.interface is FinancialModelingService, "service 端口 interface 应绑定 FinancialModelingService"
 
     def test_service_methods_contract(self) -> None:
         """service 三方法契约断言（REQUIRED_METHODS_SERVICE——方法面纳入契约验证）。"""
