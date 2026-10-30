@@ -295,10 +295,10 @@ class TestPriorityOrder:
         """
         bus, _, _ = _make_bus()
         receiver_id = str(uuid.uuid4())
-        delivery_order: list[str] = []
+        delivery_order: list[tuple[MessagePriority, str]] = []
 
         async def handler(message: SAPMessage) -> None:
-            delivery_order.append(message.content)
+            delivery_order.append((message.priority, message.content))
 
         bus.subscribe(receiver_id, handler)
         priorities = (
@@ -312,10 +312,15 @@ class TestPriorityOrder:
         for index, priority in enumerate(priorities):
             await bus.send(_make_message(receiver_id=receiver_id, priority=priority, content=f"msg-{index}"))
         await _wait_delivery([delivery_order], 6)
-        # 出队 content 期望：URGENT(msg-3) > HIGH(msg-2) > NORMAL×3 按入队序(msg-1/4/5) > LOW(msg-0)
-        assert delivery_order == ["msg-3", "msg-2", "msg-1", "msg-4", "msg-5", "msg-0"], (
-            f"优先级出队顺序错误（含同级 FIFO 内序）: {delivery_order}"
-        )
+        # 出队期望：URGENT(msg-3) > HIGH(msg-2) > NORMAL×3 按入队序(msg-1/4/5) > LOW(msg-0)
+        assert delivery_order == [
+            (MessagePriority.URGENT, "msg-3"),
+            (MessagePriority.HIGH, "msg-2"),
+            (MessagePriority.NORMAL, "msg-1"),
+            (MessagePriority.NORMAL, "msg-4"),
+            (MessagePriority.NORMAL, "msg-5"),
+            (MessagePriority.LOW, "msg-0"),
+        ], f"优先级出队顺序错误（含同级 FIFO 内序）: {delivery_order}"
 
 
 # ==== 循环 A：校验面 fail-loud（AC-1/OD-5/OD-8） ====

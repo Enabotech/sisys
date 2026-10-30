@@ -64,6 +64,11 @@ class SAPBus(Protocol):
     async def send(self, message: SAPMessage) -> None:
         """发送消息（校验面 → 黑板桥 → 入队分发）
 
+        close 竞态放弃语义：blackboard_visible=True 的消息在黑板桥 await 挂起期间
+        总线被 close 时，本调用静默放弃（不投递不登记不报错——返回 None）——
+        已写入黑板的内容保留（持久面诚实）；调用方对「消息被放弃」零显式感知
+        通道（V1 契约知悉——需确定性投递语义的调用方应避免 close 并发窗口）。
+
         Args:
             message: SAP 消息（15 字段 Pydantic 载体）
 
@@ -159,6 +164,7 @@ class InProcessSAPBus:
         _consumer_tasks: per-receiver 消费任务表（串行消费循环）
         _pending: correlation 登记表（message_id → (Future, timeout_seconds)——Task 3 兑现）
         _closed: 关闭标志（校验次序首位）
+        _closed_event: 关闭唤醒事件（无挂起条目等待者收 461 的唤醒通道——close 时 set）
     """
 
     def __init__(self, blackboard: PublicBlackboard, guard: IsolationGuardPort) -> None:
@@ -185,6 +191,11 @@ class InProcessSAPBus:
 
         零挂起确定性前提：blackboard_visible=False 时校验+入队同步完成（put_nowait
         无让渡）——优先级序断言成立的确定性基础（v1.3.0 注记）。
+
+        close 竞态放弃语义（R1-F1）：blackboard_visible=True 的消息在黑板桥 await
+        挂起期间总线被 close 时，本调用静默放弃（不投递不登记不报错）；已写入
+        黑板的内容保留（持久面诚实）。调用方对「消息被放弃」零显式感知通道——
+        需确定性投递语义的调用方应避免 close 并发窗口（V1 契约知悉）。
 
         Args:
             message: SAP 消息
@@ -326,9 +337,11 @@ class InProcessSAPBus:
         except Exception 不吞取消信号，放行传播）② 清空 per-receiver 队列
         ③ 挂起 correlation Future → 461 bus_closed（仅未 done 条目——future.done()
         守卫防 InvalidStateError；set_exception 后同步消化 retrieved 标记——无等待者
-        条目不产 never-retrieved 噪音）④ 清空登记表（二次 close 空表幂等）⑤ 在途
-        等待者收 461 非 CancelledError——含无挂起条目的 sleep 等待者（_closed_event
-        唤醒——R1-F3 两路径结局统一），与「close 后新调用 → 461」结局统一。
+        条目不产 never-retrieved 噪音）④ 清空登记表（二次 close 空表幂等）⑤ 登记
+        表内条目的在途等待者收 461 非 CancelledError + 无挂起条目的等待者经
+        _closed_event 唤醒收 461（R1-F3 两路径结局统一），与「close 后新调用 →
+        461」结局统一（边界知悉：同 correlation 多等待者中先超时者已清理条目时，
+        其余等待者不被本清单触达——各自等满收 460，单请求单等待者惯例下不可达）。
 
         消息丢弃语义：在途与滞留消息丢弃，无 redelivery（V1 非持久）；黑板桥
         await 挂起期间 close 的在途 send 恢复后同样放弃投递（send 侧复查——已写

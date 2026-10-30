@@ -144,7 +144,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官族 Story（SAP 协议面
 
 **Given** 真实 `InProcessSAPBus` + 两方装配（请求方 subscribe 自身 receiver_id；响应方 subscribe **自身 receiver_id（即 REQUEST 的 receiver 目标——v1.1.0 措辞修正：创建期「响应方 subscribe 请求方 target」易误读为响应方订阅请求方的 id）**，其 handler 内回发 RESPONSE）
 **When** ①关联：请求方 `send(REQUEST, requires_response=True)` 取 `message_id` 作 correlation 锚 → `wait_for_response(correlation_id=该 message_id)` 挂起 → 响应方 handler 构造 `RESPONSE(correlation_id=请求.message_id)` 回发 → Future resolve②超时：`send(REQUEST)` 后无人回发 → `wait_for_response(correlation_id, timeout_seconds=0.1)`（短超时快速验证）③无等待语义：`send(NOTIFICATION, requires_response=False)`（默认）——消息直达 handler，correlation 索引零挂起条目
-**Then** ①**关联送达**：`wait_for_response` 返回的 RESPONSE 消息 `correlation_id == 请求.message_id`（关联链闭合——interface-design.md §7.5 REQUEST→RESPONSE 流程的协议承载；**correlation 锚约定见 OD-9**）；请求方 handler **同时**也收到该 RESPONSE（正常单播送达语义不受等待原语影响——双动作：送达 + resolve）②**超时**：抛 `SAPTimeoutError`（EXCEPTION_460——context 携 correlation_id: str[统一 `str(correlation_id)` 换算——参数面 UUID/异常 context 面 str 的口径钦定] 与 timeout_seconds；**等待条目清理**——超时后索引中该 correlation 零残留[等待路径防泄漏 + 迟到响应不 resolve 已超时 Future——v1.1.0 措辞收窄：创建期「防内存泄漏」泛化过强，未 await 的登记条目活至 close，V1 无 TTL 清扫，知悉注记]）；迟到响应（超时后 RESPONSE 才到）→ 零崩溃零 resolve（Future 已清理防御面——静默跳过；log warning 仅对条目保留的重复 resolve 生效——R1-F10 勘误）③**默认无等待**：NOTIFICATION 直送 + `wait_for_response` 对无挂起条目的 correlation_id 立即按超时路径处理（等满 timeout 抛 460——不 special-case）④**正常双响应幂等（v1.1.0 新增）**：同 correlation 第二条 RESPONSE 到达（发送方重复回发——正常路径非超时迟到）→ 幂等 resolve 守卫（`future.done()` 检查）零 InvalidStateError 零崩溃（log-ignore——JMS 重复投递幂等惯例）；**条目生命周期钦定**：登记条目保留至超时清理或 close（resolve **不**移除条目——「resolve 即移除」会使 resolve 之后才调 wait 的等待者落入无条目路径等满伪超时）
+**Then** ①**关联送达**：`wait_for_response` 返回的 RESPONSE 消息 `correlation_id == 请求.message_id`（关联链闭合——interface-design.md §7.5 REQUEST→RESPONSE 流程的协议承载；**correlation 锚约定见 OD-9**）；请求方 handler **同时**也收到该 RESPONSE（正常单播送达语义不受等待原语影响——双动作：送达 + resolve）②**超时**：抛 `SAPTimeoutError`（EXCEPTION_460——context 携 correlation_id: str[统一 `str(correlation_id)` 换算——参数面 UUID/异常 context 面 str 的口径钦定] 与 timeout_seconds；**等待条目清理**——超时后索引中该 correlation 零残留[等待路径防泄漏 + 迟到响应不 resolve 已超时 Future——v1.1.0 措辞收窄：创建期「防内存泄漏」泛化过强，未 await 的登记条目活至 close，V1 无 TTL 清扫，知悉注记]）；迟到响应（超时后 RESPONSE 才到）→ 零崩溃零 resolve（Future 已清理防御面——静默跳过；log warning 仅对条目保留的重复 resolve 生效——R1-F10 勘误）③**默认无等待**：NOTIFICATION 直送 + `wait_for_response` 对无挂起条目的 correlation_id 立即按超时路径处理（等满 timeout 抛 460——不 special-case；R2-A-5 注记：close 介入时经 _closed_event 唤醒收 461——R1-F3 两路径结局统一）④**正常双响应幂等（v1.1.0 新增）**：同 correlation 第二条 RESPONSE 到达（发送方重复回发——正常路径非超时迟到）→ 幂等 resolve 守卫（`future.done()` 检查）零 InvalidStateError 零崩溃（log-ignore——JMS 重复投递幂等惯例）；**条目生命周期钦定**：登记条目保留至超时清理或 close（resolve **不**移除条目——「resolve 即移除」会使 resolve 之后才调 wait 的等待者落入无条目路径等满伪超时）
 **And** **timeout 默认值口径**：`wait_for_response(correlation_id, timeout_seconds=None)` 时取**请求消息的 timeout_seconds**（登记条目承载——300 默认，SAPMessage 字段语义承载；显式传参覆盖）；**无挂起条目 + None 的兜底钦定（v1.1.0）**：无登记条目可取时取模块级常量 `SAP_DEFAULT_RESPONSE_TIMEOUT_SECONDS = 300.0`（与 SAPMessage.timeout_seconds 默认对齐——创建期该组合无定义）；**计时锚点钦定（v1.1.0）**：timeout 从 `wait_for_response` **调用时刻**起算（asyncio.wait_for duration 语义——非 send 时刻 deadline 语义）；超时抛出前取消底层等待任务；并发多请求挂起互不干扰（两对 REQUEST 并发等待各自 resolve——correlation 键控隔离）
 
 **验证标准/Validation Criteria:**
@@ -152,7 +152,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官族 Story（SAP 协议面
 - [x] 超时 → 460 三段式（raises + code + context 两键）+ 索引清理断言（超时后内部挂起表零残留——行为断言经迟到 RESPONSE 零异常承载）
 - [x] 迟到响应零崩溃（超时后回发 RESPONSE——bus 不抛不 resolve）
 - [x] 正常双 RESPONSE 幂等（第二条 RESPONSE 零 InvalidStateError 零二次 resolve + log-ignore）
-- [x] NOTIFICATION 默认无等待 + 未挂起 correlation 的 wait 按超时路径
+- [x] NOTIFICATION 默认无等待 + 未挂起 correlation 的 wait 按超时路径（close 介入时收 461——R1-F3/R2-A-5 注记）
 - [x] timeout 默认值取请求消息 timeout_seconds（不传参 300 生效口径——短化场景用显式传参）+ 无条目 + None 兜底 300.0（SAP_DEFAULT_RESPONSE_TIMEOUT_SECONDS——**验证技法钦定 v1.2.0**：单测 monkeypatch 模块常量为短值[如 0.05] → 无条目 wait(None) → 460 且 context.timeout_seconds == 短值；显式传参即离开 None 分支故该分支只能经 patch 验证——单测 mock 合规面）
 - [x] 计时锚点 = wait_for_response 调用时刻（duration 语义——docstring 注记）
 - [x] 并发两对请求各自关联 resolve（键控隔离）
@@ -596,7 +596,7 @@ Epic 5「单 Agent 战略规划能力」价值组收官族 Story（SAP 协议面
 
 #### 代码审查周期知悉注记（R1-F11——Round 1 知悉登记，非缺陷不落码）
 
-- **同 correlation 多等待者踩踏**：首个超时者 pop 条目后，其余等待者失去 resolve 能力（各自等满收 460）——V1 单请求单等待者是请求-响应常规形态（JMS ReplyTo 同款惯例），OD-9 Epic 9 知悉注记同族；复杂化（引用计数/广播 resolve）留 V2+
+- **同 correlation 多等待者踩踏**：首个超时者 pop 条目后，其余等待者失去 resolve 能力（各自等满收 460）——V1 单请求单等待者是请求-响应常规形态（JMS ReplyTo 同款惯例），OD-9 Epic 9 知悉注记同族；复杂化（引用计数/广播 resolve）留 V2+。**R2-B-1 深化变体（2026-10-30 实测）**：early 超时 pop 条目后 close 到达——late 等待者挂于 shield(Future) 既不被 close 的 set_exception 触达（条目已不在登记表）也不被 _closed_event 唤醒（挂点非 event）→ 滞留至自身超时收 460 非 461（close 动作⑤「登记表内条目的等待者」措辞已收窄对齐——R2 清偿）；触发前提为单等待者主路径之外的非典型并发用法，维持知悉不落码
 - **UUID 校验宽松面**：`uuid.UUID()` 可解析 32 位无连字符/花括号/urn 前缀三形态（契约措辞「可解析性」字面合规）；生产写入方 `str(agent_id)` 恒规范形态，宽松面仅防御性余量——黑板 agent_id 键可能见非规范字符串（urn: 前缀等）
 - **生产 assert ×2**（bus.py wait_for_response 尾部 + _resolve_pending 头部）：逻辑不可达已论证（超时分支必 raise / 调用点 None 守卫已过）；`python -O` 剥离后无运行时后果——改显式 raise 反引入不可达异常路径且需领域异常映射，维持现状
 - **架构测试 baseline 空集与白名单 {pydantic} 双层张力**：有意防漂移设计（5-7 OD-1 家族）——引入白名单内依赖须同步改 baseline 断言（受控变更点）
@@ -835,6 +835,22 @@ tests/
 
 **R1 落码记录**（2026-10-30，C3 门禁后执行）：代码面 3 处（send 竞态复查 + close exception() 消化 + _closed_event 两路径结局统一）+ 测试面 6 新用例 + 4 改造 + 验收 content 序断言；**变异验证三杀**：①去 send 复查 → F1 用例红 ✓；②seq 常量化 → 单元+验收 FIFO 用例双红 ✓（teardown error 系变异自身产物——heapq 元组比较落到无 `__lt__` 的 SAPMessage）；③事件赢 raise 改落穿 → F3 用例红 ✓。回归全绿：单元面 132 passed（126+6 新用例）/集成+验收 21 passed/既有被改测试 126 passed/ruff 全过/mypy 714 源文件+2 测试文件零错/红线 grep 零命中/单元面 unraisable warning 15→**0**（R1-F8 生效）。**并行会话协同记录**：R1-F8 机制（单元版 _ACTIVE_BUSES + 验收版 _buses×7 登记位 + 两处 teardown）在 C3 复评窗口以并行方式进入工作树，内容与本 Story 裁决后方案逐字一致且经 `-W error::PytestUnraisableExceptionWarning` 实测 53→59 passed 零 unraisable 验证有效——按「内容正确不回滚」纪律采纳，主会话核验行数与改动区段互补无冲突（bus.py 532 行/单元 1297 行全部为本会话落码）。
 
+#### Round 2（2026-10-30——回归核查 A + 组合交互与运行面 B 双 Agent 并行；基线对照 HEAD=2ca3bc42）
+
+**R1 修复回归核查结论**：九项落码逐项核验——行为级零回归（历史周期「R1 修复自引入 P1」模式本轮未复现）；F1（docstring 注记落成行内注释——契约面零披露）与 F4（单元用例单收 content——钦定「双收」形态未字面兑现，判别力等价已证）两项部分落地，其余七项完整；登记位三文件零逃逸（单元 3 构造 3 登记/验收 7 构造 7 登记/集成 4 构造 4 登记——集成面自带同款 _ACTIVE_BUSES autouse fixture 系并行会话补齐，随 R1 提交入库）。
+
+| # | 发现 | 级别 | 处置（R2 批次全文字面——双 Agent 互证 + 主会话核验直落，5-9 轻量化门禁先例） |
+|---|---|---|---|
+| R2-F1 | R2-B-1：**多等待者踩踏 × close 组合缺口**（实测变体）——early 超时 pop 条目后 close：late 等待者挂于 shield(Future) 既不被 set_exception 触达（条目已出表）也不被 _closed_event 唤醒（挂点非 event）→ 滞留至自身超时收 460 非 461；close 动作⑤「在途等待者收 461」承诺在此场景失守。定性：首版即有的预存组合盲点（pop 清理系 DC-11 钦定语义），非 R1 三处修改引入；触发前提为单等待者主路径之外的非典型并发用法 | P2 | **docstring 措辞收窄 + 知悉注记深化**（R2-B 处置建议 c 采纳）：close docstring 动作⑤改「登记表内条目的在途等待者」+ 边界知悉括注；Dev Notes A-4 注记补 R2-B-1 深化变体（实测形态完整落账）。复杂化修复（弱引用登记/等待者计数）违最小干预——单请求单等待者惯例下不可达 |
+| R2-F2 | R2-A-1：R1-F1 钦定「send docstring 补竞态放弃注记」落成方法体行内注释——实现类 send docstring 与 Protocol SAPBus.send docstring 均无，「close 竞态下消息静默放弃、调用方零感知通道」新语义面在接口契约层零披露（Epic 9 消费方以 Protocol docstring 为编码依据） | P3 | **补 docstring**（双侧——Protocol 面 + 实现类面）：「close 竞态放弃语义」段（挂起窗口静默放弃 + 黑板保留 + 零感知通道知悉 + 确定性投递建议） |
+| R2-F3 | R2-A-2：类 docstring Attributes 列表（8 私有属性）漏登 R1-F3 新增 `_closed_event` | P3 | Attributes 补第 9 行 |
+| R2-F4 | R2-A-3：单元 FIFO 用例单收 content 与钦定「双收 priority+content」不符 + docstring 自述「双观测」与代码单收失配（验收侧真双观测——两文件形态不一致） | P3 | **改双收**：handler 收 (priority, content) 元组，断言六元组精确序（对齐钦定形态 + docstring） |
+| R2-F5 | R2-A-4：close docstring「无挂起条目的 sleep 等待者」措辞残留——R1-F3 后该等待者已非 sleep 形态（_closed_event.wait()），句内新旧形态自相矛盾 | P3 | 措辞统一（随 R2-F1 的动作⑤改写一并消解） |
+| R2-F6 | R2-A-5：AC-2 Then③「等满 timeout 抛 460——不 special-case」绝对化表述在 close 介入时不成立（现为 461 唤醒）——AC 文本与实现未注记缝隙（验证清单 L155 同族） | P3 | 两处补「close 介入时经 _closed_event 唤醒收 461（R1-F3）」括注 |
+| R2-F7 | D-2 清偿关闭：`-W error::PytestUnraisableExceptionWarning` 双形态跑集成+验收 21+21 passed 零 unraisable——集成文件自带同款 teardown 机制（4 构造 4 登记），三测试文件收尾机制全覆盖 | P2（清偿） | 台账关闭（R1-F11 的 D-2 转 R2 验证面已完成使命——零残留） |
+
+**组合交互矩阵结论**（R2-B 实测）：①close+在途 send+无条目等待者三方并发 → 闭环 ✓（六断言全立）；②竞态放弃后 RESPONSE 三子路径 → 闭环 ✓（查表 miss 静默/入口 461 闸门/复查先于 resolve）；③多等待者 × close → 主路径 ✓（双等待者收 461、消化零副作用）+ 变体缺口（R2-F1）；④_closed_event × 二次 close → 闭环 ✓（_closed 守卫先 return，event.set 幂等双防线）。**运行面**：单元+异常+架构+契约 157 passed（132+25 既有 test_message.py）/集成+验收 21 passed/既有被改 126 passed/门禁三项全过/**3 连跑零 flaky**（R1-F7 与 R1-F1 新用例时序余量充足，波动 <1.3s）。
+
 ---
 
 ### 下一步 Next Steps
@@ -846,7 +862,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.5.0（代码审查周期 Round 1）
+**故事版本/Story Version:** v1.6.0（代码审查周期 Round 2）
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-30
 **更新说明/Description:**
@@ -857,3 +873,4 @@ tests/
 - v1.4.0: **dev-story 实施完成**（Task 0-7 全勾收尾——14 验收场景全绿/全量 13738 passed 3 skipped/SAP 族 5 连发稳定/接口层覆盖率 90%/mypy 1814 文件零错/ruff 全清/零抑制零 AI 署名 grep 自查过；存量触碰两件：test_exception_handlers 两处同步[import+expected_types] + 5-5 isolation_access 白名单两处登记性更新[bus.py 合法新消费方]；Status → review）
 - v1.3.1: 文档审查周期收敛终态（R4 纯验证六维全过零修复 1 P3 留项登记 + R5 独立终审五节全过零新发现——周期闭合 4 提交零游离/关键修复双向取证 8/8 全立/特权快扫 12 处绝对化断言抽验全过/门禁三项全绿/递减曲线 21→15→9→零修复→零新发现严格单调）——R4 留项清偿（OD-7 引文逐字化勘误）+ 五轮收敛声明入档；修复表 33 行（R5-F33）；Status 保持 ready-for-dev
 - v1.5.0: **代码审查周期 Round 1**（四视角并行调研 A 总线实现/B 接线合规/C 测试判别力/D 运行面实测——零 P0，P1×5 + P2×5 + P3×12）——落码 9 项：代码 3 处（send/close 竞态幽灵条目复查[P1·实测证实·变异杀] / close 无等待者 Future retrieved 消化[P2] / _closed_event 无条目等待者 461 结局统一[P2·变异杀]）+ 测试 6 新用例（FIFO 内序[F1·变异双杀] / close done 守卫+登记表清空 / CancelledError 放行守护 / 计时锚延迟回发判别形态 1.6/0.8/1.2 / 事件赢 461+超时赢 460 双分支 / 慢桥竞态）+ 4 改造（验收 content 序断言/BROADCAST+False 全员送达/空 caplog 块/docstring 缩进与措辞）+ teardown 双机制（单元 _ACTIVE_BUSES + 验收 _buses——unraisable warning 15→0）；双评审员合格→修订 6 点吸收→单复评员优秀放行（三步门禁）；文档勘误 2 + 知悉注记 6 入 Dev Notes + 留项 2；回归全绿（132+21+126 passed/ruff/mypy/红线零命中）
+- v1.6.0: **代码审查周期 Round 2**（回归核查 A + 组合交互与运行面 B 双 Agent）——R1 修复回归核查行为级零回归（「R1 自引入 P1」历史模式未复现；F1 docstring 落位与 F4 双收形态两项部分落地判别力等价）+ 组合矩阵四组三闭环一变体缺口 + 运行面全绿（157+21+126/门禁三项/3 连跑零 flaky）+ D-2 清偿关闭；修复 6 项全文字面（R2-F1 多等待者×close 组合缺口 docstring 收窄+知悉深化[P2·实测变体·预存非 R1 回归·单等待者惯例下不可达] / R2-F2 send docstring 双侧补竞态放弃契约披露 / R2-F3 Attributes 补 _closed_event / R2-F4 单元 FIFO 改双收六元组 / R2-F5 close 措辞统一 / R2-F6 AC-2 两处 461 注记）——双 Agent 互证+主会话核验直落（5-9 轻量化门禁先例，全批次零行为变更）
