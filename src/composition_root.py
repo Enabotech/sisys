@@ -3194,52 +3194,74 @@ def bootstrap() -> None:
             register_fn()
             continue
         # 异步 handler（register 方法——UDMR/CostMetrics，需事件循环；
-        # bootstrap 为同步上下文，通过新建事件循环执行异步注册）
+        # bootstrap 为同步上下文，通过新建事件循环执行异步注册——
+        # 订阅落位 DualChannelEventBus→RedisEventSubscriber 纯内存 dict，
+        # 零连接零 loop 绑定资源；循环用毕即关防 selector fd 泄漏[终局审查 R2②-F3]）
         async_register = getattr(handler, "register", None)
         if callable(async_register):
             import asyncio
 
+            loop = asyncio.new_event_loop()
             try:
-                asyncio.new_event_loop().run_until_complete(async_register())
+                loop.run_until_complete(async_register())
             except Exception as e:
                 logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
+            finally:
+                loop.close()
+
+
+_metrics_port_instance: "MetricsPortImpl | None" = None
 
 
 def _build_metrics_port(resolver: Any) -> "MetricsPortImpl":
     """metrics 端口注册工厂（Epic 5 终局审查修复——原字符串 impl 指向不存在的 metrics_adapter 模块）。
 
-    BusinessMetricsCollector 单实例共享是结构性必需而非防御：其构造器即向
-    Prometheus 默认 REGISTRY 注册 sisys_* 指标，二次构造必抛 Duplicated
-    timeseries——aggregator 与 MetricsPortImpl 两依赖位必须注入同一实例。
+    进程级单例复用（R2 修复）：BusinessMetricsCollector 构造器即向 Prometheus
+    默认 REGISTRY 注册 sisys_* 指标——二次构造必抛 Duplicated timeseries，而
+    resolver 的 SINGLETON 缓存可被测试纪律 clear_singleton() 驱逐（5.x 验收
+    场景级重建），驱逐后裸 resolve 重建会在全局 REGISTRY 上必炸。Prometheus
+    全局注册表是进程级资源，不应随 resolver 缓存丢弃——本工厂以模块级实例
+    缓存对齐两生命周期：clear 后重建返回同一实例，重建幂等。
+
+    激活语义诚实注记（R2②-F2）：本修复恢复的是「订阅注册」（bootstrap 激活环
+    resolve cost_metrics_handler 成功 → async register() → RedisEventSubscriber
+    纯内存 dict 注册 RoutingDecided，零外部依赖）；「消费循环」全仓零调用点
+    （DualChannelEventBus.start / RedisEventBus.start 无人拉起 listen loop），
+    on_routing_decided 回调在测试与生产均无触发路径——消费面接线归 Epic 6
+    首个事件消费 Story（与 R1-DF2 同锚）。
 
     历史注记：幽灵 impl 字符串源自 19fbf461（2026-05-12 组合根重构期脚手架），
     d49261b0（2026-10-12 UDMR 审计修复 F2）将 cost_metrics_handler 加入
     handler_names 激活清单后缺陷活化——每次 bootstrap resolve 失败被静默吞为
-    warning（1-19 成本追踪「激活」从未生效）。修复后激活链恢复：handler_names
-    循环 → resolve("cost_metrics_handler") 成功 → async register() 订阅
-    RoutingDecided（REALTIME 通道，进程内注册零外部依赖）。
+    warning（1-19 成本追踪「激活」从未生效）。
 
     Args:
         resolver: 端口解析器（resolver._instantiate 以 spec.impl(resolver=self)
             约定调用——零参签名会 TypeError 且被 bootstrap except 吞掉）。
 
     Returns:
-        组合完成的 MetricsPort 单例（15 方法全实现，含 cost_metrics_handler
-        消费的 record_token_usage / record_cost）。
+        组合完成的 MetricsPort 进程级单例（15 方法全实现，含
+        cost_metrics_handler 消费的 record_token_usage / record_cost）。
     """
+    global _metrics_port_instance
+
     from src.infrastructure.monitoring.aggregator import MetricsAggregator
     from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
     from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
     from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
 
+    if _metrics_port_instance is not None:
+        return _metrics_port_instance
+
     business = BusinessMetricsCollector()
-    return MetricsPortImpl(
+    _metrics_port_instance = MetricsPortImpl(
         aggregator=MetricsAggregator(
             event_metrics_collector=EventMetricsCollector(),
             business_metrics_collector=business,
         ),
         business_metrics=business,
     )
+    return _metrics_port_instance
 
 
 def _build_agent_workflow_use_case(resolver: Any) -> Any:

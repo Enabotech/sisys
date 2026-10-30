@@ -79,7 +79,35 @@
 
 ---
 
-## Round 2 —（待执行）
+## Round 2 — 回归核查 + 组合交互面（2026-10-31）
+
+### 调研方法
+全量四目录实跑 + R2①（R1 修复传播完备性——git show 逐文件对照声称清单）+ R2②（metrics 激活链六项组合交互推演——订阅目标/事件触发面/clear_singleton/跨 loop/Prometheus 污染/生产面，全部单进程端到端实证）。
+
+### 发现与处置（R2 台账）
+
+| 编号 | 级别 | 发现 | 处置 |
+|------|------|------|------|
+| R2②-F1 | P1 | **[clear_singleton → resolve("metrics")] 组合确定性 ValueError**：全量四目录首跑 2 failed（新增 wiring 测试在 gw6/gw7）——5.x 验收 clear_singleton 纪律驱逐 SINGLETON 缓存后，裸 resolve 重建触发 BusinessMetricsCollector 二构 Duplicated timeseries（`_get_impl` 捕获面不含 ValueError，CI integration+contracts 同 session 组合真实可引爆）；clear_singleton 生产零调用（纯测试纪律 API）——非生产缺陷，是 F6 修复形态与测试基建的组合破口（5-5 CI 修复族） | **M1 修复**：`_build_metrics_port` 升级进程级单例复用（模块级实例缓存——Prometheus 全局 REGISTRY 与 resolver 缓存生命周期错配的对齐：clear 后重建返回同一实例）；引爆组合重放 47 passed 实证 |
+| R2②-F2 | P2 | 修复恢复「订阅注册」未恢复「消费」：listen loop 拉起点（DualChannelEventBus.start/RedisEventBus.start）全仓零调用，on_routing_decided 回调无触发路径——「1-19 成本追踪激活」端到端仍休眠（可观测变化仅 REGISTRY 15 名+订阅 dict+日志行） | docstring/台账「激活语义诚实注记」修正（注册≠消费）+ R1-DF2 追加第五件确证（消费归 Epic 6 锚） |
+| R2①-A | P3 | 长效锚点「本提交自移」陈旧 5 处（composition_root 行号被同提交 TYPE_CHECKING/工厂函数推移） | 符号锚修正（grep 定位双位点注记 + agent_engine 锚更新 :1552/:3316 + L176 + 5-5 L911） |
+| R2①-B | P3 | R1-F13 方法枚举失实：reset 不存在（实为 restart）、四实为五（漏 wait） | 台账勘误（五迁移方法含行号锚） |
+| R2①-C | P3 | F6 测试②形态较方案降档未声明（callable 断言 vs 实调 register） | 测试②升级：register() 实调（run_until_complete+close）零异常验证 |
+| R2①-D | P3 | F14 归类失准（新增登记行非内联注记） | 新区段引言勘误 |
+| R2①-E | P3 | F2「7 项激活」计数无推导 | 改「⑤类组件」与枚举自洽 |
+| R2②-F3 | P3 | 激活环每个 async handler 新建 event loop 不 close（修复后泄漏 2 组 selector fd） | try/finally loop.close() 修复 |
+| R2②-F4 | P3 | :3171 注释「订阅到 InMemoryEventListener」对 async 分支失实（实际 DualChannelEventBus→RedisEventSubscriber） | 注释修正（随 F3 一并） |
+| R2②-F5 | P3 | tests/fixtures.py:383 与 contracts/conftest.py 裸 Resolver() fixture 潜伏陷阱 | M1 后 resolve("metrics") 幂等——陷阱自然消解，留痕不修 |
+| R2②-F6 | P3 | clear_singleton 后激活环若真重跑，metrics ValueError 被吞 warning（静默复现 F6 症状）——当前被 agent_cli spec 守卫挡住 | 与 F1 同根——M1 修复后 resolve 不再抛，形态消解 |
+
+R2① 证伪留痕要点：16/16 落码对照一致零缺漏、无超范围扩散、无结构损伤、5-7 无残留矛盾；「Round 1 contracts 1431 passed 可作组合安全证据」被 R2② 重放实验证伪（单目录跑缓存单例在、先序 clear 从未发生）。
+
+R2② 证伪留痕要点：订阅零 Redis 连接依赖（纯 dict append）；回调全仓无触发路径（无跨测试污染）；不破坏 5-4 R7-F02 跨 loop 修复面（注册不创建 loop 绑定资源）；agent_cli 守卫查 spec 不受 clear 影响（bootstrap 重入短路）。
+
+### R2 落码
+M1 工厂进程级单例复用 + 激活环 loop close + 注释修正 + wiring 测试升级（register 实调）与新增幂等锁测试③ + 台账 6 处修正。门禁：ruff/mypy 绿 + monitoring 21 passed + 引爆组合重放 47 passed + 全量四目录复验（见 R4 记录）。
+
+
 
 ## Round 3 —（待执行）
 
