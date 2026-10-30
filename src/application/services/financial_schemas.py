@@ -178,7 +178,10 @@ class PrecedentRequestSection(BaseModel):
         ...,
         gt=0,
         le=Decimal("1E+15"),
-        description="目标公司 EBITDA（正值域；量级界 1E+15[CR3-1②]）",
+        description=(
+            "目标公司 EBITDA（正值——V1 倍数法不支持负 EBITDA 亏损标的，引擎层无 242 落点由此拦截[CR4-6 与可比段双落]；"
+            "量级界 1E+15[CR3-1②]）"
+        ),
     )
 
 

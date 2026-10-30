@@ -275,7 +275,7 @@ class MultiplesStats:
     Attributes:
         min: 最小倍数
         median: 中位倍数
-        mean: 平均倍数（statistics.mean——Decimal 精确和/个数）
+        mean: 平均倍数（Decimal 域自实现 sum/len——引擎 _multiple_stats[CR3-1①：statistics.mean 有理转换挂死面改定]）
         max: 最大倍数
     """
 
