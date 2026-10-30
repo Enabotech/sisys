@@ -113,7 +113,7 @@
 
 ### 入口面缺口（最高优先）
 - create_app() 仅挂 7 路由，5 个已实现 router 未挂载：**auth（登录端点缺失——最大单点风险）**、audit（1.10 交付）、crawler、monitoring（/metrics）、equilibrium_security — 触发=V1 API 可用性立项时统一接线（auth 建议先行）
-- exception_metrics 端口零消费 + register_exception_handlers(app) 未传 metrics — 异常遥测静默关闭；接线成本一行。**metrics 端口 impl 修复注记（2026-10-31，Epic 5 终局审查 R1-N6；R2 修订）**：metrics 端口幽灵 impl（metrics_adapter.PrometheusMetricsAdapter——模块不存在）已修复为组合根工厂 `_build_metrics_port`（指向真实 metrics_port_impl.MetricsPortImpl；R2 升级为**进程级单例复用**——clear_singleton 驱逐 resolver 缓存后重建返回同一实例，杜绝 BusinessMetricsCollector 二构的 Duplicated timeseries）。**激活语义诚实注记（R2②-F2）**：修复恢复的是「订阅注册」（cost_metrics_handler resolve 成功 → async register → RedisEventSubscriber 纯内存 dict 注册 RoutingDecided）而非「消费」——listen loop 拉起点（DualChannelEventBus.start/RedisEventBus.start）全仓零调用，on_routing_decided 回调无触发路径，消费面接线归 Epic 6 首个事件消费 Story（R1-DF2 同锚，见 L169 区段第五件追加）；本行 exception_metrics 的未接线现状不变
+- exception_metrics 端口零消费 + register_exception_handlers(app) 未传 metrics — 异常遥测静默关闭；接线成本一行。**metrics 端口 impl 修复注记（2026-10-31，Epic 5 终局审查 R1-N6；R2 修订）**：metrics 端口幽灵 impl（metrics_adapter.PrometheusMetricsAdapter——模块不存在）已修复为组合根工厂 `_build_metrics_port`（指向真实 metrics_port_impl.MetricsPortImpl；R2 升级为**进程级单例复用**——clear_singleton 驱逐 resolver 缓存后重建返回同一实例，杜绝 BusinessMetricsCollector 二构的 Duplicated timeseries）。**激活语义诚实注记（R2②-F2）**：修复恢复的是「订阅注册」（cost_metrics_handler resolve 成功 → async register → RedisEventSubscriber 纯内存 dict 注册 RoutingDecided）而非「消费」——listen loop 拉起点（DualChannelEventBus.start/RedisEventBus.start）全仓零调用，on_routing_decided 回调无触发路径，消费面接线归 Epic 6 首个事件消费 Story（R1-DF2 同锚，见 L170 区段第五件追加）；本行 exception_metrics 的未接线现状不变
 - RabbitMQConsumer/RabbitMQEventListener/EventBusFactory 零接线 — reliable 通道只发不收；触发=首个消费方 Story
 
 ### 事件 handler 未激活（注册≠激活——UDMR F2 同款）

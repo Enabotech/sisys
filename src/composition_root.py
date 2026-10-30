@@ -3167,8 +3167,10 @@ def bootstrap() -> None:
     )
 
     # === 事件处理器注册（register_handlers）===
-    # 所有事件处理器端口注册完成后，统一调用 register_handlers()
-    # 将处理器订阅到 InMemoryEventListener 事件总线
+    # 所有事件处理器端口注册完成后，统一调用注册方法——同步 handler
+    # （register_handlers 方法，event_listener 端口注入 InMemoryEventListener）
+    # 与异步 handler（register 方法，event_subscriber 别名经 DualChannelEventBus
+    # 落位 RedisEventSubscriber 纯内存 dict）双通道分述[终局审查 R3-N2 收口]
     from src.domain.ports.resolver import get_resolver
 
     handler_names = [
