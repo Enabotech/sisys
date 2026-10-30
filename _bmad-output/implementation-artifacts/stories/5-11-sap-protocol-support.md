@@ -1,6 +1,6 @@
 # Story 5.11: SAP 协议支持（内部 Agent 通信）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -710,13 +710,13 @@ tests/
 **创建的文件/Created Files (Dev Story 实施完成 2026-10-30):**
 - `src/interfaces/sap/bus.py` - SAPBus Protocol + InProcessSAPBus + serialize/deserialize + SAP_DEFAULT_RESPONSE_TIMEOUT_SECONDS
 - `src/domain/exceptions/sap_exceptions.py` - 三异常（460/461/462）
-- `tests/unit/interfaces/sap/test_bus.py` - 总线单测（四批 78 用例）
-- `tests/unit/domain/exceptions/test_sap_exceptions.py` - 异常单测（30 用例）
+- `tests/unit/interfaces/sap/test_bus.py` - 总线单测（四批 60 用例——v1.7.1 勘误：原记 78 无任何时点口径可复算，终态 collected 实测 60）
+- `tests/unit/domain/exceptions/test_sap_exceptions.py` - 异常单测（39 用例——v1.7.1 勘误：原记 30，dev 时点即 39）
 - `tests/contracts/test_port_contract_sap_bus.py` - 端口契约测试（11 维度 + fail-fast）
 - `tests/integration/test_integration_sap_protocol.py` - 集成 + 性能三锚（7 用例）
 - `tests/unit/architecture/test_arch_sap_protocol.py` - AST 架构验证器（A/B/C 21 用例）
 - `tests/acceptance/test_acceptance_sap_protocol.feature` - Gherkin 场景（14 场景）
-- `tests/acceptance/test_acceptance_sap_protocol.py` - BDD 步骤实现（1723 行）
+- `tests/acceptance/test_acceptance_sap_protocol.py` - BDD 步骤实现（1771 行——v1.7.1 勘误：原记 1723，R1-F8 验收登记位 +48 行未随更新）
 
 **已修改的文件/Modified (Dev Story 实施完成 2026-10-30):**
 - `src/interfaces/sap/__init__.py` - SAPBus/InProcessSAPBus 导出 + docstring 注记更新
@@ -813,7 +813,7 @@ tests/
 
 #### Round 1（2026-10-30——四视角并行调研：A 总线实现正确性 / B 接线与异常体系合规 / C 测试判别力与红线合规 / D 运行面实测；运行面基线：147 passed 零失败、覆盖率 97%、门禁三项全绿、红线 grep 零命中）
 
-高质量 dev（文档周期五轮收敛先行 v1.3.1）使 R1 即 P1 天花板（零 P0——5-2/5-8/5-9 同构第四次复现）。发现 P1×5 + P2×5 + P3×12，落码 9 项 + 文档勘误 2 项 + 知悉注记 7 项 + 留项 2 项：
+高质量 dev（文档周期五轮收敛先行 v1.3.1）使 R1 即 P1 天花板（零 P0——5-2/5-8/5-9 同构第四次复现）。发现 P1×5 + P2×5 + P3×12（v1.7.1 勘误：原分级计数不可复算——行级实为 P1×5+P2×3+P3×4、子项级 P3×14；「P2×5+P3×12」系四视角原始发现级与表格行级两套口径混写，分级修正以表 12 行行级为准），落码 9 项 + 文档勘误 2 项 + 知悉注记 7 项 + 留项 2 项：
 
 | # | 发现 | 级别 | 处置 |
 |---|---|---|---|
@@ -863,6 +863,22 @@ tests/
 
 **证伪不成立的疑点 12 条留痕**（推演排除——防下轮重推，全文见审查过程记录）：late 460 与 R2-F1 登记逐字一致复证 / closing 态三方法探针证伪漏拦截 / send 复查后全段零 yield 原子不可交叠 / FIFO 双收判别力 + TypeError 第三杀背书 / 无条目 461 覆盖分配自洽 / AC-2.2「零 resolve」行为断言口径内 / _PERF_CACHE 命中顺序无关 / exception() 消化零副作用双证 / 模块级 loop 与 pytest-asyncio 零冲突 / 内部表残留不可利用 / marker 自动挂载不含 sap / AC-3.3 reject_with 置位顺序无影响。
 
+#### Round 4 + Round 5（2026-10-30——R4 纯验证零提交 + R5 独立终审五节；基线 HEAD=2c30ddb9）
+
+**Round 4（纯验证轮——零修复，两项留项交接 R5）**：六维验证全过——①三轮修复双落点存续（R1 代码 3 处/6 用例 + R2 六项 + R3 双落点全在，零后轮覆盖前轮）②16 组行号锚实测全命中（行号漂移容忍内容在）③台账计数闭合（三表 21 行 + 版本链三提交对应；唯一不可复算点 → R4-N1）④红线零违规（源面+测试七文件全零；test_arch L222/224 命中系守护测试自身扫描字面量）⑤全量回归（SAP 族七文件 179 passed 精确命中 60+25+39+13+21+7+14；既有被改 126；ruff/mypy 全清）⑥结构完整（三轮标题连续零跳级/sprint-status review 未误流转/R2-F7 交叉声称实证）。留项：**R4-N1**（R1 台账分级计数口径不可复算——行级 P1×5+P2×3+P3×4 vs 头行「P2×5+P3×12」）+ **R4-N2**（版本日志 v1.4.0/v1.3.1 数值序错位）——随 v1.7.1 收敛提交清偿（口径注 + 归位）。
+
+**Round 5（独立终审五节——不轻信自报，全部仓库现实复算）**：①周期闭合成立（4 提交零游离——R1 交付提交 21 文件全属 5-11、R2 三文件、R3 两文件、R4 零提交自洽；代码周期 R4 留项在 Story 零登记系台账载体缺口→本节入档补齐）②关键修复双向取证 **8/8 全立**（send 复查 L215-216 落点逐字吻合 / _closed_event L182/353/322 / exception() 消化 L367 / FIFO 六元组双面 / done 守卫+CancelledError 双用例 / 计时锚 1.6/0.8/1.2 / teardown 三文件 7+4 登记位 / mid-bridge 快照守护）③特权快扫 1 簇新发现：**R5-F1（P3）File List 三数字失实**（test_bus「78 用例」→实测 60 无任何时点口径/test_sap_exceptions「30」→实测 39/acceptance「1723 行」→实测 1771——文件集合 100% 一致纯数字失实，前四轮结构性盲区：文档周期审 dev 前 File List 尚不存在）+ 绝对化断言 8 处抽验 7 过 1 未验证（全仓 13738 长跑两次超窗如实记录——门禁不依赖）④门禁三项实跑全绿（ruff/mypy 714/SAP 族 179 精确闭合/零 AI 署名/零抑制零红线）⑤收敛判定成立 + N1/N2 裁决（补口径注不改数——改数级联触碰自洽叙述；N2 swap 归位——纯排版零语义）。
+
+### 🏁 五轮代码审查收敛声明（v1.7.1 终态）
+
+- **周期间隔**：2026-10-30 闭环（v1.3.1 dev 就绪 → v1.4.0+v1.5.0（2ca3bc42，dev 交付与代码 R1 合一提交）→ v1.6.0（1b397b0a）→ v1.7.0（2c30ddb9）→ v1.7.1；每轮提交文件面仅本 Story 面——R1 交付提交 21 文件全属 5-11（存量触碰两件双声明），sprint-status 恰两行翻转在案；R4 纯验证零提交）
+- **轮次投入**：R1 四视角并行调研（A 总线实现/B 接线合规/C 测试判别力/D 运行面实测——零 P0，12 行）+ 双评审员合格→修订 6 点吸收→单复评员优秀放行三步门禁 → R2 回归核查+组合交互双 Agent（R1 九项落码行为级零回归；组合矩阵四组三闭环一变体缺口；6 项全文字面）→ R3 单深度推演四件套（14 Gherkin 三轴 14✅/六时间线全闭合/断言数学全过/9 格状态矩阵；P3×2）→ R4 纯验证（零修复，2 项 P3 留项交接 R5）→ R5 独立终审五节取证（全部以仓库现实复算不采信自报）
+- **发现与修复分级统计**：R1 P1×5+P2×3+P3×4（12 行；表头原记「P2×5+P3×12」不可复算——行级/子项级口径勘误，v1.7.1）→ R2 P2×1+P3×5 → R3 P3×2 → R4 零 → R5 P3×1（File List 数字失实——前四轮结构性盲区）。修复量 12→6→2→0 严格单调递减；P1 仅现于 R1，P2 至 R2 收敛，R3 起 P3 地板
+- **关键修复一句话版**：send/close 竞态复查钉死 bridge await 后（慢桥用例变异杀）｜close 无等待者 Future exception() 消化（never-retrieved 零噪音）｜_closed_event 两路径结局统一 461（显式 raise 禁落穿 assert，变异杀）｜FIFO 双收六元组（单元+验收双面，seq 变异双杀）｜done 守卫+登记表清空+CancelledError 放行三守护用例｜计时锚 1.6/0.8/1.2 延迟回发判别形态｜teardown 三文件登记（单元/验收/集成全覆盖——unraisable warning 15→0）｜快照边界=入队分发时刻（mid-bridge 守护用例）
+- **收敛判据核验**（R5 独立终审）：周期闭合 4 提交零游离 ✓｜关键修复双向取证 8/8 全立（file:line 逐项实测）｜特权快扫 1 簇 P3 新发现（File List 78/30/1723 → 实测 60/39/1771——纯数字失实零行为影响）+绝对化断言 8 处抽验 7 过 1 未验证（全仓 13738 长跑两次超窗，如实记录）｜门禁三项全绿（ruff/mypy 714/SAP 族 179 精确闭合/零 AI 署名/零抑制/红线零命中）｜R4-N1 补口径注+N2 版本日志归位+R5-F1 File List 勘误三清偿落地
+- **Status**：`review → done`（收敛成立——零 P0/P1/P2 残留、门禁全绿、五轮递减归零；本声明随收敛提交入档并清偿三项后翻转）
+- **V2+ 知悉移交**：R2-F1 多等待者×close 变体（单等待者惯例下不可达）/ R3-F2 close 三内部表残留（重开语义须显式清理）/ V1 无 redelivery 非持久——均已 Dev Notes 知悉注记在档，Epic 9 消费方接线时按注记执行
+
 ---
 
 ### 下一步 Next Steps
@@ -874,7 +890,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.7.0（代码审查周期 Round 3）
+**故事版本/Story Version:** v1.7.1（代码审查周期收敛终态）
 **创建日期/Created:** 2026-10-29
 **最后更新/Last Updated:** 2026-10-30
 **更新说明/Description:**
@@ -882,8 +898,9 @@ tests/
 - v1.1.0: 文档审查周期 Round 1（四视角调研 + 三视角审查，7 Agent 并行）——修复 21 簇：P1×5（同级 FIFO 构造缺口 / BROADCAST×visible 正交开关钦定 / correlation 条目生命周期+幂等 resolve / handler 异常 deliver-continue / lambda fail-fast 翻译形态）+ P2×14（范围边界计数勘误 21 行 / AC-1 场景消歧 / timeout 计时锚+兜底常量 / 新增 OD-9 correlation 锚约定 / invalid_receiver_id 用例 / 十键强度统一 / close 语义清单 / Task 2 红形态 / 泄漏措辞收窄 / 闭集拒绝异常 EntityValidationError / redis marker 分档 / 覆盖率口径统一+两段式命令 / §7.6 审计行归属 / 验收延迟 import 钦定）+ P3 簇（行号锚勘误 + 零散项——DC-11/DC-12 新增、四方法签名钦定、边缘语义钦定等；v1.2.0 计数勘误：实为 8 类勘误 13 落点 + 17 项零散，本行原记「9 位勘误 + 16 项」各差一）；OD 8→9 项、DC 10→12 项、范围边界 20→21 行
 - v1.2.0: 文档审查周期 Round 2（回归核查 + 组合交互双 Agent）——修复 9 簇 15 项：P2×5（R1-F2 传播漏网 DC-3/Lessons 残留「BROADCAST 主语义」旧框架 / R1-F17 半落地 Task 2 DoD 双分母 / AC-3 Given③ 场景归属矛盾 / R1-F16 句内自拆 AC-3.3 替身场景误挂 redis marker + 验收 xdist_group 落位补钦 / R1-F3×F12 组合缺口 close 已-done 条目守卫与登记表清空）+ P3×4 簇（except Exception 边界防吞 CancelledError / lambda 元组扩 ImportError 第三形态——内联 __import__ lambda 失败路径 resolver fallback_on 三元组同款 / 兜底常量 monkeypatch 验证技法 + Task 5.4 措辞 / 台账计数勘误两处 + 89% 实测锚 + OD-5③ 论据锚改引）；修复表扩至 30 行（R2-F22~F30）
 - v1.3.0: 文档审查周期 Round 3（单深度推演 Agent——14 Gherkin 场景三轴推演[12✅+2⚠️] + 六协议时间线逐字段终态[4✅+1❌+1⚠️] + 断言数学可满足性[4 项全过] + TDD Task 依赖终局干跑[零窗口矛盾]）——修复 2 簇 9 项：P2×1（正交性计数锚——「一次 post + N 投递」此前无唯一可写断言，per-receiver 错误实现可过全部钦定断言：BROADCAST+True+N≥2 → post 计数==1 用例三联位 + AC-3.1 递增收紧 v2==v1+1 + 版本断言走 get 读回）+ P3×8（Task 2 wait stub 形态 / close 丢弃语义 / None 守卫 / 组合用例 receiver 取 UUID / 入队零挂起前提 / 常量等值断言 / 红原因核对口径 / AC-2.2 承载两 Edge 子用例）；R3 沙盒证伪留痕：StepDefinitionNotFoundError 在 pytest-bdd 8.1.0 亦为 failed 非 error——Task 0 红形态主张两形态均成立；修复表扩至 32 行（R3-F31~F32）
-- v1.4.0: **dev-story 实施完成**（Task 0-7 全勾收尾——14 验收场景全绿/全量 13738 passed 3 skipped/SAP 族 5 连发稳定/接口层覆盖率 90%/mypy 1814 文件零错/ruff 全清/零抑制零 AI 署名 grep 自查过；存量触碰两件：test_exception_handlers 两处同步[import+expected_types] + 5-5 isolation_access 白名单两处登记性更新[bus.py 合法新消费方]；Status → review）
 - v1.3.1: 文档审查周期收敛终态（R4 纯验证六维全过零修复 1 P3 留项登记 + R5 独立终审五节全过零新发现——周期闭合 4 提交零游离/关键修复双向取证 8/8 全立/特权快扫 12 处绝对化断言抽验全过/门禁三项全绿/递减曲线 21→15→9→零修复→零新发现严格单调）——R4 留项清偿（OD-7 引文逐字化勘误）+ 五轮收敛声明入档；修复表 33 行（R5-F33）；Status 保持 ready-for-dev
+- v1.4.0: **dev-story 实施完成**（Task 0-7 全勾收尾——14 验收场景全绿/全量 13738 passed 3 skipped/SAP 族 5 连发稳定/接口层覆盖率 90%/mypy 1814 文件零错/ruff 全清/零抑制零 AI 署名 grep 自查过；存量触碰两件：test_exception_handlers 两处同步[import+expected_types] + 5-5 isolation_access 白名单两处登记性更新[bus.py 合法新消费方]；Status → review）（v1.7.1 归位：本行原误列于 v1.3.1 之前——提交时间序 bcef6b48[00:38] 早于 2ca3bc42[11:20]，数值序亦应后置）
 - v1.5.0: **代码审查周期 Round 1**（四视角并行调研 A 总线实现/B 接线合规/C 测试判别力/D 运行面实测——零 P0，P1×5 + P2×5 + P3×12）——落码 9 项：代码 3 处（send/close 竞态幽灵条目复查[P1·实测证实·变异杀] / close 无等待者 Future retrieved 消化[P2] / _closed_event 无条目等待者 461 结局统一[P2·变异杀]）+ 测试 6 新用例（FIFO 内序[F1·变异双杀] / close done 守卫+登记表清空 / CancelledError 放行守护 / 计时锚延迟回发判别形态 1.6/0.8/1.2 / 事件赢 461+超时赢 460 双分支 / 慢桥竞态）+ 4 改造（验收 content 序断言/BROADCAST+False 全员送达/空 caplog 块/docstring 缩进与措辞）+ teardown 双机制（单元 _ACTIVE_BUSES + 验收 _buses——unraisable warning 15→0）；双评审员合格→修订 6 点吸收→单复评员优秀放行（三步门禁）；文档勘误 2 + 知悉注记 6 入 Dev Notes + 留项 2；回归全绿（132+21+126 passed/ruff/mypy/红线零命中）
 - v1.6.0: **代码审查周期 Round 2**（回归核查 A + 组合交互与运行面 B 双 Agent）——R1 修复回归核查行为级零回归（「R1 自引入 P1」历史模式未复现；F1 docstring 落位与 F4 双收形态两项部分落地判别力等价）+ 组合矩阵四组三闭环一变体缺口 + 运行面全绿（157+21+126/门禁三项/3 连跑零 flaky）+ D-2 清偿关闭；修复 6 项全文字面（R2-F1 多等待者×close 组合缺口 docstring 收窄+知悉深化[P2·实测变体·预存非 R1 回归·单等待者惯例下不可达] / R2-F2 send docstring 双侧补竞态放弃契约披露 / R2-F3 Attributes 补 _closed_event / R2-F4 单元 FIFO 改双收六元组 / R2-F5 close 措辞统一 / R2-F6 AC-2 两处 461 注记）——双 Agent 互证+主会话核验直落（5-9 轻量化门禁先例，全批次零行为变更）
 - v1.7.0: **代码审查周期 Round 3**（单深度推演 Agent 四件套）——零 P0/P1/P2 + P3×2：①14 Gherkin 场景三轴推演 14✅+0⚠️+0❌（文档周期两 ⚠️ 经正交性计数锚落码后独立复核收敛）②六协议时间线逐字段终态全闭合（T6 快照精确边界=入队分发时刻探针实证）③断言数学可满足性全过（六元组同构复算/计时锚 δ 实测 2ms 余量消耗 0.5%）④R1+R2 叠加 9 格全路径闭合矩阵+R2 八处文档落点 grep 实证全在位；修复 2 项（R3-F1 快照边界守护用例+L129 措辞勘误 / R3-F2 close 三内部表残留知悉登记）+ 证伪留痕 12 条；单深度推演独立发现+主会话核验直落（文字面+一行级用例）
+- v1.7.1: **代码审查周期收敛终态**（R4 纯验证六维全过零修复 2 留项 + R5 独立终审五节全过收敛判定成立——周期闭合 4 提交零游离/关键修复双向取证 8/8 全立/特权快扫 1 簇 P3 新发现[File List 三数字失实 78/30/1723→实测 60/39/1771——前四轮结构性盲区]/门禁三项全绿 179 精确闭合零 AI 署名零抑制/递减曲线 12→6→2→0 严格单调）——三项留项随本收敛提交清偿（R4-N1 R1 台账分级口径勘误注 / R4-N2 版本日志 v1.3.1/v1.4.0 归位 / R5-F1 File List 三数字勘误）+ R4/R5 台账节与五轮收敛声明入档；Status review → done
