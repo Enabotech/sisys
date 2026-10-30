@@ -168,7 +168,7 @@ development_status:
   5-10-checkpoint-with-evaluation-integration: done
   # 迁移自 Epic 4: SAP 协议 + 财务建模
   5-11-sap-protocol-support: done
-  5-12-financial-modeling-valuation: review
+  5-12-financial-modeling-valuation: done  # 代码审查五轮 C1~C5 收敛（2026-10-30——38 项台账+独立终审收敛判定成立）
   epic-5-retrospective: optional
 
   # ===========================================================================
