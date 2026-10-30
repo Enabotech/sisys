@@ -168,7 +168,7 @@ development_status:
   5-10-checkpoint-with-evaluation-integration: done
   # 迁移自 Epic 4: SAP 协议 + 财务建模
   5-11-sap-protocol-support: done
-  5-12-financial-modeling-valuation: backlog
+  5-12-financial-modeling-valuation: ready-for-dev
   epic-5-retrospective: optional
 
   # ===========================================================================
