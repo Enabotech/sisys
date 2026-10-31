@@ -25,13 +25,6 @@ logger = logging.getLogger(__name__)
 # 组合根仅做装配，不包含业务逻辑
 
 
-def _llm_config() -> Any:
-    """组合根一行委托（组合根零私有函数纪律——工厂在 infrastructure/config/llm.py）."""
-    from src.infrastructure.config.llm import build_default_llm_config
-
-    return build_default_llm_config()
-
-
 def bootstrap() -> None:
     """引导端口注册表，注册所有已知端口
 
@@ -2006,13 +1999,14 @@ def bootstrap() -> None:
 
     # === LLM Client Port ===
     from src.domain.ports.llm_client import LLMClientPort
+    from src.infrastructure.config.llm import build_default_llm_config
     from src.infrastructure.external_services.llm import LitellmLLMClient
 
     register_port(
         name="llm_client",
         version="v1.1.0",  # 升级: UDMR SSOT 接线（审计修复 F1——UDMR 云端配置优先）
         interface=LLMClientPort,
-        impl=lambda resolver: LitellmLLMClient(_llm_config()),
+        impl=lambda resolver: LitellmLLMClient(build_default_llm_config()),
         module="src.infrastructure.external_services.llm.litellm_llm_client",
         lifetime=Lifetime.SINGLETON,
         owner="foundation-team",
@@ -2670,7 +2664,7 @@ def bootstrap() -> None:
             session_repository=resolver.resolve("debate_session_repository"),
             event_publisher=resolver.resolve("event_publisher"),
             # F1 SSOT：辩论 base_config 也走 UDMR 优先（原 from_env 双轨消除）
-            base_config=_llm_config(),
+            base_config=build_default_llm_config(),
         ),
         module="src.application.services.red_blue_debate_service",
         lifetime=Lifetime.SCOPED,
