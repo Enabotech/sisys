@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-30
+last_updated: 2026-10-31
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -168,8 +168,8 @@ development_status:
   5-10-checkpoint-with-evaluation-integration: done
   # 迁移自 Epic 4: SAP 协议 + 财务建模
   5-11-sap-protocol-support: done
-  5-12-financial-modeling-valuation: done  # 代码审查五轮 C1~C5 收敛（2026-10-30——38 项台账+独立终审收敛判定成立）
-  epic-5-retrospective: done  # 承载认定：遗留项收口/孤儿承诺处置已由终局审查承载（2026-10-31，记录存续于 deferred-work 核销清偿区段）；经验萃取面后续可选补充
+  5-12-financial-modeling-valuation: done
+  epic-5-retrospective: done
 
   # ===========================================================================
   # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始
@@ -395,23 +395,23 @@ development_status:
   # ===========================================================================
   # Epic 91: 技术债清偿专项 (2026-10-15 立项，来源 5-1 审查周期留项 D8/D11 残余)
   # ===========================================================================
-  epic-91: backlog
+  epic-91: done  # 2/2 Story done（2026-10-15 技术债清偿）
   91-1-api-auth-unification: done  # API 认证守卫统一化（26 处 HTTPException → auth.py 单点 AuthenticationError；2026-10-15 实施完成）
   91-2-outbox-dead-letter-termination: done  # Outbox archived 终态 + requeue + cleanup 扩展（2026-10-15 实施完成，基于既有 PG 集成测试连 dev 5432）
 
 # =============================================================================
-# Summary: (verified 2026-08-27 by code + tests + story files + retrospectives)
+# Summary: (verified 2026-10-31 by code + tests + story files + retrospectives + 遗留项核销 R1~R5)
 # =============================================================================
-# Total Epics: 24 (Epic 0-20 + Epic 21 + Epic 22 + Epic 90; Epic 0 含 Iteration 0 / Iteration 1)
-# Total Stories (excluding retrospectives): 193
+# Total Epics: 25 (Epic 0-22 + Epic 90 + Epic 91; Epic 0 含 Iteration 0 / Iteration 1)
+# Total Stories (excluding retrospectives): 201
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 📋 3 ready-for-dev)
 #   - Epic 1: 23 stories (✅ done)
 #   - Epic 2: 9 stories (✅ done)
 #   - Epic 3: 14 stories (✅ done)
-#   - Epic 4: 8 stories (📋 backlog, 含 4.1a 补充，Story 4.8/4.9 已迁移至 Epic 5)
-#   - Epic 5: 12 stories (📋 backlog, 含 5.11 SAP 协议 + 5.12 财务建模迁移)
-#   - Epic 6: 12 stories (📋 backlog)
+#   - Epic 4: 13 stories (✅ done — 4-1 + 4-1a~4-1f 补充 6 + 4-2~4-7；Story 4.8/4.9 已迁移至 Epic 5 为 5.11/5.12)
+#   - Epic 5: 12 stories (✅ done 2026-10-30 + 终局审查五轮收敛 + 遗留项核销 R1~R5 收口 2026-10-31；retro 见 epic-5-retro-2026-10-31.md)
+#   - Epic 6: 12 stories (📋 backlog — 下一站，6-1 create-story 前置留项清单承载)
 #   - Epic 7: 8 stories (📋 backlog)
 #   - Epic 8: 6 stories (📋 backlog)
 #   - Epic 9-14: 38 stories (📋 backlog, V1)
@@ -419,24 +419,25 @@ development_status:
 #   - Epic 21: 9 stories (📋 backlog, MVP P0)
 #   - Epic 22: 8 stories (📋 backlog, V1 P1)
 #   - Epic 90: 8 stories (✅ done)
+#   - Epic 91: 2 stories (✅ done)
 #
 # Status Summary:
 #   Stories:
-#     - Done: 66  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 90:8)
-#     - Ready for Dev: 6 (0-17, 0-18, 0-30, 4-1, 4-1a)
-#     - In Progress: 1 (Epic 4 — Story 4.1a ready-for-dev)
+#     - Done: 93  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 4:13 + Epic 5:12 + Epic 90:8 + Epic 91:2)
+#     - Ready for Dev: 3 (0-17, 0-18, 0-30)
+#     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 129 (+4 for Story 4-1b/4-1c/4-1d/4-1e)
+#     - Backlog: 105 (Epic 6-22)
 #   Epics:
-#     - Done: 4 (Epic 1, Epic 2, Epic 3, Epic 90)
-#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30; Epic 4 — Story 4.1 ready-for-dev)
-#     - Backlog: 19 (Epic 5-20, Epic 21, Epic 22)
+#     - Done: 7 (Epic 1, Epic 2, Epic 3, Epic 4, Epic 5, Epic 90, Epic 91)
+#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30)
+#     - Backlog: 17 (Epic 6-20, Epic 21, Epic 22)
 #   Retrospectives:
-#     - Done: 3 (Epic 1, Epic 2, Epic 3)
-#     - Optional: 22
+#     - Done: 5 (Epic 1, Epic 2, Epic 3, Epic 4, Epic 5)
+#     - Optional: 20
 #
 # Next Steps:
-#   1. Option A: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
-#   2. Option B: Start Epic 4 — Story 4-1a-strategic-tool-impl is ready-for-dev
-#   3. Option C: Start Epic 21 (决策舱 P0) — 可与 Epic 4-6 并行，依赖 Story 1.7 + Story 3.8 均已完成
+#   1. Start Epic 6 — Story 6-1 create-story（前置留项清单承载唤醒区决策面，见 epic-5-retro-2026-10-31.md 行动项 1a/6）
+#   2. Option: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
+#   3. Option: 数据源 Key 申请（uspto/GCP，Epic 6.2 市场洞察前）
 # =============================================================================
