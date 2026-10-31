@@ -174,8 +174,8 @@ development_status:
   # ===========================================================================
   # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始
   # ===========================================================================
-  epic-6: backlog
-  6-1-blm-first-two-phases: backlog
+  epic-6: in-progress
+  6-1-blm-first-two-phases: ready-for-dev
   6-2-market-insight-six-substeps: backlog
   6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
   6-4-json-chain-of-thought-output: backlog
