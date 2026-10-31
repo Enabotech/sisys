@@ -61,7 +61,7 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | Story 1.7 MinIO 对象层 | 证据包落盘位（本 Story 仅内存态证据 VO，落盘归 6.5） | ✅ done |
 | Story 1.18b LangGraph 编排 | `LangGraphEngine` 状态机执行引擎（`submit_graph`/`get_graph_result`） | ✅ done |
 | Story 2.2a 文档解析 | AC Given「文档已解析并索引」——分析语料前置 | ✅ done |
-| Story 3.1a Dense 语义检索 | bge-m3 嵌入 + Qdrant 检索（市场洞察取数证据） | ✅ done |
+| Story 3-1a Dense 语义检索 | bge-m3 嵌入 + Qdrant 检索（市场洞察取数证据） | ✅ done |
 | Story 4.1 战略工具注册 | 23 种工具注册面（SWOT-TOWS/KPI 树/PESTEL/波特五力/$APPEALS/VRIO/安索夫等 BLM 建议工具均已注册） | ✅ done |
 | Story 5.3 单 Agent 工作流 | CEO Agent 执行骨架：六阶段服务方法/图适配器模式/CLI 接线/思维链内建 | ✅ done |
 
@@ -112,7 +112,7 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 
 ### AC-1: BLM 前两阶段流程执行
 
-**Given** 文档已解析并索引（2.2a/3.1a 产物在位——构造序列与检索门控档位 Task 0.3 钦定：复用 3-1a 验收 embedding 探测+upsert 先例建租户隔离 collection，检索不可达环境该类场景动态 skip）
+**Given** 文档已解析并索引（2-2a/3-1a 产物在位——构造序列与检索门控档位 Task 0.3 钦定：复用 3-1a 验收 embedding 探测+upsert 先例建租户隔离 collection，检索不可达环境该类场景动态 skip）
 **And** CEO Agent 已实例化（Story 5.1）且档案已加载（Story 5.2）
 **When** 启动 BLM 规划（`blm-plan` 提交规划任务）
 **Then** ①阶段 1 业绩差距分析执行：产出差距量化产物（financial_gap/operational_gap/root_causes/portfolio_health 四字段语义对齐 §17.4.2 伪码产物定义）
@@ -429,7 +429,7 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | 🔴 红 | 编写 `tests/unit/application/test_blm_planning_service.py`（阶段 1 四字段产物/六子步骤顺序/角色视角前缀+工具候选白名单 prompt 断言（语义配置表驱动）/检索证据注入调用/`_structured_call` 444 纪律/8s 配置传递断言/步级降级（449/380 捕获+直接推理续行）/降级下游标注注入（⑥规则）/各方法末尾快照写+事件发布调用断言） |
 | 🟢 绿 | 实现 `src/application/services/blm_planning_service.py` + `blm_planning_prompts.py`（按六子步骤语义配置表参数化；LLM/工具/检索/EventPublisher/快照通道经端口注入；每步时序钦定：确定性工具候选→工具先行执行（失败/未选→直接推理）→检索证据+工具输出注入→单次结构化 LLM 调用；**瞬时故障两级设计=服务内重试**：每步 asyncio 单次重试循环（瞬时 LLM/网络失败）→仍败则步级降级——**不用 per-node RetryPolicy**（其重试耗尽=异常上抛=图失败中断，与 AC-6①「继续推进」语义互斥，且服务全捕获下恒不触发=死配置）） |
 | 🟡 变异 | 降级分支删除 → degraded_steps 断言红；prompt 前缀删 → AC-2 断言红 → 还原 |
-| 🔄 重构 | 温度五档/8s timeout 复用对齐 + docstring |
+| 🔄 重构 | 温度分档纪律对齐（档值以语义配置表为唯一源——五档键与 BLM 8 步无直接映射）+ 8s timeout 复用 + docstring |
 
 #### TDD 循环 B：SpBlmGraph 图拓扑
 
@@ -701,6 +701,11 @@ tests/
 | R3-7 | 推演坐实的规格/断言缺口族（P2×7+P3×5 归并）：降级产物 VO 不对称（PerformanceGapArtifacts/InsightSynthesis 无降级标记、insight_steps 恒满 6 未成文）；current_step 值域与「最近完成步」语义（挂起第 N 步读到第 N-1 步）；快照序列化契约（Task 2 种子与 Task 3 写入可各自为政）与读径通道（端口 vs 裸 hget）；480 触发路径零测试锚（无「不存在」第三态用例）；温度断言期望值无源（五档键与 8 步无映射——语义配置表缺温度列）；「零注册回归 grep」钉进契约测试锁死 Epic 7 三向未定的 deferred 决策；AgentDecided confidence 回落 0.9 常量（5-3 DC-6 修掉的假置信度复发）；端口组合 SSOT 漏 EventPublisher/快照通道两注入位；端口文件创建 Task 归属未指派；PlanningStarted 发布位置（守卫前=孤儿事件）未钦定；两套工具名单（tools_l1/步候选）关系未说明；AC-1③ 综合洞察非空断言 Fake 下近自证；Task 0 提交时序（pre-commit mypy 阻断延迟 import 缺失模块+CI 无 continue-on-error——.py/.feature 入仓纪律未承载，5-5 先例）；outbox 10 行/run 量级未成文 | P1~P3 | 逐项钦定：VO 补 degraded 字段+恒满 6 成文；current_step=最近完成步（阶段 1 取 performance_gap）；序列化契约入 SSOT+读径经端口；Task 2 红补「无快照→480」；语义配置表增温度列；零注册断言移出契约测试归 Subtask 0.9 单次核验；DC-11 补 confidence 显式钦定；SSOT 补两注入位；端口文件随 Task 2 绿；发布位置=三守卫后 submit 前；DC-5 补两机制并存；AC-1③ 改注入侧双锚；Task 0 DoD 补提交时序纪律；outbox 量级入 Task 0.6② |
 | R4-1 | 纯验证轮抓到的**前轮修复传播漏网 4 处**（修复表声称已修、正文漏改——与文档内已正确的权威表述直接矛盾，实施代理按字面执行会踩回已修掉的坑）：Gherkin 场景配比行仍「380 降级」（应 449——Subtask 0.3 已改）；Edge Cases 注入矩阵仍「工具 380」（应 449——与相邻行直接矛盾）；Subtask 5.1 顺序断言仍单锚时间戳+「期望独立构造」（R3-5 已判该形态不可判序——AC-1 已改双锚本行漏同步）；风险 R2 缓解仍引「5-3 L252-254 先例」（R1-9 已改口该行为正常分支非降级先例） | P2×4 | 四处逐一同步：449 口径×2 / Subtask 5.1 双锚（与 AC-1 同构）/ R2 缓解改「6.1 新增步级捕获（BLM 面局部核销）」 |
 | R4-2 | 验证轮 P3 三项：`_code_ranges.py:169` 标签微偏（注释实在 L167，L169 是段条目行）；风险 R1「DC-3 两级」指向松散（两级设计钦定在 Task 3 循环 A 绿，DC-3 本体无重试字样）；结构树 configs/event_channels.yaml 嵌在 src/ 子树下（实际位于仓根 configs/） | P3×3 | 三处修正（:167 预留注释注记 / 改指 Task 3 循环 A / 树行注明仓根位置）。**验证通过面**：正文 file:line 88 处 87 精确命中（1 处即本条标签偏）；结构/计数全过（Subtask 29/场景 14/OD×5/DC×11/风险×7/留项×8/18★11▲0✂/矩阵 17 行全覆盖）；三轮提交完整零游离；5 处关键修复终态在位 |
+| R5-1 | 终审特权发现 P3×2（五节全过后的记录级清偿）：Story key 写法混用（依赖表「Story 3.1a」vs 正文「3-1a」——sprint-status 正式 key 为 3-1a-dense-semantic-search，统一为 3-1a/2-2a）；Task 3 循环 A 重构行「温度五档/8s timeout 复用对齐」与 AC-5「五档键与 8 步无直接映射」字面张力（改「纪律对齐+配置表唯一源」） | P3×2 | 两处统一/改写。**终审通过面**：周期闭合（4 提交零游离+4 簇修复表↔diff 抽验吻合）/关键修复双向取证 10/10 一致/file:line 抽验 55+ 处零失实/独立快扫零新 P0-P2/门禁红线全承载/结构计数全复算吻合 |
+
+#### 收敛声明（Round 5 独立终审——2026-10-31）
+
+Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5+P1×11）、R2 回归+增量正确性（P1×1+簇）、R3 深度推演四轴（P1×6+归并簇）、R4 纯验证传播清偿（P2×4+P3×3）；关键改判：异常码段 480 新开 planning 子域、DC-9 改判保留、图形态钉死 8 节点 7 直连边+服务内两级重试、降级验收锚 449/380 单测层。独立终审五节全过：周期闭合 4 提交零游离、4 簇修复表↔diff 抽验吻合；关键修复双向取证 10/10 一致，file:line 抽验 55+ 处零失实；门禁红线全承载、结构计数全复算吻合。终审新增仅 P3×2（记录级，随收敛提交清偿——R5-1），零 P0/P1 残留——**ready-for-dev 放行成立**。
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -718,7 +723,7 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.3.2
 **创建日期/Created:** 2026-10-31
 **最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
@@ -727,3 +732,4 @@ tests/
 - v1.2.0: 文档审查 Round 2（回归核查+增量正确性双视角）——R2×5 修复（快照写入方双钦定冲突→读侧改造[P1] / R1 声称未落地 4 处清偿[六件→七件·四件套→五件套×4·L31→L36·DC-8 补 DC-11] / add_node retry=→retry_policy=[langgraph 1.2.9 实测] / PlanningStarted 发布点+恰一行断言+第三 resolve 名三缺口 / L51·Rule 名·5-10 文件名·图例·DC 行序·结构树六锚点级修正）+ R1 台账勘误两处内联标注；核验通过 40+ 锚点零偏差
 - v1.3.0: 文档审查 Round 3（深度推演轮——14 场景期望唯一性/测试可满足性/R1×R2 组合交互面/Task 依赖干跑四轴）——R3×7 修复（P1×6：图形态钦定自相矛盾→8 节点 7 直连边[条件边与直连等价、变异物理不可红] / per-node RetryPolicy×步级降级互斥→删改服务内两级重试[R2-3 引入的设计缺陷推演证伪] / 380 白名单下生产不可达→验收锚 449+380 单测层 / 全降级 481 抛出点+部分降级终态成文 / 顺序断言时间戳不可判序→枚举序+非重叠双锚 / 检索必填性+Given 构造+门控清单钦定；P2×7+P3×5 归并 R3-7：降级 VO 对称/current_step 语义/序列化契约/480 触发锚/温度列/零注册断言移出/confidence 0.9/SSOT 两注入位/端口文件归属/发布位置/两套工具名单/综合洞察双锚/提交时序纪律/outbox 10 行量级）；另留「推演不成立疑点」留痕 5 项（Task 2 读侧可测/滞留与 L170 不冲突/场景计数无误/契约测试红 CI 可容/DC-11 已修——防后续轮重推）
 - v1.3.1: 文档审查 Round 4（纯验证轮——R3 传播验证+file:line 全量实地核验 88 处+结构/计数终核+三轮存续）——R4×2 修复（R4-1 前轮修复传播漏网 4 处[P2]：场景配比 380→449/Edge Cases 380→449/Subtask 5.1 双锚同步/风险 R2 先例引用改口；R4-2 P3×3：_code_ranges 注释行号 L169→L167 标签/R1 交叉引用改指 Task 3 循环 A/结构树 configs 仓根注记）；验证通过面：正文锚点 87/88 精确命中、结构与计数全过、三轮提交完整零游离、5 处关键修复终态在位
+- v1.3.2: 文档审查 Round 5（独立终审五节——周期闭合/双向取证/独立快扫/门禁红线/状态流转）——五节全过，ready-for-dev 放行成立；R5-1 终审特权发现 P3×2 随收敛清偿（Story key 统一 3-1a/2-2a、温度重构行措辞与 AC-5 对齐）；收敛声明入档（修复表末节）
