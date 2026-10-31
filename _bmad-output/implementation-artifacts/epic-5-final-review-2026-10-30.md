@@ -150,3 +150,28 @@ M1 工厂进程级单例复用 + 激活环 loop close + 注释修正 + wiring �
 > **遗留移交**：CI flaky（phoenix tracer 比例分母噪声——5-7 资产预存，R4 定性在案）；R3-N3/N4 理论留痕（本文档 R3 节）；消费循环接线（Epic 6 首个事件消费 Story——R1-DF2 锚）。
 >
 > **F9 随本提交执行**：sprint-status epic-5 → done + epic-5-retrospective → done（承载认定：遗留项收口/孤儿承诺处置已由本终局审查承载，经验萃取面可选补充）。
+
+---
+
+## 追加修正（2026-10-31 用户裁定）：组合根零私有函数纪律恢复
+
+**用户裁定**：Epic 5 在组合根创建的私有函数违反「组合根仅做装配」纪律（组合根 L26 自述「工厂函数已迁移至对应 infrastructure/config/ 模块」+ `_llm_config` 一行委托先例）——私有工厂应迁至各自子系统/功能模块。
+
+**迁移执行**（4 函数 + 1 模块级变量）：
+
+| 原组合根私有成员 | 迁移目标（公开名） | 归宿依据 |
+|---|---|---|
+| `_build_metrics_port` + `_metrics_port_instance` | `src/infrastructure/config/metrics.py`（`build_metrics_port`） | infrastructure/config 工厂之家（_llm_config 先例）；与既有 MetricsConfig 同文件 |
+| `_build_agent_workflow_use_case` | `src/infrastructure/config/agent_workflow.py`（新建，`build_agent_workflow_use_case`） | 同上；import-linter 明示 infrastructure 允许 import application |
+| `_build_sap_bus` | `src/interfaces/sap/bus.py`（`build_sap_bus`，`__all__` 同步） | SAP 实现域本文件——infrastructure/config 不可承接（import-linter 禁 infrastructure 依赖 interfaces） |
+| `_wire_agent_tracing` | `src/infrastructure/config/agent_tracing.py`（新建，`wire_agent_tracing`） | 同 config 惯例 |
+
+组合根改造：四函数区删除（约 150 行）、TYPE_CHECKING 块随迁删除、注册行/调用点改 import 公开工厂（metrics `impl=build_metrics_port` 直引；sap_bus 由 `lambda resolver: _build_sap_bus(resolver)` 简化为 `impl=build_sap_bus` 直引）。
+
+**测试联动（6 文件）**：
+- `test_acceptance_drift_detection.py` / `test_acceptance_checkpoint_evaluation.py`：工厂直调 import 改新路径 + **源码锚点断言随锚搬家**（`resolve_optional("agent_drift"/"agent_checkpoint")` 锚改读 agent_workflow.py——组合根源码断言的锚点跟随形态）
+- `test_acceptance_agent_triple_isolation.py`：`isolation_guard=` 双接线点断言改双源各在位（组合根 lambda 1 处 + 工厂 1 处——原「组合根内恰两处」计数断言随工厂搬家失效）
+- `test_acceptance_phoenix_tracer.py` + `.feature`：BDD 三联动位同步（@when 绑定串/feature 行/断言消息 `_wire_agent_tracing`→`wire_agent_tracing`）
+- `test_arch_sap_protocol.py`：`InProcessSAPBus` 构造点收窄断言语义更新（仅组合根→仅 interfaces/sap/bus.py 实现域工厂）
+
+**验证**：ruff 全仓零违例（I001 import 排序 auto-fix×2）；mypy src/ 721 文件零问题 + 三验收文件零问题；lint-imports 5 kept 0 broken；四段全量零失败（unit 10391 / contracts 1431 / integration 800+2s / acceptance 1304——phoenix perf flaky 本轮亦绿[预存项 R4 定性在案]）。

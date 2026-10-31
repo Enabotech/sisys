@@ -23,7 +23,7 @@ import inspect
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.ports.public_blackboard import PublicBlackboard
@@ -538,8 +538,46 @@ class InProcessSAPBus:
 __all__ = [
     "BROADCAST_RECEIVER_ID",
     "InProcessSAPBus",
+    "build_sap_bus",
     "SAP_DEFAULT_RESPONSE_TIMEOUT_SECONDS",
     "SAPBus",
     "deserialize",
     "serialize",
 ]
+
+
+def build_sap_bus(resolver: Any) -> InProcessSAPBus:
+    """Story 5.11 — sap_bus 端口注册工厂（组合根装配用；fail-fast 装配，DC-12 翻译形态）。
+
+    lambda 单表达式装不下 try/except 故提工厂（build_agent_workflow_use_case
+    先例同款）；与可选依赖降级族相反的裁定：SAP 总线是功能主面且零存量消费方，
+    装配失败应立即暴露（raise ConfigurationError——无 None 降级消费方）。翻译
+    三元组 (KeyError, RuntimeError, ImportError)：resolver 对未注册名抛 KeyError、
+    字符串 impl 加载失败包装 RuntimeError、isolation_guard_service 内联 __import__
+    lambda 的 import 失败抛裸 ImportError——resolver resolve_optional 的
+    fallback_on 三元组是仓内「依赖缺失」规范形态。
+
+    本模块归宿注记（用户裁定 2026-10-31：组合根零私有函数纪律——工厂迁至
+    SAP 实现域本文件；infrastructure/config 不可承接本工厂：import-linter
+    禁止 infrastructure 依赖 interfaces 层）。
+
+    Args:
+        resolver: 端口解析器。
+
+    Returns:
+        组装完成的进程内 SAP 总线实例。
+
+    Raises:
+        ConfigurationError: public_blackboard / isolation_guard_service 依赖不可用。
+    """
+    from src.domain.exceptions import ConfigurationError
+
+    try:
+        blackboard = resolver.resolve("public_blackboard")
+        guard = resolver.resolve("isolation_guard_service")
+    except (KeyError, RuntimeError, ImportError) as error:
+        raise ConfigurationError(
+            message="sap_bus 装配失败：public_blackboard/isolation_guard_service 依赖不可用",
+            cause=error,
+        ) from error
+    return InProcessSAPBus(blackboard=blackboard, guard=guard)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -19,9 +19,6 @@ from src.domain.ports.registry import (
 )
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
 
 
 # 工厂函数已迁移至对应 infrastructure/config/ 模块；组合根仅做装配，不包含业务逻辑
@@ -889,11 +886,14 @@ def bootstrap() -> None:
         tags=("sandbox", "reaper", "ttl"),
     )
 
+    # metrics 端口工厂（infrastructure/config/metrics.py——组合根零私有函数纪律）
+    from src.infrastructure.config.metrics import build_metrics_port
+
     register_port(
         name="metrics",
         version="v1.0.0",
         interface=MetricsPort,
-        impl=_build_metrics_port,
+        impl=build_metrics_port,
         module="src.infrastructure.monitoring.metrics_port_impl",
         lifetime=Lifetime.SINGLETON,
         owner="monitoring-team",
@@ -2832,6 +2832,9 @@ def bootstrap() -> None:
     )
     # Story 5-3 — 单 Agent 工作流执行用例（run-task 全链编排：守卫→入口隔离检查
     # [Story 5.5 fail-closed]→档案加载→装配→图执行→结果组装；R2 组合端口五依赖）
+    # agent_workflow_use_case 工厂（infrastructure/config/agent_workflow.py——组合根零私有函数纪律）
+    from src.infrastructure.config.agent_workflow import build_agent_workflow_use_case
+
     register_port(
         name="agent_workflow_use_case",
         version="v1.0.0",
@@ -2839,7 +2842,7 @@ def bootstrap() -> None:
             "src.application.use_cases.run_agent_workflow",
             fromlist=["RunAgentWorkflowUseCase"],
         ).RunAgentWorkflowUseCase,
-        impl=_build_agent_workflow_use_case,
+        impl=build_agent_workflow_use_case,
         module="src.application.use_cases.run_agent_workflow",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
@@ -2986,8 +2989,11 @@ def bootstrap() -> None:
         tags=("agent", "observability", "tracing"),
     )
     # Story 5.7 initialize 接线（enabled=false 默认 NoOp 零开销；配置错误
-    # warning 降级跳过不阻断主链启动——DC-7；独立可调用单元便于负路径直测）
-    _wire_agent_tracing()
+    # warning 降级跳过不阻断主链启动——DC-7；独立可调用单元便于负路径直测——
+    # 接线单元在 infrastructure/config/agent_tracing.py，组合根零私有函数纪律）
+    from src.infrastructure.config.agent_tracing import wire_agent_tracing
+
+    wire_agent_tracing()
 
     # === Story 5.8 — Agent 输出质量评估（EvaluationHarness + UDMR in-band 评估模型路由）===
     # 双 SINGLETON（Epic 5 全家政策——DC-9：EvaluationHarness 无状态纯函数式 evaluate
@@ -3105,8 +3111,10 @@ def bootstrap() -> None:
     # 裁定——SAP 总线是功能主面且零存量消费方，无 None 兼容包袱）；翻译三元组
     # (KeyError, RuntimeError, ImportError)——resolver fallback_on 仓内规范形态
     # （isolation_guard_service 是内联 __import__ lambda，import 失败抛裸 ImportError
-    # 逃出二元组）；lambda 单表达式装不下 try/except 故提 _build_sap_bus 工厂
-    # （_build_agent_workflow_use_case 先例同款）。
+    # 逃出二元组）；装配工厂在 SAP 实现域 bus.py（build_sap_bus——组合根零
+    # 私有函数纪律；infrastructure/config 不可承接：import-linter 禁 infra 依赖 interfaces）。
+    from src.interfaces.sap.bus import build_sap_bus
+
     register_port(
         name="sap_bus",
         version="v1.0.0",
@@ -3114,7 +3122,7 @@ def bootstrap() -> None:
             "src.interfaces.sap.bus",
             fromlist=["SAPBus"],
         ).SAPBus,
-        impl=lambda resolver: _build_sap_bus(resolver),
+        impl=build_sap_bus,
         module="src.interfaces.sap.bus",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
@@ -3210,163 +3218,6 @@ def bootstrap() -> None:
                 logger.warning("异步事件处理器注册失败 %s: %s", handler_name, type(e).__name__)
             finally:
                 loop.close()
-
-
-_metrics_port_instance: "MetricsPortImpl | None" = None
-
-
-def _build_metrics_port(resolver: Any) -> "MetricsPortImpl":
-    """metrics 端口注册工厂（Epic 5 终局审查修复——原字符串 impl 指向不存在的 metrics_adapter 模块）。
-
-    进程级单例复用（R2 修复）：BusinessMetricsCollector 构造器即向 Prometheus
-    默认 REGISTRY 注册 sisys_* 指标——二次构造必抛 Duplicated timeseries，而
-    resolver 的 SINGLETON 缓存可被测试纪律 clear_singleton() 驱逐（5.x 验收
-    场景级重建），驱逐后裸 resolve 重建会在全局 REGISTRY 上必炸。Prometheus
-    全局注册表是进程级资源，不应随 resolver 缓存丢弃——本工厂以模块级实例
-    缓存对齐两生命周期：clear 后重建返回同一实例，重建幂等。
-
-    激活语义诚实注记（R2②-F2）：本修复恢复的是「订阅注册」（bootstrap 激活环
-    resolve cost_metrics_handler 成功 → async register() → RedisEventSubscriber
-    纯内存 dict 注册 RoutingDecided，零外部依赖）；「消费循环」全仓零调用点
-    （DualChannelEventBus.start / RedisEventBus.start 无人拉起 listen loop），
-    on_routing_decided 回调在测试与生产均无触发路径——消费面接线归 Epic 6
-    首个事件消费 Story（与 R1-DF2 同锚）。
-
-    历史注记：幽灵 impl 字符串源自 19fbf461（2026-05-12 组合根重构期脚手架），
-    d49261b0（2026-10-12 UDMR 审计修复 F2）将 cost_metrics_handler 加入
-    handler_names 激活清单后缺陷活化——每次 bootstrap resolve 失败被静默吞为
-    warning（1-19 成本追踪「激活」从未生效）。
-
-    Args:
-        resolver: 端口解析器（resolver._instantiate 以 spec.impl(resolver=self)
-            约定调用——零参签名会 TypeError 且被 bootstrap except 吞掉）。
-
-    Returns:
-        组合完成的 MetricsPort 进程级单例（15 方法全实现，含
-        cost_metrics_handler 消费的 record_token_usage / record_cost）。
-    """
-    global _metrics_port_instance
-
-    from src.infrastructure.monitoring.aggregator import MetricsAggregator
-    from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
-    from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
-    from src.infrastructure.monitoring.metrics_port_impl import MetricsPortImpl
-
-    if _metrics_port_instance is not None:
-        return _metrics_port_instance
-
-    business = BusinessMetricsCollector()
-    _metrics_port_instance = MetricsPortImpl(
-        aggregator=MetricsAggregator(
-            event_metrics_collector=EventMetricsCollector(),
-            business_metrics_collector=business,
-        ),
-        business_metrics=business,
-    )
-    return _metrics_port_instance
-
-
-def _build_agent_workflow_use_case(resolver: Any) -> Any:
-    """Story 5.8 — agent_workflow_use_case 注册工厂（def 承载 try/except——lambda 语法不可能）。
-
-    第六依赖 evaluation_harness 经 resolve_optional 可选注入（audit_service 先例
-    ——注册缺失/构造失败降级 None）；评估接线配置错误（不在 resolve_optional
-    默认 fallback_on 内）被本工厂捕获降级 None：评估面损失不阻断主链（可观测
-    附加面哲学——风险 #9，ConfigurationError 非 RuntimeError 子类故须显式捕获；
-    SINGLETON 失败不缓存，后续 resolve 重试不残留毒化）。
-
-    适用面注记（CR1-F16——实测收窄；R2 勘误：原「评估独有失败面（a）」实为下述
-    窗口的子情形——resolver lambda 的子 resolve 异常已被 resolve_optional 默认
-    fallback_on 吸收，逃逸的 ConfigurationError 与 llm_client 同源自 env）：本防护
-    的净值场景是 **llm_client 单例已缓存后 env 中途损坏**（或测试 override
-    llm_client 后注入坏 env）的窗口形态——若 UDMR_* env 损坏发生在冷启动，主链
-    五 resolve 先经 llm_client→build_default_llm_config→from_env 同源 101 失败
-    （预存面：llm_client 无 from_env 防护，非 5.8 引入——CR1-DF1 登记），工厂
-    降级触发但 use case 仍失败。
-    """
-    use_case_cls = __import__(
-        "src.application.use_cases.run_agent_workflow",
-        fromlist=["RunAgentWorkflowUseCase"],
-    ).RunAgentWorkflowUseCase
-    from src.domain.exceptions import ConfigurationError
-
-    try:
-        evaluation_harness = resolver.resolve_optional("agent_evaluation")
-    except ConfigurationError as error:
-        logger.warning("评估接线降级跳过（agent_evaluation 构造失败——评估面损失不阻断主链）: %s", error)
-        evaluation_harness = None
-    # Story 5.9 — 第七依赖同款降级防护（agent_drift resolve_optional 可选接线：
-    # 检测器构造失败 → None 不阻断 bootstrap；CR1-DF2[5.8] 一并处置——降级路径
-    # 测试覆盖经 5-9 验收 AC-4.1 承载）
-    try:
-        drift_detector = resolver.resolve_optional("agent_drift")
-    except ConfigurationError as error:
-        logger.warning("漂移检测接线降级跳过（agent_drift 构造失败——漂移检测面损失不阻断主链）: %s", error)
-        drift_detector = None
-    # Story 5.10 — 第八依赖同款降级防护（agent_checkpoint resolve_optional 可选
-    # 接线：Recorder 构造失败 → None 不阻断 bootstrap；CR1-DF2[5.8] 家族延续——
-    # 降级路径测试覆盖经 5-10 验收 AC-4.1 承载。同窗纪律（R1-F1）：本注入与第八
-    # 构造参数 + record 块三者同一 Task 落地（参数不存在窗口注入 kwarg 必 TypeError）
-    try:
-        checkpoint_recorder = resolver.resolve_optional("agent_checkpoint")
-    except ConfigurationError as error:
-        logger.warning("评估历史接线降级跳过（agent_checkpoint 构造失败——持久化面损失不阻断主链）: %s", error)
-        checkpoint_recorder = None
-    return use_case_cls(
-        agent_repository=resolver.resolve("agent_repository"),
-        agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
-        agent_engine=resolver.resolve("agent_engine"),
-        agent_workflow_service=resolver.resolve("agent_workflow_service"),
-        isolation_guard=resolver.resolve("isolation_guard_service"),
-        evaluation_harness=evaluation_harness,
-        drift_detector=drift_detector,
-        checkpoint_recorder=checkpoint_recorder,
-    )
-
-
-def _build_sap_bus(resolver: Any) -> Any:
-    """Story 5.11 — sap_bus lambda 工厂（fail-fast 装配，DC-12 翻译形态）。
-
-    lambda 单表达式装不下 try/except 故提工厂（_build_agent_workflow_use_case
-    先例同款）；与可选依赖降级族相反的裁定：SAP 总线是功能主面且零存量消费方，
-    装配失败应立即暴露（raise ConfigurationError——无 None 降级消费方）。翻译
-    三元组 (KeyError, RuntimeError, ImportError)：resolver 对未注册名抛 KeyError、
-    字符串 impl 加载失败包装 RuntimeError、isolation_guard_service 内联 __import__
-    lambda 的 import 失败抛裸 ImportError——resolver resolve_optional 的
-    fallback_on 三元组是仓内「依赖缺失」规范形态。
-    """
-    from src.domain.exceptions import ConfigurationError
-    from src.interfaces.sap.bus import InProcessSAPBus
-
-    try:
-        blackboard = resolver.resolve("public_blackboard")
-        guard = resolver.resolve("isolation_guard_service")
-    except (KeyError, RuntimeError, ImportError) as error:
-        raise ConfigurationError(
-            message="sap_bus 装配失败：public_blackboard/isolation_guard_service 依赖不可用",
-            cause=error,
-        ) from error
-    return InProcessSAPBus(blackboard=blackboard, guard=guard)
-
-
-def _wire_agent_tracing() -> None:
-    """Story 5.7 — agent_tracing 端口 initialize 接线（独立可调用单元——负路径直测）。
-
-    try 罩住整段（resolve + isinstance + initialize——R2-6）：lambda 构造期
-    from_env 的 101 抛在 resolve 时发生，只包 initialize 罩不住；配置 typo 只
-    损失观测面不阻断主链启动（DC-7 旁路哲学——追踪连「拒绝主链」语义都没有）。
-    enabled=false 时 initialize 返回 False NoOp 零开销。
-    """
-    try:
-        from src.application.ports.agent_tracing import AgentTracingPort
-        from src.domain.exceptions import ConfigurationError
-        from src.domain.ports.resolver import get_resolver
-
-        tracer = get_resolver().resolve("agent_tracing")
-        if isinstance(tracer, AgentTracingPort):
-            tracer.initialize()
-    except ConfigurationError as error:
-        logger.warning("agent_tracing 初始化降级跳过（NoOp 态——追踪配置错误不阻断主链）: %s", error)
 
 
 async def shutdown() -> None:

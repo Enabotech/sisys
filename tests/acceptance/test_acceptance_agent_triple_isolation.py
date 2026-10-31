@@ -1131,11 +1131,14 @@ def then_guard_resolve_reachable(context: dict[str, Any]) -> None:
 
 @then("双接线点 lambda 注入第五依赖")
 def then_both_wiring_points_injected(context: dict[str, Any]) -> None:
-    """组合根源码断言: isolation_guard=resolver.resolve(...) 恰两处
-    （RunAgentWorkflowUseCase + AgentWorkflowService——lambda 漏注入的静态锚）。"""
-    source = (REPO_ROOT / "src" / "composition_root.py").read_text(encoding="utf-8")
+    """双接线点注入 isolation_guard 各在位（AgentWorkflowService 注册 lambda[组合根] +
+    RunAgentWorkflowUseCase 工厂[infrastructure/config/agent_workflow.py]——漏注入静态锚；
+    工厂迁移注记 2026-10-31：组合根零私有函数纪律，use case 工厂迁 subsystem 模块）。"""
     expected_fragment = 'isolation_guard=resolver.resolve("isolation_guard_service")'
-    assert source.count(expected_fragment) == 2, f"双接线点 lambda 注入应恰两处（实际 {source.count(expected_fragment)}）"
+    composition_source = (REPO_ROOT / "src" / "composition_root.py").read_text(encoding="utf-8")
+    factory_source = (REPO_ROOT / "src" / "infrastructure" / "config" / "agent_workflow.py").read_text(encoding="utf-8")
+    assert expected_fragment in composition_source, "AgentWorkflowService 注册 lambda 应含第五依赖注入"
+    assert expected_fragment in factory_source, "RunAgentWorkflowUseCase 工厂应含第五依赖注入"
 
 
 @scenario(

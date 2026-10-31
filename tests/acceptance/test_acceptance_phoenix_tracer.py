@@ -1200,7 +1200,7 @@ def then_direct_initialize_true(context: dict[str, Any]) -> None:
     assert not _is_proxy_global(), "initialize 应 set 全局"
 
 
-@when("直调 _wire_agent_tracing 接线单元且采样配置非法（PHOENIX_TRACES_SAMPLER_ARG 为 0）")
+@when("直调 wire_agent_tracing 接线单元且采样配置非法（PHOENIX_TRACES_SAMPLER_ARG 为 0）")
 def when_wire_unit_with_bad_config(
     context: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
@@ -1209,7 +1209,7 @@ def when_wire_unit_with_bad_config(
     """负路径直调（R3-3：接线提取为独立可调用单元——直调真实函数 + 坏 env 断言
     warning 降级不抛；新 Resolver 经 monkeypatch 注入绕 SINGLETON 缓存使 lambda 真跑）。"""
     import src.domain.ports.resolver as resolver_module
-    from src.composition_root import _wire_agent_tracing
+    from src.infrastructure.config.agent_tracing import wire_agent_tracing
 
     _reset_global_tracing()  # 负路径前提（场景序中直构步骤已 set 全局——前置复位）
     monkeypatch.delenv("PHOENIX_TRACING_ENABLED", raising=False)
@@ -1218,7 +1218,7 @@ def when_wire_unit_with_bad_config(
     fresh_resolver = resolver_module.Resolver()
     monkeypatch.setattr(resolver_module, "get_resolver", lambda: fresh_resolver)
     with caplog.at_level(logging.WARNING):
-        _wire_agent_tracing()  # 不抛（DC-7 旁路哲学——try 罩住 resolve + isinstance + initialize）
+        wire_agent_tracing()  # 不抛（DC-7 旁路哲学——try 罩住 resolve + isinstance + initialize）
     context["wire_warning_records"] = [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
@@ -1226,7 +1226,7 @@ def when_wire_unit_with_bad_config(
 def then_wire_warning_degraded(context: dict[str, Any]) -> None:
     """负路径断言：warning 有记录 + 全局未 set（配置 typo 只损失观测面）。"""
 
-    assert context["wire_warning_records"], "_wire_agent_tracing 应 logger.warning 降级（不静默）"
+    assert context["wire_warning_records"], "wire_agent_tracing 应 logger.warning 降级（不静默）"
     assert _is_proxy_global(), "负路径不应 set 全局"
 
 

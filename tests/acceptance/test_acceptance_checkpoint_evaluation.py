@@ -1447,8 +1447,8 @@ def given_composition_root_loaded(context: dict[str, Any]) -> None:
 @when("检查 agent_checkpoint 端口注册与 use case 工厂第八依赖接线")
 def when_check_port_registration_and_factory_wiring(context: dict[str, Any]) -> None:
     """注册与接线检查（含 CR1-DF2 降级防护——未注册形态 resolve_optional None）。"""
-    from src.composition_root import _build_agent_workflow_use_case
     from src.domain.ports.registry import _global_registry
+    from src.infrastructure.config.agent_workflow import build_agent_workflow_use_case
 
     context["checkpoint_spec"] = _global_registry.get("agent_checkpoint")
 
@@ -1461,7 +1461,7 @@ def when_check_port_registration_and_factory_wiring(context: dict[str, Any]) -> 
         def resolve_optional(self, name: str) -> Any:
             return None
 
-    degraded_use_case = _build_agent_workflow_use_case(_UnregisteredCheckpointResolver())
+    degraded_use_case = build_agent_workflow_use_case(_UnregisteredCheckpointResolver())
     context["degraded_use_case"] = degraded_use_case
 
 
@@ -1877,7 +1877,9 @@ def then_src_completion_anchors(context: dict[str, Any]) -> None:
 
     composition_source = (REPO_ROOT / "src/composition_root.py").read_text(encoding="utf-8")
     assert 'name="agent_checkpoint"' in composition_source, "组合根应有 agent_checkpoint 注册区段"
-    assert 'resolve_optional("agent_checkpoint")' in composition_source, "use case 工厂应有第八依赖接线"
+    # use case 工厂已迁 infrastructure/config/agent_workflow.py（组合根零私有函数纪律——2026-10-31 用户裁定）
+    workflow_factory_source = (REPO_ROOT / "src/infrastructure/config/agent_workflow.py").read_text(encoding="utf-8")
+    assert 'resolve_optional("agent_checkpoint")' in workflow_factory_source, "use case 工厂应有第八依赖接线"
 
     ports_init_source = (REPO_ROOT / "src/application/ports/__init__.py").read_text(encoding="utf-8")
     assert "AgentCheckpointPort" in ports_init_source, "ports __init__ 应导出 AgentCheckpointPort"

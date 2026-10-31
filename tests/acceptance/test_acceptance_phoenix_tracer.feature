@@ -106,7 +106,7 @@
     并且 resolve 实例 isinstance AgentTracingPort 且 resolve 无全局副作用
     当 场景内直构 PhoenixTracer（monkeypatch 环境启用追踪）并 initialize
     那么 initialize 返回 True（lambda 同构语义传导）
-    当 直调 _wire_agent_tracing 接线单元且采样配置非法（PHOENIX_TRACES_SAMPLER_ARG 为 0）
+    当 直调 wire_agent_tracing 接线单元且采样配置非法（PHOENIX_TRACES_SAMPLER_ARG 为 0）
     那么 记录 warning 降级跳过且不抛出（DC-7 旁路哲学）
 
   场景: AC-4.2 - 架构静态扫描（AST 三验证器与 domain 零触碰）

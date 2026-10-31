@@ -1264,8 +1264,8 @@ def given_composition_root_loaded(context: dict[str, Any]) -> None:
 @when("检查 agent_drift 端口注册与 use case 工厂接线")
 def when_check_port_registration_and_factory_wiring(context: dict[str, Any]) -> None:
     """注册与接线检查（含 CR1-DF2 降级防护——未注册形态 resolve_optional None）。"""
-    from src.composition_root import _build_agent_workflow_use_case
     from src.domain.ports.registry import _global_registry
+    from src.infrastructure.config.agent_workflow import build_agent_workflow_use_case
 
     context["drift_spec"] = _global_registry.get("agent_drift")
 
@@ -1278,7 +1278,7 @@ def when_check_port_registration_and_factory_wiring(context: dict[str, Any]) -> 
         def resolve_optional(self, name: str) -> Any:
             return None
 
-    degraded_use_case = _build_agent_workflow_use_case(_UnregisteredDriftResolver())
+    degraded_use_case = build_agent_workflow_use_case(_UnregisteredDriftResolver())
     context["degraded_use_case"] = degraded_use_case
 
 
@@ -1700,7 +1700,9 @@ def then_src_completion_anchors(context: dict[str, Any]) -> None:
 
     composition_source = (REPO_ROOT / "src/composition_root.py").read_text(encoding="utf-8")
     assert 'name="agent_drift"' in composition_source, "组合根应有 agent_drift 注册区段"
-    assert 'resolve_optional("agent_drift")' in composition_source, "use case 工厂应有第七依赖接线"
+    # use case 工厂已迁 infrastructure/config/agent_workflow.py（组合根零私有函数纪律——2026-10-31 用户裁定）
+    workflow_factory_source = (REPO_ROOT / "src/infrastructure/config/agent_workflow.py").read_text(encoding="utf-8")
+    assert 'resolve_optional("agent_drift")' in workflow_factory_source, "use case 工厂应有第七依赖接线"
 
 
 @then("tests 四目录完成清单断言通过（十件新建 + 断言同步 ×5 + expected_types 伴随更新）")

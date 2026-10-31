@@ -106,14 +106,14 @@ class TestValidatorAThirdPartyWhitelist:
 class TestValidatorBInstantiationAndDependencies:
     """组合根外零实例化 + SAP 异常定义点收窄 + events 零触碰 + 依赖方向单向。"""
 
-    def test_inprocess_sap_bus_instantiation_only_in_composition_root(self) -> None:
-        """InProcessSAPBus 构造点仅 composition_root.py（组合根唯一注册纪律）。"""
+    def test_inprocess_sap_bus_instantiation_only_in_bus_module(self) -> None:
+        """InProcessSAPBus 构造点仅 interfaces/sap/bus.py（实现域工厂单一真源——组合根零私有函数纪律）."""
         sites = _scan_instantiation_sites("InProcessSAPBus")
         src_sites = [s for s in sites if not s.startswith("tests/")]
-        assert all(s.startswith("src/composition_root.py") for s in src_sites), (
-            f"组合根外出现 InProcessSAPBus 实例化: {src_sites}"
+        assert all(s.startswith("src/interfaces/sap/bus.py") for s in src_sites), (
+            f"bus.py 外出现 InProcessSAPBus 实例化: {src_sites}"
         )
-        assert src_sites, "composition_root.py 应至少一处实例化（_build_sap_bus 工厂）"
+        assert src_sites, "src/interfaces/sap/bus.py 应至少一处实例化（build_sap_bus 工厂）"
 
     @pytest.mark.parametrize(
         "exception_class",
