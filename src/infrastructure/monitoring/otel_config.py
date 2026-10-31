@@ -317,6 +317,13 @@ def reset_for_testing() -> None:
 
     ⚠️ 仅用于测试环境，生产环境禁止调用
     H-04 修复: 同时重置 OpenTelemetry SDK 内部的全局状态
+
+    双复位（Epic 5 遗留项核销 R1 批 K2——修复原单复位在 OTel 1.44.0 Once
+    闩锁下不恢复 re-set 能力的缺陷，模板=phoenix_tracer.reset_for_testing
+    同款）：仅复位 ``trace._TRACER_PROVIDER`` 变量时，后续 ``set_tracer_provider``
+    经 ``_TRACER_PROVIDER_SET_ONCE.do_once`` 闩锁被静默忽略（安装源码
+    opentelemetry/trace/__init__.py 实证——首次 set 消费 Once 后 do_once
+    永返 False）——必须同时重建 Once 实例才能恢复同进程 re-init 能力。
     """
     global _initialized, _tracer_provider, _failed
 
@@ -330,10 +337,17 @@ def reset_for_testing() -> None:
     _failed = False
     _tracer_provider = None
 
-    # 重置 OpenTelemetry 内部全局状态，允许后续重新初始化
+    # 重置 OpenTelemetry 内部全局状态（双复位），允许后续重新初始化
     try:
         from opentelemetry import trace
 
         trace._TRACER_PROVIDER = None  # 测试隔离必需（opentelemetry 内部状态复位）
-    except (ImportError, AttributeError):
-        pass
+        # 第二腿：Once 闩锁重建——不重建则同进程后续 set_tracer_provider
+        # 被 do_once 静默忽略（1.44.0 实证；防御告警对齐 phoenix_tracer 先例）
+        from opentelemetry.util._once import Once
+
+        trace._TRACER_PROVIDER_SET_ONCE = Once()
+    except ImportError:
+        logger.warning("OTel Once 类型导入失败——闩锁重建跳过（re-set 能力可能不恢复）")
+    except AttributeError:
+        logger.warning("OTel 内部状态属性缺失——复位部分跳过（非 1.44.0 形态）")

@@ -249,25 +249,28 @@ class OpenTelemetryTracer:
             yield None
             return
 
+        # 装配段（import + tracer 解析）——try 只罩本段；消费方 with 体内异常
+        # 经下方 with 的 __exit__ 后原样穿透（Epic 5 遗留项核销 R1 批 K1——
+        # 修复原「yield 罩在 except 内」吞消费方异常缺陷，模板=phoenix_tracer
+        # create_span 同款形态：两 yield 出口均在 try 外）
         try:
             from opentelemetry import trace
 
             tracer = trace.get_tracer("sisys-event-bus")
-            with tracer.start_as_current_span(span_name) as span:
-                if event_id:
-                    span.set_attribute("event.id", event_id)
-                if event_type:
-                    span.set_attribute("event.type", event_type)
-                if status:
-                    span.set_attribute("event.status", status)
-                if duration > 0:
-                    span.set_attribute("event.duration_seconds", duration)
-                yield span
         except ImportError:
             logger.warning("OpenTelemetry not installed, tracing disabled")
             self.enabled = False
             self._initialized = False
             yield None
-        except Exception as e:
-            logger.error("Error creating OpenTelemetry span: %s", e)
-            yield None
+            return
+
+        with tracer.start_as_current_span(span_name) as span:
+            if event_id:
+                span.set_attribute("event.id", event_id)
+            if event_type:
+                span.set_attribute("event.type", event_type)
+            if status:
+                span.set_attribute("event.status", status)
+            if duration > 0:
+                span.set_attribute("event.duration_seconds", duration)
+            yield span

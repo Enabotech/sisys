@@ -17,12 +17,16 @@ shutdown L277 先例）；create_span 降级骨架同构 event_metrics（L227-27
 消费方在 with 体内抛出的业务异常被吞并替换为 RuntimeError；本类 try 只罩
 tracer 解析段，yield 两个出口（None 降级/真 span）均在 try 外，消费方异常
 原样穿透——OTel use_span __exit__ 兜底 record_exception + set ERROR）。
+（核销注记 2026-10-31：⑤ 所述 event_metrics 模板缺陷本体已随 Epic 5
+遗留项核销 R1 批 K1 修复——本类自 R1-F1 起即为正形）。
 
 reset_for_testing 双复位是本模块对既有先例的必要增强（非照抄）：锁定的
 OTel 1.44.0 全局 set 受 Once 闩锁（trace._TRACER_PROVIDER_SET_ONCE）约束，
 otel_config.reset_for_testing 单复位形态（仅 trace._TRACER_PROVIDER = None）
 不恢复 re-set 能力——同进程后续 set 仍被静默忽略；双复位 = 变量复位 +
 Once 闩锁重建（主会话探针实证此形态 re-set 恢复工作）。
+（核销注记 2026-10-31：otel_config 单复位缺陷本体已随核销 R1 批 K2 升级
+双复位——模块间形态已对齐）。
 
 OTel 全局状态治理（DC-5）：生产面全局 set_tracer_provider 的唯一通道 =
 本类 initialize()（默认配置下唯一激活 setter——otel_config.init 是 env 门控

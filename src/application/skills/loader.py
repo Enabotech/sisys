@@ -132,6 +132,12 @@ class InMemorySkillLoader(SkillLoaderPort):
             if not match:
                 continue
             slug = match.group(1)
+            # 表头行过滤（Epic 5 遗留项核销 R1 批 K4——原三跳过条件拦不住
+            # TOOLS.md 表头 `| slug | tool_name | ...`，pattern 捕获首列 'slug'
+            # 产幽灵条目 slug='slug'/status='active' 污染 L1 缓存 24 vs 23；
+            # 真实工具 slug 不可能为裸 'slug'，单签名过滤已足）
+            if slug == "slug":
+                continue
             try:
                 meta = self._parse_table_row(stripped)
             except (IndexError, ValueError) as exc:

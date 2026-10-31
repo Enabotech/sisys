@@ -175,6 +175,28 @@ class TestOpenTelemetryTrace:
             # When it works, span would be a real span object
             pass  # Context manager should enter and exit cleanly
 
+    def test_create_span_consumer_exception_propagates(self):
+        """消费方 with 体内异常必须原样穿透（核销 R1 批 K1 回归锁）.
+
+        修复前缺陷形态：yield 罩在 except Exception 内——消费方异常经
+        gen.throw 被 except 捕获后二次 yield None，原异常被替换为
+        contextlib 的 RuntimeError("generator didn't stop after throw()")。
+        探针异常用自定义类，与替换形态 RuntimeError 严格区分。
+        """
+        import pytest
+
+        from src.infrastructure.monitoring.event_metrics import OpenTelemetryTracer
+
+        class _ProbeError(Exception):
+            """穿透探针异常（自定义类——与 RuntimeError 替换形态可区分）."""
+
+        tracer = OpenTelemetryTracer()
+        tracer.enabled = True
+
+        with pytest.raises(_ProbeError):
+            with tracer.create_span("test-span") as _span:
+                raise _ProbeError("consumer failure must propagate")
+
 
 # ============================================================================
 # TDD Cycle D: OTLP 导出器配置 (Task 5.4)

@@ -76,7 +76,7 @@ class ValidityRequest(BaseModel):
         """强制 timezone-aware（UTC），非 UTC 时区自动转换为 UTC"""
         if v is not None:
             if v.tzinfo is None:
-                raise ValueError("valid_from/valid_until must be timezone-aware (UTC)")
+                raise AssertionError("valid_from/valid_until must be timezone-aware (UTC)")
             if v.utcoffset() is not None and v.utcoffset() != timedelta(0):
                 return v.astimezone(UTC)
         return v
@@ -86,7 +86,7 @@ class ValidityRequest(BaseModel):
         """当两者均非 None 时校验 valid_from <= valid_until"""
         if self.valid_from is not None and self.valid_until is not None:
             if self.valid_from > self.valid_until:
-                raise ValueError("valid_from must be before or equal to valid_until")
+                raise AssertionError("valid_from must be before or equal to valid_until")
         return self
 
 

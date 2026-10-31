@@ -130,7 +130,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
 
         except Exception as e:
             logger.error("Failed to save snapshot: session_id=%s error=%s", snapshot.session_id, e)
-            raise StorageError(f"Failed to save snapshot: {e}") from e
+            raise StorageError(f"Failed to save snapshot: {e}", cause=e) from e
 
     async def load(self, session_id: str) -> CheckpointSnapshot | None:
         """加载会话的最新快照
@@ -180,7 +180,7 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
 
         except Exception as e:
             logger.error("Failed to delete snapshot: session_id=%s error=%s", session_id, e)
-            raise StorageError(f"Failed to delete snapshot: {e}") from e
+            raise StorageError(f"Failed to delete snapshot: {e}", cause=e) from e
 
     async def exists(self, session_id: str) -> bool:
         """检查快照是否存在

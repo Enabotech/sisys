@@ -70,7 +70,7 @@ class PostgreSQLSchemaValidationRecordRepository(PostgreSQLAdapter[SchemaValidat
         violations_data: list[dict[str, Any]] = model.violations or []
         violations = tuple(self._deserialize_violation(v) for v in violations_data)
         # validation_phase 严格校验(防 DB 漂移 + CHECK 约束兜底)
-        # 遵守 CLAUDE.md §5 红线(禁止 raise ValueError),改用 EntityValidationError (EXCEPTION_242)
+        # 遵守 CLAUDE.md §5 红线（禁用内建 ValueError 抛出形态），改用 EntityValidationError（EXCEPTION_242）
         if model.validation_phase not in _VALID_PHASES:
             raise EntityValidationError(
                 message=(

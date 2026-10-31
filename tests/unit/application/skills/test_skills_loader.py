@@ -88,6 +88,22 @@ class TestSkillManifestExtended:
     def test_get_all_slugs_returns_23(self) -> None:
         assert len(get_all_slugs()) == 23
 
+    def test_l1_cache_excludes_header_ghost(self) -> None:
+        """L1 元数据缓存与 manifest 静态清单对钉——无表头幽灵条目（核销 R1 批 K4 回归锁）.
+
+        修复前缺陷形态：TOOLS.md 表头行 `| slug | tool_name | ...` 被
+        _TABLE_ROW_PATTERN 解析为数据条目——缓存 24 条（manifest 23 + ghost
+        slug='slug'/status='active'）。get_all_slugs 是 skill_manifest 静态
+        真源（非缓存派生），本断言对两源对钉：修复前 24 != 23 红、修复后绿。
+        """
+        from src.application.skills.loader import InMemorySkillLoader
+
+        loader = InMemorySkillLoader()
+        cache_keys = set(loader._metadata_cache.keys())
+
+        assert len(loader._metadata_cache) == len(get_all_slugs())
+        assert "slug" not in cache_keys, "表头幽灵条目（slug='slug'）不应进入 L1 缓存"
+
     def test_get_slugs_by_category_environment(self) -> None:
         slugs = get_slugs_by_category("environment_analysis")
         assert "pestel-analysis" in slugs
