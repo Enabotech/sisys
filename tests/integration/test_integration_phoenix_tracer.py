@@ -9,8 +9,9 @@
 ⑤ eval/drift 四键通道写入实证（组件级注入通道）
 ⑥ span 记录 P95<5ms（_PERF_CACHE 委托——注入通道，验收 AC-5.1 同缓存）
 ⑦ 追踪开销<1%（块序钉死：t_untraced×5 → 一次性 initialize → t_traced×5；
-  fail-once 链 7 次 structured × 20ms → t_untraced≈140ms、span 恰 10/轮、
-  预算 1.4ms、t_untraced 下限守卫 0.13s、正向锚 traced 计数 50）
+  fail-once 链 span 恰 10/轮、正向锚 traced 计数 50；开销采样专属延迟
+  OVERHEAD_SAMPLING_DELAY_SEC=0.15[核销 K7 重标定——实测 ~13 次 sleep/轮 →
+  t_untraced≈1.95s、预算≈20ms、5.3σ 噪声裕量]、下限守卫 1.5s）
 ⑧ trace_id 贯通（span hex == ExecutionContext.trace_id；NoOp 全零）
 
 通道分派（SSOT）：①②③④⑦⑧ 经 initialize 全局通道（autouse 前置双复位 +
@@ -42,6 +43,15 @@ SPAN_RECORD_P95_LIMIT_SECONDS = 0.005
 #: t_untraced ≈ 0.14s 确定性量级、span 恰 10/轮、1% 预算 ≈ 1.4ms）
 FAKE_LLM_DELAY_SEC = 0.02
 
+#: 场景⑦开销采样专属延迟（核销 R2 批 K7——分母噪声根治：实测每轮 fail-once
+#: 链约 13 次 LLM sleep，0.02 时 t_untraced≈0.29s、1% 预算≈2.9ms 小于 ±20ms
+#: 调度噪声（结构性 flaky——CI 曾两轮复测仍超标）；改传 0.15 → t_untraced≈
+#: 1.95s、预算≈20ms、实测 ratio 极差 [-0.31%, +0.10%]（5.3σ 裕量；负载下
+#: 共模抵消更稳）。0.15 每相位比 20ms 更代表真实 LLM 百 ms~秒级形态——分母
+#: 放大是测量稳定化非放水（阈值 1% 与两轮复测机制零改动）。场景 1-6 仍走
+#: L43 模块常量（等比依赖勿动））
+OVERHEAD_SAMPLING_DELAY_SEC = 0.15
+
 #: 采样规格（warmup 1 + 20 采样——5-4/5-5/5-6 委托模式同款形态）
 SPAN_RECORD_WARMUP_ROUNDS = 1
 SPAN_RECORD_SAMPLE_ROUNDS = 20
@@ -56,9 +66,11 @@ FAIL_ONCE_SPAN_COUNT = 10
 #: traced 块正向锚（10 span × 5 轮——防 traced 轮静默降级假绿）
 TRACED_BLOCK_SPAN_COUNT = 50
 
-#: t_untraced 基准下限守卫（秒——fail-once 链 ~0.14s 标定留抖动余量，防链
-#: 被意外加速导致开销比分母失真）
-UNTRACED_BASELINE_MIN_SECONDS = 0.13
+#: t_untraced 基准下限守卫（秒——核销 R2 批 K7 重标定：场景⑦改传
+#: OVERHEAD_SAMPLING_DELAY_SEC=0.15 后理论地板≈13×0.15≈1.95s（asyncio.sleep
+#: 不欠睡），取 1.5 拦「调用量减半至 <10 次」的分母腰斩形态[0.8 拦不住]；
+#: 常量名禁改——tests/acceptance/test_acceptance_phoenix_tracer.py 按名 import）
+UNTRACED_BASELINE_MIN_SECONDS = 1.5
 
 #: 采样缓存（模块级单槽——集成场景⑥⑦与验收 AC-5.1/5.2 共享同批结果，
 #: 同 xdist_group 同 worker 串行保证缓存命中；禁采样双跑）
@@ -648,7 +660,7 @@ async def sample_tracing_overhead(force_refresh: bool = False) -> dict[str, Any]
     _reset_global()  # 前提自包含（R1-F4'——复测可重入的必要条件）
 
     async def _timed_round() -> float:
-        chain = await _assemble_chain(verify_mode="fail_once", delay_sec=FAKE_LLM_DELAY_SEC)
+        chain = await _assemble_chain(verify_mode="fail_once", delay_sec=OVERHEAD_SAMPLING_DELAY_SEC)
         started = time.perf_counter()
         result, error = await _run_chain(chain)
         elapsed = time.perf_counter() - started

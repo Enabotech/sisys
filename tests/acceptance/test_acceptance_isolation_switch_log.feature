@@ -149,7 +149,6 @@
     并且 切换日志已直构落库一条（fallback 独立会话 commit——生产 CLI 真实形态）
     当 进程内执行 isolation-logs 命令（CLI fallback 全链）
     那么 退出码为 0 且 stdout 含等级与原因行
-    并且 造数行清理零残留（superuser 连接 DELETE——非绕过环境跳过）
 
   场景: AC-6.3 - 架构合规静态扫描
     当 扫描 domain 实体与端口文件 import

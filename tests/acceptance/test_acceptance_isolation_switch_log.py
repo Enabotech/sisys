@@ -55,6 +55,7 @@ Run with:
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import subprocess
 import uuid
@@ -67,6 +68,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 
 from src.infrastructure.storage.redis.key_builder import build_key
 
+logger = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src"
 
@@ -173,6 +175,51 @@ def context(
             key = build_key(namespace, str(agent_id))
             assert not _run_async(event_loop, redis_client.exists(key)), f"自产键未清理: {key}"
     _run_async(event_loop, redis_client.close())
+    # teardown ③（核销 R2 批 K8——原独立尾随 then 步迁移）：AC-6.2 CLI 造数行
+    # 清理。fixture teardown 恒执行（pytest-bdd 步骤断言失败即中断其后步骤——
+    # 挂 then 步形态断言失败即跳过清理留残留）；键门控（cli_log_id 缺席即本场景
+    # 无造数）；非 superuser 环境 warning 容忍（teardown 语境禁 skip——追加型
+    # 审计表取舍与 superuser 绕 RLS 语义维持原状）
+    if ctx.get("cli_log_id") is not None:
+        if not ctx.get("cli_superuser", False):
+            logger.warning("CLI 造数行跳过清理（非 superuser——RLS deny DELETE 不可绕）: log_id=%s", ctx["cli_log_id"])
+        else:
+            from sqlalchemy import text as _text
+            from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+
+            from src.infrastructure.config.postgresql import PostgreSQLConfig
+            from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+            from tests.environments import get_test_env
+
+            env_cfg = get_test_env().postgres
+            _manager = PostgreSQLManager(
+                PostgreSQLConfig(
+                    host=env_cfg.host,
+                    port=env_cfg.port,
+                    database=env_cfg.database,
+                    username=env_cfg.username,
+                    password=env_cfg.password,
+                )
+            )
+            _cleanup_session = _AsyncSession(_manager.get_async_engine())
+            _run_async(
+                event_loop,
+                _cleanup_session.execute(
+                    _text("DELETE FROM isolation_switch_logs WHERE log_id = :lid"),
+                    {"lid": str(ctx["cli_log_id"])},
+                ),
+            )
+            _run_async(event_loop, _cleanup_session.commit())
+            _remain = _run_async(
+                event_loop,
+                _cleanup_session.execute(
+                    _text("SELECT COUNT(*) FROM isolation_switch_logs WHERE log_id = :lid"),
+                    {"lid": str(ctx["cli_log_id"])},
+                ),
+            ).scalar()
+            _run_async(event_loop, _cleanup_session.close())
+            _run_async(event_loop, _manager.get_async_engine().dispose())
+            assert _remain == 0, "CLI 造数行未清理"
 
 
 def _ensure_pg_session(context: dict[str, Any]) -> dict[str, Any]:
@@ -1685,49 +1732,6 @@ def then_cli_exit_zero_with_output(context: dict[str, Any]) -> None:
     out = context["cli_stdout"]
     assert "L4" in out and "L3" in out, f"stdout 缺等级行: {out!r}"
     assert "CLI 检索验证原因" in out, f"stdout 缺原因: {out!r}"
-
-
-@then("造数行清理零残留（superuser 连接 DELETE——非绕过环境跳过）")
-def then_cli_seed_cleaned(context: dict[str, Any]) -> None:
-    """造数行清理（superuser 绕过 RLS deny DELETE——非绕过环境本步骤 skip）."""
-    from sqlalchemy import text
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from src.infrastructure.config.postgresql import PostgreSQLConfig
-    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
-    from tests.environments import get_test_env
-
-    if not context.get("cli_superuser", False):
-        pytest.skip("CLI 造数清理需 superuser 连接（RLS deny DELETE 对普通角色不设防例外）")
-    env = get_test_env().postgres
-    manager = PostgreSQLManager(
-        PostgreSQLConfig(
-            host=env.host,
-            port=env.port,
-            database=env.database,
-            username=env.username,
-            password=env.password,
-        )
-    )
-    session = AsyncSession(manager.get_async_engine())
-    _run_async(
-        context["_loop"],
-        session.execute(
-            text("DELETE FROM isolation_switch_logs WHERE log_id = :lid"),
-            {"lid": str(context["cli_log_id"])},
-        ),
-    )
-    _run_async(context["_loop"], session.commit())
-    remain = _run_async(
-        context["_loop"],
-        session.execute(
-            text("SELECT COUNT(*) FROM isolation_switch_logs WHERE log_id = :lid"),
-            {"lid": str(context["cli_log_id"])},
-        ),
-    ).scalar()
-    _run_async(context["_loop"], session.close())
-    _run_async(context["_loop"], manager.get_async_engine().dispose())
-    assert remain == 0, "CLI 造数行未清理"
 
 
 @when("扫描 domain 实体与端口文件 import")

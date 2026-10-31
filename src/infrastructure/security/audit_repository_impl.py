@@ -6,12 +6,13 @@ Session 通过 ContextVar 由 middleware 或 test fixture 提供，无需构造�
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.ports.audit_repository import (
     AuditRepositoryPort,
@@ -19,7 +20,9 @@ from src.domain.ports.audit_repository import (
     AuditSearchResult,
 )
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-from src.infrastructure.storage.postgresql.session_context import get_session
+from src.infrastructure.storage.postgresql.session_context import get_session, session_context
+
+logger = logging.getLogger(__name__)
 
 
 class AuditRepository(AuditRepositoryPort):
@@ -27,7 +30,20 @@ class AuditRepository(AuditRepositoryPort):
 
     Attributes:
         _session: 通过 ContextVar 获取的 SQLAlchemy 异步会话
+        _session_factory: fallback 独立会话工厂（CLI/后台路径——save 专用；
+            None 时无 ContextVar session 则 RuntimeError 上抛，配置缺失显式失败）
     """
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
+        """构造器.
+
+        Args:
+            session_factory: fallback 独立会话工厂（isolation_switch_log_repository
+                DC-5 双模式同款——CLI set-isolation 路径无 ContextVar session 时
+                经工厂走独立会话 commit，消除 MVP 唯一运行通道的 audit 联动
+                结构性 100% 降级[核销 R2 批 K10]）。
+        """
+        self._session_factory = session_factory
 
     @property
     def _session(self) -> AsyncSession:
@@ -74,8 +90,24 @@ class AuditRepository(AuditRepositoryPort):
             archived_at=archived_at,
         )
 
-        self._session.add(audit_log)
-        await self._session.flush()
+        # 双模式写入（核销 R2 批 K10——isolation_switch_log_repository DC-5 模板）：
+        # 请求路径（ContextVar session）add+flush 随主事务；CLI/后台路径无请求
+        # session 时经注入工厂走独立会话 commit。只修 save（CLI 可达面——其余
+        # 四方法消费方均为 HTTP 路由，middleware 恒有 session）。
+        try:
+            session = get_session()
+        except RuntimeError:
+            if self._session_factory is None:
+                raise
+            async with session_context(self._session_factory):
+                independent = get_session()
+                independent.add(audit_log)
+                await independent.flush()
+            logger.info("审计日志经独立会话落库（CLI/后台路径 fallback）: log_id=%s", log_id)
+            return log_id
+
+        session.add(audit_log)
+        await session.flush()
         return log_id
 
     async def get_by_id(self, log_id: UUID) -> dict[str, Any] | None:

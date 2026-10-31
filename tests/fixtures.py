@@ -375,7 +375,12 @@ def resolver() -> Resolver:
 
     注意:
         - 此 fixture 依赖 session 级 bootstrap() fixture（conftest.py）
-        - 获取的是全局单例实例
+        - 每次返回**独立实例缓存**的 Resolver（注册表全局共享、实例缓存隔离）
+          ——刻意取舍非缺陷：函数级场景与 clear_singleton 的全局缓存互相
+          隔离，异步客户端（Redis 连接池等）不跨场景/跨事件循环复用
+          （"Event loop is closed" 失败类的隐形防线）；契约测试域的
+          get_resolver() 统一化（F6/K14）与本 fixture 的隔离形态是两域
+          分述——验收场景级隔离优先
         - 如需覆盖默认实现，传入 overrides 参数
     """
     from src.domain.ports.resolver import Resolver

@@ -276,3 +276,66 @@ class TestAuditRepository:
         assert isinstance(result, AuditSearchResult)
         assert result.offset == 5
         assert result.limit == 10
+
+
+def _make_audit_data() -> dict[str, str]:
+    """构造最小合法审计数据（fallback 路径测试用——save 从 dict 提取字段）。"""
+    return {
+        "log_id": str(uuid4()),
+        "timestamp": datetime.now(UTC).isoformat(),
+        "actor": "agent:test",
+        "action_type": "isolation:switch",
+    }
+
+
+class TestSaveFallbackPath:
+    """save 双模式分派——fallback 路径（核销 R2 批 K10 回归锁）.
+
+    CLI set-isolation 路径无 ContextVar session → RuntimeError → 注入工厂
+    走独立会话 commit（isolation_switch_log_repository DC-5 模板同款）；
+    修复前该路径结构性 100% 降级（RuntimeError 被 record 的 except 包
+    AuditError → 服务层 DC-6 降级 warning——audit 联动在 MVP 唯一运行
+    通道永不可达）。
+    """
+
+    def test_save_via_factory_session_commits(self) -> None:
+        """无 ContextVar session: factory 独立会话 add+commit（session_context 编排）。"""
+        import asyncio
+        from unittest import mock
+
+        factory_session = mock.AsyncMock(spec=AsyncSession)
+        factory_session.add = mock.Mock()
+        repo_with_factory = AuditRepository(session_factory=mock.MagicMock(return_value=factory_session))
+
+        asyncio.new_event_loop().run_until_complete(repo_with_factory.save(_make_audit_data()))
+
+        factory_session.add.assert_called_once()
+        factory_session.commit.assert_awaited_once()  # session_context 独立会话 commit
+
+    def test_save_without_factory_reraises_runtime_error(self) -> None:
+        """无 ContextVar 且无 factory: RuntimeError 原样上抛（配置缺失显式失败）。"""
+        import asyncio
+
+        repo_bare = AuditRepository()
+        try:
+            asyncio.new_event_loop().run_until_complete(repo_bare.save(_make_audit_data()))
+            raise AssertionError("预期 RuntimeError 上抛")
+        except RuntimeError:
+            pass  # 无请求 session 且无工厂——显式失败（保持修复前行为）
+
+    def test_save_with_context_session_uses_request_path(self) -> None:
+        """有 ContextVar session: 请求路径 add+flush（不触发工厂——主事务语义）。"""
+        import asyncio
+
+        context_session = mock.AsyncMock(spec=AsyncSession)
+        context_session.add = mock.Mock()
+        token = set_session(context_session)
+        try:
+            factory_probe = mock.MagicMock()
+            repo_request_path = AuditRepository(session_factory=factory_probe)
+            asyncio.new_event_loop().run_until_complete(repo_request_path.save(_make_audit_data()))
+            factory_probe.assert_not_called()  # 请求路径优先——工厂不触发
+            context_session.add.assert_called_once()
+            context_session.flush.assert_awaited_once()
+        finally:
+            reset_session(token)

@@ -258,12 +258,18 @@ def bootstrap() -> None:
         tags=("neo4j", "infrastructure"),
     )
 
+    # l0_storage 工厂 lambda（核销 R2 批 K5——原字符串 impl 缺 fs 层级必炸；
+    # from_env 防裸构陷阱[空 path 落相对路径污染 CWD]；FileMemoryAdapter 实现
+    # 在 storage/fs/，工厂注入形态与 redis_connection_manager 先例同款）
+    from src.infrastructure.config.memory import MemoryConfig
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
+
     register_port(
         name="l0_storage",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=L0StoragePort,
-        impl="src.infrastructure.storage.file_memory_adapter.FileMemoryAdapter",
-        module="src.infrastructure.storage.file_memory_adapter",
+        impl=lambda resolver: FileMemoryAdapter(MemoryConfig.from_env()),
+        module="src.infrastructure.storage.fs.file_memory_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )
@@ -473,11 +479,17 @@ def bootstrap() -> None:
         owner="platform-team",
     )
 
+    # audit_repo 双模式写入（核销 R2 批 K10——CLI set-isolation 路径 audit 联动
+    # 降级修复：session_factory fallback 注入，isolation_switch_log DC-5 同款）
+    from src.infrastructure.security.audit_repository_impl import AuditRepository as _AuditRepoImpl
+
     register_port(
         name="audit_repo",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=AuditRepositoryPort,
-        impl="src.infrastructure.security.audit_repository_impl.AuditRepository",
+        impl=lambda resolver: _AuditRepoImpl(
+            session_factory=resolver.resolve("session_factory"),
+        ),
         module="src.infrastructure.security.audit_repository_impl",
         lifetime=Lifetime.SCOPED,
         owner="compliance-team",
@@ -1101,12 +1113,17 @@ def bootstrap() -> None:
     )
 
     # === Rule 4: Application Port Implementations ===
+    # memory_file_storage 工厂 lambda（核销 R2 批 K5——impl 路径修正 + 懒 resolve
+    # l0_storage 依赖注入；MemoryFileStorage 实现在 storage/fs/）
     register_port(
         name="memory_file_storage",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=MemoryFilePort,
-        impl="src.infrastructure.storage.memory_file_storage.MemoryFileStorage",
-        module="src.infrastructure.storage.memory_file_storage",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.fs.memory_file_storage",
+            fromlist=["MemoryFileStorage"],
+        ).MemoryFileStorage(resolver.resolve("l0_storage")),
+        module="src.infrastructure.storage.fs.memory_file_storage",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )

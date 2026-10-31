@@ -160,6 +160,61 @@ def context(
             key = build_key(namespace, str(agent_id))
             assert not _run_async(event_loop, redis_client.exists(key)), f"自产键未清理: {key}"
     _run_async(event_loop, redis_client.close())
+    # teardown ③（核销 R2 批 K8——原 then 混装步清理段迁移）：CLI set-isolation
+    # 真实链产物的 PG 行清理——isolation_switch_logs 按 agent_id（superuser 绕
+    # RLS deny DELETE）+ audit_log 按 actor（K10 联动：session_factory fallback
+    # 修复后 CLI 路径 audit 联动真实落库；audit_log RLS ENABLE 无 FORCE——表
+    # owner[跑 alembic 的测试用户]可删，owner/superuser 双轨容忍）。fixture
+    # teardown 恒执行（断言失败残留洞闭合）；见 _cli_switch_cleanup_agent_ids
+    # 键才清理（仅 CLI set-isolation 场景登记；删 0 行无害）。
+    cleanup_ids = ctx.get("_cli_switch_cleanup_agent_ids")
+    if cleanup_ids:
+        import logging
+
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        from src.infrastructure.config.postgresql import PostgreSQLConfig
+        from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+        from tests.environments import get_test_env
+
+        env_cfg = get_test_env().postgres
+        manager = PostgreSQLManager(
+            PostgreSQLConfig(
+                host=env_cfg.host,
+                port=env_cfg.port,
+                database=env_cfg.database,
+                username=env_cfg.username,
+                password=env_cfg.password,
+            )
+        )
+        session = AsyncSession(manager.get_async_engine())
+        try:
+            for aid in cleanup_ids:
+                _run_async(
+                    event_loop,
+                    session.execute(
+                        text("DELETE FROM isolation_switch_logs WHERE agent_id = :aid"),
+                        {"aid": aid},
+                    ),
+                )
+                _run_async(
+                    event_loop,
+                    session.execute(
+                        text("DELETE FROM audit_log WHERE actor = :actor"),
+                        {"actor": f"agent:{aid}"},
+                    ),
+                )
+            _run_async(event_loop, session.commit())
+        except Exception:
+            _run_async(event_loop, session.rollback())
+            logging.getLogger(__name__).warning(
+                "CLI set-isolation PG 行清理失败（容忍——owner/superuser 语义双轨）: %s",
+                cleanup_ids,
+            )
+        finally:
+            _run_async(event_loop, session.close())
+            _run_async(event_loop, manager.get_async_engine().dispose())
 
 
 def _instantiate_ceo_agent(context: dict[str, Any]) -> None:
@@ -1116,7 +1171,13 @@ def then_cli_exit0_l4_summary(context: dict[str, Any]) -> None:
 
 @when(parsers.parse('执行 CLI set-isolation 切换到 "{level}" 原因 "{reason}"'))
 def when_cli_set_isolation(context: dict[str, Any], level: str, reason: str, capsys: pytest.CaptureFixture[str]) -> None:
-    """set-isolation（成功/L1/L9 共用——446 双路径经统一异常出口）。"""
+    """set-isolation（成功/L1/L9 共用——446 双路径经统一异常出口）。
+
+    登记清理键（核销 R2 批 K8——真实链成功切换产生 isolation_switch_logs 行
+    [fallback commit] 与 audit_log 行[K10 修复后联动真实落库]，teardown 见键
+    才清理；拒绝路径零行——删 0 行无害）。
+    """
+    context.setdefault("_cli_switch_cleanup_agent_ids", []).append(str(context["agent_id"]))
     _run_cli(
         context,
         [
@@ -1134,67 +1195,13 @@ def when_cli_set_isolation(context: dict[str, Any], level: str, reason: str, cap
 
 @then("CLI 退出码为 0 且输出切换摘要 L4 到 L3")
 def then_cli_exit0_switch_summary(context: dict[str, Any]) -> None:
-    """set-isolation 切换摘要（previous -> target）+ 日志行自包含清理。
+    """set-isolation 切换摘要断言（previous -> target）.
 
-    Story 5.6 回归面义务: set-isolation 成功路径经组合根真实六依赖链 audit-first
-    写 isolation_switch_logs（fallback 独立会话 commit——非测试事务，需本场景
-    自行清理）。log_id 在服务内 from_event 自铸不可知——按 agent_id 粒度清理
-    （场景恰一次成功切换恰一行）；superuser 连接绕过 RLS deny DELETE，非
-    superuser 环境容忍残留并注记（追加型审计表，5-6 AC-6.2 同款取舍）。
+    日志行自包含清理已迁 context fixture teardown（核销 R2 批 K8——断言失败
+    即中断其后清理的残留洞闭合；清理见 teardown 注记）。
     """
-    import logging
-
     assert context["cli_exit_code"] == 0
     assert "L4 -> L3" in context["cli_captured"].out, "切换摘要须含 L4 -> L3"
-
-    from sqlalchemy import text
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from src.infrastructure.config.postgresql import PostgreSQLConfig
-    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
-    from tests.environments import get_test_env
-
-    env = get_test_env().postgres
-    manager = PostgreSQLManager(
-        PostgreSQLConfig(
-            host=env.host,
-            port=env.port,
-            database=env.database,
-            username=env.username,
-            password=env.password,
-        )
-    )
-    session = AsyncSession(manager.get_async_engine())
-    try:
-        probe = _run_async(
-            context["_loop"],
-            session.execute(text("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")),
-        ).fetchone()
-        if not (probe and probe[0]):
-            logging.getLogger(__name__).warning(
-                "非 superuser 连接无法清理 set-isolation 日志行（RLS deny DELETE）——容忍残留: agent_id=%s",
-                context["agent_id"],
-            )
-            return
-        _run_async(
-            context["_loop"],
-            session.execute(
-                text("DELETE FROM isolation_switch_logs WHERE agent_id = :aid"),
-                {"aid": str(context["agent_id"])},
-            ),
-        )
-        _run_async(context["_loop"], session.commit())
-        remain = _run_async(
-            context["_loop"],
-            session.execute(
-                text("SELECT COUNT(*) FROM isolation_switch_logs WHERE agent_id = :aid"),
-                {"aid": str(context["agent_id"])},
-            ),
-        ).scalar()
-        assert remain == 0, f"set-isolation 日志行清理后仍有残留 {remain} 行（agent_id={context['agent_id']}）"
-    finally:
-        _run_async(context["_loop"], session.close())
-        _run_async(context["_loop"], manager.get_async_engine().dispose())
 
 
 @then("CLI 退出码为 0 且输出 L3 等级")
