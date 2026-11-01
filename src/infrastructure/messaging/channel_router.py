@@ -270,6 +270,19 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="战略偏差警告",
         ),
+        # BLM 规划事件（Story 6-1——reliable 单通道，AgentDecided 配置先例）
+        "PlanningStarted": ChannelMapping(
+            event_type="PlanningStarted",
+            rabbitmq_routing_key="sisys.events.reliable.planning_started",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="BLM规划启动",
+        ),
+        "BlmStageCompleted": ChannelMapping(
+            event_type="BlmStageCompleted",
+            rabbitmq_routing_key="sisys.events.reliable.blm_stage_completed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="BLM阶段完成",
+        ),
         "DriftDetected": ChannelMapping(
             event_type="DriftDetected",
             rabbitmq_routing_key="sisys.events.reliable.drift_detected",

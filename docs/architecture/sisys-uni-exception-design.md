@@ -749,6 +749,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_463~469 | （预留 sap 子域）| — | — |（后续 SAP 协议域异常如需新码在此段取）|
 | EXCEPTION_470 | FinancialCalculationError | BusinessException | 422 |（Story 5.12，财务计算失败——DCF 数值求解失败双路径（V1 实际触发面：①IRR bracket 端点同号等病态输入 ②NPV=0 时 terminal_value_weight 分母为零[盈亏平衡精确抵消输入——代码审查 CR1-1 补充路径]，均 fail-loud 显式报错而非静默返回 None——Excel #NUM! 类比参照非逐字对齐）；context 双键={method, detail}——method ∈ {dcf, comparable, precedent} 闭集语义但 docstring 约定非闭集校验（诊断标注面与 SAPBusStateError reason 协议契约面差异钦定）；构造形态模板照抄 AgentEvaluationError 450（kwargs 领域参数在前 + message 缺省回落 + context_extra 合并）；语义归属 business——数值求解失败=输入数据使计算约束不可满足，调用方可调整输入/换方法重试（BusinessRuleViolationError 422 族语义就近映射）；comparable/precedent 统计面 V1 零失败路径（空集合已由 VO 层 242 拦截）；financial 子域 470-479 新开——六代开段先例第七段；471-479 预留 financial 域）|
 | EXCEPTION_471~479 | （预留 financial 子域）| — | — |（后续财务域异常如需新码在此段取）|
+| EXCEPTION_480 | PlanningNotFoundError | BusinessException | 404 |（Story 6.1，规划任务不存在——BLM 状态查询无快照第三态显式失败；context 单键={plan_id}；404 语义就近映射 NotFoundError 202 族；planning 子域 480-489 新开——七代开段先例第八段（data_source 410/debate 420/tool_version 430/agent 440/evaluation 450/sap 460/financial 470——规划流程域语义分立）；开段依据：business 物理段 (201,209) 已满、financial 471-479 双重成文预留不侵占）|
+| EXCEPTION_481 | PlanningExecutionError | BusinessException | 500 |（Story 6.1，规划执行失败终态——BLM 前两阶段全部 8 步降级（阶段 1+六子步骤+synthesis）时 RunBlmPlanningUseCase 终态组装处抛出；部分降级（如 7/8）返回成功 DTO+degraded_steps 成文语义不触发；context 三键={agent_id, plan_id, reason}；系统执行语义 500 就近映射 AgentWorkflowError 444 先例）|
+| EXCEPTION_482 | PlanningStateError | BusinessException | 409 |（Story 6.1，规划状态机非法推进——预留码：6.1 前两阶段顺序执行不触发，6.3 Checkpoint 恢复面状态机守卫消费时激活；context 双键={plan_id, transition}）|
+| EXCEPTION_483~489 | （预留 planning 子域）| — | — |（后续规划域异常如需新码在此段取）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——
@@ -830,6 +834,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 | `evaluation` | 450–459 | AgentEvaluationError（Story 5.8 Agent 输出质量评估）+ DriftDetectionError（Story 5.9 CUSUM 漂移检测——预留段首个取用）+ EvaluationHistoryError（Story 5.10 评估历史持久化——452-459 预留段首个取用）；450/451/452 语义归属 system（SystemException 子类——评估/漂移检测/历史持久化均系统侧可观测行为，AgentWorkflowError[444] 同族论证），物理段独立——agent 段 440-449 已满后四代开段先例第五段（data_source 410/debate 420/tool_version 430/agent 440）；453-459 预留后续评估域异常） |
 | `sap` | 460–469 | SAPTimeoutError, SAPBusStateError, SAPBlackboardWriteError（Story 5.11 SAP 协议支持——内部 Agent 通信运行时）；460 语义归属 business（协议交互超时是调用方可处理结果——ToolExecutionTimeoutError 385 三合一先例）、461/462 语义归属 system（SystemException 子类——协议契约违规/基础设施写失败），物理段独立——五代开段先例第六段（data_source 410/debate 420/tool_version 430/agent 440/evaluation 450——SAP 协议域与事件总线/评估域语义分立，MessageBusError 与 SAP 分立先例同款）；463-469 预留 sap 域后续异常 |
 | `financial` | 470–479 | FinancialCalculationError（Story 5.12 财务建模与估值基础——DCF/可比/先例三方法确定性估值计算）；470 语义归属 business（数值求解失败=输入数据使计算约束不可满足，调用方可调整输入/换方法重试——BusinessRuleViolationError 422 族语义就近映射），物理段独立——六代开段先例第七段（data_source 410/debate 420/tool_version 430/agent 440/evaluation 450/sap 460——财务估值计算域语义分立）；471-479 预留 financial 域后续异常 |
+| `planning` | 480–489 | PlanningNotFoundError, PlanningExecutionError, PlanningStateError（Story 6.1 BLM 前两阶段流程——规划任务不存在/全流程失败终态/状态机非法推进[预留]）；480-482 语义归属 business（BusinessException 子类——规划流程结果是调用方可处理结果），物理段独立——七代开段先例第八段（data_source 410/debate 420/tool_version 430/agent 440/evaluation 450/sap 460/financial 470——规划流程域与财务计算域语义分立）；开段依据：business 物理段 (201,209) 已满、financial 471-479 双重成文预留（_code_ranges 段条目注释+本表双处成文）不侵占；483-489 预留 planning 域后续异常 |
 | `fallback` | 999 | UnknownError（兜底，独立于所有子域） |
 
 #### 3.3.3 CI 校验规则

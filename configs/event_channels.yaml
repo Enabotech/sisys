@@ -209,6 +209,17 @@ event_channels:
     delivery_mode: "reliable"
     description: "战略偏差警告"
 
+  # BLM 规划事件（Story 6-1——reliable 单通道，AgentDecided 配置先例）
+  PlanningStarted:
+    rabbitmq_routing_key: "sisys.events.reliable.planning_started"
+    delivery_mode: "reliable"
+    description: "BLM规划启动"
+
+  BlmStageCompleted:
+    rabbitmq_routing_key: "sisys.events.reliable.blm_stage_completed"
+    delivery_mode: "reliable"
+    description: "BLM阶段完成"
+
   DriftDetected:
     rabbitmq_routing_key: "sisys.events.reliable.drift_detected"
     delivery_mode: "reliable"

@@ -92,6 +92,9 @@ from src.domain.exceptions import (
     OCRProcessingError,
     PasswordValidationError,
     PermissionDeniedError,
+    PlanningExecutionError,
+    PlanningNotFoundError,
+    PlanningStateError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
     RerankError,
@@ -362,6 +365,9 @@ class TestExceptionHttpMap:
             SAPBusStateError,  # 461 — Story 5.11 SAP 总线状态违规（409）
             SAPBlackboardWriteError,  # 462 — Story 5.11 SAP 公共黑板写入失败（500）
             FinancialCalculationError,  # 470 — Story 5.12 财务计算失败（422）
+            PlanningNotFoundError,  # 480 — Story 6.1 规划任务不存在（404）
+            PlanningExecutionError,  # 481 — Story 6.1 规划执行失败终态（500）
+            PlanningStateError,  # 482 — Story 6.1 状态机非法推进（409——预留）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

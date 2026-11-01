@@ -79,3 +79,32 @@ class WorkflowAgentState(TypedDict, total=False):
     executed_phases: list[str]
     evidence: Any
     chain: Any
+
+
+class SpBlmState(TypedDict, total=False):
+    """SpBlmGraph 图 state（Story 6-1——BLM 前两阶段）。
+
+    仅图工厂/引擎内部使用（application 端口签名一律 dict[str, Any]——
+    import-linter 契约，WorkflowAgentState 同款约束）。
+
+    键说明：
+        agent_id: Agent 标识（str——parameters 透传，agent_id 必须 str 序列化）
+        plan_id: 规划任务标识（事件与快照写入方依赖——必入 parameters 与 state）
+        task: 规划任务描述
+        context: BlmPlanningContext 实例（VO 实例直存——InMemorySaver 无序列化）
+        gap_artifacts: PerformanceGapArtifacts（阶段 1 产物）
+        insight_step_results: 六子步骤产物列表（累积——服务聚合适配器直写全量）
+        synthesis: InsightSynthesis（综合洞察）
+        degraded_steps: 降级步骤清单（服务投影直写全量）
+        timeline: 步骤时间线（服务投影直写全量——6.3 快照消费面）
+    """
+
+    agent_id: str
+    plan_id: str
+    task: str
+    context: Any
+    gap_artifacts: Any
+    insight_step_results: list[Any]
+    synthesis: Any
+    degraded_steps: list[str]
+    timeline: list[dict[str, Any]]

@@ -101,6 +101,11 @@ from src.domain.exceptions.ocr_exceptions import (
     OCRProcessingError,
 )
 from src.domain.exceptions.permission_exceptions import InsufficientTokenError
+from src.domain.exceptions.planning_exceptions import (
+    PlanningExecutionError,
+    PlanningNotFoundError,
+    PlanningStateError,
+)
 from src.domain.exceptions.relevance_exceptions import (
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
@@ -331,6 +336,9 @@ __all__ = [
     "SAPBlackboardWriteError",
     # 财务子域异常（Story 5.12 财务建模与估值——470 计算失败[IRR 求解失败 + NPV 为零]）
     "FinancialCalculationError",
+    "PlanningNotFoundError",
+    "PlanningExecutionError",
+    "PlanningStateError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

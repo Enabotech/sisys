@@ -167,6 +167,21 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   BusinessRuleViolationError 422 族「业务约束不可满足」；471-479 预留 financial 域)
     # 470 语义归属 business（数值求解失败是调用方可处理结果——调整输入/换方法重试）
     "financial": (470, 479),
+    # 规划子域（480-489）—— Story 6-1 新开 1 批 3 个
+    # （financial 段 470-479 之后八代开段先例第八段：data_source 410/debate 420/
+    #  tool_version 430/agent 440/evaluation 450/sap 460/financial 470 同款
+    #  「前段满/双重成文预留不可占/语义独立 → 开独立段」——规划流程域与财务计算
+    #  域语义分立；business 物理段 (201,209) 已满、financial 471-479 双重成文
+    #  预留（段条目注释 + sisys-uni-exception-design.md §3.3.2 双处成文）不侵占）:
+    # EXCEPTION_480 PlanningNotFoundError (Story 6-1, 规划任务不存在——状态查询
+    #   无快照第三态显式失败；404 语义)
+    # EXCEPTION_481 PlanningExecutionError (Story 6-1, 规划执行失败终态——全部
+    #   8 步降级时 RunBlmPlanningUseCase 终态组装处抛出；系统执行语义 500；
+    #   部分降级返回成功 DTO 成文语义不触发)
+    # EXCEPTION_482 PlanningStateError (Story 6-1, 规划状态机非法推进——预留，
+    #   6.3 Checkpoint 恢复面消费时激活)
+    # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；483-489 预留 planning 域
+    "planning": (480, 489),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -340,6 +355,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "SAPBlackboardWriteError": "sap",
     # financial_exceptions.py (Story 5.12 新增 1 个异常——财务建模估值计算失败码)
     "FinancialCalculationError": "financial",
+    # planning_exceptions.py (Story 6-1 新增 3 个异常——BLM 规划流程三码)
+    "PlanningNotFoundError": "planning",
+    "PlanningExecutionError": "planning",
+    "PlanningStateError": "planning",
 }
 
 

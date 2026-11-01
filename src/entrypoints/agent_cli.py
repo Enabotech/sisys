@@ -285,6 +285,34 @@ def build_parser() -> argparse.ArgumentParser:
         help='任务描述原文（如 "分析新能源汽车行业进入战略"）',
     )
 
+    blm_plan = subparsers.add_parser(
+        "blm-plan",
+        help="执行 BLM 前两阶段规划（业绩差距分析+市场洞察六子步骤——MVP CEO 单角色阻塞执行）",
+    )
+    blm_plan.add_argument(
+        "-a",
+        "--agent-id",
+        type=str,
+        required=True,
+        metavar="AGENT_ID",
+        help="目标 Agent 实例 UUID（instantiate 产出的 agent_id）",
+    )
+    blm_plan.add_argument(
+        "-t",
+        "--task",
+        type=str,
+        required=True,
+        metavar="TASK",
+        help='规划任务描述（如 "制定新能源汽车行业五年战略规划"）',
+    )
+    blm_plan.add_argument(
+        "--plan-id",
+        type=str,
+        default=None,
+        metavar="PLAN_ID",
+        help="规划任务标识（缺省新铸——同 id 重跑将被拒绝 482，重试请用新 id）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -555,6 +583,84 @@ def _run_task_cli(agent_id_raw: str, task: str) -> int:
         return 1
     except Exception as error:
         logger.error("Agent 工作流执行异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _run_blm_planning(agent_id: uuid_module.UUID, task: str, plan_id: str | None) -> object:
+    """执行 BLM 前两阶段规划并清理连接池（Story 6-1——阻塞执行到终态）。"""
+    use_case = resolve("blm_planning_use_case")
+    try:
+        return await use_case.execute(agent_id=agent_id, task=task, plan_id=plan_id)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_blm_progress(result: object) -> None:
+    """输出 BLM 规划多行进度摘要（stdout——AC-3 CLI 进度数据面）。
+
+    规划标识 + 阶段 1 四字段概要 + 六子步骤计数 + 综合结论 + 降级清单
+    （降级可见性——AC-6③）+ 耗时（getattr 属性访问避免 import 依赖——
+    _print_workflow_summary 先例模式）。
+
+    Args:
+        result: BlmPlanningResult（属性访问面）
+    """
+    print(f"规划任务: {getattr(result, 'plan_id')}")
+    gap = getattr(result, "gap_artifacts")
+    print(f"阶段 1 业绩差距分析: {getattr(gap, 'financial_gap', '')}")
+    print(f"  运营差距: {getattr(gap, 'operational_gap', '')}")
+    print(f"  根因: {'；'.join(getattr(gap, 'root_causes', ()))}")
+    print(f"  组合健康度: {getattr(gap, 'portfolio_health', '')}")
+    insight_steps = getattr(result, "insight_steps", ())
+    print(f"阶段 2 市场洞察: {len(insight_steps)}/6 子步骤完成")
+    synthesis = getattr(result, "synthesis")
+    conclusions = getattr(synthesis, "conclusions", ())
+    if conclusions:
+        print(f"综合洞察: {conclusions[0]}{' …' if len(conclusions) > 1 else ''}")
+    degraded_steps = getattr(result, "degraded_steps", ())
+    if degraded_steps:
+        print(f"降级步骤（{len(degraded_steps)}）: {', '.join(degraded_steps)}")
+    print(f"耗时: {getattr(result, 'execution_ms')}ms")
+
+
+def _run_blm_plan_cli(agent_id_raw: str, task: str, plan_id: str | None) -> int:
+    """blm-plan 子命令执行（守卫 → bootstrap → 执行 → 进度摘要输出）。
+
+    退出码契约（对齐 run-task）：成功 exit 0（降级步骤在摘要中显式标注）；
+    443/441/447/481 等业务异常 exit 1。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+        task: --task 原始字符串
+        plan_id: --plan-id 可选透传（缺省 None——用例内新铸）
+
+    Returns:
+        退出码（0=规划正常完成（含部分降级），1=业务异常）
+    """
+    # UUID 守卫（先于 bootstrap——argparse type= 禁 uuid.UUID 纪律）
+    try:
+        agent_id = _parse_agent_uuid(agent_id_raw)
+    except ValidationError as error:
+        logger.error("%s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_blm_planning(agent_id, task, plan_id))
+        _print_blm_progress(result)
+        logger.info(
+            "BLM 规划执行完成: plan_id=%s degraded=%d",
+            getattr(result, "plan_id"),
+            len(getattr(result, "degraded_steps", ())),
+        )
+        return 0
+    except DomainError as error:
+        logger.error("BLM 规划执行失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("BLM 规划执行异常: %s", error, exc_info=True)
         return 1
 
 
@@ -866,6 +972,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_load_profile_cli(args.agent_id)
     if args.command == "run-task":
         return _run_task_cli(args.agent_id, args.task)
+    if args.command == "blm-plan":
+        return _run_blm_plan_cli(args.agent_id, args.task, args.plan_id)
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":

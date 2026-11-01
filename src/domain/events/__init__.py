@@ -31,7 +31,7 @@ from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
 from .memory_events import MemoryChanged
-from .planning_events import StrategicDeviationWarning
+from .planning_events import BlmStageCompleted, PlanningStarted, StrategicDeviationWarning
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
 from .tool_version_events import (
@@ -67,6 +67,8 @@ __all__ = [
     "DriftDetected",
     "EntitiesExtracted",
     "StrategicDeviationWarning",
+    "PlanningStarted",
+    "BlmStageCompleted",
     "HeartbeatTriggered",
     "IsolationLevelSwitched",
     "RoutingDecided",

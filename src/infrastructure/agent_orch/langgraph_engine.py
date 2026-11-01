@@ -22,6 +22,7 @@ from src.infrastructure.config.langgraph import LangGraphConfig
 
 if TYPE_CHECKING:
     from src.application.ports.agent_workflow import AgentWorkflowServicePort
+    from src.application.ports.blm_planning import BlmPlanningServicePort
     from src.domain.ports.event_publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
@@ -49,10 +50,12 @@ class LangGraphEngine:
         config: LangGraphConfig,
         event_publisher: EventPublisher,
         workflow_service: AgentWorkflowServicePort | None = None,
+        blm_planning_service: "BlmPlanningServicePort | None" = None,
     ) -> None:
         self._config = config
         self._event_publisher = event_publisher
         self._workflow_service = workflow_service
+        self._blm_planning_service = blm_planning_service
         self._checkpointer = InMemorySaver()
         # 运行记录：run_id → (FlowStatus, monotonic 时间戳, 终态 state | None)
         # ——Story 5-3 扩展第三位存终态 state（get_graph_result 数据源，
@@ -169,7 +172,7 @@ class LangGraphEngine:
 
         return self._runs.get(graph_run_id, (FlowStatus.FAILED, 0.0, None))[2]
 
-    _SUPPORTED_GRAPHS = {"BasicAgent", "SingleAgentWorkflow"}
+    _SUPPORTED_GRAPHS = {"BasicAgent", "SingleAgentWorkflow", "SpBlmGraph"}
 
     def _build_graph(self, graph_name: str, parameters: dict[str, Any]) -> Any:
         """构建并编译状态图
@@ -194,6 +197,13 @@ class LangGraphEngine:
             )
 
             return build_single_agent_workflow_graph(self._workflow_service)
+
+        if graph_name == "SpBlmGraph":
+            if self._blm_planning_service is None:
+                raise ValidationError(message="SpBlmGraph 图需要 blm_planning_service 注入（组合根 lambda 注入位）")
+            from src.infrastructure.agent_orch.graphs.sp_blm_graph import build_sp_blm_graph
+
+            return build_sp_blm_graph(self._blm_planning_service)
 
         if graph_name not in self._SUPPORTED_GRAPHS:
             logger.warning(
@@ -245,11 +255,32 @@ class LangGraphEngine:
                 "evidence_ref": getattr(evidence, "input_hash", ""),
                 "retry_count": result.get("retry_count", 0),
             }
+        elif graph_name == "SpBlmGraph" and isinstance(result, dict):
+            # SpBlmGraph 五键纯标量投影（Story 6-1 DC-11——VO 实例禁入事件
+            # payload：gap_artifacts/insight_step_results/synthesis 均 VO 实例，
+            # 全量透传必炸 JSON 序列化；confidence 显式置 0.0（state 无置信度
+            # 面——勿吃引擎默认回落 0.9 假置信度，5-3 DC-6 教训）
+            gap = result.get("gap_artifacts")
+            synthesis = result.get("synthesis")
+            conclusions = getattr(synthesis, "conclusions", ()) if synthesis is not None else ()
+            first_conclusion = conclusions[0] if conclusions else ""
+            decision_result = {
+                "workflow_status": "completed" if not result.get("degraded_steps") else "degraded",
+                "task_summary": (getattr(gap, "financial_gap", "") or "")[:200],
+                "chain_summary": (first_conclusion or "")[:200],
+                "evidence_ref": str(result.get("plan_id", "")),
+                "retry_count": 0,
+            }
 
+        if graph_name == "SpBlmGraph":
+            # SpBlmGraph state 无置信度面——显式 0.0（勿吃 0.9 默认假置信度，DC-11）
+            confidence = 0.0
+        else:
+            confidence = result.get("confidence", 0.9) if isinstance(result, dict) else 0.9
         event = AgentDecided(
             agent_id=agent_id,
             decision_result=decision_result,
-            confidence=result.get("confidence", 0.9) if isinstance(result, dict) else 0.9,
+            confidence=confidence,
         )
         publish_result = await self._event_publisher.publish(event)
         if publish_result is None:

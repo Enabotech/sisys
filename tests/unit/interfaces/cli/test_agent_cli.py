@@ -1136,3 +1136,149 @@ class TestIsolationLogsCommand:
         assert exit_code == 1
         assert "EXCEPTION_242" in capsys.readouterr().err
         assert repo.search_calls == []
+
+
+# ===================================================================
+# Story 6-1: blm-plan 子命令（BLM 前两阶段规划——argparse 进程内直调先例）
+# ===================================================================
+
+
+class _StubGapArtifacts:
+    """阶段 1 产物替身（四字段——getattr 摘要输出面）。"""
+
+    financial_gap = "财务差距量化：达成率 82%"
+    operational_gap = "运营差距：交付周期延长"
+    root_causes = ("价格竞争侵蚀毛利", "供应链成本上升")
+    portfolio_health = "核心业务稳健，新兴业务双低"
+    degraded = False
+    degrade_reason = ""
+
+
+class _StubSynthesis:
+    """综合洞察替身。"""
+
+    conclusions = ("优先补强内部能力", "把握海外机会窗口")
+    degraded_inputs = ()
+
+
+class _StubBlmPlanningResult:
+    """BLM 规划结果 DTO 替身（_print_blm_progress getattr 消费面）。"""
+
+    def __init__(self, *, plan_id: str, degraded_steps: tuple[str, ...] = ()) -> None:
+        self.plan_id = plan_id
+        self.agent_id = uuid.uuid4()
+        self.gap_artifacts = _StubGapArtifacts()
+        self.insight_steps = ()
+        self.synthesis = _StubSynthesis()
+        self.degraded_steps = degraded_steps
+        self.execution_ms = 1234
+
+
+class _StubBlmPlanningUseCase:
+    """BLM 规划用例替身（calls 记录 + 可编程异常）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[uuid.UUID, str, str | None]] = []
+        self.error: Exception | None = None
+        self.last_result: _StubBlmPlanningResult | None = None
+
+    async def execute(self, agent_id: uuid.UUID, task: str, plan_id: str | None = None) -> _StubBlmPlanningResult:
+        self.calls.append((agent_id, task, plan_id))
+        if self.error is not None:
+            raise self.error
+        self.last_result = _StubBlmPlanningResult(plan_id=plan_id or str(uuid.uuid4()))
+        return self.last_result
+
+
+def _patch_blm_plan_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubBlmPlanningUseCase) -> None:
+    """blm-plan 入口注入（bootstrap/resolve/get_resolver 三件套替身）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: use_case)
+    monkeypatch.setattr(agent_cli, "get_resolver", lambda: _StubResolver())
+
+
+class TestBlmPlanParser:
+    """blm-plan 子命令解析（参数面——type=str 纪律）。"""
+
+    def test_blm_plan_requires_agent_and_task(self) -> None:
+        """-a/-t 双必填（缺一 usage error exit 2）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["blm-plan"])
+        assert exc_info.value.code == 2
+
+    def test_blm_plan_short_options(self) -> None:
+        """短选项形态（-a/-t——run-task 先例）。"""
+        args = agent_cli.build_parser().parse_args(["blm-plan", "-a", str(uuid.uuid4()), "-t", "五年战略规划"])
+        assert args.command == "blm-plan"
+        assert args.agent_id and args.task == "五年战略规划"
+        assert args.plan_id is None
+
+    def test_blm_plan_optional_plan_id(self) -> None:
+        """--plan-id 可选透传（恢复/幂等锚）。"""
+        args = agent_cli.build_parser().parse_args(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务", "--plan-id", "plan-42"])
+        assert args.plan_id == "plan-42"
+
+
+class TestBlmPlanExecution:
+    """blm-plan 执行链（守卫/摘要输出/退出语义）。"""
+
+    def test_success_outputs_progress_and_plan_id(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功：exit 0 + 进度摘要输出（_print_blm_progress——进度/降级/耗时）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+        agent_id = uuid.uuid4()
+        exit_code = agent_cli.main(["blm-plan", "-a", str(agent_id), "-t", "五年战略规划"])
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "规划" in out
+        assert "子步骤完成" in out, "进度行缺失（进度摘要输出断言——R1-9①）"
+        assert stub.last_result is not None and stub.last_result.plan_id in out
+        assert stub.calls == [(agent_id, "五年战略规划", None)]
+
+    def test_invalid_agent_uuid_guards_before_bootstrap(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """非法 UUID → 201 先于 bootstrap（use_case 零调用——argparse type= 纪律）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["blm-plan", "-a", "not-a-uuid", "-t", "任务"])
+        assert exit_code == 1
+        assert "EXCEPTION_201" in capsys.readouterr().err
+        assert stub.calls == []
+
+    def test_domain_error_exits_one(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """业务异常（481 全降级）→ exit 1 + stderr 编码。"""
+        from src.domain.exceptions.planning_exceptions import PlanningExecutionError
+
+        stub = _StubBlmPlanningUseCase()
+        stub.error = PlanningExecutionError(agent_id="a", plan_id="p", reason="全部 8 步降级")
+        _patch_blm_plan_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务"])
+        assert exit_code == 1
+        assert "EXCEPTION_481" in capsys.readouterr().err
+
+    def test_degraded_flow_marks_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """部分降级成功 → 摘要含降级标记（降级可见性——AC-6③）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+
+        original = _StubBlmPlanningResult(plan_id="plan-d", degraded_steps=("trend",))
+
+        async def _execute(agent_id: uuid.UUID, task: str, plan_id: str | None = None) -> Any:
+            stub.calls.append((agent_id, task, plan_id))
+            return original
+
+        stub.execute = _execute  # type: ignore[method-assign]
+        exit_code = agent_cli.main(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务"])
+        assert exit_code == 0
+        assert "降级" in capsys.readouterr().out
+
+    def test_plan_id_passthrough(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--plan-id 透传到用例（execute 第三参数）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+        agent_id = uuid.uuid4()
+        agent_cli.main(["blm-plan", "-a", str(agent_id), "-t", "任务", "--plan-id", "plan-77"])
+        assert stub.calls[0][2] == "plan-77"

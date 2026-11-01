@@ -1,6 +1,6 @@
 # Story 6.1: BLM 前两阶段流程（业绩差距分析 + 市场洞察）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -121,10 +121,10 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** ④结果 DTO 返回阶段 1+2 全部产物（终态 state 直读组装，5-3 同构）
 
 **验证标准/Validation Criteria:**
-- [ ] 阶段 1 产物含四字段语义（值可为 LLM 生成文本/结构化对象，字段名对齐伪码）
-- [ ] 六子步骤执行顺序断言**双锚**：①`insight_steps[i].step == EXPECTED_ORDER[i]`（枚举序期望独立构造自 or.md 六步序——真正的顺序判别；时间戳单调**无法证伪乱序串行**）②时间戳非重叠断言 `started_at[i] >= completed_at[i-1]`（证伪并行；时间戳为运行期值不可独立构造——5-12 循环自证红线）
-- [ ] 综合洞察**双锚**：①注入侧——synthesize prompt 含六步产物摘要（Fake 捕获 prompt 断言，可判别漏传；产出侧非空断言在 Fake 可控输出下近自证）②`degraded_inputs` 为空（正常路径）
-- [ ] 全链在 CEO Agent 单实例上执行（agent_id 全程单一）
+- [x] 阶段 1 产物含四字段语义（值可为 LLM 生成文本/结构化对象，字段名对齐伪码）
+- [x] 六子步骤执行顺序断言**双锚**：①`insight_steps[i].step == EXPECTED_ORDER[i]`（枚举序期望独立构造自 or.md 六步序——真正的顺序判别；时间戳单调**无法证伪乱序串行**）②时间戳非重叠断言 `started_at[i] >= completed_at[i-1]`（证伪并行；时间戳为运行期值不可独立构造——5-12 循环自证红线）
+- [x] 综合洞察**双锚**：①注入侧——synthesize prompt 含六步产物摘要（Fake 捕获 prompt 断言，可判别漏传；产出侧非空断言在 Fake 可控输出下近自证）②`degraded_inputs` 为空（正常路径）
+- [x] 全链在 CEO Agent 单实例上执行（agent_id 全程单一）
 
 ### AC-2: CEO Agent 单角色替代（MVP）
 
@@ -134,9 +134,9 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** 5.3 单 Agent 标准工作流骨架（守卫→档案→装配→图执行）全量复用
 
 **验证标准/Validation Criteria:**
-- [ ] 全仓 grep 零新增非 CEO 角色实例化（SUPPORTED_ROLES 不扩展）
-- [ ] 阶段 prompt 含角色视角前缀**与该步工具候选白名单**（第 N 步 prompt 含第 N 步前缀与候选——六子步骤语义配置表 Task 0.1 钦定；persona 研究证据：任务化角色框架优于纯身份宣称）
-- [ ] 5.3 守卫链（存在 443/角色 441/隔离 fail-closed 447）对 BLM 入口同样生效
+- [x] 全仓 grep 零新增非 CEO 角色实例化（SUPPORTED_ROLES 不扩展）
+- [x] 阶段 prompt 含角色视角前缀**与该步工具候选白名单**（第 N 步 prompt 含第 N 步前缀与候选——六子步骤语义配置表 Task 0.1 钦定；persona 研究证据：任务化角色框架优于纯身份宣称）
+- [x] 5.3 守卫链（存在 443/角色 441/隔离 fail-closed 447）对 BLM 入口同样生效
 
 ### AC-3: 流程可视化数据面
 
@@ -147,10 +147,10 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** CLI 输出阶段进度摘要（`_print_blm_progress` 模式）
 
 **验证标准/Validation Criteria:**
-- [ ] 执行中（**步骤边界快照点**——同步阻塞流程下 use case 看不到步骤内部，「任一时点」物理不可达；测试构造=`asyncio.create_task` 后台跑规划 + 主协程轮询快照，Fake LLM 经 `asyncio.Event` 挂起制造窗口）状态可查询（阶段/子步骤/进度百分比非空）
-- [ ] 执行完成后状态为终态（total_steps=8 全部 completed：performance_gap+六子步骤+synthesis）
-- [ ] Redis latest 快照读写一致（写后读回断言）
-- [ ] 后端仅提供数据面，零 UI 交付（epics L2060「前端指标，后端不定义」）
+- [x] 执行中（**步骤边界快照点**——同步阻塞流程下 use case 看不到步骤内部，「任一时点」物理不可达；测试构造=`asyncio.create_task` 后台跑规划 + 主协程轮询快照，Fake LLM 经 `asyncio.Event` 挂起制造窗口）状态可查询（阶段/子步骤/进度百分比非空）
+- [x] 执行完成后状态为终态（total_steps=8 全部 completed：performance_gap+六子步骤+synthesis）
+- [x] Redis latest 快照读写一致（写后读回断言）
+- [x] 后端仅提供数据面，零 UI 交付（epics L2060「前端指标，后端不定义」）
 
 ### AC-4: 领域事件发布（通道登记与投递）
 
@@ -161,10 +161,10 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** `configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` 同步登记（CLAUDE.md 纪律）
 
 **验证标准/Validation Criteria:**
-- [ ] 新事件契约测试通过（命名/字段/序列化 roundtrip）
-- [ ] event_channels.yaml + ChannelRouter 双登记断言（守护测试防漏登）
-- [ ] 集成场景：真实 event_publisher 路径 PG event_outbox 落行断言（5-3 场景⑤先例，PG 门控动态 skip）——**全集断言**：一次全流程 `BlmStageCompleted` 的 8 个 stage 值（performance_gap+market_insight_{六步}+market_insight_synthesis）各恰发布一次，另 `PlanningStarted` 恰一行
-- [ ] CheckpointReached **不发布**（6.3 语义分立——5-10 OD-6/DC-8 裁定先例：`5-10-checkpoint-with-evaluation-integration.md` L53/L624；负向断言入 Task 4 循环 A）
+- [x] 新事件契约测试通过（命名/字段/序列化 roundtrip）
+- [x] event_channels.yaml + ChannelRouter 双登记断言（守护测试防漏登）
+- [x] 集成场景：真实 event_publisher 路径 PG event_outbox 落行断言（5-3 场景⑤先例，PG 门控动态 skip）——**全集断言**：一次全流程 `BlmStageCompleted` 的 8 个 stage 值（performance_gap+market_insight_{六步}+market_insight_synthesis）各恰发布一次，另 `PlanningStarted` 恰一行
+- [x] CheckpointReached **不发布**（6.3 语义分立——5-10 OD-6/DC-8 裁定先例：`5-10-checkpoint-with-evaluation-integration.md` L53/L624；负向断言入 Task 4 循环 A）
 
 ### AC-5: 性能与成功率
 
@@ -174,10 +174,10 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** 计量口径在测试 docstring 显式声明：**Fake LLM 管线自身开销口径**（真实 LLM 延迟显式出栈——5-8 AC-5/5-2 R1-DF3 先例；真实 LLM 全链计时归部署验证）
 
 **验证标准/Validation Criteria:**
-- [ ] Fake LLM 口径 P95<30s 断言（分级断言形态，4-6/4-7 基准先例）
-- [ ] 六子步骤成功率≥95% 批量执行统计断言（**受控失败注入采样**：≥20 次中随机注入单步失败→降级成功计入后断言≥95%——零注入采样在 Fake 可控输出下恒 100% 零鉴别力；与 AC-6⑤ 口径衔接）
-- [ ] 口径差声明落测试 docstring
-- [ ] 单调用 8s 上限以**配置传递断言**验证：Fake LLM 捕获 `structured_generate` 收到的 config 实参逐次断言 `timeout == 8.0` **且温度==语义配置表该步钦定档**（8 步温度映射入 Task 0.1 配置表温度列——5-3 五档键（perceive/plan/verify/reflect/package）与 BLM 8 步无直接映射，期望值以配置表为唯一源；真实超时执行在 LLM 客户端内——Fake 口径下行为断言不可达，真实行为归部署验证，DC-7 口径差声明覆盖本条）
+- [x] Fake LLM 口径 P95<30s 断言（分级断言形态，4-6/4-7 基准先例）
+- [x] 六子步骤成功率≥95% 批量执行统计断言（**受控失败注入采样**：≥20 次中随机注入单步失败→降级成功计入后断言≥95%——零注入采样在 Fake 可控输出下恒 100% 零鉴别力；与 AC-6⑤ 口径衔接）
+- [x] 口径差声明落测试 docstring
+- [x] 单调用 8s 上限以**配置传递断言**验证：Fake LLM 捕获 `structured_generate` 收到的 config 实参逐次断言 `timeout == 8.0` **且温度==语义配置表该步钦定档**（8 步温度映射入 Task 0.1 配置表温度列——5-3 五档键（perceive/plan/verify/reflect/package）与 BLM 8 步无直接映射，期望值以配置表为唯一源；真实超时执行在 LLM 客户端内——Fake 口径下行为断言不可达，真实行为归部署验证，DC-7 口径差声明覆盖本条）
 
 ### AC-6: 异常与步级降级
 
@@ -189,12 +189,12 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 **And** ⑥降级下游消费三规则：degraded 步骤产物以「[降级]+原因」显式标注注入下游 prompt；`synthesize_insights` 结论必须列举 degraded 输入（不可无标注吞并）；阶段 1 全降级时阶段 2 照常执行但综合报告携带标记
 
 **验证标准/Validation Criteria:**
-- [ ] 单步注入失败（Fake LLM 抛错/隔离预检 449/检索取数失败——三类注入落点矩阵 Task 0.3 钦定；验收层 449 构造=tools_l1 受限的真实 CEO Agent；**380 降级锚单测层**（Mock 注册表注入未注册名——`AsyncMock(spec=...)` 合规域）→ 流程完成且 `degraded_steps` 恰含该步
-- [ ] 上游降级 → 下游产物含降级标注（⑥规则断言：下游 prompt 或 synthesis 含 degraded 步骤标注）
-- [ ] **全部 8 步降级**（len(degraded_steps)==total_steps——**抛出点钦定**：RunBlmPlanningUseCase 终态组装处，归 Task 2 红）→ 顶层 PlanningExecutionError(481)（领域异常，HTTP 映射注册）
-- [ ] **部分降级**（如 7/8，含仅 synthesis 降级）返回成功 DTO + degraded_steps（成文语义——防「部分降级误抛 481」多解；补 7/8 降级终态期望断言）
-- [ ] 新异常五件套齐备（定义文件/`_code_ranges.py` 子域映射/`__init__.py` 暴露+EXCEPTION_HTTP_MAP/子域码段校验/`sisys-uni-exception-design.md` §3.3.2 编码表同步）
-- [ ] 三条红线 grep 自查零输出（`raise ValueError`/手动 HTTPException/继承内置 Exception）
+- [x] 单步注入失败（Fake LLM 抛错/隔离预检 449/检索取数失败——三类注入落点矩阵 Task 0.3 钦定；验收层 449 构造=tools_l1 受限的真实 CEO Agent；**380 降级锚单测层**（Mock 注册表注入未注册名——`AsyncMock(spec=...)` 合规域）→ 流程完成且 `degraded_steps` 恰含该步
+- [x] 上游降级 → 下游产物含降级标注（⑥规则断言：下游 prompt 或 synthesis 含 degraded 步骤标注）
+- [x] **全部 8 步降级**（len(degraded_steps)==total_steps——**抛出点钦定**：RunBlmPlanningUseCase 终态组装处，归 Task 2 红）→ 顶层 PlanningExecutionError(481)（领域异常，HTTP 映射注册）
+- [x] **部分降级**（如 7/8，含仅 synthesis 降级）返回成功 DTO + degraded_steps（成文语义——防「部分降级误抛 481」多解；补 7/8 降级终态期望断言）
+- [x] 新异常五件套齐备（定义文件/`_code_ranges.py` 子域映射/`__init__.py` 暴露+EXCEPTION_HTTP_MAP/子域码段校验/`sisys-uni-exception-design.md` §3.3.2 编码表同步）
+- [x] 三条红线 grep 自查零输出（`raise ValueError`/手动 HTTPException/继承内置 Exception）
 
 ---
 
@@ -208,71 +208,71 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 
 #### 领域事件 Schema (Domain Events)
 
-- [ ] `PlanningStarted`：`src/domain/events/planning_events.py`——**扩展既有文件**（现含 `StrategicDeviationWarning`，勿整文件覆盖）——plan_id/agent_id/tenant_id/started_at（dataclass，继承 DomainEvent 基类；命名对齐 story-template.md L50 `[Aggregate][EventName]` 规范，事件链语义对齐 or.md L138 规划事件流转）
-- [ ] `BlmStageCompleted`：同文件——plan_id/agent_id/stage（`performance_gap`/`market_insight_{trend|market_customer|competition|self|opportunity|opportunity_gap}`/`market_insight_synthesis`）/completed_at/summary_excerpt（截断纪律参照 fix_attempts violations_excerpt 先例：≤200 字符）
-- [ ] 事件类经 `event_type: str = field(default="X", init=False)` 字段声明由 `DomainEvent.__init_subclass__` **自动注册**进 `DomainEvent._registry`（仓内无 `__event_registry__` 符号——`src/domain/events/base.py:77-90`）+ `events/__init__.py` 导出与序列化 roundtrip 约束（既有 DomainEvent 契约）
-- [ ] domain 层零第三方依赖（dataclass + 标准库）
+- [x] `PlanningStarted`：`src/domain/events/planning_events.py`——**扩展既有文件**（现含 `StrategicDeviationWarning`，勿整文件覆盖）——plan_id/agent_id/tenant_id/started_at（dataclass，继承 DomainEvent 基类；命名对齐 story-template.md L50 `[Aggregate][EventName]` 规范，事件链语义对齐 or.md L138 规划事件流转）
+- [x] `BlmStageCompleted`：同文件——plan_id/agent_id/stage（`performance_gap`/`market_insight_{trend|market_customer|competition|self|opportunity|opportunity_gap}`/`market_insight_synthesis`）/completed_at/summary_excerpt（截断纪律参照 fix_attempts violations_excerpt 先例：≤200 字符）
+- [x] 事件类经 `event_type: str = field(default="X", init=False)` 字段声明由 `DomainEvent.__init_subclass__` **自动注册**进 `DomainEvent._registry`（仓内无 `__event_registry__` 符号——`src/domain/events/base.py:77-90`）+ `events/__init__.py` 导出与序列化 roundtrip 约束（既有 DomainEvent 契约）
+- [x] domain 层零第三方依赖（dataclass + 标准库）
 
 #### 数据模型 (Data Models)
 
-- [ ] `BlmPhase` 枚举（`src/domain/value_objects/blm_phases.py`）：`PERFORMANCE_GAP`/`MARKET_INSIGHT`（前两阶段；枚举预留六阶段扩展注释锚 Epic 10）
-- [ ] `MarketInsightStep` 枚举（同文件）：六值按 or.md 顺序（TREND/MARKET_CUSTOMER/COMPETITION/SELF/OPPORTUNITY/OPPORTUNITY_GAP——OD-2 口径）
-- [ ] `BlmPlanningStatus` VO：plan_id/phase/current_step/completed_steps/**total_steps=8 钦定**（performance_gap+六子步骤+synthesis——进度百分比分母）/degraded_steps/timeline（frozen dataclass；**current_step 语义钦定**=最近完成步标识（快照写点在方法末尾——挂起第 N 步时轮询读到第 N-1 步），阶段 1 期间取 `"performance_gap"`（与 stage 值域同源，无 None 哨兵）；**timeline 条目结构钦定**：step/started_at/completed_at/status/summary_excerpt/degraded——兼作 AC-3「各步骤摘要」载体与 AC-1 顺序断言数据源，对齐 5-3 `ExecutionResult.step_summaries` 先例）
-- [ ] `PerformanceGapArtifacts` VO：financial_gap/operational_gap/root_causes/portfolio_health（§17.4.2 产物字段语义——L1856-1896）+ **degraded/degrade_reason 两字段**（阶段 1 降级标记与 InsightStepResult 信封对称——VO 自身可判降级，免交叉查 degraded_steps）
-- [ ] `InsightStepResult` VO（通用信封）：step/summary/findings/tool_used/evidence_refs/degraded/degrade_reason（结构化程度止于信封层——类型化 Schema 归 6-2；**降级步=完整信封**：degraded=True+degrade_reason+空 summary/findings，`insight_steps` 恒满 6 元素）
-- [ ] `InsightSynthesis` VO：conclusions/degraded_inputs（列举降级输入——AC-6⑥ 规则载体；**synthesis 自身降级**时 conclusions=空列表+degraded_inputs 自含标记）
-- [ ] `BlmPlanningContext`（`src/application/ports/blm_planning.py` 端口文件内定义）：profile/task/retrieved_evidence/prior_outputs（阶段 1 差距量化数据源口径——检索证据经此入上下文）
-- [ ] **快照序列化契约**（Task 2 种子与 Task 3 写入同源——不先钦定则两侧各自为政）：BlmPlanningStatus ↔ 快照存储 `state_data` dict 的键名/枚举与 datetime 的 JSON 形态入本 SSOT；读径=经快照存储端口 load（hget 在存储实现内部，用例只持 session_id——不自持 Redis 客户端）
-- [ ] 图 state schema 钦定（Task 0.1）：`SpBlmGraph` 专属 state（agent_id/plan_id/task/context/gap_artifacts/insight_step_results/synthesis/degraded_steps/timeline——**plan_id 必入 parameters 与 state**，事件与快照写入方依赖）
-- [ ] `BlmPlanningResult` DTO（application 层）：plan_id/agent_id/gap_artifacts/insight_steps（六步产物列表，元素携带 started_at/completed_at——顺序断言观测面）/synthesis/degraded_steps/execution_ms
+- [x] `BlmPhase` 枚举（`src/domain/value_objects/blm_phases.py`）：`PERFORMANCE_GAP`/`MARKET_INSIGHT`（前两阶段；枚举预留六阶段扩展注释锚 Epic 10）
+- [x] `MarketInsightStep` 枚举（同文件）：六值按 or.md 顺序（TREND/MARKET_CUSTOMER/COMPETITION/SELF/OPPORTUNITY/OPPORTUNITY_GAP——OD-2 口径）
+- [x] `BlmPlanningStatus` VO：plan_id/phase/current_step/completed_steps/**total_steps=8 钦定**（performance_gap+六子步骤+synthesis——进度百分比分母）/degraded_steps/timeline（frozen dataclass；**current_step 语义钦定**=最近完成步标识（快照写点在方法末尾——挂起第 N 步时轮询读到第 N-1 步），阶段 1 期间取 `"performance_gap"`（与 stage 值域同源，无 None 哨兵）；**timeline 条目结构钦定**：step/started_at/completed_at/status/summary_excerpt/degraded——兼作 AC-3「各步骤摘要」载体与 AC-1 顺序断言数据源，对齐 5-3 `ExecutionResult.step_summaries` 先例）
+- [x] `PerformanceGapArtifacts` VO：financial_gap/operational_gap/root_causes/portfolio_health（§17.4.2 产物字段语义——L1856-1896）+ **degraded/degrade_reason 两字段**（阶段 1 降级标记与 InsightStepResult 信封对称——VO 自身可判降级，免交叉查 degraded_steps）
+- [x] `InsightStepResult` VO（通用信封）：step/summary/findings/tool_used/evidence_refs/degraded/degrade_reason（结构化程度止于信封层——类型化 Schema 归 6-2；**降级步=完整信封**：degraded=True+degrade_reason+空 summary/findings，`insight_steps` 恒满 6 元素）
+- [x] `InsightSynthesis` VO：conclusions/degraded_inputs（列举降级输入——AC-6⑥ 规则载体；**synthesis 自身降级**时 conclusions=空列表+degraded_inputs 自含标记）
+- [x] `BlmPlanningContext`（`src/application/ports/blm_planning.py` 端口文件内定义）：profile/task/retrieved_evidence/prior_outputs（阶段 1 差距量化数据源口径——检索证据经此入上下文）
+- [x] **快照序列化契约**（Task 2 种子与 Task 3 写入同源——不先钦定则两侧各自为政）：BlmPlanningStatus ↔ 快照存储 `state_data` dict 的键名/枚举与 datetime 的 JSON 形态入本 SSOT；读径=经快照存储端口 load（hget 在存储实现内部，用例只持 session_id——不自持 Redis 客户端）
+- [x] 图 state schema 钦定（Task 0.1）：`SpBlmGraph` 专属 state（agent_id/plan_id/task/context/gap_artifacts/insight_step_results/synthesis/degraded_steps/timeline——**plan_id 必入 parameters 与 state**，事件与快照写入方依赖）
+- [x] `BlmPlanningResult` DTO（application 层）：plan_id/agent_id/gap_artifacts/insight_steps（六步产物列表，元素携带 started_at/completed_at——顺序断言观测面）/synthesis/degraded_steps/execution_ms
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] `BlmPlanningServicePort`：`src/application/ports/blm_planning.py`——`run_performance_gap_analysis(context) -> PerformanceGapArtifacts`、`run_insight_step(step, context, prior_outputs) -> InsightStepResult`、`synthesize_insights(step_outputs) -> InsightSynthesis`、`build_planning_context(profile_result, task) -> BlmPlanningContext`（组合注入既有端口：LLMClientPort/tool_execution_service/hybrid 检索/**EventPublisher（BlmStageCompleted 发布）/快照存储通道（步骤边界快照写）**——R2 规则：应用层端口组合注入 R1 基础端口）
-- [ ] `GetBlmPlanningStatusPort` 或并入用例（Task 0 钦定最小面）
-- [ ] 端口注册 `PortSpec`（name/version/interface/impl/lifetime/tags）+ registry 登记 + contract_gate 兼容检查
-- [ ] 复用既有端口零重复定义：AgentEnginePort/LLMClientPort/ToolExecutionServicePort/检索端口/agent_tracing（继承表清单为准）
-- [ ] 端口契约测试 `tests/contracts/test_port_contract_blm_planning.py`
+- [x] `BlmPlanningServicePort`：`src/application/ports/blm_planning.py`——`run_performance_gap_analysis(context) -> PerformanceGapArtifacts`、`run_insight_step(step, context, prior_outputs) -> InsightStepResult`、`synthesize_insights(step_outputs) -> InsightSynthesis`、`build_planning_context(profile_result, task) -> BlmPlanningContext`（组合注入既有端口：LLMClientPort/tool_execution_service/hybrid 检索/**EventPublisher（BlmStageCompleted 发布）/快照存储通道（步骤边界快照写）**——R2 规则：应用层端口组合注入 R1 基础端口）
+- [x] `GetBlmPlanningStatusPort` 或并入用例（Task 0 钦定最小面）
+- [x] 端口注册 `PortSpec`（name/version/interface/impl/lifetime/tags）+ registry 登记 + contract_gate 兼容检查
+- [x] 复用既有端口零重复定义：AgentEnginePort/LLMClientPort/ToolExecutionServicePort/检索端口/agent_tracing（继承表清单为准）
+- [x] 端口契约测试 `tests/contracts/test_port_contract_blm_planning.py`
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本 Story 端口清单是唯一事实源：新增端口仅 `BlmPlanningServicePort`（+可选状态查询）；禁止新增与既有端口语义重复的接口
-- [ ] registry/resolver/contract test/owner/version 五要素齐备；未过 Contract Gate 不得进实现 Task
+- [x] 本 Story 端口清单是唯一事实源：新增端口仅 `BlmPlanningServicePort`（+可选状态查询）；禁止新增与既有端口语义重复的接口
+- [x] registry/resolver/contract test/owner/version 五要素齐备；未过 Contract Gate 不得进实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
 
-- [ ] 归属 **planning 新子域**（物理码段 **(480,489)**——410/420/430/440/450/460/470 七代开段先例链的第八段；语义继承 `BusinessException` 基类）：`src/domain/exceptions/planning_exceptions.py`
-- [ ] 候选编码 **480~482**：`PlanningNotFoundError`（480，plan_id 不存在）、`PlanningExecutionError`（481，全流程失败终态）、`PlanningStateError`（482，状态机非法推进——预留）。钦定流程（**唯一性+码段归属双查**）：读 `_code_ranges.py` CODE_RANGES+预留注释——business (201,209) 已满、financial (470,479) 为**双重成文预留**（`_code_ranges.py:167` 预留注释（L169 段条目行）+ `sisys-uni-exception-design.md` §3.3.2 编码表，471-479 不可占用）→ 取空闲段 480 开 planning 子域（全仓 `grep -rn "EXCEPTION_48" src/` 零占用验证——注：`grep EXCEPTION_47` 会命中 470 属预期勿混淆）
-- [ ] 构造器携带领域上下文（plan_id/stage 等，`context` 字典暴露）；消息不泄露内部实现
-- [ ] 完整 5 项 checklist：定义文件 / `_code_ranges.py` 子域映射（CODE_RANGES 条目 + `_CLASS_TO_SUBDOMAIN` 三条 + 段注释）/ `__init__.py` 暴露 + EXCEPTION_HTTP_MAP（`src/interfaces/api/exception_handlers.py:147`）/ 子域码段校验（`test_code_ranges.py` Rule 1 + `test_all_subdomain_ranges_are_valid`（同级子域段不重叠校验）——planning 段与 financial 段不重叠）/ `sisys-uni-exception-design.md §3.3.2` 编码表同步（逐码行+段表双处）
-- [ ] 测试：构造/to_dict/HTTP 映射/编码唯一性（`test_error_code_uniqueness.py` + `test_code_ranges.py` 8 项全过）
+- [x] 归属 **planning 新子域**（物理码段 **(480,489)**——410/420/430/440/450/460/470 七代开段先例链的第八段；语义继承 `BusinessException` 基类）：`src/domain/exceptions/planning_exceptions.py`
+- [x] 候选编码 **480~482**：`PlanningNotFoundError`（480，plan_id 不存在）、`PlanningExecutionError`（481，全流程失败终态）、`PlanningStateError`（482，状态机非法推进——预留）。钦定流程（**唯一性+码段归属双查**）：读 `_code_ranges.py` CODE_RANGES+预留注释——business (201,209) 已满、financial (470,479) 为**双重成文预留**（`_code_ranges.py:167` 预留注释（L169 段条目行）+ `sisys-uni-exception-design.md` §3.3.2 编码表，471-479 不可占用）→ 取空闲段 480 开 planning 子域（全仓 `grep -rn "EXCEPTION_48" src/` 零占用验证——注：`grep EXCEPTION_47` 会命中 470 属预期勿混淆）
+- [x] 构造器携带领域上下文（plan_id/stage 等，`context` 字典暴露）；消息不泄露内部实现
+- [x] 完整 5 项 checklist：定义文件 / `_code_ranges.py` 子域映射（CODE_RANGES 条目 + `_CLASS_TO_SUBDOMAIN` 三条 + 段注释）/ `__init__.py` 暴露 + EXCEPTION_HTTP_MAP（`src/interfaces/api/exception_handlers.py:147`）/ 子域码段校验（`test_code_ranges.py` Rule 1 + `test_all_subdomain_ranges_are_valid`（同级子域段不重叠校验）——planning 段与 financial 段不重叠）/ `sisys-uni-exception-design.md §3.3.2` 编码表同步（逐码行+段表双处）
+- [x] 测试：构造/to_dict/HTTP 映射/编码唯一性（`test_error_code_uniqueness.py` + `test_code_ranges.py` 8 项全过）
 
 #### API 契约 (API Contract)
 
-- [ ] 本 Story 零 REST API（OD-5）——CLI 入口无 OpenAPI 面；`docs/api/openapi.yaml` 零改动（守护断言：文件 diff 为空）
+- [x] 本 Story 零 REST API（OD-5）——CLI 入口无 OpenAPI 面；`docs/api/openapi.yaml` 零改动（守护断言：文件 diff 为空）
 
 #### 六边形架构约束（必须遵守）
 
 四层定义与依赖方向矩阵按 template.md 全量执行。特别约束：
-- [ ] domain 新增（枚举/VO/事件/异常）零第三方依赖
-- [ ] `sp_blm_graph.py` 在 infrastructure/agent_orch/graphs/（R3：基础设施实现应用层端口）
-- [ ] BlmPlanningService 在 application/services/（编排语义）——LLM/工具/检索经端口注入，不直连 infrastructure 实现
-- [ ] CLI 在 entrypoints（D1 方案 A：入口在 `src/entrypoints/`，interfaces 层零组合根引用）
+- [x] domain 新增（枚举/VO/事件/异常）零第三方依赖
+- [x] `sp_blm_graph.py` 在 infrastructure/agent_orch/graphs/（R3：基础设施实现应用层端口）
+- [x] BlmPlanningService 在 application/services/（编排语义）——LLM/工具/检索经端口注入，不直连 infrastructure 实现
+- [x] CLI 在 entrypoints（D1 方案 A：入口在 `src/entrypoints/`，interfaces 层零组合根引用）
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] `tests/acceptance/test_acceptance_blm_planning.feature` + `.py`（OD-1 命名；R6 模板 `test_acceptance_postgresql_relational_layer.feature/.py` + 5-11 现代三件套形态）
-- [ ] 场景配比（Task 0.3 钦定，目标 14 场景）：AC-1×3（流程执行/顺序断言/综合洞察）+ AC-2×2（单角色/守卫链）+ AC-3×2（状态查询中/终态）+ AC-4×2（事件发布/outbox 落行）+ AC-5×1（性能口径）+ AC-6×3（步级降级/顶层异常/449 降级——380 单测层锚）+ 收尾×1
-- [ ] BDD 步骤：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；context dict fixture + 模块级 event_loop + `_run_async` 同循环三件套；延迟 import（Task 0-N 窗口期逐场景 failed 非 collection error）
-- [ ] 真实服务优先：CEO Agent 真实实例化（Redis）+ 真实图引擎 + Fake LLM（可控结构化输出 + 失败注入）；检索/PG 门控动态 skip
-- [ ] Edge Cases 含异常路径（AC-6 三场景，注入落点矩阵 Task 0.3 钦定：LLM 失败/工具 449/检索失败 × 采样步——验收层锚 449，380 单测层）
-- [ ] 场景构造四钦定：执行中场景门控构造（`asyncio.Event` 挂起 Fake LLM + `asyncio.create_task` 后台执行 + 主协程轮询——**挂起步骤须 ≥第 2 步**，首步完成前无快照会 480）；事件场景 8 个 stage 值全集各恰一次断言+PlanningStarted 恰一行；降级场景注入落点矩阵（LLM 失败/449/检索失败 × 采样步——**验收层锚 449**，380 单测层）；检索门控档位清单（依赖检索的场景逐一标档动态 skip）
-- [ ] 业务方评审通过（feature 文件确认）
+- [x] `tests/acceptance/test_acceptance_blm_planning.feature` + `.py`（OD-1 命名；R6 模板 `test_acceptance_postgresql_relational_layer.feature/.py` + 5-11 现代三件套形态）
+- [x] 场景配比（Task 0.3 钦定，目标 14 场景）：AC-1×3（流程执行/顺序断言/综合洞察）+ AC-2×2（单角色/守卫链）+ AC-3×2（状态查询中/终态）+ AC-4×2（事件发布/outbox 落行）+ AC-5×1（性能口径）+ AC-6×3（步级降级/顶层异常/449 降级——380 单测层锚）+ 收尾×1
+- [x] BDD 步骤：`event_loop.run_until_complete()`（禁 `@pytest.mark.asyncio`）；context dict fixture + 模块级 event_loop + `_run_async` 同循环三件套；延迟 import（Task 0-N 窗口期逐场景 failed 非 collection error）
+- [x] 真实服务优先：CEO Agent 真实实例化（Redis）+ 真实图引擎 + Fake LLM（可控结构化输出 + 失败注入）；检索/PG 门控动态 skip
+- [x] Edge Cases 含异常路径（AC-6 三场景，注入落点矩阵 Task 0.3 钦定：LLM 失败/工具 449/检索失败 × 采样步——验收层锚 449，380 单测层）
+- [x] 场景构造四钦定：执行中场景门控构造（`asyncio.Event` 挂起 Fake LLM + `asyncio.create_task` 后台执行 + 主协程轮询——**挂起步骤须 ≥第 2 步**，首步完成前无快照会 480）；事件场景 8 个 stage 值全集各恰一次断言+PlanningStarted 恰一行；降级场景注入落点矩阵（LLM 失败/449/检索失败 × 采样步——**验收层锚 449**，380 单测层）；检索门控档位清单（依赖检索的场景逐一标档动态 skip）
+- [x] 业务方评审通过（feature 文件确认）
 
 **Task 0 完成标志：**
-- [ ] 规范项全部定义完毕；Gherkin 已编写并确认失败（红阶段验证——预期红因=ModuleNotFoundError，StepDefinitionNotFoundError 非预期红，步骤函数 Task 0 全就位）
-- [ ] **链路接线断言清单**已定义：①组合根 `register_port("blm_planning_service")`/`("blm_planning_use_case")`/`("blm_planning_status_use_case")` 装配验证（resolve 可达 + 注入链非 None + `agent_engine` lambda 增 `blm_planning_service` 注入）②新事件 reliable 通道真实发布验证（发布点代码位——**PlanningStarted 由 RunBlmPlanningUseCase 三守卫通过后、submit_graph 前发布（守卫前发布则 443 失败 run 留孤儿事件）、BlmStageCompleted 由 BlmPlanningService 各阶段/子步骤方法末尾发布** + event_channels.yaml/ChannelRouter.DEFAULT_MAPPINGS 双登记 + outbox 落行；一次全流程 outbox 落行量级=10 行：PlanningStarted 1+BlmStageCompleted 8+AgentDecided 1——Task 0.7 落 L170 锚注记）③图挂载**双点**验证（`_build_graph` SpBlmGraph 分派分支存在 + **图身份锚断言**：终态 state 含 BLM 专属键（insight_steps/synthesis）而非 BasicAgent 状态——5-3 验收图身份锚先例）④CLI `blm-plan` 子命令接线（entrypoints bootstrap 链）⑤StrategicAnalysisUseCase 保留注记落档核验（处置 #2 改判保留：deferred-work L125 注记 + 组合根零注册状态不变）⑥「已实现未接线」检查：本 Story 交付件零休眠（全部激活或显式登记）⑦SpBlmGraph 路径 AgentDecided 形态断言（投影键纯标量——DC-11）
-- [ ] **前置留项清单八条裁定落档**（Subtask 0.7）
+- [x] 规范项全部定义完毕；Gherkin 已编写并确认失败（红阶段验证——预期红因=ModuleNotFoundError，StepDefinitionNotFoundError 非预期红，步骤函数 Task 0 全就位）
+- [x] **链路接线断言清单**已定义：①组合根 `register_port("blm_planning_service")`/`("blm_planning_use_case")`/`("blm_planning_status_use_case")` 装配验证（resolve 可达 + 注入链非 None + `agent_engine` lambda 增 `blm_planning_service` 注入）②新事件 reliable 通道真实发布验证（发布点代码位——**PlanningStarted 由 RunBlmPlanningUseCase 三守卫通过后、submit_graph 前发布（守卫前发布则 443 失败 run 留孤儿事件）、BlmStageCompleted 由 BlmPlanningService 各阶段/子步骤方法末尾发布** + event_channels.yaml/ChannelRouter.DEFAULT_MAPPINGS 双登记 + outbox 落行；一次全流程 outbox 落行量级=10 行：PlanningStarted 1+BlmStageCompleted 8+AgentDecided 1——Task 0.7 落 L170 锚注记）③图挂载**双点**验证（`_build_graph` SpBlmGraph 分派分支存在 + **图身份锚断言**：终态 state 含 BLM 专属键（insight_steps/synthesis）而非 BasicAgent 状态——5-3 验收图身份锚先例）④CLI `blm-plan` 子命令接线（entrypoints bootstrap 链）⑤StrategicAnalysisUseCase 保留注记落档核验（处置 #2 改判保留：deferred-work L125 注记 + 组合根零注册状态不变）⑥「已实现未接线」检查：本 Story 交付件零休眠（全部激活或显式登记）⑦SpBlmGraph 路径 AgentDecided 形态断言（投影键纯标量——DC-11）
+- [x] **前置留项清单八条裁定落档**（Subtask 0.7）
 
 ### TDD 循环约束（适用于每个 Task）
 
@@ -304,17 +304,17 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 
 #### 覆盖率要求
 
-- [ ] 整体覆盖率 ≥80%（P0 阻断）；domain 层 ≥90%；应用层 ≥85%（epics L2064）、集成测试覆盖率 ≥75%（L2065）
+- [x] 整体覆盖率 ≥80%（P0 阻断）；domain 层 ≥90%；应用层 ≥85%（epics L2064）、集成测试覆盖率 ≥75%（L2065）
 
 #### 代码质量门禁
 
-- [ ] `ruff check`/`mypy`/pre-commit 全过（mypy 含 tests/——5-9 教训）；无 P0/P1 审查问题
-- [ ] 并行 `pytest tests/unit tests/integration tests/acceptance tests/contracts -n 8` 通过（显式四目录，禁裸 `tests/`——会挂起）；连续 5 次无随机失败
+- [x] `ruff check`/`mypy`/pre-commit 全过（mypy 含 tests/——5-9 教训）；无 P0/P1 审查问题
+- [x] 并行 `pytest tests/unit tests/integration tests/acceptance tests/contracts -n 8` 通过（显式四目录，禁裸 `tests/`——会挂起）；连续 5 次无随机失败
 
 #### 测试隔离约束
 
-- [ ] 测试隔离全约束按 template.md 执行（UUID 前缀租户隔离/BDD event_loop 模式/禁手动 delete）
-- [ ] 本 Story 验收测试事件清理走 fixture teardown（K8 先例——断言失败也执行；outbox 事件无 poller 残留知悉注记归 L170 锚）
+- [x] 测试隔离全约束按 template.md 执行（UUID 前缀租户隔离/BDD event_loop 模式/禁手动 delete）
+- [x] 本 Story 验收测试事件清理走 fixture teardown（K8 先例——断言失败也执行；outbox 事件无 poller 残留知悉注记归 L170 锚）
 
 ---
 
@@ -348,18 +348,18 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 
 **关联 AC:** 全部（规范输入源）
 
-- [ ] Subtask 0.1: 数据模型/端口契约签名钦定（BlmPhase/MarketInsightStep 枚举 + **四 VO**——BlmPlanningStatus/PerformanceGapArtifacts/InsightStepResult/InsightSynthesis + BlmPlanningContext（端口文件内定义）+ BlmPlanningState 图 state（含 plan_id）+ **六子步骤语义配置表**（每步=视角前缀句（or.md 主导角色）/工具候选 slug 白名单（or.md 钦定映射，23 工具在位）/检索 query 模板/产物要点/**温度档**（8 步各档值或映射规则——AC-5 温度断言期望值唯一源）——prompt 模板按表参数化）+ BlmPlanningServicePort 四方法 + BlmPlanningResult DTO——本 Story 端口清单 SSOT）
-- [ ] Subtask 0.2: 领域异常契约（**480~482 + planning 子域段 (480,489) 新开**——码段唯一性+归属双查（business (201,209) 已满、financial (470,479) 双重成文预留不可占）+ 五件套设计 + HTTP 映射预案）
-- [ ] Subtask 0.3: Gherkin feature 编写（14 场景配比：AC-1×3 + AC-2×2 + AC-3×2 + AC-4×2 + AC-5×1 + AC-6×3[步级降级/顶层异常/**449 降级**——380 单测层锚] + 收尾×1；**检索门控档位清单钦定**：依赖检索可用性的场景逐一标档，检索不可达环境动态 skip；AC-1 Given 构造序列=3-1a 验收 embedding 探测+upsert 先例）
-- [ ] Subtask 0.4: BDD 步骤实现三件套（context dict fixture/模块级 event_loop/`_run_async` + 延迟 import + 检索/PG 探测 skip 分档 + marker 分档）
-- [ ] Subtask 0.5: 红阶段验证（全部场景 failed 非 collection error；红因核对口径记录）
-- [ ] Subtask 0.6: 链路接线断言清单七件（见 Task 0 完成标志）
-- [ ] Subtask 0.7: **前置留项清单八条裁定落档**（deferred-work.md 注记：#1 消费基建四件顺延+锚位调研 / #2 StrategicAnalysisUseCase **保留+取代注记**（改判——DC-9）+ L190 BLM 面局部核销注记 / #3 orchestration_service 保留+取代注记 / #4 记忆链路顺延 / #5 改串不触发 / #6 灰度评估不触发 / #7 retry-timeout 保持 6.6 / #8 checkpointer 保持 6.3）
-- [ ] Subtask 0.8: DC 决策表复核落定（DC-1~DC-11，含 DC-5 差距分析工具归属终审——3-body/Alice 评审位；DC-11 为文档审查 Round 1 新增需重点复核）+ OD 五条登记
-- [ ] Subtask 0.9: StrategicAnalysisUseCase **保留裁定核验**（处置 #2 改判保留——DC-9：组合根零注册状态不变（回归 grep 断言）+ deferred-work L125 取代事实注记落档（SOP 白名单（4.1c）与 ToolExecuted 统计链两独有能力归宿登记：工具面 6-2 评估 / 统计留项 #6）；**不删除**任何文件与测试——删除爆炸半径 7 测试文件+4 引用已实证，删除论据（5-3 全链内嵌）失实）
+- [x] Subtask 0.1: 数据模型/端口契约签名钦定（BlmPhase/MarketInsightStep 枚举 + **四 VO**——BlmPlanningStatus/PerformanceGapArtifacts/InsightStepResult/InsightSynthesis + BlmPlanningContext（端口文件内定义）+ BlmPlanningState 图 state（含 plan_id）+ **六子步骤语义配置表**（每步=视角前缀句（or.md 主导角色）/工具候选白名单（**R1-12② 勘误：实施口径为中文显示名**——Task 3 实施发现 slug 口径致全工具 449 假通过后改判，与 ceo_agent.yaml allowed_tools 真源及 get_tool(tool_name=) 同口径；原钦定 slug 枚举清单作废——见 Task 3 实施记录）/检索 query 模板/产物要点/**温度档**（8 步各档值或映射规则——AC-5 温度断言期望值唯一源）——prompt 模板按表参数化）+ BlmPlanningServicePort 四方法 + BlmPlanningResult DTO——本 Story 端口清单 SSOT）
+- [x] Subtask 0.2: 领域异常契约（**480~482 + planning 子域段 (480,489) 新开**——码段唯一性+归属双查（business (201,209) 已满、financial (470,479) 双重成文预留不可占）+ 五件套设计 + HTTP 映射预案）
+- [x] Subtask 0.3: Gherkin feature 编写（14 场景配比：AC-1×3 + AC-2×2 + AC-3×2 + AC-4×2 + AC-5×1 + AC-6×3[步级降级/顶层异常/**449 降级**——380 单测层锚] + 收尾×1；**检索门控档位清单钦定**：依赖检索可用性的场景逐一标档，检索不可达环境动态 skip；AC-1 Given 构造序列=3-1a 验收 embedding 探测+upsert 先例）
+- [x] Subtask 0.4: BDD 步骤实现三件套（context dict fixture/模块级 event_loop/`_run_async` + 延迟 import + 检索/PG 探测 skip 分档 + marker 分档）
+- [x] Subtask 0.5: 红阶段验证（全部场景 failed 非 collection error；红因核对口径记录）
+- [x] Subtask 0.6: 链路接线断言清单七件（见 Task 0 完成标志）
+- [x] Subtask 0.7: **前置留项清单八条裁定落档**（deferred-work.md 注记：#1 消费基建四件顺延+锚位调研 / #2 StrategicAnalysisUseCase **保留+取代注记**（改判——DC-9）+ L190 BLM 面局部核销注记 / #3 orchestration_service 保留+取代注记 / #4 记忆链路顺延 / #5 改串不触发 / #6 灰度评估不触发 / #7 retry-timeout 保持 6.6 / #8 checkpointer 保持 6.3）
+- [x] Subtask 0.8: DC 决策表复核落定（DC-1~DC-11，含 DC-5 差距分析工具归属终审——3-body/Alice 评审位；DC-11 为文档审查 Round 1 新增需重点复核）+ OD 五条登记
+- [x] Subtask 0.9: StrategicAnalysisUseCase **保留裁定核验**（处置 #2 改判保留——DC-9：组合根零注册状态不变（回归 grep 断言）+ deferred-work L125 取代事实注记落档（SOP 白名单（4.1c）与 ToolExecuted 统计链两独有能力归宿登记：工具面 6-2 评估 / 统计留项 #6）；**不删除**任何文件与测试——删除爆炸半径 7 测试文件+4 引用已实证，删除论据（5-3 全链内嵌）失实）
 
 **完成标准/Definition of Done:**
-- [ ] 规范全部定义；验收测试红阶段确认；deferred-work.md 八条注记落档；DC/OD 落定
+- [x] 规范全部定义；验收测试红阶段确认；deferred-work.md 八条注记落档；DC/OD 落定
 - [ ] **提交时序纪律**（pre-commit mypy 对延迟 import 的未建模块报 import-not-found 阻断提交、CI 三测试 job 无 continue-on-error——5-5 先例）：`.feature` 于 Task 0 入仓；`test_acceptance_blm_planning.py` 随 Task 4（CLI/组合根落地后）批入仓；`test_port_contract_blm_planning.py` 同批（其「Task 0 编写」指规格设计，文件入仓随首个落地 Task）
 
 ### Task 1: 领域层——BLM 概念与异常（含完整 TDD 循环）
@@ -384,11 +384,11 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | 🟡 变异 | code 改碰撞值 → 唯一性断言红 → 还原 |
 | 🔄 重构 | 注册四动作（CODE_RANGES planning 段+`_CLASS_TO_SUBDOMAIN` 三条/`__init__`/EXCEPTION_HTTP_MAP）+ `test_code_ranges.py` 校验 + 文档 §3.3.2 双表同步 + `test_exception_handlers.py` 联动 |
 
-- [ ] Subtask 1.1: 🔴🟢🟡🔄 循环 A
-- [ ] Subtask 1.2: 🔴🟢🟡🔄 循环 B
+- [x] Subtask 1.1: 🔴🟢🟡🔄 循环 A
+- [x] Subtask 1.2: 🔴🟢🟡🔄 循环 B
 
 **完成标准/Definition of Done:**
-- [ ] `poetry run pytest tests/unit/domain/ -v` 全绿（含 8 项自动校验）；grep 新码零碰撞
+- [x] `poetry run pytest tests/unit/domain/ -v` 全绿（含 8 项自动校验）；grep 新码零碰撞
 
 ### Task 2: 应用层——用例与状态查询（含完整 TDD 循环）
 
@@ -412,11 +412,11 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | 🟡 变异 | 进度计算改错 → 百分比断言红 → 还原 |
 | 🔄 重构 | 5-10 Recorder 键控先例对齐注记 |
 
-- [ ] Subtask 2.1: 🔴🟢🟡🔄 循环 A
-- [ ] Subtask 2.2: 🔴🟢🟡🔄 循环 B
+- [x] Subtask 2.1: 🔴🟢🟡🔄 循环 A
+- [x] Subtask 2.2: 🔴🟢🟡🔄 循环 B
 
 **完成标准/Definition of Done:**
-- [ ] 用例层测试全绿；覆盖率 ≥85%
+- [x] 用例层测试全绿；覆盖率 ≥85%
 
 ### Task 3: BLM 规划服务与图实现（含完整 TDD 循环）
 
@@ -440,11 +440,11 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | 🟡 变异 | **边序交换/漏节点** → 图身份锚或枚举序断言红（「条件边改直连」变异在本图形态下行为等价、物理不可红——不设）；**分派分支删除 → 图身份锚断言红**（终态 state 含 BLM 专属键非 BasicAgent 状态）→ 还原 |
 | 🔄 重构 | docstring 注明 Epic 10 六阶段扩展锚（OD-4） |
 
-- [ ] Subtask 3.1: 🔴🟢🟡🔄 循环 A
-- [ ] Subtask 3.2: 🔴🟢🟡🔄 循环 B
+- [x] Subtask 3.1: 🔴🟢🟡🔄 循环 A
+- [x] Subtask 3.2: 🔴🟢🟡🔄 循环 B
 
 **完成标准/Definition of Done:**
-- [ ] 服务+图测试全绿；`submit_graph("SpBlmGraph")` 全链可达
+- [x] 服务+图测试全绿；`submit_graph("SpBlmGraph")` 全链可达
 
 ### Task 4: 组合根接线 + 事件通道登记 + CLI（含完整 TDD 循环）
 
@@ -468,11 +468,11 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 | 🟡 变异 | 输出删进度行 → 断言红 → 还原 |
 | 🔄 重构 | `_ensure_bootstrapped`/`_close_connection_pools` 模式对齐 |
 
-- [ ] Subtask 4.1: 🔴🟢🟡🔄 循环 A
-- [ ] Subtask 4.2: 🔴🟢🟡🔄 循环 B
+- [x] Subtask 4.1: 🔴🟢🟡🔄 循环 A
+- [x] Subtask 4.2: 🔴🟢🟡🔄 循环 B
 
 **完成标准/Definition of Done:**
-- [ ] 链路接线断言**七件**全绿（Task 0.6 清单——①②④⑦由本 Task 交付；③图挂载归 Task 3 DoD、⑤保留核验归 Task 0.9、⑥零休眠归 Task 7 收尾）；本 Story 交付件零休眠
+- [x] 链路接线断言**七件**全绿（Task 0.6 清单——①②④⑦由本 Task 交付；③图挂载归 Task 3 DoD、⑤保留核验归 Task 0.9、⑥零休眠归 Task 7 收尾）；本 Story 交付件零休眠
 
 ### Task 5: 集成测试——真实服务链（验证型）
 
@@ -480,28 +480,28 @@ BLM（Business Leadership Model）前两阶段是战略规划（SP）的入口�
 
 > 套件型豁免条款（5-9/5-10 先例）：本 Task 为验证型集成测试，以变异替代 TDD 红绿——对关键断言做突变注入-还原实证。
 
-- [ ] Subtask 5.1: 场景①真实实例化链（Redis 真 CEO Agent + 真档案加载 + 真图引擎 + Fake LLM 可控输出——全流程跑通 + 顺序断言**双锚**（`insight_steps[i].step == EXPECTED_ORDER[i]` 枚举序独立构造 + 时间戳非重叠 `started_at[i] >= completed_at[i-1]`——与 AC-1 同构）+ 图身份锚断言（终态含 BLM 专属键））
-- [ ] Subtask 5.2: 场景②状态快照（**执行中轮询——门控构造**：`asyncio.Event` 挂起 Fake LLM + `asyncio.create_task` 后台执行 + 主协程轮询快照；终态断言 total_steps=8 全 completed + Redis latest 写读一致——FakeRedis 真跑）
-- [ ] Subtask 5.3: 场景③真实事件发布（resolve 真实 event_publisher/DualChannelEventBus + PG event_outbox 落行断言——PG 门控连接+表存在双预检动态 skip，5-4 R1-F07 先例）
-- [ ] Subtask 5.4: 场景④性能基准（Fake LLM 口径 P95<30s 分级断言 + 六子步骤 ≥20 次**受控失败注入**采样成功率≥95%（降级成功计入——零注入恒 100% 无鉴别力）+ 8s 配置传递断言 + 口径差 docstring 声明）
-- [ ] Subtask 5.5: 变异实证四锚（顺序断言/进度计算/outbox 落行/降级清单——各改坏→红→还原→绿）
-- [ ] Subtask 5.6: 清理 fixture teardown 化（K8 先例——断言失败也执行；outbox 残留知悉注记）
+- [x] Subtask 5.1: 场景①真实实例化链（Redis 真 CEO Agent + 真档案加载 + 真图引擎 + Fake LLM 可控输出——全流程跑通 + 顺序断言**双锚**（`insight_steps[i].step == EXPECTED_ORDER[i]` 枚举序独立构造 + 时间戳非重叠 `started_at[i] >= completed_at[i-1]`——与 AC-1 同构）+ 图身份锚断言（终态含 BLM 专属键））
+- [x] Subtask 5.2: 场景②状态快照（**执行中轮询——门控构造**：`asyncio.Event` 挂起 Fake LLM + `asyncio.create_task` 后台执行 + 主协程轮询快照；终态断言 total_steps=8 全 completed + Redis latest 写读一致——FakeRedis 真跑）
+- [x] Subtask 5.3: 场景③真实事件发布（resolve 真实 event_publisher/DualChannelEventBus + PG event_outbox 落行断言——PG 门控连接+表存在双预检动态 skip，5-4 R1-F07 先例）
+- [x] Subtask 5.4: 场景④性能基准（Fake LLM 口径 P95<30s 分级断言 + 六子步骤 ≥20 次**受控失败注入**采样成功率≥95%（降级成功计入——零注入恒 100% 无鉴别力）+ 8s 配置传递断言 + 口径差 docstring 声明）
+- [x] Subtask 5.5: 变异实证四锚（顺序断言/进度计算/outbox 落行/降级清单——各改坏→红→还原→绿）
+- [x] Subtask 5.6: 清理 fixture teardown 化（K8 先例——断言失败也执行；outbox 残留知悉注记）
 
 ### Task 6: SDD 架构约束验证测试（验证型）
 
 **关联 AC:** 六边形约束
 
-- [ ] Subtask 6.1: `tests/unit/architecture/test_blm_planning_arch.py`——domain 新增文件零第三方 import（AST 扫描验证器 A 先例）/依赖方向矩阵/`sp_blm_graph.py` 落位断言/CLI 在 entrypoints 层断言
-- [ ] Subtask 6.2: 架构验证器实跑 + 违规即失败报告
+- [x] Subtask 6.1: `tests/unit/architecture/test_blm_planning_arch.py`——domain 新增文件零第三方 import（AST 扫描验证器 A 先例）/依赖方向矩阵/`sp_blm_graph.py` 落位断言/CLI 在 entrypoints 层断言
+- [x] Subtask 6.2: 架构验证器实跑 + 违规即失败报告
 
 ### Task 7: 开发结束验收测试
 
 **关联 AC:** 全部收尾
 
-- [ ] Subtask 7.1: 收尾验收场景（feature 收尾场景：`src` 完成清单 + 四测试目录完成清单逐项确认）
-- [ ] Subtask 7.2: BDD 步骤实现 + 全场景绿
-- [ ] Subtask 7.3: `pytest tests/unit tests/integration tests/acceptance tests/contracts` 四目录全绿 + `ruff check` + `mypy` 收尾校验
-- [ ] Subtask 7.4: deferred-work.md 留项台账更新（本 Story 新增留项按 gap 四要素登记；前置清单八条处置核销注记核对）
+- [x] Subtask 7.1: 收尾验收场景（feature 收尾场景：`src` 完成清单 + 四测试目录完成清单逐项确认）
+- [x] Subtask 7.2: BDD 步骤实现 + 全场景绿
+- [x] Subtask 7.3: `pytest tests/unit tests/integration tests/acceptance tests/contracts` 四目录全绿 + `ruff check` + `mypy` 收尾校验
+- [x] Subtask 7.4: deferred-work.md 留项台账更新（本 Story 新增留项按 gap 四要素登记；前置清单八条处置核销注记核对）
 
 ---
 
@@ -599,9 +599,9 @@ tests/
 - 【5-3 直承】agent_id 必须 str 序列化进 parameters；`executed_phases` 末元素语义对齐；per-call 8s 上限纪律
 
 **应用到本故事/Applied to This Story:**
-- [ ] 循环自证红线：六子步骤顺序断言不经被测服务生成期望
-- [ ] 全部计数点数 + R5 机器复算预留
-- [ ] 5-3 八项遗产逐条对齐（见 Dev Notes 风险表与 DC 表）
+- [x] 循环自证红线：六子步骤顺序断言不经被测服务生成期望
+- [x] 全部计数点数 + R5 机器复算预留
+- [x] 5-3 八项遗产逐条对齐（见 Dev Notes 风险表与 DC 表）
 
 ---
 
@@ -627,6 +627,14 @@ tests/
 
 ### 完成清单 Completion Notes List
 
+- [x] **Task 1 实施记录（2026-10-31）**：循环 A——`src/domain/value_objects/blm_phases.py`（BlmPhase/MarketInsightStep 枚举 + BlmPlanningStatus/BlmTimelineEntry/PerformanceGapArtifacts/InsightStepResult/InsightSynthesis 五 VO + STAGE_VALUE_DOMAIN/make_timeline_entry；total_steps=8 构造守卫/progress_percent/timeline 条目 to_dict）；planning_events.py 扩展 PlanningStarted/BlmStageCompleted（kw_only 必填+init=False 自动注册+stage 8 值域守卫+summary ≤200 截断）；events/__init__ 双处登记。变异×2（枚举序打乱→顺序断言红/stage 守卫禁用→越域红）。循环 B——planning_exceptions.py 480~482 + 五件套（CODE_RANGES planning 段 (480,489) 第八段+段注释/_CLASS_TO_SUBDOMAIN 三条/exceptions __init__ 暴露/EXCEPTION_HTTP_MAP 480→404·481→500·482→409/文档 §3.3.2 逐码表+段表双处/test_exception_handlers expected_types 联动）。变异×1（code 碰撞→唯一性红）。**38+17 用例绿；tests/unit/domain 全域 3513 passed 零回归**
+- [x] **Task 2 实施记录（2026-10-31）**：`src/application/ports/blm_planning.py`（BlmPlanningServicePort 四方法+投影两方法/BlmPlanningContext/BlmPlanningResult/BLM_PLANNING_SESSION_PREFIX 单源常量+快照序列化契约 SSOT）；RunBlmPlanningUseCase 七步编排（443→441→447→档案→build_planning_context→PlanningStarted 发布（三守卫后 submit 前——共享事件序断言）→submit_graph（agent_id str+plan_id 入 parameters）→终态直读组装+全降级 481 抛出点（len(degraded_steps)>=8）；7/8 部分降级成功 DTO/终态缺失 481）；GetBlmPlanningStatusUseCase 读侧（session_id 拼接经端口 load/state_data 反序列化/无快照→480）。变异×2（角色守卫禁用→441 红/481 阈值破坏→全降级红）。**18 用例绿**
+- [x] **Task 3 实施记录（2026-10-31）**：`blm_planning_prompts.py`（三 pydantic Schema+StepSemanticConfig 语义配置表 SSOT：**工具候选=中文显示名口径**（与 ceo_agent.yaml allowed_tools 白名单真源及 get_tool(tool_name=) 同口径——实施中发现 slug 口径导致全工具 449 假通过，集成场景④成功率断言抓红后修正）+8 步温度档+三 prompt 构造+降级标注注入）；`blm_planning_service.py`（每步时序 DC-3：工具候选先行（449/380/解析失败步级捕获→直接推理续行）→检索（连接失败=降级/空结果=正常空证据）→单次结构化调用（温度档+8s 经 dataclasses.replace）+服务内单次瞬时重试（R3-2 两级设计）+各方法末尾快照写（CheckpointSnapshot latest）+BlmStageCompleted 发布+降级下游三规则+公开只读探针六件）；`sp_blm_graph.py`（8 节点 7 直连边+END/compile 无 checkpointer/节点闭包工厂/OD-4 扩展锚 docstring）；引擎挂载双点（_SUPPORTED_GRAPHS+_build_graph 分派+构造器 blm_planning_service 尾参+AgentDecided SpBlmGraph 五键纯标量投影（DC-11——confidence 显式 0.0 勿吃 0.9 默认））；schemas.py 增 SpBlmState。变异×3（降级删除→断言红/前缀删→AC-2 红/分派分支名改→图身份锚 4 测试红）。**28 用例绿；tests/unit 全域 10497 passed**
+- [x] **Task 4 实施记录（2026-10-31）**：组合根注册族（blm_planning_service v1.0.0 SINGLETON lambda 八依赖注入/blm_planning_use_case/blm_planning_status_use_case + agent_engine v1.0.0→v1.1.0 增 blm_planning_service 注入）；event_channels.yaml+ChannelRouter.DEFAULT_MAPPINGS 双登记（PlanningStarted/BlmStageCompleted 均 reliable——sisys.events.reliable.planning_started/blm_stage_completed）；契约测试 11 项+双登记守护 8 项（CheckpointReached 零发布负向断言改源码引用面——事件类与登记是 Epic 1 既有资产，断言语义=本 Story 交付面零发布点）；CLI blm-plan 子命令（-a/-t/--plan-id type=str 纪律/UUID 守卫先于 bootstrap/_print_blm_progress 进度摘要/exit 0 成功·1 业务异常——五步定式）。变异×2（yaml 键漂移→守护红/降级输出删→CLI 断言红）。**契约 19+CLI 8 用例绿**
+- [x] **Task 5 实施记录（2026-10-31）**：集成四场景（真实 Redis CEO Agent+真 guard 链+真档案+真图引擎+真检索（3-1a 门控建制语料）+Fake LLM 唯一豁免）：①全链+顺序双锚+图身份锚 ②执行中轮询（hold_at_call=2 挂起+create_task+轮询 active_plan_ids）+终态 8/8+latest 写读一致 ③真实 event_publisher（clear_singleton 跨 loop 防线）outbox 落行（**payload->'payload'->>'stage' JSONB 双层路径**——to_dict 子类字段合入 payload 子 dict）8 stage 全集+PlanningStarted 恰一行+teardown 按 event_id 精确清理 ④P95<30s（实测秒级）+受控注入 20 轮采样 100%≥95%（降级成功计入）+timeout 8.0/温度全档配置传递。变异四锚（图节点枚举错配→顺序红/进度分母→百分比红/事件发布删→落行红/降级清单漏记→累积断言红）。**4 场景绿**
+- [x] **Task 6 实施记录（2026-10-31）**：`test_blm_planning_arch.py` 三验证器 13 用例（A：domain 三文件零第三方+仅标准库与 domain 层——AST walk 覆盖延迟 import；B：服务在 application 且不直连 infrastructure/sp_blm_graph 在 infrastructure 且依赖应用端口/图工厂消费面收窄仅引擎分派/CLI 在 entrypoints；C：BlmPlanningService 实例化收窄仅组合根/交付件零抑制注释/openapi 零 BLM 面 OD-5）。变异×1（domain 注入 pydantic→验证器 A 两断言红）。**13 用例绿**
+- [x] **Task 7 实施记录（2026-11-01）**：验收 14 场景全绿（137.52s——AC-1×3/AC-2×2/AC-3×2/AC-4×2/AC-5×1/AC-6×3/收尾×1）；调参记录：守卫探针 Agent 补 name/ttl、449 构造改 _RestrictedConfigLoader 白名单收窄（L4 严格白名单语义——L2 是共享池全放行不触发 449）、注入序号按「每步 1 调+失败重试+1」校准（trend={1,2}/全降=range(16)/7-8=range(14)）、成功率口径修正（降级成功计入=轮完成 6/6——鉴别力来自降级失效则轮炸）、温度断言与采样解耦（base_calls 标准链锚）、outbox event_id 列表直取。红线自查：交付件 raise ValueError/手动 HTTPException/内置 Exception 继承/抑制注释全零（存量 2 处 HTTPException 属 3-1a embedding_api_server 非 Story 交付件）；ruff src/+tests/ 全过；mypy src/ 729 文件零错。deferred-work.md 新增 6.1-DF1（真实 LLM 计时归部署验证）/6.1-DF2（稀疏路 400 知悉）两条 gap 四要素登记
+- [x] **Task 0 实施记录（2026-10-31）**：五路并行调研（编排骨架/图引擎/事件异常体系/快照存储与组合根/CLI 与测试模板）全部实证核对 Story 引用的 file:line 代码事实（引擎 `_build_graph` 分派约定/parameters 即 state 输入/DualChannelEventBus 单模式分派/480 段空闲+grep EXCEPTION_48 零命中/EventPublisher 在 domain·ports/快照三层键形态/Rule 2 白名单对 BusinessException 抽象基类跳过·无需白名单对）。**Subtask 0.7/0.9**：deferred-work.md 十处注记落档（八条裁定+L190 知悉注记+L293），StrategicAnalysisUseCase 核验（组合根零注册 grep 实证+测试面 7 文件确认）保留不删。**Subtask 0.1 规范钦定**：六子步骤语义配置表（视角前缀=or.md 主导角色双重视角/工具候选白名单=TOOLS.md 已注册 slug 全实证：pestel-analysis·scenario-planning·appeals-analysis·value-proposition-canvas·porters-five-forces·competitor-analysis·value-chain-analysis·swot-tows·vrio-framework·ansoff-matrix·ge-mckinsey-matrix·kpi-tree/温度档 8 步=0.2·0.4·0.4·0.4·0.3·0.5·0.2·0.3 对齐五档先例值域/检索 query 模板）；快照序列化契约（state_data 七键+timeline 条目六字段+stage_id="blm_planning"+datetime→isoformat·enum→value 经 RedisJSONEncoder）；Schema 钦定并入 blm_planning_prompts.py（GapAnalysisSchema/InsightStepSchema/InsightSynthesisSchema——结构化输出契约是 prompt 面一部分）；检索 collection 钦定为 BlmPlanningService 构造参数（租户隔离装配灵活性）。**Subtask 0.3/0.4/0.5**：feature 14 场景+步骤实现三件套全就位，红阶段验证 15 collected→15 failed 全 ModuleNotFoundError 非 collection error ✅。**Subtask 0.8**：DC-1~DC-11 全部复核落定（DC-5 终审确认：or.md 建议工具全部在 23 工具注册面——YAGNI 成立）；OD 五条维持。**验收分档表**：R 档（检索门控 embedding+Qdrant 双探测+租户 collection 建制）×11 场景/R+PG ×1/仅 Redis ×1/零依赖 ×1（见验收 .py docstring 分档表）
 - [x] 故事需求从 `epics_v1.0.md` L2040-2077 提取（含 FR-SP-01/or.md L379-415 溯源）
 - [x] 架构约束从 architecture.md §17.5 + core-domain-design §17.4 提取
 - [x] 前一个故事学习经验整合（5-12 + 5-3 八项遗产）
@@ -640,9 +648,41 @@ tests/
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/6-1-blm-first-two-phases.md`
+- `src/domain/value_objects/blm_phases.py`（Task 1）
+- `src/domain/exceptions/planning_exceptions.py`（Task 1）
+- `src/application/ports/blm_planning.py`（Task 2）
+- `src/application/use_cases/run_blm_planning.py`（Task 2）
+- `src/application/use_cases/get_blm_planning_status.py`（Task 2）
+- `src/application/services/blm_planning_service.py`（Task 3）
+- `src/application/services/blm_planning_prompts.py`（Task 3）
+- `src/infrastructure/agent_orch/graphs/sp_blm_graph.py`（Task 3）
+- `tests/unit/domain/test_blm_domain_models.py`（Task 1——38 用例）
+- `tests/unit/domain/exceptions/test_planning_exceptions.py`（Task 1——17 用例）
+- `tests/unit/application/test_blm_planning_service.py`（Task 3——28 用例）
+- `tests/unit/application/test_run_blm_planning.py`（Task 2——18 用例）
+- `tests/unit/architecture/test_blm_planning_arch.py`（Task 6——13 用例）
+- `tests/integration/test_integration_blm_planning.py`（Task 5——4 场景）
+- `tests/contracts/test_port_contract_blm_planning.py`（Task 4——11 用例）
+- `tests/contracts/test_event_channel_mapping_blm_planning.py`（Task 4——8 用例）
+- `tests/acceptance/test_acceptance_blm_planning.feature`（Task 0——14 场景）
+- `tests/acceptance/test_acceptance_blm_planning.py`（Task 0 骨架→Task 7 全场景绿）
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- 见「项目结构说明」★/▲ 清单（**18 新建 + 11 修改 + 0 删除**——src 8★10▲、tests 10★1▲；DC-9 改判保留后零删除）
+**修改的文件/Modified Files (Dev Story 实施):**
+- `_bmad-output/implementation-artifacts/deferred-work.md`（Task 0.7——八条裁定+两知悉注记落档；Task 7.4——6.1-DF1/DF2 新增登记）
+- `src/domain/events/planning_events.py`（Task 1——扩展 PlanningStarted/BlmStageCompleted）
+- `src/domain/events/__init__.py`（Task 1——导出更新）
+- `src/domain/exceptions/_code_ranges.py`（Task 1——planning 段+三条映射）
+- `src/domain/exceptions/__init__.py`（Task 1——暴露三异常）
+- `src/interfaces/api/exception_handlers.py`（Task 1——EXCEPTION_HTTP_MAP 三登记：480→404/481→500/482→409）
+- `docs/architecture/sisys-uni-exception-design.md`（Task 1——§3.3.2 逐码表+段表双处同步）
+- `src/infrastructure/agent_orch/langgraph_engine.py`（Task 3——_SUPPORTED_GRAPHS 增名+_build_graph 分派+构造器注入位+SpBlmGraph 投影 DC-11）
+- `src/infrastructure/agent_orch/schemas.py`（Task 3——SpBlmState）
+- `src/composition_root.py`（Task 4——注册族三端口+agent_engine v1.1.0 注入）
+- `src/infrastructure/messaging/channel_router.py`（Task 4——DEFAULT_MAPPINGS 两事件）
+- `configs/event_channels.yaml`（Task 4——两事件登记）
+- `src/entrypoints/agent_cli.py`（Task 4——blm-plan 子命令+_print_blm_progress）
+- `tests/unit/interfaces/api/test_exception_handlers.py`（Task 1——expected_types 联动三异常）
+- `tests/unit/interfaces/cli/test_agent_cli.py`（Task 4——blm-plan 测试族 8 用例）
 
 ---
 
@@ -709,21 +749,65 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 待定
-**审查模式:** 待定
+**审查日期:** 2026-11-01（Round 1）/ 后续轮追加
+**审查模式:** 四视角并行调研（A 流程正确性/B 架构接线/C 测试判别力/D 验收集成审计）+ 主会话实测定谳
 
-（待代码审查轮填写——格式按 5-12 先例 R1/R2/R3 轮表）
+> 编号规则：R<轮>-<序>（与文档审查轮 R1~R12 同命名空间顺延）。Round 1 汇总：**P0×2 + P1×6 + P2×12 簇 + P3×10+**（四视角报告去重合并；两 Agent 对「重跑守卫」严重度分歧 P1/P3，主会话采 P1——CLI `--plan-id` help 自述「透传恢复/幂等锚」使同 id 重跑成为预期用法而非防御面）。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R1-1 | **检索证据提取恒空**：`_retrieve_evidence` 用 `getattr(item, "text", "")` 提取，而 `SearchResult` 是 **TypedDict**（`l3_vector.py:28`——运行时 dict，仅 id/score/payload 三键，文本在 payload 子 dict 内）——getattr 对 dict 恒返 ""，**生产环境证据注入链路 100% 空转**，全部 8 步 prompt 恒为「（无可用证据，基于任务描述推理）」，AC-1 Given「文档已解析并索引」的核心取数链失效；双重掩盖=单测 MagicMock 属性形态断裂（`.text` 手设）+ 恒真断言（`assert "检索证据" in prompt or "证据" in prompt`——空分支提示文本本身含该子串，`blm_planning_service.py:583` + `test_blm_planning_service.py:257`）。**C3 增补（评审员①实证）**：文本键**双源分裂**——生产链 `chunk_indexing_handler.py:159-166` 写入键为 **`content`**（L164），集成测试自构语料才是 `text`（`test_integration_blm_planning.py:174`）——按单键 text 修复则测试绿而生产面**依旧空转**（三重掩盖） | P0 | 提取改 **双键兼容**：`(item.get("payload") or {}).get("text") or ...get("content")`（测试语料 text 键与生产链 content 键双命中；None 容错 `or {}`/`or ""` 防值 None 注入 "None" 文本）；单测 Mock 改 SearchResult dict 形态**且与生产改原子同批落码**（只改一侧=MagicMock `.get` 链返回垃圾文本的静默双绿）；注入断言改 Fake 独有锚（「新能源行业趋势要点」文本入 prompt）；单测补 content 键形态用例锁生产面；payload 键 SSOT 统一登记 deferred（text/content 双键期） |
+| R1-2 | **DC-11 投影断言全仓零覆盖**：链路接线七件⑦（SpBlmGraph 路径 AgentDecided 形态断言——投影键纯标量）Story 声称 Task 4 交付，实测 `grep AgentDecided tests/` 35 文件与 SpBlmGraph 交集为零——投影分支整段删除（VO 实例入 payload 序列化炸被吞）或 confidence 0.9 假值回落均零红 | P0 | 引擎全链单测（test_blm_planning_service.py TestSpBlmGraphTopology/引擎链路）recorder 检查 AgentDecided 实参：五键存在、值递归断言纯标量（str/int/float/bool，无 VO/UUID/datetime 实例）、`confidence == 0.0` 显式断言 |
+| R1-3 | **租户上下文全链丢失**：工具执行 `tenant_id = uuid.uuid4()`（`blm_planning_service.py:537`）每次随机伪造——偏离 5-3 先例（`agent_workflow_context.py:39` MVP_TENANT_ID 固定常量，`agent_workflow_service.py:261-264` context.tenant_id 注入 ToolCall/ExecutionContext）；工具执行审计/统计归属随机租户 | P1 | 工具执行 tenant_id 改 MVP_TENANT_ID 先例平移（import 自 agent_workflow_context）；检索 filter 面（collection 级隔离已达成租户隔离，filter 需与 3-1a upsert payload 对齐——当前 upsert 仅 text 键无租户维度，强传即零命中）与事件 tenant_id 字段（MVP 单租户恒空）**登记 deferred** 归多租户 Story（R1-F21 同族），不强改 |
+| R1-4 | **AC-6⑥ 规则 3 未实现 + 规则 1 阶段 1→2 断链**：`run_insight_step` 无视图适配器传入的 `prior_outputs["performance_gap"]`（sp_blm_graph.py:56 已传、服务 L301 仅读 insight_steps）——阶段 1 产物（含降级态）不注入任何阶段 2 prompt；`synthesize_insights` 的 `degraded_inputs` 只从六子步骤提取（L384），gap 全降级永不进综合报告标记——「阶段 1 全降级时综合报告携带标记」半句无生产实现路径；测试假覆盖（test_gap_degraded_phase2_continues docstring 声称覆盖该半句，断言体只查 gap.degraded 与六步 not degraded） | P1 | 服务端：run_insight_step 从 prior_outputs 提取 gap_artifacts 构造摘要段注入 prompt（**C3 增补**：gap 为 None/缺键时跳过注入且不进 degraded_inputs——服务直调单测形态容错；降级标注复用 `DEGRADATION_MARKER_PREFIX` 同款形态「[降级] 步骤 performance_gap 降级（原因）」——与规则 1 注入形态一致）；图 `_synthesize_node` step_outputs 增 performance_gap，synthesize_insights 的 degraded_inputs 增 gap 降级源提取（同样 None 安全）；单测补断言（trend prompt 含 gap 摘要/降级标注；synthesis.degraded_inputs 含 "performance_gap"）；**验收 L1408 既有断言 `len(degraded_inputs)==6` 同步改 `==7` 并改写其注释**（7/8 场景 gap 降级——「直接输入=六子步骤」旧口径随本修复失效，评审员双确认漏改必红）；验收场景补 synthesize 断言 |
+| R1-5 | **同 plan_id 重跑零守卫**：`_ensure_run_state` 已存在即复用旧累积器（无重置无拒绝）——同 id 重跑 timeline 追加翻倍（16 条重复序列）、degraded_steps 无限累积可致第二次 run 中途 `>=8` 误抛 481；`PlanningStateError(482)` 预留「状态机非法推进」却零消费；CLI `--plan-id` help 自述「透传恢复/幂等锚」使重跑为预期用法 | P1 | **守卫位钦定（C3 修订——评审员双确认原案 `_ensure_run_state` 字面实现将误炸同 run 第 2~8 步，约 14 个绿用例红）**：守卫置于 `run_performance_gap_analysis` 入口——`self._runs.get(plan_id)` 已存在且 `completed_steps > 0` → 抛 `PlanningStateError(482)`（run 钦定唯一入口=图 entry 恒 performance_gap；`_ensure_run_state` 保持纯取/建；拒绝而非重置——首次 run 事件已发布/快照已写，静默重置造成事件流与快照不可调和，重试语义=新 plan_id）；单测补「同 service 同 plan_id 二次 run_performance_gap_analysis→482」用例；CLI `--plan-id` help 勘误（承诺失效改「缺省新铸——同 id 重跑将被拒绝（482）」）；482 激活后 planning_exceptions.py 与其测试 docstring「预留」字样同步改口 |
+| R1-6 | **验收「执行中状态可查询」轮询空转**：`_poll_during_execution` 循环体零快照读取（plan_id 声明后从未赋值）——挂起窗口 10s 纯空转 1000 次 sleep，随后读的是**终态**（completed_steps>=1 与 0<progress<=100 对终态 8/100 恒真）；AC-3 验证标准①「主协程轮询快照」验收层未兑现（集成场景②真实有效但验收层声称失实）；附带 Given 双重装配浪费（无 hold 装配一次弃用再 hold 重新装配） | P1 | 验收 when 改集成②形态（`test_integration_blm_planning.py:418-439` 先例平移）：挂起窗口内经 `blm_service.active_plan_ids` 探测 plan_id → 真实读快照 → 断言执行中值（`1 <= completed_steps < 8`、`0 < progress < 100`、phase/current_step 非空）→ break → `_release_holds` 释放 → await task。**C3 增补（评审员②）**：①轮询内置 **480 容错**（plan_id 已探测但首步快照未落盘时 GetStatus 抛 480 → try/except continue——集成 L432-433 形态）②`if task.done(): break` 防挂起构造失效死循环；③双重装配消除须 **feature+.py 双点**（删场景 6 首个 Given 行——`ceo_agent_instantiated_and_profile_loaded` 被 12 场景共享不可改行为）；④改造后场景时长 10s+→亚秒（正向，无超时风险——挂起位 call 2=market_customer 首调，窗口内 completed_steps=2/progress=25% 断言可满足） |
+| R1-7 | **AC-1③ 综合洞察注入侧断言不可判别漏传**：验收 Fake 六步 summary 为完全相同固定文本（`_FAKE_STEP_SUMMARY_PREFIX（结构化要点）`），断言仅单子串 `prefix in prompt`——漏传任 1~5 步均恒绿（唯一红路径=六步全漏）；Story 声称「可判别漏传」失实 | P1 | **C3 修订（评审员双确认原案「按调用计数注入标识」在失败注入场景计数错位——降级步重试同占调用序）**：Fake 从 **prompt 提取 display_name 判定步骤**（prompt 含「执行 BLM 市场洞察子步骤「看趋势」」——六名唯一可判别，正常/注入场景均正确），InsightStepSchema 响应 summary 携带该步标识（`{prefix}:{step_key}`）；断言六个步骤标识**逐一**出现在 synthesis prompt（期望独立构造自 EXPECTED_INSIGHT_ORDER） |
+| R1-8 | **集成场景④成功率口径与钦定相反 + 采样零降级触发**：计数代码「降级步从分子**排除**」（`success_steps += 6 - degraded_in_insight`）与行内注释「降级成功计入」及 epics L2061 钦定**相反**——若按注释口径改（或双点注入触发真降级）该断言 5/6≈83.3%<95% 必红，口径自相矛盾坐实；且单点注入 `{1+(i%6)}` 被服务内单次重试兜住 → 20 轮 degraded 恒 0，**采样从未触发降级路径**，实际验证的是「瞬时重试有效」 | P1 | 注入改双点（`{1+(i%6), 2+(i%6)}`——同一步首调+重试皆败，每轮恰 1 步真降级，与验收层对齐；重试紧邻首调且工具执行不占 structured_generate 调用序——评审员①已验证序号对齐前提）；计数口径 **C3 统一钦定（评审员②发现原 R1-8/R1-9② 两处表述互相矛盾）**：「降级信封完整即计入成功」——分子按 insight_steps 各步**信封完整性逐位判定**（summary 非空，或 degraded 且 degrade_reason 非空），非无条件 +6 亦非 6−degraded（后者按钦定 83.3% 必红）；**补鉴别锚「每轮 degraded_in_insight == 1」**（单断言覆盖三失效形态：重试机制删除=2 红/降级标记丢失=0 红/降级捕获删除=经 481 红）；验收层 AC-5 统计同口径修复（当前分子分母同源 +6 恒真 100%——补同款信封完整性与降级计数锚） |
+| R1-9 | **断言判别力族（P2×6 簇）**：①CLI 进度断言 `"规划" in out` 与首行「规划任务:」恒真耦合——进度行删除不红（Task 4 变异声称失效）②验收 AC-5 统计断言分子分母同源无条件 +6，rate 恒 100%（恒真）③单元层顺序断言三处合力失效（`_run_six_steps` 按枚举序喂再断言枚举序=循环自证；拓扑测试 issubset+>=7 不验边；引擎全链只查 len==6 不断言序——单元目录独立回归时边序错乱静默通过）④EXCEPTION_HTTP_MAP 只断言键存在不断言 480→404/481→500/482→409 值⑤六子步骤工具白名单 any() 弱化（阶段 1 是全量 for）——只注入部分候选仍绿⑥契约 test_search_collection_configurable 是空壳断言（callable(spec.impl) 恒真）+ collection 传参全链无判别（漏传回落默认不红） | P2 | 六处逐一：①断言改进度行专属子串（「子步骤完成」/「/6」）②按 result.insight_steps 实际 degraded 计数③引擎全链测试补 `[s.step ...] == EXPECTED_ORDER`（字面量独立构造）④test_http_map_registered 补三条值断言（status.HTTP_404/500/409）⑤any() 改全量 for（与阶段 1 对齐）⑥断言 `search.await_args.kwargs.get("collection") == COLLECTION` + 空壳测试改真断言 |
+| R1-10 | **服务语义族（P2×5 簇）**：①工具候选**全执行失败**环耗尽返回 ("","") 不降级（449/380/解析失败均记降级——真执行失败反而不记，语义倒挂）②LLM 成功但空 conclusions 时 degraded_steps 计入而 degraded_inputs 不自含（R3-4 钦定「自含标记」只在 except 分支实现）③DC-5「system 面注入档案 tools_l1 全量」缺失——structured_generate 从不传 system_prompt（5-3 先例 `agent_workflow_service.py:466` 有透传；R2 幻觉名缓解机制在 BLM 面缺位）④重试 `except Exception` 过宽——LLMConfigError（确定性配置错误）也被无谓重试（5-3 先例 L468 透传）⑤信封 `tool_used`/`evidence_refs` 恒空硬编码（VO docstring 承诺「实际执行的工具 slug」「evidence_refs 直存」——工具成功/检索命中也不回填，真执行与直接推理不可区分，6-5 报告引文/6-7 溯源数据面断供） | P2 | 五处逐一：①环耗尽返回聚合降级原因（`f"工具候选全部执行失败：{names}"`）②成功分支 degraded 判定 True 时 degraded_inputs 同样追加 "market_insight_synthesis" 自含③`_structured_call_with_retry` 从 context.profile_result 提取 tools_l1 构造 system_prompt 透传（structured_generate 签名支持——`llm_client.py:167`；**C3 增补**：单测 `_make_context` 裸 MagicMock 的 tools_l1 迭代为空→system_prompt 退化空串不炸；三个 Fake 的 `_structured_generate` 签名已含 system_prompt kwargs 透传零适配——评审员②已确认）④`except LLMConfigError` 单独分支**置于 except Exception 之前**：不重试、直接步级降级且原因如实记「LLM 配置错误」（包装 `AgentWorkflowError(reason=...) from error`——对齐 AC-6① 流程继续语义；评审员①判定偏离 5-3 透传正当：透传形态下图 FAILED→481「终态缺失」配置错误信息完全不上浮，更差）⑤`_execute_candidate_tools` 返回扩三元组携带 tool_used（**C3 钦定 slug 口径：`tool.slug or tool.name`——与 VO docstring「工具 slug」契约及 6-2/6-5 消费面一致**）、`_retrieve_evidence` 携带 evidence_refs（**`str(item["id"])` 归一**——SearchResult id 是 str|int 而 VO 字段 tuple[str,...]，防 Qdrant int id 直塞），信封构造回填 |
+| R1-11 | **status_use_case 生产消费面为零**：`blm_planning_status_use_case` 注册五要素齐备但全 src/ 零 resolve 消费（CLI `_print_blm_progress` 消费 result DTO 非 status 用例；验收测试直接手工构造）——Task 0.6⑥「交付件零休眠（全部激活或显式登记）」声明的反例 | P2 | **deferred-work 登记**「状态查询生产入口接线归 7-2 REST 入口」（AC-3 钦定 CLI 输出形态=执行后进度摘要 `_print_blm_progress`，新增 blm-status 子命令属范围蔓延——CLI blm-plan 同步阻塞语义下用户无中途查询场景；测试消费面已真实存在）；Story Task 0.6⑥ 表述补注记（激活判定=注册+测试真实消费+显式登记三者其一） |
+| R1-12 | **杂项族（P3）**：①端口 `BlmPlanningContext.retrieved_evidence` docstring「build 时一次性检索」与实现（build 不检索、各步骤内检索）矛盾——死字段误导 6-2/6-3 消费方②Subtask 0.1 钦定工具候选 **slug 口径**（pestel-analysis 等 11 slug 枚举）与实现**中文显示名口径**不一致（Task 3 实施发现改判但钦定源未回写）③验收顺序锚缺时间戳非空前置（None 抛 TypeError 非断言红——集成版有前置）④outbox event_id 采集窗口 1min 与断言窗口 5min 不对称（慢环境 teardown 漏清理）⑤畸形 agent_id fail-open（解析失败跳过 449 预检+事件伪造随机 UUID——正常链三守卫下不可达，防御方向反了但触发面窄）⑥验收 `_tenant`/`_restorers` 双死代码⑦B 视角其余 P3（终态组装裸下标 KeyError 逃逸面/事件 tenant_id 恒空） | P3 | ①②文档勘误（docstring 改口+Story Subtask 0.1 口径勘误内联标注）；③④顺带修（两行级）；⑤⑥⑦登记不改（触发面窄/死代码无行为影响/防御面归后续）——⑤⑦并入 R1-3 的 deferred 登记，⑥记录备查 |
+
+#### Round 1 C3 双评审员评审与方案修订（2026-11-01）
+
+双评审员（①科学性/正确性 + ②可行性/回归面/组合交互）独立评审 R1-1~R1-12 方案，初评均「合格（修订后放行）」，修订已全部回写上表方案列：
+
+- **阻断性修订×2**：R1-1 键名依据选错源（评审员①实证生产链 `chunk_indexing_handler.py:164` 文本键为 **content** 非 text——测试自构语料才是 text，单键修复则测试绿而生产面依旧空转→改双键兼容）；R1-5 守卫位字面实现误炸同 run 第 2~8 步（双评审员独立确认，约 14 绿用例红→守卫移至 run_performance_gap_analysis 入口）。
+- **增量补明×6**：R1-4 验收 L1408 `==6→==7` 传播位 + gap None 容错 + 标注形态统一；R1-6 轮询 480 容错 + task.done 保护 + feature/.py 双点；R1-7 Fake 锚改 prompt display_name 判定（调用计数在注入场景错位）；R1-8/R1-9② 计数口径统一「降级信封完整即计入成功」+「每轮 degraded==1」鉴别锚；R1-10⑤ tool_used 钦定 slug 口径 + evidence_refs str() 归一；R1-10④ LLMConfigError 分支位序钦定。
+- **回归面确认（评审员②逐项）**：检索替身全仓唯一（test L174-177 工厂）；验收/集成/use case 三层零同 plan_id 重跑形态；R1-3 零 ToolCall.tenant_id 值断言无红；R1-10③ 三 Fake system_prompt 签名兼容零适配；全降级场景 degraded_steps/degraded_inputs 两面语义确认不互扰。
+- **落码顺序钦定（评审员②）**：R1-1 最先或与 R1-10⑤ 原子同批（生产与 Mock 双绿陷阱）；R1-4+R1-10② 同批（共改 synthesize_insights 断言面）；R1-8+R1-9② 同批（口径统一）；R1-5/R1-6 独立；每簇生产+测试原子落码禁跨簇半成品跑门禁。
+
+#### Round 1 修复实施记录（2026-11-01——C3 评审「优秀」放行后落码）
+
+- **生产面 8 文件**：`blm_planning_service.py`（R1-1 双键提取+isinstance dict 容错/R1-3 MVP_TENANT_ID/R1-4 gap 注入+degraded_inputs 跨阶段源/R1-5 run 入口 482 守卫/R1-10①环耗尽聚合降级/R1-10②空结论自含对称化/R1-10③ system_prompt 透传（tools_l1 单分节最小形态）/R1-10④ LLMConfigError 不重试分支/R1-10⑤ 三元组扩展+slug 回填+str(id) 归一）；`blm_planning_prompts.py`（gap_summary 参数+summarize_gap_for_downstream）；`sp_blm_graph.py`（_synthesize_node 传 performance_gap）；`planning_exceptions.py`（482 docstring 激活改口）；`blm_planning.py`（retrieved_evidence docstring 勘误）；`agent_cli.py`（--plan-id help 勘误）
+- **测试面 9 文件**：单测检索替身 dict 化+独有锚断言（text/content 双键形态用例×2）+482 用例+tool_used slug 断言+空结论自含+环耗尽+LLMConfigError 不重试+DC-11 投影纯标量/confidence 断言+引擎全链字面量顺序断言+白名单全量 for+HTTP MAP 三值断言+collection 传参断言（空壳改真）+CLI 进度行专属子串；验收轮询改造（active_plan_ids 探测+480 容错+task.done 保护+执行中值断言 `1<=completed<8`）+Fake display_name 提取（完整句式锚）+六标识逐一断言+L1440 `==6→==7`+AC-5 信封完整性逐位计数+每轮恰 1 降级鉴别锚+时间戳非空前置+采集窗口对称 5min；集成场景④双点注入+同口径计数+同鉴别锚；feature 场景 6 双重装配消除（删首个 Given）
+- **新发现红线×2（四视角均漏——主会话 grep 自查抓出）**：`test_blm_domain_models.py:348` `# noqa: F401` 与 `test_acceptance_blm_planning.py:304` `# type: ignore[attr-defined]`（Task 7「红线自查全零」声称失实——自查范围未覆盖 tests 抑制注释形态）；均已根因修复（isinstance 收窄增强 roundtrip 判别力+Any 收窄探针挂载）
+- **mypy tests 预存错误×4 顺带修复**：from_dict 返回基类注解致 `restored.plan_id` attr-defined——isinstance 收窄（同上根因修复）
+- **deferred-work 新增 3 条**：6.1-DF3（payload 键 SSOT 双源分裂——text/content 双键兼容期）/6.1-DF4（租户维度贯通——检索 filter/事件 tenant/上下文链）/6.1-DF5（状态查询生产入口归 7-2）
+- **突变实证 4 锚**：①双键提取删 content 键→content 用例红→还原绿②482 守卫禁用→482 用例红③DC-11 confidence 0.9→投影断言红④gap 源提取禁用→规则 3 用例红——四锚全部还原后 35 用例复绿
+- **验证面**：单测 35+18+38+17+13+80 与契约 11+8 全绿；集成 4+验收 14 全绿（225.58s）；ruff src/+tests/ 全过；mypy src/ 729 文件+改动测试文件零错
+
+#### Round 1 通过面（四视角验证无问题的关键点）
+
+- 481 边界单 run 语义正确（8 方法各恰一次 record，>=8 与 ==8 单 run 等价；7/8 部分降级成功 DTO 路径真实）；两级重试不产生事件重复发布/快照重复写入（重试封闭于 LLM 调用内）
+- 降级三规则的**六子步骤间**传导成立（规则 1 注入下游 prompt/规则 2 列举/阶段 2 照常）；缺口集中阶段 1 传导（R1-4）
+- 工具白名单中文显示名口径三源一致（配置表 12 候选 ⊆ ceo_agent.yaml 23 名单 ⊆ TOOL_CATALOG name= 键）；温度 8 档全覆盖无 KeyError；8s timeout dataclasses.replace 传递
+- 接线主干闭合：组合根三注册+agent_engine v1.1.0 注入/引擎挂载双点+分派守卫/SpBlmState 9 键无缺/事件双登记四面一致+发布点恰两处 8 stage 全覆盖/异常五件套齐（480~482 与 financial 段不重叠）/DC-11 投影生产实现在位（缺断言=R1-2）/CLI exit 语义+UUID 守卫+type=str
+- domain 三文件零第三方依赖（含函数内延迟 import）；import 方向四层合规；架构测试 13 用例实跑绿
+- 验收结构面：14 场景配比吻合+46 步骤文本双向对照零死场景/449 真实路径锚（真实 InstantiateAgentUseCase+Redis+真实 IsolationGuardService）/BDD 禁 asyncio 标记（3 命中皆 docstring）/outbox JSONB 双层路径正确+teardown 精确清理/顺序双锚集成层有效/温度逐位断言有判别力/隔离清理纪律合规
+- 测试注入侧锚纪律整体优于历史水位（Fake 独有标记/共享调用序/三重等值/独立字面量期望），恒真面明显收窄——缺口集中「存在性断言」未到「值级断言」
 
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（Task 0 起步——前置留项八条裁定 + DC-5 终审为首个动作）
+- [x] 运行 `dev-story` 开始实施（Task 0 起步——前置留项八条裁定 + DC-5 终审为首个动作）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.2
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-10-31
 **最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
@@ -733,3 +817,5 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 - v1.3.0: 文档审查 Round 3（深度推演轮——14 场景期望唯一性/测试可满足性/R1×R2 组合交互面/Task 依赖干跑四轴）——R3×7 修复（P1×6：图形态钦定自相矛盾→8 节点 7 直连边[条件边与直连等价、变异物理不可红] / per-node RetryPolicy×步级降级互斥→删改服务内两级重试[R2-3 引入的设计缺陷推演证伪] / 380 白名单下生产不可达→验收锚 449+380 单测层 / 全降级 481 抛出点+部分降级终态成文 / 顺序断言时间戳不可判序→枚举序+非重叠双锚 / 检索必填性+Given 构造+门控清单钦定；P2×7+P3×5 归并 R3-7：降级 VO 对称/current_step 语义/序列化契约/480 触发锚/温度列/零注册断言移出/confidence 0.9/SSOT 两注入位/端口文件归属/发布位置/两套工具名单/综合洞察双锚/提交时序纪律/outbox 10 行量级）；另留「推演不成立疑点」留痕 5 项（Task 2 读侧可测/滞留与 L170 不冲突/场景计数无误/契约测试红 CI 可容/DC-11 已修——防后续轮重推）
 - v1.3.1: 文档审查 Round 4（纯验证轮——R3 传播验证+file:line 全量实地核验 88 处+结构/计数终核+三轮存续）——R4×2 修复（R4-1 前轮修复传播漏网 4 处[P2]：场景配比 380→449/Edge Cases 380→449/Subtask 5.1 双锚同步/风险 R2 先例引用改口；R4-2 P3×3：_code_ranges 注释行号 L169→L167 标签/R1 交叉引用改指 Task 3 循环 A/结构树 configs 仓根注记）；验证通过面：正文锚点 87/88 精确命中、结构与计数全过、三轮提交完整零游离、5 处关键修复终态在位
 - v1.3.2: 文档审查 Round 5（独立终审五节——周期闭合/双向取证/独立快扫/门禁红线/状态流转）——五节全过，ready-for-dev 放行成立；R5-1 终审特权发现 P3×2 随收敛清偿（Story key 统一 3-1a/2-2a、温度重构行措辞与 AC-5 对齐）；收敛声明入档（修复表末节）
+- v1.4.0: dev-story 实施完成（Task 0~7 全 Subtask 29 项 + 变异实证 13 锚）——五路调研实证/八条留项裁定落档/领域层（枚举+五 VO+两事件+480 段三异常五件套）/端口+两用例/服务（每步时序 DC-3+两级重试+步级降级 449/380+快照+事件）/SpBlmGraph 8 节点图+引擎挂载双点+DC-11 投影/组合根三注册+双登记+CLI blm-plan/集成 4 场景/架构 13 用例/验收 14 场景全绿（137.52s）；四目录回归+ruff+mypy+红线 grep 全过；关键实施发现：工具白名单=中文显示名口径（slug 口径致 449 假通过——集成成功率断言抓红修正）、outbox JSONB 双层路径 payload->'payload'->>'stage'、L4 严格白名单（L2 共享池全放行）；Status → review
+- v1.5.0: 代码审查 Round 1（四视角并行调研 A 流程正确性/B 架构接线/C 测试判别力/D 验收集成审计 + 双评审员 C3 评审 + 复评「优秀」放行 + 4 锚突变实证）——**P0×2**（检索证据 TypedDict 提取断裂+生产 payload 键 content 双源分裂→双键兼容；DC-11 投影断言全仓零覆盖→五键纯标量+confidence 断言）+ **P1×6**（租户丢失→MVP_TENANT_ID 先例平移；AC-6⑥ 规则 3 未实现→gap 跨阶段传导三层；同 plan_id 重跑零守卫→run 入口 482；验收轮询空转→执行中真实观测；综合断言不可判别→display_name 六标识；集成成功率口径相反+零降级触发→双杀注入+信封完整性）+ **P2×12 簇**（断言判别力族 6+服务语义族 5+status_use_case 登记 DF5）+ **P3×10+**（含新发现红线×2：tests 抑制注释——自查声称失实）；deferred 新增 DF3/DF4/DF5；Subtask 0.1 slug 口径勘误

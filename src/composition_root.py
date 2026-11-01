@@ -1554,20 +1554,47 @@ def bootstrap() -> None:
 
     register_port(
         name="agent_engine",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=AgentEnginePort,
         # Story 5-3：lambda 注入 workflow_service（六阶段图真跑的硬前置——
         # 不注入则 SingleAgentWorkflow 分派抛 ValidationError；惰性 resolve
-        # 不要求注册顺序）
+        # 不要求注册顺序）。
+        # Story 6-1：尾部增 blm_planning_service 注入（SpBlmGraph 分派前置——
+        # 同款硬前置语义；version v1.0.0→v1.1.0 增量注入位）
         impl=lambda resolver: LangGraphEngine(
             LangGraphConfig.from_env(),
             resolver.resolve("event_publisher"),
             workflow_service=resolver.resolve("agent_workflow_service"),
+            blm_planning_service=resolver.resolve("blm_planning_service"),
         ),
         module="src.infrastructure.agent_orch.langgraph_engine",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("agent", "langgraph"),
+    )
+
+    # BlmPlanningService — BLM 前两阶段规划服务（Story 6-1）
+    from src.application.ports.blm_planning import BlmPlanningServicePort
+    from src.application.services.blm_planning_service import BlmPlanningService
+
+    register_port(
+        name="blm_planning_service",
+        version="v1.0.0",
+        interface=BlmPlanningServicePort,
+        impl=lambda resolver: BlmPlanningService(
+            llm_client=resolver.resolve("llm_client"),
+            tool_execution_service=resolver.resolve("tool_execution_service"),
+            tool_registry_service=resolver.resolve("tool_registry_service"),
+            isolation_guard=resolver.resolve("isolation_guard_service"),
+            hybrid_search=resolver.resolve("hybrid_search_service"),
+            search_collection=os.getenv("BLM_SEARCH_COLLECTION", "documents"),
+            event_publisher=resolver.resolve("event_publisher"),
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+        ),
+        module="src.application.services.blm_planning_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("blm", "planning", "sp"),
     )
 
     # OrchestrationService — 应用层编排服务（service 注册，非 port）
@@ -3183,6 +3210,50 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("financial", "valuation", "usecase"),
+    )
+
+    # BLM 规划用例族（Story 6-1——执行用例 + 状态查询用例）
+    register_port(
+        name="blm_planning_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.run_blm_planning",
+            fromlist=["RunBlmPlanningUseCase"],
+        ).RunBlmPlanningUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.run_blm_planning",
+            fromlist=["RunBlmPlanningUseCase"],
+        ).RunBlmPlanningUseCase(
+            agent_repository=resolver.resolve("agent_repository"),
+            agent_profile_use_case=resolver.resolve("agent_profile_use_case"),
+            agent_engine=resolver.resolve("agent_engine"),
+            blm_planning_service=resolver.resolve("blm_planning_service"),
+            isolation_guard=resolver.resolve("isolation_guard_service"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.use_cases.run_blm_planning",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("blm", "planning", "usecase"),
+    )
+
+    register_port(
+        name="blm_planning_status_use_case",
+        version="v1.0.0",
+        interface=__import__(
+            "src.application.use_cases.get_blm_planning_status",
+            fromlist=["GetBlmPlanningStatusUseCase"],
+        ).GetBlmPlanningStatusUseCase,
+        impl=lambda resolver: __import__(
+            "src.application.use_cases.get_blm_planning_status",
+            fromlist=["GetBlmPlanningStatusUseCase"],
+        ).GetBlmPlanningStatusUseCase(
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+        ),
+        module="src.application.use_cases.get_blm_planning_status",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("blm", "planning", "status", "usecase"),
     )
 
     # === 事件处理器注册（register_handlers）===

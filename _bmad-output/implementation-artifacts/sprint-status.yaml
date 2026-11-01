@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-10-31
+last_updated: 2026-11-01
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -175,7 +175,7 @@ development_status:
   # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始
   # ===========================================================================
   epic-6: in-progress
-  6-1-blm-first-two-phases: ready-for-dev
+  6-1-blm-first-two-phases: review
   6-2-market-insight-six-substeps: backlog
   6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
   6-4-json-chain-of-thought-output: backlog
