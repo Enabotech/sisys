@@ -45,15 +45,15 @@
 **And** 六步类型化分派由模块级 SSOT 映射驱动，服务层零 if-else 硬编码分派
 
 **验证标准/Validation Criteria:**
-- [ ] 看趋势产出含 PESTEL 六维度评估（OD-8 工具产物化）+ 技术演进路线图 + 情景规划方案集
-- [ ] 看市场与客户产出含客户细分画像 + 需求优先级矩阵 + 价值主张地图
-- [ ] 看竞争产出含波特五力五维评估（OD-8 工具产物化）+ 竞争对手能力雷达图评估 + 竞争策略建议
-- [ ] 看自己产出含内部能力清单 + 核心能力 VRIO 评估 + 资源约束分析
-- [ ] 看机会产出含机会清单 + 机会优先级排序 + 增长路径图
-- [ ] 机会差距分析产出含机会差距量化报告 + 能力-机会匹配矩阵 + 差距弥合策略
-- [ ] 产物命名以 or.md L386-415 原产物名为准（图/报告类产物以要点字段族承载——图本体生成归 6-5 报告面，OD-8 声明）
-- [ ] 每个 Schema 字段类型仅限 `str` / `float` / `list[str]`（嵌套对象禁入——OD-5 扁平化强制）
-- [ ] 每步 Schema 均含公共字段 `summary: str` + `findings: list[str]`（信封同源双公共字段——R3 修订，服务 L350-353 直读两字段——R5 勘误：findings 实在 L353）
+- [x] 看趋势产出含 PESTEL 六维度评估（OD-8 工具产物化）+ 技术演进路线图 + 情景规划方案集
+- [x] 看市场与客户产出含客户细分画像 + 需求优先级矩阵 + 价值主张地图
+- [x] 看竞争产出含波特五力五维评估（OD-8 工具产物化）+ 竞争对手能力雷达图评估 + 竞争策略建议
+- [x] 看自己产出含内部能力清单 + 核心能力 VRIO 评估 + 资源约束分析
+- [x] 看机会产出含机会清单 + 机会优先级排序 + 增长路径图
+- [x] 机会差距分析产出含机会差距量化报告 + 能力-机会匹配矩阵 + 差距弥合策略
+- [x] 产物命名以 or.md L386-415 原产物名为准（图/报告类产物以要点字段族承载——图本体生成归 6-5 报告面，OD-8 声明）
+- [x] 每个 Schema 字段类型仅限 `str` / `float` / `list[str]`（嵌套对象禁入——OD-5 扁平化强制）
+- [x] 每步 Schema 均含公共字段 `summary: str` + `findings: list[str]`（信封同源双公共字段——R3 修订，服务 L350-353 直读两字段——R5 勘误：findings 实在 L353）
 
 ### AC-2: 每子步骤触发 Checkpoint 快照骨架
 
@@ -64,11 +64,11 @@
 **And** per-step 快照写入失败不阻断流程（与 latest 写入同语义——步级容错）
 
 **验证标准/Validation Criteria:**
-- [ ] 一次完整市场洞察运行后，6 个子步骤快照 + 1 个 latest 快照全部可独立读回
-- [ ] per-step 快照键形态：`sisys:snapshot:blm-planning-{plan_id}:{step_value}`（session_id 后缀区分步骤——RedisSnapshotStore 键仅由 session_id 决定，见 Dev Notes）
-- [ ] per-step 快照 stage_id = 该步 stage 值（`market_insight_{step}`，与 `STAGE_VALUE_DOMAIN` 同源）
-- [ ] latest 快照（`stage_id="blm_planning"`）行为与 6-1 完全一致——读侧 `GetBlmPlanningStatusUseCase` 零回归
-- [ ] 降级步同样触发快照（state_data 含降级标记；`structured_output` 键恒存在、值为 `null` 当且仅当 LLM 调用/校验失败（工具/检索面降级而 LLM 成功时为类型化产物——R1-F1 收窄口径），见 state_data 七键契约）
+- [x] 一次完整市场洞察运行后，6 个子步骤快照 + 1 个 latest 快照全部可独立读回
+- [x] per-step 快照键形态：`sisys:snapshot:blm-planning-{plan_id}:{step_value}`（session_id 后缀区分步骤——RedisSnapshotStore 键仅由 session_id 决定，见 Dev Notes）
+- [x] per-step 快照 stage_id = 该步 stage 值（`market_insight_{step}`，与 `STAGE_VALUE_DOMAIN` 同源）
+- [x] latest 快照（`stage_id="blm_planning"`）行为与 6-1 完全一致——读侧 `GetBlmPlanningStatusUseCase` 零回归
+- [x] 降级步同样触发快照（state_data 含降级标记；`structured_output` 键恒存在、值为 `null` 当且仅当 LLM 调用/校验失败（工具/检索面降级而 LLM 成功时为类型化产物——R1-F1 收窄口径），见 state_data 七键契约）
 
 ### AC-3: CheckpointReached 事件语义分立（负向断言）
 
@@ -79,9 +79,9 @@
 **And** 本 Story 零新增领域事件、零事件通道登记变更（`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` 零 diff）
 
 **验证标准/Validation Criteria:**
-- [ ] outbox 中本 plan_id 相关行零 `CheckpointReached`（负向断言——验收/契约双承载；**非空锚前置（R3 补）**：先断言该 plan_id 行数 ≥9（PlanningStarted×1+BlmStageCompleted×8）再负向 CheckpointReached——防 recorder 装配空真；**行筛选 SQL 路径（R1-F2 双通道）** = `(payload->'payload'->>'plan_id' = :plan_id OR payload->'payload'->>'phase_identifier' LIKE 'market\_insight%')`：plan_id 单通道对 CheckpointReached 恒 NULL（事件类字段族无 plan_id——过滤键空真盲区），第二通道转义 LIKE 捕获 phase_identifier="market_insight_*" 误发布形态（BLM 命名空间独占前缀）；outbox 行 payload 列存 `to_dict()` 全量、子类字段并入 payload 子字典——`event_outbox_adapter.from_domain_event` L30 + `base.to_dict` 语义，6-1 集成既有先例 `payload->'payload'->>'stage'` 同构；验收层该场景用 6-1 场景⑨ 真实发布装配先例）
-- [ ] `test_event_channel_mapping_blm_planning.py` 既有负向源码 grep 断言继续通过
-- [ ] `STAGE_VALUE_DOMAIN` 值域守卫测试零修改通过
+- [x] outbox 中本 plan_id 相关行零 `CheckpointReached`（负向断言——验收/契约双承载；**非空锚前置（R3 补）**：先断言该 plan_id 行数 ≥9（PlanningStarted×1+BlmStageCompleted×8）再负向 CheckpointReached——防 recorder 装配空真；**行筛选 SQL 路径（R1-F2 双通道）** = `(payload->'payload'->>'plan_id' = :plan_id OR payload->'payload'->>'phase_identifier' LIKE 'market\_insight%')`：plan_id 单通道对 CheckpointReached 恒 NULL（事件类字段族无 plan_id——过滤键空真盲区），第二通道转义 LIKE 捕获 phase_identifier="market_insight_*" 误发布形态（BLM 命名空间独占前缀）；outbox 行 payload 列存 `to_dict()` 全量、子类字段并入 payload 子字典——`event_outbox_adapter.from_domain_event` L30 + `base.to_dict` 语义，6-1 集成既有先例 `payload->'payload'->>'stage'` 同构；验收层该场景用 6-1 场景⑨ 真实发布装配先例）
+- [x] `test_event_channel_mapping_blm_planning.py` 既有负向源码 grep 断言继续通过
+- [x] `STAGE_VALUE_DOMAIN` 值域守卫测试零修改通过
 
 ### AC-4: 类型化校验失败降级与成功率
 
@@ -92,11 +92,11 @@
 **And** 受控失败注入采样下，六子步骤成功率≥95%（口径：子步骤产出完整信封即计入成功——6-1 AC-5 先例）
 
 **验证标准/Validation Criteria:**
-- [ ] 单点类型化校验失败 → 仅该步降级，其余五步 + synthesis 正常
-- [ ] 双杀注入（相邻两步 {k, k+1} 的**两个 Schema 同时恒败**——注意与 6-1 代码审查 R1-8 的"双杀"同词不同义：6-1 指单步首调+重试两序号皆败，本 Story 指相邻两步各自降级）→ 两步降级且互不传染
-- [ ] **注入键钦定（R1 修订）**：一律按 `response_schema` 身份注入（`fail_schemas` 语义——schema 恒败，首调与重试皆败）——验收/集成 Fake 在既有 `fail_call_indices` 之外**扩展 schema 身份注入参数**；禁用调用序算术注入（重试同占调用序、20 轮采样下序号连续累计会漂移错位——6-1 验收 Fake L111 注记成文）；六 Schema 与六步一一对应，`fail_schemas={SchemaK, SchemaK+1}` 即精确双杀
-- [ ] `structured_output` 填充语义（R1-F1 收窄）：值为 None 当且仅当 LLM 调用/校验失败（与 summary/findings 空同步）；工具/检索面降级而 LLM 调用成功时为类型化产物（与信封 summary/findings 非空对称）
-- [ ] 20 轮受控注入采样全绿（Fake LLM 口径——判别力由轮内逐条断言承载：任一步失败即中止，20 轮 × 每轮全断言 ≡ 逐轮 100% 验证，强于尾聚合——R1-F3 口径；schema 身份注入与轮次无关，逐轮稳定复现双降级）
+- [x] 单点类型化校验失败 → 仅该步降级，其余五步 + synthesis 正常
+- [x] 双杀注入（相邻两步 {k, k+1} 的**两个 Schema 同时恒败**——注意与 6-1 代码审查 R1-8 的"双杀"同词不同义：6-1 指单步首调+重试两序号皆败，本 Story 指相邻两步各自降级）→ 两步降级且互不传染
+- [x] **注入键钦定（R1 修订）**：一律按 `response_schema` 身份注入（`fail_schemas` 语义——schema 恒败，首调与重试皆败）——验收/集成 Fake 在既有 `fail_call_indices` 之外**扩展 schema 身份注入参数**；禁用调用序算术注入（重试同占调用序、20 轮采样下序号连续累计会漂移错位——6-1 验收 Fake L111 注记成文）；六 Schema 与六步一一对应，`fail_schemas={SchemaK, SchemaK+1}` 即精确双杀
+- [x] `structured_output` 填充语义（R1-F1 收窄）：值为 None 当且仅当 LLM 调用/校验失败（与 summary/findings 空同步）；工具/检索面降级而 LLM 调用成功时为类型化产物（与信封 summary/findings 非空对称）
+- [x] 20 轮受控注入采样全绿（Fake LLM 口径——判别力由轮内逐条断言承载：任一步失败即中止，20 轮 × 每轮全断言 ≡ 逐轮 100% 验证，强于尾聚合——R1-F3 口径；schema 身份注入与轮次无关，逐轮稳定复现双降级）
 
 ### AC-5: 市场洞察段性能 P95<25s
 
@@ -105,9 +105,9 @@
 **Then** 市场洞察段执行延迟 P95 < 25s（Fake LLM 管线开销口径——OD-3：真实 LLM 延迟显式出栈，口径差声明落测试 docstring，与 6-1 DC-7 先例一致；真实 LLM 计时归 6.1-DF1 部署验证）
 
 **验证标准/Validation Criteria:**
-- [ ] 采样 ≥20 轮（R1 修订：≥10 时 `ceil(0.95*10)-1=9` 即 P95≡最大值零容忍；20 轮取次大值档，对齐 6-1 先例），P95 = durations[ceil(0.95*n)-1] < 25.0s
-- [ ] 计时窗口 = 六子步骤开始至 synthesis 完成（阶段 2 全段）；**观测点钦定（R1 修订）**：`timeline[market_insight_trend].started_at → timeline[market_insight_synthesis].completed_at`（经 `project_timeline(plan_id)` 或 latest 快照 state_data.timeline 读取——`InsightSynthesis` VO 本身无时间戳字段，`BlmTimelineEntry` 两端字段先由服务 `record_step` 写入）
-- [ ] 性能场景复用 `_CachedEmbedding` 缓存代理模式（6-1 收敛优化先例：embedding API 往返占性能场景 >95%）
+- [x] 采样 ≥20 轮（R1 修订：≥10 时 `ceil(0.95*10)-1=9` 即 P95≡最大值零容忍；20 轮取次大值档，对齐 6-1 先例），P95 = durations[ceil(0.95*n)-1] < 25.0s
+- [x] 计时窗口 = 六子步骤开始至 synthesis 完成（阶段 2 全段）；**观测点钦定（R1 修订）**：`timeline[market_insight_trend].started_at → timeline[market_insight_synthesis].completed_at`（经 `project_timeline(plan_id)` 或 latest 快照 state_data.timeline 读取——`InsightSynthesis` VO 本身无时间戳字段，`BlmTimelineEntry` 两端字段先由服务 `record_step` 写入）
+- [x] 性能场景复用 `_CachedEmbedding` 缓存代理模式（6-1 收敛优化先例：embedding API 往返占性能场景 >95%）
 
 ### AC-6: 并发执行 5 个市场洞察任务
 
@@ -117,9 +117,9 @@
 **And** 各 plan_id 的 per-step 快照键/事件 outbox 行按 plan_id 可分离断言
 
 **验证标准/Validation Criteria:**
-- [ ] 5 任务全部返回成功 DTO（或各自的降级终态正确归属）
-- [ ] 每任务 6 个 per-step 快照独立可读回，无跨 plan_id 污染（state_data.plan_id 归属锚逐任务断言，R1-4）
-- [ ] outbox 行按 `payload->'payload'->>'plan_id'` 逐任务计数正确（R1 修订：**禁用 `payload->>'aggregate_id'`**——`BlmStageCompleted.aggregate_id` 实测语义为 agent_id 非 plan_id（`planning_events.py` L132-133），5 任务共享 CEO agent 时该键全同值不可分离，且 context 无可解析 agent_id 时服务侧每次发布随机 uuid4（service L673）连单 plan 内都不稳定；`plan_id` 位于 to_dict 的 payload 子字典内，两级 JSONB 路径与 6-1 集成既有先例 `payload->'payload'->>'stage'` 同构）
+- [x] 5 任务全部返回成功 DTO（或各自的降级终态正确归属）
+- [x] 每任务 6 个 per-step 快照独立可读回，无跨 plan_id 污染（state_data.plan_id 归属锚逐任务断言，R1-4）
+- [x] outbox 行按 `payload->'payload'->>'plan_id'` 逐任务计数正确（R1 修订：**禁用 `payload->>'aggregate_id'`**——`BlmStageCompleted.aggregate_id` 实测语义为 agent_id 非 plan_id（`planning_events.py` L132-133），5 任务共享 CEO agent 时该键全同值不可分离，且 context 无可解析 agent_id 时服务侧每次发布随机 uuid4（service L673）连单 plan 内都不稳定；`plan_id` 位于 to_dict 的 payload 子字典内，两级 JSONB 路径与 6-1 集成既有先例 `payload->'payload'->>'stage'` 同构）
 
 ### AC-7: 跨阶段传导与综合消费（gap 四字段全量）
 
@@ -130,9 +130,9 @@
 **And** synthesis 综合消费六步产物（含降级标注——⑥规则不变）
 
 **验证标准/Validation Criteria:**
-- [ ] 阶段 2 第一步 prompt 中可断言四字段全量摘要存在（Fake LLM calls 记录断言）
-- [ ] gap 降级时摘要仍带 `[降级]` 标注（DEGRADATION_MARKER_PREFIX 单源不变）
-- [ ] synthesis degraded_inputs 降级列举语义与 6-1 一致（零回归）
+- [x] 阶段 2 第一步 prompt 中可断言四字段全量摘要存在（Fake LLM calls 记录断言）
+- [x] gap 降级时摘要仍带 `[降级]` 标注（DEGRADATION_MARKER_PREFIX 单源不变）
+- [x] synthesis degraded_inputs 降级列举语义与 6-1 一致（零回归）
 
 ---
 
@@ -174,7 +174,7 @@
   - **公共字段（R3 修订——P1 修复）**：每 Schema 含 **`summary: str` + `findings: list[str]` 双公共字段**（信封同源：服务成功分支信封构造 L350-353 直读 `schema_result.summary`/`schema_result.findings` 填充 `InsightStepResult`——六 Schema 缺 findings 字段则切表即 AttributeError，Task 3 阻断；双公共字段使 6-1「findings/summary 语义未变」回归声明成立、降级分支空 summary/空 findings 对称保持；R5 勘误：findings 行实在 L353，原引 L350-352 偏一行）
   - **扁平化强制（OD-5）**：字段类型仅限 `str` / `float` / `list[str]`；禁嵌套 BaseModel / 禁 `list[dict]` / **禁 Optional[X] / None 默认值字段**（`model_dump()` 对 Optional 字段产 `None`——VO 守卫拒 None 且拒绝点在信封构造处、位于步级降级 try/except 之外，会炸整轮 run 而非降级该步）；GLM-5.3 anthropic 端点对嵌套 Schema 服务端栈溢出 500（`src/infrastructure/external_services/llm/litellm_llm_client.py` L631-637 注记成文）；字段命名 snake_case
   - 领域要素 → 字段的精确映射在 Task 0 定稿并冻结（后续 Task 不得擅自增删字段——契约面变更需过 Contract Gate 思路评审）
-- [ ] `InsightStepSchema`（两字段通用信封 Schema）**移除**：六步全量切换类型化后生产调用点归零，保留即双源（YAGNI）；其 `summary` 语义并入各类型化 Schema 公共字段。引用面清理见"6-1 回归面"
+- [x] `InsightStepSchema`（两字段通用信封 Schema）**移除**：六步全量切换类型化后生产调用点归零，保留即双源（YAGNI）；其 `summary` 语义并入各类型化 Schema 公共字段。引用面清理见"6-1 回归面"
 - [x] per-step 快照 state_data 键契约登记于端口文件序列化契约区（`src/application/ports/blm_planning.py` 既有 SSOT 区——**latest 两级契约（模块 docstring 登记的顶层七键 + timeline 条目六键）之外新增第三级 per-step 契约，属待新增非既有**）：`step`/`plan_id`/`summary`/`structured_output`/`degraded`/`degrade_reason`/`completed_steps` 七键
   - `completed_steps` = 截至该步（**含**该步）的已完成步骤标识清单 `list[str]`（timeline 条目 step 字段同源——六子步骤为裸 step 值（trend 等）、performance_gap/synthesis 为 stage 形态；R1-F5 口径校准），**首步快照即含 `performance_gap`**（自然实现 `[e.step for e in run_state.timeline]` 含阶段 1——期望构造侧按此口径，R3 钉死）；恢复语义下清单可用性优于计数；与 latest 的 int 计数语义显式区分——R1 修订钉死）
   - `structured_output` 键**恒存在**；值为 `null` 当且仅当 LLM 调用/校验失败降级，工具/检索面降级而 LLM 成功时为类型化产物（None 可 JSON 序列化，禁"降级时键缺失"形态——6-3 读侧免双兼容；R1-F1 收窄口径）
@@ -198,13 +198,13 @@
 | `ToolExecutionServicePort` / hybrid 检索 / `EventPublisher` | — | 既有 | 复用，零改动 |
 | `RunBlmPlanningUseCase` / `GetBlmPlanningStatusUseCase` | application | `blm_planning_use_case`/`blm_planning_status_use_case` | 复用，零改动 |
 
-- [ ] 组合根 `src/composition_root.py` **预计零 diff**（Task 4 守护验证——resolve 可达性复核）
+- [x] 组合根 `src/composition_root.py` **预计零 diff**（Task 4 守护验证——resolve 可达性复核）
 - [x] 既有契约测试 `tests/contracts/test_port_contract_blm_planning.py` 回归通过（端口签名零变更 → 零修改通过；若需修改即契约破坏，必须回 Task 0 重审）
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本清单是唯一事实源（Single Source of Truth）；实现中确需新端口时回 Task 0 补登记 + Contract Gate + 契约测试，禁止边写边加
-- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象（6-1 纪律沿袭）
+- [x] 本清单是唯一事实源（Single Source of Truth）；实现中确需新端口时回 Task 0 补登记 + Contract Gate + 契约测试，禁止边写边加
+- [x] 禁止在服务文件中本地定义 Protocol / Port 抽象（6-1 纪律沿袭）
 
 #### 领域异常契约 (Domain Exception Contract)
 
@@ -257,7 +257,7 @@
 
 - [x] 功能测试文件：`tests/acceptance/test_acceptance_market_insight.feature`（OD-7 功能名族命名）
 - [x] 步骤实现文件：`tests/acceptance/test_acceptance_market_insight.py`
-- [ ] 业务方评审通过
+- [x] 业务方评审通过
 - [x] 所有场景覆盖（Happy Path + Edge Cases）——钉死 14 场景（AC-1×3/AC-2×3/AC-3×1/AC-4×2/AC-5×1/AC-6×1/AC-7×2/收尾×1）：AC-1×3 / AC-2×3 / AC-3×1 / AC-4×2 / AC-5×1 / AC-6×1 / AC-7×1~2 / 收尾×1（范围式钦定——**Subtask 0.4 定稿时钉死为确定值**并全文同步，禁带范围值进入 Task 7）
 
 **BDD 步骤实现约束：**
@@ -333,17 +333,17 @@
 
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**（本 Story 主改动层——epics 钦定）
-- [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain`）——VO 扩展部分遵循
-- [ ] **集成测试覆盖率 ≥75%**（epics 钦定）
-- [ ] **关键路径覆盖率 100%**：六步类型化分派 / per-step 快照写入 / 校验失败降级三分支
+- [x] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [x] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**（本 Story 主改动层——epics 钦定）
+- [x] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain`）——VO 扩展部分遵循
+- [x] **集成测试覆盖率 ≥75%**（epics 钦定）
+- [x] **关键路径覆盖率 100%**：六步类型化分派 / per-step 快照写入 / 校验失败降级三分支
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy src/`）
-- [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`，禁止 `--no-verify`）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy src/`）
+- [x] **无 P0/P1 级别问题**（代码审查）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`，禁止 `--no-verify`）
 
 #### 测试隔离约束
 
@@ -371,9 +371,9 @@
 - ❌ 裸 `pytest tests/`（会挂起——显式四目录：`pytest tests/unit tests/integration tests/contracts tests/acceptance`）
 
 **验证要求：**
-- [ ] `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance` 四目录全量通过（含 6-1 全部既有测试零回归）
-- [ ] 连续 5 次运行无随机失败
-- [ ] `poetry run ruff check` / `poetry run mypy` 通过
+- [x] `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance` 四目录全量通过（含 6-1 全部既有测试零回归）
+- [x] 连续 5 次运行无随机失败
+- [x] `poetry run ruff check` / `poetry run mypy` 通过
 
 ---
 
@@ -489,7 +489,7 @@
 
 **完成标准/Definition of Done:**
 - [x] 六 Schema + 映射 + gap 扩展全部实现，TDD 循环通过
-- [ ] **Task 2 = 纯 prompt 面资产交付，服务层与测试面零改动，自然全绿**（R1 修订钦定：`InsightStepSchema` 暂留 deprecated；"L339 切表 + `InsightStepSchema` 移除 + 三处 Fake 适配（unit 返回体/验收分派/集成分派）"**整体归 Task 3 循环 A 同批承载**——服务切换与 6-1 回归面适配必须在同一 Task 红绿闭环内完成，拆到两个 Task 必产生中间全红态或恒绿红测）
+- [x] **Task 2 = 纯 prompt 面资产交付，服务层与测试面零改动，自然全绿**（R1 修订钦定：`InsightStepSchema` 暂留 deprecated；"L339 切表 + `InsightStepSchema` 移除 + 三处 Fake 适配（unit 返回体/验收分派/集成分派）"**整体归 Task 3 循环 A 同批承载**——服务切换与 6-1 回归面适配必须在同一 Task 红绿闭环内完成，拆到两个 Task 必产生中间全红态或恒绿红测）
 - [x] 应用层覆盖率≥85% 维持（Task 7 全量回归复核）
 
 ---
@@ -707,11 +707,11 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - **红线三处漏网教训**（R5）：tests 中 `# type: ignore[method-assign]` 用 stub 属性根因修复——本 Story 全程零抑制注释
 
 **应用到本故事/Applied to This Story:**
-- [ ] Task 3 Fake 分派面适配清单化（三处：unit 返回体 + 6-1 验收/集成双文件——R2 勘误归属）；Task 4 回归验证兜底
-- [ ] 领域要素期望键族独立构造（验收/集成/单测三面）
-- [ ] 双杀注入降级验证（AC-4）
-- [ ] 性能场景 `_CachedEmbedding` + xdist_group 串行
-- [ ] 全程禁抑制注释 + 提交信息禁 AI 署名
+- [x] Task 3 Fake 分派面适配清单化（三处：unit 返回体 + 6-1 验收/集成双文件——R2 勘误归属）；Task 4 回归验证兜底
+- [x] 领域要素期望键族独立构造（验收/集成/单测三面）
+- [x] 双杀注入降级验证（AC-4）
+- [x] 性能场景 `_CachedEmbedding` + xdist_group 串行
+- [x] 全程禁抑制注释 + 提交信息禁 AI 署名
 
 ### 其他约束速查
 
@@ -850,7 +850,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 | **Story ID** | 6.2 |
 | **Story Key** | 6-2-market-insight-six-substeps |
 | **File** | `_bmad-output/implementation-artifacts/stories/6-2-market-insight-six-substeps.md` |
-| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` |
+| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `review` → `done`（代码审查周期收敛后流转——R5 终审判定） |
 | **Epic** | Epic 6: 战略规划流程（BLM 前两阶段） |
 | **价值组** | 战略规划与审批能力 |
 | **优先级** | P0-2 |
@@ -941,6 +941,14 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - **P95 数学新证**：`20*0.95==19.0` IEEE 双精度精确成立（浮点上漂疑虑排除）、档位=次大值、单冷轮自愈（任意时长）、双慢轮检出（≥2/20 轮超阈）、n=10 时自愈性消失注记（测试钉死 range(20) 性质稳定）。
 - **R3 留项 3 项 P3 全部登记 deferred**（R3-1 LIKE 转义无独立守护——6.3 引入合法发布者时自然获得红路径；R3-2 gap 降级四字段空形态无直接断言——单 fork 结构保证 + 6-1 域；R3-3 `_runs` 无淘汰机制——6-1 既有形态，6-3 快照真源切换时一并处理）。本轮零代码改动。
 
+#### Round 4 纯验证 + Round 5 独立收敛终审（周期闭合——2026-11-01）
+
+**R4 主会话纯验证零发现零提交**：四目录全量回归 14178 passed/2 skipped 零 failed（与 R1 后全量同值——连续两轮稳定）；ruff 全过 + mypy 729 零 issue + lint-imports 5 契约全 KEPT；红线终扫变更面零命中；10 组关键锚点向 HEAD 实地核验全部存续（基类链 ×8/双通道 SQL ×3/充要式措辞 ×3/hash 锚/SSOT 实锚/修复表勾选 15/deferred 台账 5）。
+
+**R5 独立终审 Agent 六节取证全部通过（不采信自报）**：①周期闭合（4 提交恰量归属——CI bot e39d944e 甄别为 argocd 镜像自动变更；d5cfc088→e03eed31 amend 澄清树差异仅 argocd 文件零隐藏改动；工作区干净；R1 17 文件与变更面逐一吻合无越界）②8 项高风险修复双向取证 8/8 成立（文档口径与仓库 HEAD 实证逐处吻合——含 R1-F1 grep 全面零无限定残留、R1-F4 基类全链七位、R1-F9/R2-A1 三实锚、R1-F14 实数复算）③台账完整（22 项发现全落点复算无静默丢弃；DF1~DF5 四要素逐条在位）④文档-仓库事实一致（版本链与提交一一对应；计数声明精确闭合——143/19/22/13/9/10/14/5 全实跑复现；「54 用例」= 四新建文件之和 22+13+14+5 的口径精确重构）⑤红线零违背（三提交零 AI 署名、零抑制注释引入——唯一命中为台账文档文本）⑥流转依据充分（零 P0/P1 残留 + 全量两轮稳定 + **终审 HEAD 实跑 162 项全绿**（单测/架构/契约 46+97 + 集成 5 + 验收 14——真实服务）+ 留项全登记）。**终审特权发现 1 项 P3（F-1）**：AC/VC/门禁勾选框 59 处未随 v1.4.0 实施勾选（实质内容终审逐项验证均已满足——对照 6-1 done 终态先例属纯勾选卫生缺口），随本收敛提交清偿（合理保留 3 处：DF2 登记项/「无」决策注记/可选自动化）。
+
+**收敛声明**：Story 6-2 代码审查周期（R1 修复 15 项/R2 回归核查清偿/R3 单深度推演/R4 纯验证/R5 独立终审）五轮收敛，版本 v1.4.0→v1.5.3，4 提交（c11f176e/e03eed31/89e63035/本次收敛提交）。六节终审取证全过、8 项高风险修复双向实证 8/8 成立、22 项发现台账全落点、留项 DF1~DF5 四要素齐备、红线零违背、HEAD 实跑 162 项全绿。**周期收敛，Status: review → done**。
+
 #### 已修复 Patch
 
 **Round 1 修复表（编号规则：R<轮>-F<序号>，与文档审查 R<轮>-<序号> 及风险表 R<n> 分属三个命名空间；表内行号锚为 Round 1 落码前工作树坐标——落码后行号系统性漂移（R2 核查实证：@given 1491→1511 等），消费时以关键词 grep 重新定位而非直接引用行号）：**
@@ -979,13 +987,13 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.2
+**故事版本/Story Version:** v1.5.3
 **创建日期/Created:** 2026-11-01
 **最后更新/Last Updated:** 2026-11-01
 **更新说明/Description:**
@@ -998,3 +1006,4 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - v1.5.0: **代码审查 Round 1**（四视角并行调研 + 双评审员 + 复评 + 落码验证；P1×2 + P2×2 + P3 簇 → 15 修复 + 1 Defer + 3 显式不动：R1-F1「恒 None」契约收窄（17 处措辞位 + 钉语义新单测）、R1-F2 负向断言双通道（LIKE 转义 + 括号分组 + 独立查询函数）、R1-F3 恒真率断言删除、R1-F4 公共基类 MarketInsightSchemaBase（Any 类型弱化修复 + 双公共字段单源）、P3 簇 11 项（架构实锚/hash 锚/分步标记/死代码重构/步骤文两联动等）；6.2-DF2 登记 deferred-work）
 - v1.5.1: **代码审查 Round 2 回归核查**（双 Agent：传播完备性 + 组合交互；15 项 R1 修复传播全部完备零漏网、10 组合面零冲突、零 P1/P2 零代码级回归；清偿 3 项 P3：SSOT 映射验证器 import 实锚化/修复表引文勘误/行号锚易腐注记）
 - v1.5.2: **代码审查 Round 3 单深度推演**（突变验证 6 点 5 红 1 存活——19 用例实证「断言活着」，存活项论证为域事实天花板 + SQL 探针三态实证（查询判别力为真/转义必要性）；R1-F1/R1-F10 判别力突变实证闭环；长状态（20 轮 TTL 累积/并发键空间/8 节点不变量）与 P95 浮点精确性全部闭合；无 P1/P2，3 项 P3 登记 6.2-DF3/4/5；零代码改动）
+- v1.5.3: **Round 4 纯验证 + Round 5 独立收敛终审（周期闭合）**：R4 四目录全量 14178 passed 两轮稳定 + 门禁四项全绿 + 10 组锚点存续零发现；R5 六节取证全过（周期闭合 4 提交恰量/8 项高风险修复双向取证 8÷8 成立/22 项台账全落点/计数声明精确闭合/红线零违背/流转依据充分——HEAD 实跑 162 项全绿）；终审特权发现 F-1（AC/VC/门禁勾选卫生缺口 59 处）随收敛提交清偿（合理保留 3 处）；**周期收敛，Status: review → done**
