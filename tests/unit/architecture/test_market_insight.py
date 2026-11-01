@@ -172,11 +172,30 @@ class TestSchemaPlacement:
             assert name in exported, f"{name} 未在 __all__ 导出"
 
     def test_ssot_mapping_in_prompts_module(self) -> None:
-        """SSOT 映射 MARKET_INSIGHT_STEP_SCHEMA 定义于 prompts 模块（形态 A 独立 dict）。"""
-        content = PROMPTS_MODULE.read_text(encoding="utf-8")
-        assert "MARKET_INSIGHT_STEP_SCHEMA: dict[MarketInsightStep, type[BaseModel]]" in content, (
-            "SSOT 映射形态 A 钦定：独立 dict[MarketInsightStep, type[BaseModel]]（Subtask 0.1）"
-        )
+        """SSOT 映射 MARKET_INSIGHT_STEP_SCHEMA 定义于 prompts 模块（形态 A 独立 dict）。
+
+        import 实锚形态（R2-A1——原整文件字符串锚可被注释/文档同文误满足）：
+        直接导入对象断言 dict 形态 + 键集恰为枚举全集 + 值均为 BaseModel 子类
+        且互异（与单测行为锚互补，本验证器侧重形态与落位）。
+        """
+        import sys as _sys
+
+        _sys.path.insert(0, str(SRC_ROOT.parent))
+        from pydantic import BaseModel
+
+        from src.application.services import blm_planning_prompts as prompts_module
+        from src.domain.value_objects.blm_phases import MarketInsightStep
+
+        mapping = getattr(prompts_module, "MARKET_INSIGHT_STEP_SCHEMA", None)
+        assert mapping is not None, "SSOT 映射 MARKET_INSIGHT_STEP_SCHEMA 未定义于 prompts 模块"
+        assert isinstance(mapping, dict), "SSOT 映射形态 A 钦定：独立 dict（Subtask 0.1）"
+        assert set(mapping) == set(MarketInsightStep), "六枚举键应齐备"
+        values = list(mapping.values())
+        assert len(values) == len(set(values)), "六 Schema 值应互异"
+        for value in values:
+            assert isinstance(value, type) and issubclass(value, BaseModel), (
+                f"映射值应为 BaseModel 子类（实测 {value!r}——类型注解 dict[MarketInsightStep, type[BaseModel]]）"
+            )
 
 
 # ===================================================================
