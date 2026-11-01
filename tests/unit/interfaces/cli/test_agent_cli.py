@@ -1180,12 +1180,16 @@ class _StubBlmPlanningUseCase:
     def __init__(self) -> None:
         self.calls: list[tuple[uuid.UUID, str, str | None]] = []
         self.error: Exception | None = None
+        self.result_override: _StubBlmPlanningResult | None = None
         self.last_result: _StubBlmPlanningResult | None = None
 
     async def execute(self, agent_id: uuid.UUID, task: str, plan_id: str | None = None) -> _StubBlmPlanningResult:
         self.calls.append((agent_id, task, plan_id))
         if self.error is not None:
             raise self.error
+        if self.result_override is not None:
+            self.last_result = self.result_override
+            return self.last_result
         self.last_result = _StubBlmPlanningResult(plan_id=plan_id or str(uuid.uuid4()))
         return self.last_result
 
@@ -1263,14 +1267,7 @@ class TestBlmPlanExecution:
         """部分降级成功 → 摘要含降级标记（降级可见性——AC-6③）。"""
         stub = _StubBlmPlanningUseCase()
         _patch_blm_plan_entry(monkeypatch, stub)
-
-        original = _StubBlmPlanningResult(plan_id="plan-d", degraded_steps=("trend",))
-
-        async def _execute(agent_id: uuid.UUID, task: str, plan_id: str | None = None) -> Any:
-            stub.calls.append((agent_id, task, plan_id))
-            return original
-
-        stub.execute = _execute  # type: ignore[method-assign]
+        stub.result_override = _StubBlmPlanningResult(plan_id="plan-d", degraded_steps=("trend",))
         exit_code = agent_cli.main(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务"])
         assert exit_code == 0
         assert "降级" in capsys.readouterr().out
