@@ -794,6 +794,19 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 
 **Round 2 通过面**：R1 修复 12 簇声称 vs diff 比对高度吻合；C3 钦定四个高风险位（482 守卫位/LLMConfigError 位序/双杀口径/degraded_inputs 传播位）全部核实无回归；验收/集成全场景零 482 误伤（全场景新链新 plan_id）；温度断言与双杀共存无破坏（Fake calls 记录位在 raise 前+值域断言形态）；实施记录数字核验全过（35/18/38/17/13/80/11/8/4/14 逐文件 collect-only 实数吻合）；feature 14 场景零死步骤（49 唯一绑定双向对照）；测试分类表文件粒度口径下无需追加行；红线零残留复证。**环境项甄别**：全量 -n 8 下场景④红+隔离复跑绿（88.59s）+同批失败均为 qdrant/embedding 延迟形态——判并发负载抖动非回归（integration -n 4 复验）；hybrid_search/dense_search 两失败为预存环境项（与改动面零交集）。
 
+#### Round 3 深度推演轮（2026-11-01——单 Agent 五轴推演 + 运行时实证）
+
+> 五轴：长状态时间线×3（全降级 481 级联/工具链混合失败/多 plan 连续）/并发重入/R1+R2 叠加态组合/断言-实现一致性/BLM 方法论忠实度终审。**零 P0/P1/P2**——核心时序与组合面全部推演+运行时实证通过（481 抛出前 8 事件+8 快照实证、并发双跑竞态实证、482 穿透链实证）；六子步骤三层映射（角色/工具/顺序）与 or.md 逐行对照**零错位**；三层降级语义分层自洽（工具降质不降产/检索降质标记/LLM 空产物完整信封）。
+
+**证伪留痕×6（防后续轮重推）**：①482 被 481 包装掩盖——证伪（引擎 DomainError 原样 re-raise，481 分支需 submit 正常返回后可达，运行时实证 482 原样穿透 CLI 可见动态 message）②gap 摘要干扰 Fake display_name 提取——证伪（完整句式锚在四类注入文本均不存在）③system_prompt=None 破坏既有单测——证伪（MagicMock tools_l1 默认空迭代+全文件仅一测试断言）④重试调用破坏温度断言——证伪（config 循环外单次构造+Fake 先记录后 raise+base_calls 标准链隔离）⑤双键提取 refs 两形态不一致——证伪（同路径 append+str 归一）⑥六子步骤映射与 or.md 错位——证伪（七配置三层逐行全对齐+白名单三源实证）。
+
+| # | 问题 | 严重度 | 处置 |
+|---|------|--------|------|
+| R3-1 | 482 守卫×SpBlmGraph 图链路组合面零测试锚（服务层锚与引擎泛图透传锚各有，组合面仅本轮运行时实证覆盖未固化） | P3 | 补引擎级用例：同 plan_id 经真实引擎两次 submit_graph → 第二次 PlanningStateError 穿透（图身份+异常穿透双锚） |
+| R3-2 | **7-2 REST 入口前置回头清单**（三项 P3 构成）：①并发同 plan_id 双跑非 fail-loud（482 守卫竞态窗口=步骤 1 全程，gather 实证 timeline 16 条/事件 16 次/守卫完全失效——CLI 一次性进程不可达，REST 并发入口下成真；若补锁注意 asyncio.Lock 类变量 gotcha）②`_runs` 零治理×SINGLETON（引擎有 TTL/FIFO 双治理，服务面无——每 plan ~5-8KB+_last_context_cache 持留，长驻进程无界增长）③重跑被拒路径先发第二次 PlanningStarted 孤儿事件（守卫深居图节点，use case 步 6 发布先于 submit） | P3 | deferred-work 登记 6.1-DF6（7-2 立项前置：入口互斥或服务级锁/_runs 治理对齐引擎/守卫前移或事件语义裁定） |
+| R3-3 | 可观测性微缺口族：①工具候选链失败信息丢失两处（候选 1 执行失败+候选 2 命中 449 时 failed_names 丢弃；候选 2 成功时候选 1 失败零痕迹——降级判定本身正确）②481 CLI 面只见静态 message（reason 仅入 context——与 482 动态 message 不对称，属 CLI 统一打印形态）③`_last_context_cache` 服务直调形态跨 plan 污染向量（生产图路径恒传 context 不可达） | P3 | deferred-work 登记 6.1-DF7（知悉级——触发 7-2/可观测性专项）；481 CLI message 属全局异常打印形态不在本 Story 单独开特例 |
+| R3-4 | 留痕（非缺陷）：全降级 481 时事件/快照面先写满「8 步 completed」终态（实证 8 事件+8 快照先于 481；无 run 级失败事件系 AC-4 钦定两事件设计；快照 100% 进度+degraded_steps 全量可见）——设计自洽 | 留痕 | 防后续轮以「事件说成功 CLI 报错」重推为缺陷 |
+
 #### Round 1 修复实施记录（2026-11-01——C3 评审「优秀」放行后落码）
 
 - **生产面 6 文件**（R2-6④ 计数勘误：原记 8 失实）：`blm_planning_service.py`（R1-1 双键提取+isinstance dict 容错/R1-3 MVP_TENANT_ID/R1-4 gap 注入+degraded_inputs 跨阶段源/R1-5 run 入口 482 守卫/R1-10①环耗尽聚合降级/R1-10②空结论自含对称化/R1-10③ system_prompt 透传（tools_l1 单分节最小形态）/R1-10④ LLMConfigError 不重试分支/R1-10⑤ 三元组扩展+slug 回填+str(id) 归一）；`blm_planning_prompts.py`（gap_summary 参数+summarize_gap_for_downstream）；`sp_blm_graph.py`（_synthesize_node 传 performance_gap）；`planning_exceptions.py`（482 docstring 激活改口）；`blm_planning.py`（retrieved_evidence docstring 勘误）；`agent_cli.py`（--plan-id help 勘误）
@@ -823,7 +836,7 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 
 ---
 
-**故事版本/Story Version:** v1.5.1
+**故事版本/Story Version:** v1.5.2
 **创建日期/Created:** 2026-10-31
 **最后更新/Last Updated:** 2026-10-31
 **更新说明/Description:**
@@ -834,5 +847,6 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 - v1.3.1: 文档审查 Round 4（纯验证轮——R3 传播验证+file:line 全量实地核验 88 处+结构/计数终核+三轮存续）——R4×2 修复（R4-1 前轮修复传播漏网 4 处[P2]：场景配比 380→449/Edge Cases 380→449/Subtask 5.1 双锚同步/风险 R2 先例引用改口；R4-2 P3×3：_code_ranges 注释行号 L169→L167 标签/R1 交叉引用改指 Task 3 循环 A/结构树 configs 仓根注记）；验证通过面：正文锚点 87/88 精确命中、结构与计数全过、三轮提交完整零游离、5 处关键修复终态在位
 - v1.3.2: 文档审查 Round 5（独立终审五节——周期闭合/双向取证/独立快扫/门禁红线/状态流转）——五节全过，ready-for-dev 放行成立；R5-1 终审特权发现 P3×2 随收敛清偿（Story key 统一 3-1a/2-2a、温度重构行措辞与 AC-5 对齐）；收敛声明入档（修复表末节）
 - v1.4.0: dev-story 实施完成（Task 0~7 全 Subtask 29 项 + 变异实证 13 锚）——五路调研实证/八条留项裁定落档/领域层（枚举+五 VO+两事件+480 段三异常五件套）/端口+两用例/服务（每步时序 DC-3+两级重试+步级降级 449/380+快照+事件）/SpBlmGraph 8 节点图+引擎挂载双点+DC-11 投影/组合根三注册+双登记+CLI blm-plan/集成 4 场景/架构 13 用例/验收 14 场景全绿（137.52s）；四目录回归+ruff+mypy+红线 grep 全过；关键实施发现：工具白名单=中文显示名口径（slug 口径致 449 假通过——集成成功率断言抓红修正）、outbox JSONB 双层路径 payload->'payload'->>'stage'、L4 严格白名单（L2 共享池全放行）；Status → review
+- v1.5.2: 代码审查 Round 3（单深度推演轮——五轴：长状态时间线×3/并发重入/R1+R2 叠加组合/断言-实现一致性/BLM 方法论忠实度；零 P0/P1/P2）——R3×4 处置（482 图链路组合锚引擎级用例；7-2 前置回头清单三项 deferred 6.1-DF6：并发双跑非 fail-loud/_runs 零治理/重跑孤儿事件；可观测性微缺口族 6.1-DF7；全降级终态留痕）；证伪留痕×6（482 不被 481 掩盖——引擎 DomainError re-raise 实证/gap 摘要不扰 Fake 提取/system_prompt=None 无破坏/温度断言兼容/双键 refs 一致/方法论映射零错位）
 - v1.5.1: 代码审查 Round 2（回归核查+增量正确性双视角 Agent——历史规律第三次实证：唯一 P1 来自 R1 修复自身：system_prompt 用 `getattr(tool,"name")` 而 ToolMetadata 字段是 `tool_name`——生产恒空转与 R1-1 同族同因）——R2×6 修复（P1：tool_name 字段对齐+真实 ToolMetadata 断言+突变实证；P2：evidence_refs 断言/gap 正常形态断言+收窄成文/AC-5 终态口径内联勘误/482 契约节改口；P3×9 勘误族——预留×3/一次性检索×3/tool_used 回落语义/计数勘误×3/AC-6 482 锚/验收白名单全量）；环境项甄别：全量 -n 8 场景④红=并发负载抖动（隔离绿+integration -n 4 804 全绿双证）
 - v1.5.0: 代码审查 Round 1（四视角并行调研 A 流程正确性/B 架构接线/C 测试判别力/D 验收集成审计 + 双评审员 C3 评审 + 复评「优秀」放行 + 4 锚突变实证）——**P0×2**（检索证据 TypedDict 提取断裂+生产 payload 键 content 双源分裂→双键兼容；DC-11 投影断言全仓零覆盖→五键纯标量+confidence 断言）+ **P1×6**（租户丢失→MVP_TENANT_ID 先例平移；AC-6⑥ 规则 3 未实现→gap 跨阶段传导三层；同 plan_id 重跑零守卫→run 入口 482；验收轮询空转→执行中真实观测；综合断言不可判别→display_name 六标识；集成成功率口径相反+零降级触发→双杀注入+信封完整性）+ **P2×12 簇**（断言判别力族 6+服务语义族 5+status_use_case 登记 DF5）+ **P3×10+**（含新发现红线×2：tests 抑制注释——自查声称失实）；deferred 新增 DF3/DF4/DF5；Subtask 0.1 slug 口径勘误

@@ -670,6 +670,25 @@ class TestSpBlmGraphTopology:
         actual_order = tuple(s.step for s in final_state["insight_step_results"])
         assert actual_order == expected_order, f"六步执行序错乱: {actual_order}"
 
+    async def test_engine_rerun_same_plan_id_raises_482(self) -> None:
+        """482 图链路组合锚（R3-1）：同 plan_id 经真实引擎二次 submit → PlanningStateError 穿透。
+
+        服务层锚（test_same_plan_id_rerun_rejected_482）+ 引擎泛图透传锚之外，
+        SpBlmGraph×482 组合面固化：节点抛领域异常 → 引擎 DomainError re-raise
+        （非 RuntimeError 包装、非 481 终态缺失掩盖）。
+        """
+        from src.domain.exceptions.planning_exceptions import PlanningStateError
+
+        service, _mocks = _make_service()
+        engine = _make_engine(service)
+        parameters = {"agent_id": str(AGENT_ID), "plan_id": PLAN_ID, "task": TASK, "context": _make_context()}
+        first_run = await engine.submit_graph("SpBlmGraph", parameters)
+        assert await engine.get_graph_result(first_run) is not None
+        with pytest.raises(PlanningStateError) as exc_info:
+            await engine.submit_graph("SpBlmGraph", parameters)
+        assert exc_info.value.code == "EXCEPTION_482"
+        assert "重跑" in str(exc_info.value.message) or "重跑" in str(exc_info.value)
+
     async def test_engine_agent_decided_projection_pure_scalars(self) -> None:
         """DC-11 投影断言（链路接线七件⑦——R1-2）：AgentDecided 五键纯标量 + confidence==0.0。
 
