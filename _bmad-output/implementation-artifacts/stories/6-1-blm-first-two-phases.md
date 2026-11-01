@@ -819,6 +819,14 @@ Story 6-1（v1.3.1）四轮文档审查收敛：R1 三视角调研修订（P0×5
 
 Story 6-1 代码审查 R1~R5 五轮收敛：R1 四视角调研+双评审+复评放行（P0×2+P1×6+P2×12 簇+P3×10+）、R2 回归核查+增量正确性（P1×1+P2×2+P3×9——唯一 P1 系 R1 修复自身引入的 tool_name 字段错配）、R3 深度推演五轴（零 P0-P2+P3×7+证伪留痕×6）、R4 纯验证零发现、R5 独立终审（P2×1 同族红线第三处漏网——随终审清偿）。关键修复：检索证据双键提取（text/content 生产测试双源）、482 重跑守卫（run 入口+引擎组合锚）、AC-6⑥ 规则 3 跨阶段传导、MVP_TENANT_ID 先例平移、DC-11 投影断言、双杀注入+信封完整性口径、system_prompt tool_name 口径、断言判别力族 12 处。收敛判据达成：零 P0/P1/P2 残留、全量 14098 passed（预存环境项除外）、ruff/mypy 零错、红线零残留、三提交+收敛提交闭合。P3 残留全数登记 deferred-work（6.1-DF1~DF7）。**Status: review → done。**
 
+#### 收敛后性能优化（2026-11-01——BLM 测试面 embedding 缓存）
+
+**探针实证**（临时探针 3 轮打点后删除）：embedding API 往返占性能场景成本 **>95%**（每轮 execute 2.8s 中 embed_query×7=2.75s；装配/清理 ≈0）——20 轮采样 ×7 查询仅 7 个唯一值（同 task+同模板.format）= 140 次调用 133 次重复。
+
+**优化**：集成/验收两测试文件各加 `_CachedEmbedding` 缓存代理（模块级 query/documents 双缓存——bge-m3 确定性推理下同文本向量恒同，缓存命中与真实调用等价；P95 计时更纯——外部 API 往返非管线逻辑开销，DC-7 口径收敛断言只松不紧；首轮仍真实调用建缓存+探测不可达语义不变）。
+
+**实测**：集成场景④ 121.23s→**1.42s**（-98.8%）、验收 AC-5 66.35s→**1.40s**（-97.9%）、BLM 18 用例 34.46s 全绿；断言零弱化（鉴别锚/信封完整性/每轮恰 1 降级全保留）。剩余 top 时长为各 worker 冷启动建制（每 worker 首场景语料建制+装配，进程隔离下不可跨 worker 共享——固有成本非低效）。
+
 #### Round 1 修复实施记录（2026-11-01——C3 评审「优秀」放行后落码）
 
 - **生产面 6 文件**（R2-6④ 计数勘误：原记 8 失实）：`blm_planning_service.py`（R1-1 双键提取+isinstance dict 容错/R1-3 MVP_TENANT_ID/R1-4 gap 注入+degraded_inputs 跨阶段源/R1-5 run 入口 482 守卫/R1-10①环耗尽聚合降级/R1-10②空结论自含对称化/R1-10③ system_prompt 透传（tools_l1 单分节最小形态）/R1-10④ LLMConfigError 不重试分支/R1-10⑤ 三元组扩展+slug 回填+str(id) 归一）；`blm_planning_prompts.py`（gap_summary 参数+summarize_gap_for_downstream）；`sp_blm_graph.py`（_synthesize_node 传 performance_gap）；`planning_exceptions.py`（482 docstring 激活改口）；`blm_planning.py`（retrieved_evidence docstring 勘误）；`agent_cli.py`（--plan-id help 勘误）

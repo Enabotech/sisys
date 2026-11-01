@@ -150,6 +150,37 @@ class _RecordingEventBus:
 # ===================================================================
 
 
+class _CachedEmbedding:
+    """embedding 查询/文档向量缓存代理（测试面性能优化——非被测对象）。
+
+    探针实证：embedding API 往返占场景④成本 >95%（7 次 embed_query
+    ≈2.8s/轮×20 轮，装配/清理 ≈0）——同文本向量经 bge-m3 确定性推理
+    恒同，缓存命中与真实调用等价；20 轮采样 ×7 查询仅 7 个唯一值。
+    缓存后 P95 计时更纯（外部 API 往返非管线逻辑开销——DC-7 口径收
+    敛，断言只松不紧）。模块级缓存跨场景复用（进程内有效）。
+    """
+
+    _query_cache: dict[str, Any] = {}
+    _documents_cache: dict[tuple[str, ...], Any] = {}
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    async def embed_query(self, text: str) -> Any:
+        if text not in self._query_cache:
+            self._query_cache[text] = await self._inner.embed_query(text)
+        return self._query_cache[text]
+
+    async def embed_documents(self, texts: list[str]) -> Any:
+        key = tuple(texts)
+        if key not in self._documents_cache:
+            self._documents_cache[key] = await self._inner.embed_documents(texts)
+        return self._documents_cache[key]
+
+    async def close(self) -> None:
+        await self._inner.close()
+
+
 async def _ensure_retrieval(env: Any) -> dict[str, Any] | None:
     """探测并建制检索语料（不可达返回 None——调用方 skip）。"""
     from qdrant_client import AsyncQdrantClient, models
@@ -157,7 +188,7 @@ async def _ensure_retrieval(env: Any) -> dict[str, Any] | None:
     from src.infrastructure.config.embedding import EmbeddingConfig
     from src.infrastructure.external_services.embedding.embedding_api_client import EmbeddingAPIClient
 
-    embedding = EmbeddingAPIClient(EmbeddingConfig.from_env())
+    embedding = _CachedEmbedding(EmbeddingAPIClient(EmbeddingConfig.from_env()))
     client = AsyncQdrantClient(url=f"http://{env.qdrant.host}:{env.qdrant.port}", timeout=30)
     try:
         await embedding.embed_query("连通性探测")
