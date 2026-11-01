@@ -32,10 +32,16 @@ from src.application.ports.isolation_guard import IsolationGuardPort
 from src.application.services.blm_planning_prompts import (
     BLM_TEMPERATURE_PROFILE,
     MARKET_INSIGHT_STEP_CONFIG,
+    MARKET_INSIGHT_STEP_SCHEMA,
     PERFORMANCE_GAP_CONFIG,
+    CompetitionInsightSchema,
     GapAnalysisSchema,
-    InsightStepSchema,
     InsightSynthesisSchema,
+    MarketCustomerInsightSchema,
+    OpportunityGapInsightSchema,
+    OpportunityInsightSchema,
+    SelfInsightSchema,
+    TrendInsightSchema,
 )
 from src.application.services.blm_planning_service import BlmPlanningService
 from src.domain.exceptions.agent_exceptions import IsolationOperationForbiddenError
@@ -50,6 +56,10 @@ AGENT_ID = uuid.uuid4()
 TASK = "制定新能源汽车行业五年战略规划"
 COLLECTION = "test_blm_col"
 
+#: 六类型化 Schema 全族（calls 过滤与全量 fail 注入共用——SSOT 映射取值族；
+#: 6-2 三 Fake 适配后分派键 = GapAnalysis + 六类型化 + InsightSynthesis 八键族）
+TYPED_STEP_SCHEMAS: frozenset[type] = frozenset(MARKET_INSIGHT_STEP_SCHEMA.values())
+
 
 # ===================================================================
 # Fake LLM（BLM 面三 Schema 分派 + 失败注入 + 配置捕获）
@@ -62,6 +72,7 @@ def _make_fake_llm(
     fail_first_calls: int = 0,
     empty_synthesis: bool = False,
     config_error: bool = False,
+    corrupt_schemas: frozenset[type] = frozenset(),
 ) -> Any:
     """BLM 面 Fake LLM（AsyncMock spec=LLMClientPort——外部 SaaS 豁免替身）。
 
@@ -70,6 +81,8 @@ def _make_fake_llm(
         fail_first_calls: 前 N 次调用抛 LLMAPIError（瞬时故障——重试后成功）。
         empty_synthesis: synthesis 分派返回空 conclusions（R1-10② 空结论形态）。
         config_error: 每次调用抛 LLMConfigError（R1-10④ 确定性配置错误形态）。
+        corrupt_schemas: 对指定 Schema 返回非 Schema 实例（结构守卫 444 非瞬时
+            ——校验失败降级路径注入，6-2 AC-4）。
     """
     state: dict[str, Any] = {"calls": [], "count": 0}
 
@@ -95,6 +108,8 @@ def _make_fake_llm(
             from src.domain.exceptions.llm_exceptions import LLMAPIError
 
             raise LLMAPIError("瞬时故障（Fake 注入）")
+        if response_schema in corrupt_schemas:
+            return object()  # 非 Schema 实例（isinstance 守卫 444——结构守卫失败非瞬时）
         if response_schema in fail_schemas:
             from src.domain.exceptions.llm_exceptions import LLMAPIError
 
@@ -106,8 +121,66 @@ def _make_fake_llm(
                 root_causes=["根因一", "根因二"],
                 portfolio_health="业务组合健康度评估",
             )
-        if response_schema is InsightStepSchema:
-            return InsightStepSchema(summary="市场洞察步骤摘要", findings=["发现一", "发现二"])
+        # 六类型化 Schema 分派（6-2——summary 带「市场洞察步骤摘要:{step}」分步
+        # 标记（R1-F10——仿验收 _FAKE_STEP_SUMMARY_PREFIX 形态），count 断言锚与
+        # 分步断言双消费；返回体字段族与冻结表逐字段对齐）
+        if response_schema is TrendInsightSchema:
+            return TrendInsightSchema(
+                summary="市场洞察步骤摘要:trend",
+                findings=["发现一", "发现二"],
+                pestel_political="政策维度评估",
+                pestel_economic="经济维度评估",
+                pestel_social="社会维度评估",
+                pestel_technological="技术维度评估",
+                pestel_environmental="环境维度评估",
+                pestel_legal="法律维度评估",
+                technology_roadmap=["技术演进要点"],
+                scenario_plans=["情景规划要点"],
+            )
+        if response_schema is MarketCustomerInsightSchema:
+            return MarketCustomerInsightSchema(
+                summary="市场洞察步骤摘要:market_customer",
+                findings=["发现一", "发现二"],
+                customer_segments=["细分群体要点"],
+                demand_priority_matrix=["需求优先要点"],
+                value_proposition_map=["价值主张要点"],
+            )
+        if response_schema is CompetitionInsightSchema:
+            return CompetitionInsightSchema(
+                summary="市场洞察步骤摘要:competition",
+                findings=["发现一", "发现二"],
+                five_forces_supplier_power="供应商议价能力评估",
+                five_forces_buyer_power="购买者议价能力评估",
+                five_forces_new_entrants="新进入者威胁评估",
+                five_forces_substitutes="替代品威胁评估",
+                five_forces_rivalry="现有竞争者强度评估",
+                competitor_radar=["能力雷达要点"],
+                strategy_recommendations=["竞争策略要点"],
+            )
+        if response_schema is SelfInsightSchema:
+            return SelfInsightSchema(
+                summary="市场洞察步骤摘要:self",
+                findings=["发现一", "发现二"],
+                internal_capabilities=["内部能力要点"],
+                vrio_assessment=["VRIO 评估要点"],
+                resource_constraints=["资源约束要点"],
+            )
+        if response_schema is OpportunityInsightSchema:
+            return OpportunityInsightSchema(
+                summary="市场洞察步骤摘要:opportunity",
+                findings=["发现一", "发现二"],
+                opportunity_list=["机会要点"],
+                priority_ranking=["优先级要点"],
+                growth_path=["增长路径要点"],
+            )
+        if response_schema is OpportunityGapInsightSchema:
+            return OpportunityGapInsightSchema(
+                summary="市场洞察步骤摘要:opportunity_gap",
+                findings=["发现一", "发现二"],
+                gap_quantification=["差距量化要点"],
+                capability_match_matrix=["匹配矩阵要点"],
+                closure_strategies=["弥合策略要点"],
+            )
         if response_schema is InsightSynthesisSchema:
             if empty_synthesis:
                 return InsightSynthesisSchema(conclusions=[])
@@ -349,7 +422,7 @@ class TestInsightSteps:
         """每步 prompt 含视角前缀 + 该步工具候选全量（语义配置表钦定面——独立构造期望）。"""
         service, mocks = _make_service()
         await _run_six_steps(service, _make_context())
-        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema]
+        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] in TYPED_STEP_SCHEMAS]
         assert len(step_calls) == 6
         for call, (step, config) in zip(step_calls, MARKET_INSIGHT_STEP_CONFIG.items()):
             assert config.role_prefix in call["prompt"], f"{step.value} prompt 缺视角前缀"
@@ -360,7 +433,7 @@ class TestInsightSteps:
         """每步温度档=配置表钦定（8 步温度映射唯一源）。"""
         service, mocks = _make_service()
         await _run_six_steps(service, _make_context())
-        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema]
+        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] in TYPED_STEP_SCHEMAS]
         for call, (step, _config) in zip(step_calls, MARKET_INSIGHT_STEP_CONFIG.items()):
             expected_temp = BLM_TEMPERATURE_PROFILE[step.value]
             assert call["temperature"] == expected_temp, f"{step.value} 温度档不符"
@@ -388,7 +461,7 @@ class TestSynthesis:
         assert synthesis.degraded_inputs == ()
 
     async def test_synthesis_prompt_contains_step_summaries(self) -> None:
-        """注入侧锚：synthesis prompt 含六步产物摘要（漏传任一步可判别）。"""
+        """注入侧锚：synthesis prompt 含六步产物摘要（漏传/错配/重复注入任一形态可判别——R1-F10 分步标记）。"""
         service, mocks = _make_service()
         context = _make_context()
         steps = await _run_six_steps(service, context)
@@ -398,6 +471,10 @@ class TestSynthesis:
         prompt = synthesis_calls[-1]["prompt"]
         # 六步 Fake 产出均含「市场洞察步骤摘要」标记——prompt 注入面可见
         assert prompt.count("市场洞察步骤摘要") == 6, "synthesis prompt 未含全部六步摘要"
+        # 分步标记逐一断言（Fake summary 带步名——错配/重复注入时计数形断言
+        # 不红、分步断言红；R1-F10）
+        for step_value in ("trend", "market_customer", "competition", "self", "opportunity", "opportunity_gap"):
+            assert f"市场洞察步骤摘要:{step_value}" in prompt, f"synthesis prompt 缺 {step_value} 分步摘要（R1-F10）"
 
     async def test_synthesis_event_published(self) -> None:
         """synthesis 完成：BlmStageCompleted(market_insight_synthesis) 发布+快照写。"""
@@ -420,7 +497,7 @@ class TestStepDegradation:
 
     async def test_llm_failure_degrades_step(self) -> None:
         """LLM 持续失败 → 该步降级（完整信封：degraded+原因+空 summary）。"""
-        llm = _make_fake_llm(fail_schemas=frozenset({InsightStepSchema}))
+        llm = _make_fake_llm(fail_schemas=TYPED_STEP_SCHEMAS)
         service, _mocks = _make_service(llm)
         results = await _run_six_steps(service, _make_context())
         degraded = [r for r in results if r.degraded]
@@ -448,6 +525,22 @@ class TestStepDegradation:
         assert "449" in result.degrade_reason or "隔离" in result.degrade_reason
         assert result.summary, "449 降级以直接推理续行——LLM 产出仍非空"
         assert result.tool_used == "", "降级步 tool_used 空"
+
+    async def test_tool_degraded_step_keeps_structured_output(self) -> None:
+        """工具面降级 + LLM 成功 → structured_output 非 None（R1-F1 收窄口径钉语义：
+        None ⟺ LLM 调用/校验失败；工具/检索面降级而 LLM 成功时与 summary/findings
+        非空对称——信封三字段同进退，6-3 读侧禁按「degraded ⇒ null」建模）。"""
+        service, _mocks = _make_service(
+            guard_error=IsolationOperationForbiddenError(
+                agent_id=str(AGENT_ID), operation="tool_access", reason="tool_not_in_allowlist:swot-tows"
+            )
+        )
+        result = await service.run_insight_step(MarketInsightStep.TREND, _make_context(), {})
+        assert result.degraded is True, "工具面降级标记"
+        assert result.degrade_reason, "工具面降级原因非空"
+        assert result.summary, "直接推理续行——LLM 产物非空"
+        assert result.structured_output is not None, "工具面降级不丢弃类型化产物（R1-F1）"
+        assert result.structured_output["summary"] == result.summary, "信封与产物同源"
 
     async def test_tool_380_degrades_with_direct_reasoning(self) -> None:
         """380 工具未注册 → 步骤降级 + 直接推理续行（单测层注入面）。"""
@@ -478,14 +571,14 @@ class TestDegradationDownstreamRules:
 
     async def test_downstream_prompt_contains_degradation_marker(self) -> None:
         """规则 1：上游降级产物以「[降级]+原因」注入下游 prompt。"""
-        llm = _make_fake_llm(fail_schemas=frozenset({InsightStepSchema}))
+        llm = _make_fake_llm(fail_schemas=TYPED_STEP_SCHEMAS)
         service, mocks = _make_service(llm)
         context = _make_context()
         first = await service.run_insight_step(MarketInsightStep.TREND, context, {})
         assert first.degraded
         # 第二步：prior_outputs 含降级产物
         await service.run_insight_step(MarketInsightStep.MARKET_CUSTOMER, context, {"insight_steps": (first,)})
-        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema]
+        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] in TYPED_STEP_SCHEMAS]
         # 按步骤名定位「看市场与客户」首次调用（TREND 失败含重试会占多个 calls 槽位）
         market_customer_calls = [c for c in step_calls if "看市场与客户" in c["prompt"]]
         assert market_customer_calls, "未捕获看市场与客户步骤调用"
@@ -494,7 +587,7 @@ class TestDegradationDownstreamRules:
 
     async def test_synthesis_lists_degraded_inputs(self) -> None:
         """规则 2：synthesis 结论必须列举 degraded 输入（不可无标注吞并）。"""
-        llm = _make_fake_llm(fail_schemas=frozenset({InsightStepSchema}))
+        llm = _make_fake_llm(fail_schemas=TYPED_STEP_SCHEMAS)
         service, _mocks = _make_service(llm)
         context = _make_context()
         steps = await _run_six_steps(service, context)
@@ -513,7 +606,7 @@ class TestDegradationDownstreamRules:
         # 跨阶段传导：首子步骤 prompt 含 gap 降级标注（规则 1——阶段 1→阶段 2 闭合）
         steps = await _run_six_steps(service, context, prior={"performance_gap": gap, "insight_steps": ()})
         assert all(not r.degraded for r in steps), "阶段 1 降级不阻断阶段 2"
-        trend_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema and "看趋势" in c["prompt"]]
+        trend_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is TrendInsightSchema and "看趋势" in c["prompt"]]
         assert trend_calls, "未捕获看趋势步骤调用"
         assert "[降级] 步骤 performance_gap 降级" in trend_calls[0]["prompt"], "gap 降级标注未注入阶段 2 prompt"
         # 综合报告携带标记：degraded_inputs 含 performance_gap（规则 3 半句）
@@ -527,10 +620,10 @@ class TestDegradationDownstreamRules:
         gap = await service.run_performance_gap_analysis(context)
         assert not gap.degraded
         await service.run_insight_step(MarketInsightStep.TREND, context, {"performance_gap": gap, "insight_steps": ()})
-        trend_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema and "看趋势" in c["prompt"]]
+        trend_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is TrendInsightSchema and "看趋势" in c["prompt"]]
         assert trend_calls, "未捕获看趋势步骤调用"
         assert "阶段 1 业绩差距分析产物摘要" in trend_calls[0]["prompt"], "gap 正常摘要段未注入阶段 2 prompt（R2-3）"
-        assert "财务差距=" in trend_calls[0]["prompt"], "gap 摘要应含财务差距字段摘要（正常态单字段口径）"
+        assert "财务差距=" in trend_calls[0]["prompt"], "gap 摘要应含财务差距标签（四字段全量形态——财务差距=子串兼容锚，R2-3）"
 
     async def test_synthesis_empty_conclusions_self_marks(self) -> None:
         """synthesis LLM 成功但空结论 → 视同降级自含（R3-4 两分支对称——R1-10②）。"""
@@ -565,21 +658,241 @@ class TestSnapshotWrite:
     """步骤边界快照写入（DC-6——写入方唯一归服务各方法末尾）。"""
 
     async def test_snapshot_session_and_state_shape(self) -> None:
-        """快照 state_data 契约（session_id=前缀+plan_id；timeline 六键）。"""
+        """latest 快照 state_data 契约（session_id=前缀+plan_id；timeline 六键）。
+
+        6-2 适配：save 调用含 latest 与 per-step 双键族——本用例守卫 latest 形态
+        （session_id 无后缀），per-step 七键契约归 TestStepCheckpoint。"""
         service, mocks = _make_service()
         context = _make_context()
         await service.run_performance_gap_analysis(context)
         await service.run_insight_step(MarketInsightStep.TREND, context, {"insight_steps": ()})
         save_calls = mocks["snapshot_repo"].save.await_args_list
         assert save_calls, "快照未写入"
-        for call in save_calls:
-            snapshot = call.args[0]
-            assert snapshot.session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}"
+        latest_saves = [c.args[0] for c in save_calls if c.args[0].session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}"]
+        assert latest_saves, "latest 快照未写入"
+        for snapshot in latest_saves:
             data = snapshot.state_data
             assert data["plan_id"] == PLAN_ID
             assert data["total_steps"] == 8
             for entry in data["timeline"]:
                 assert set(entry) == {"step", "started_at", "completed_at", "status", "summary_excerpt", "degraded"}
+
+    async def test_latest_snapshot_form_unchanged(self) -> None:
+        """latest 快照 save 调用形态与 6-1 一致（per-step 新增不污染 latest 键——零回归锚）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+        await service.run_performance_gap_analysis(context)
+        await service.run_insight_step(MarketInsightStep.TREND, context, {"insight_steps": ()})
+        from src.application.ports.blm_planning import BLM_PLANNING_SNAPSHOT_STAGE
+
+        save_calls = mocks["snapshot_repo"].save.await_args_list
+        latest_saves = [c.args[0] for c in save_calls if c.args[0].session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}"]
+        assert latest_saves, "latest 快照写入缺失（6-1 行为回归）"
+        for snapshot in latest_saves:
+            assert snapshot.stage_id == BLM_PLANNING_SNAPSHOT_STAGE
+            assert snapshot.ttl_seconds == 86400, "TTL 沿用 CheckpointSnapshot 既有默认 86400"
+
+
+# ===================================================================
+# 6-2 循环 A：类型化分派 + structured_output 填充
+# ===================================================================
+
+
+#: 六步专属 Schema 名期望（独立构造字面量——与 SSOT 表解耦，禁 import 反射自证）
+EXPECTED_TYPED_SCHEMA_NAMES: tuple[str, ...] = (
+    "TrendInsightSchema",
+    "MarketCustomerInsightSchema",
+    "CompetitionInsightSchema",
+    "SelfInsightSchema",
+    "OpportunityInsightSchema",
+    "OpportunityGapInsightSchema",
+)
+
+#: trend 步 structured_output 期望键族（独立构造——model_dump 键域断言锚）
+EXPECTED_TREND_DUMP_KEYS: frozenset[str] = frozenset(
+    {
+        "summary",
+        "findings",
+        "pestel_political",
+        "pestel_economic",
+        "pestel_social",
+        "pestel_technological",
+        "pestel_environmental",
+        "pestel_legal",
+        "technology_roadmap",
+        "scenario_plans",
+    }
+)
+
+
+class TestTypedSchemaDispatch:
+    """6-2 类型化分派（SSOT 映射查表——服务层零 if-else 硬编码）。"""
+
+    async def test_each_step_dispatches_dedicated_schema(self) -> None:
+        """六步调用按执行序各传该步专属类型化 Schema（Fake calls 记录断言）。"""
+        service, mocks = _make_service()
+        await _run_six_steps(service, _make_context())
+        typed_name_set = set(EXPECTED_TYPED_SCHEMA_NAMES)
+        step_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"].__name__ in typed_name_set]
+        assert len(step_calls) == 6, f"六类型化调用应恰 6 次（实际 {len(step_calls)}）"
+        for call, expected_name in zip(step_calls, EXPECTED_TYPED_SCHEMA_NAMES):
+            assert call["schema"].__name__ == expected_name, (
+                f"应分派 {expected_name}（实际 {call['schema'].__name__}——硬编码/错配嫌疑）"
+            )
+
+    async def test_structured_output_filled_with_model_dump_keys(self) -> None:
+        """类型化结果填充 structured_output（键域=Schema 字段族；信封同源双公共字段）。"""
+        service, _mocks = _make_service()
+        results = await _run_six_steps(service, _make_context())
+        for step_result in results:
+            structured = getattr(step_result, "structured_output", None)
+            assert structured is not None, f"步骤 {step_result.step} structured_output 未填充"
+            assert structured["summary"] == step_result.summary, "summary 与信封不同源（R3-1）"
+            assert list(structured["findings"]) == list(step_result.findings), "findings 与信封不同源（R3-1）"
+        trend = next(r for r in results if r.step == "trend")
+        assert set(trend.structured_output) == EXPECTED_TREND_DUMP_KEYS, (
+            f"trend dump 键族不一致: {set(trend.structured_output) ^ EXPECTED_TREND_DUMP_KEYS}"
+        )
+
+    async def test_invalid_schema_instance_degrades_step(self) -> None:
+        """校验失败（返回非 Schema 实例→结构守卫 444 非瞬时）→ 完整降级信封 +
+        structured_output=None，流程继续（其余步正常）。"""
+        from src.application.services.blm_planning_prompts import TrendInsightSchema
+
+        llm = _make_fake_llm(corrupt_schemas=frozenset({TrendInsightSchema}))
+        service, _mocks = _make_service(llm)
+        results = await _run_six_steps(service, _make_context())
+        by_step = {r.step: r for r in results}
+        degraded = by_step["trend"]
+        assert degraded.degraded is True, "非法实例步应降级（结构守卫 444）"
+        assert degraded.degrade_reason, "降级原因非空（完整信封）"
+        assert degraded.structured_output is None, "降级步 structured_output 应 None"
+        for step_value in ("market_customer", "competition", "self", "opportunity", "opportunity_gap"):
+            assert by_step[step_value].degraded is False, f"{step_value} 应正常（互不传染）"
+            assert by_step[step_value].structured_output is not None
+
+    async def test_degraded_step_structured_output_none(self) -> None:
+        """LLM 持续失败降级步 structured_output=None（None ⟺ LLM 调用/校验失败——AC-4；
+        工具/检索面降级而 LLM 成功时非 None——见 test_tool_degraded_step_keeps_structured_output）。"""
+        from src.application.services.blm_planning_prompts import MARKET_INSIGHT_STEP_SCHEMA
+
+        llm = _make_fake_llm(fail_schemas=frozenset(MARKET_INSIGHT_STEP_SCHEMA.values()))
+        service, _mocks = _make_service(llm)
+        results = await _run_six_steps(service, _make_context())
+        for step_result in results:
+            assert step_result.degraded is True
+            assert step_result.structured_output is None, "LLM 失败降级步 structured_output 应 None"
+
+
+# ===================================================================
+# 6-2 循环 B：per-step Checkpoint 快照写入
+# ===================================================================
+
+#: per-step state_data 七键期望（独立构造——端口文件第三级契约镜像）
+EXPECTED_STEP_SNAPSHOT_KEYS: frozenset[str] = frozenset(
+    {
+        "step",
+        "plan_id",
+        "summary",
+        "structured_output",
+        "degraded",
+        "degrade_reason",
+        "completed_steps",
+    }
+)
+
+
+class TestStepCheckpoint:
+    """per-step Checkpoint 快照骨架（AC-2——6-3 恢复点位数据面）。"""
+
+    async def test_per_step_snapshot_written_for_each_step(self) -> None:
+        """每步完成时额外 save 一份 per-step 快照（session_id 后缀/stage_id/state_data 七键）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+        await service.run_performance_gap_analysis(context)
+        results = await _run_six_steps(service, context)
+        save_calls = mocks["snapshot_repo"].save.await_args_list
+        per_step_saves = {c.args[0].session_id: c.args[0] for c in save_calls if f"{PLAN_ID}:" in c.args[0].session_id}
+        assert len(per_step_saves) == 6, f"per-step 快照应恰 6 份（实际 {len(per_step_saves)}）"
+        for step_result in results:
+            session_id = f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}:{step_result.step}"
+            assert session_id in per_step_saves, f"{step_result.step} per-step 快照缺失"
+            snapshot = per_step_saves[session_id]
+            assert snapshot.stage_id == f"market_insight_{step_result.step}", (
+                f"{step_result.step} stage_id={snapshot.stage_id} 错配"
+            )
+            assert set(snapshot.state_data) == EXPECTED_STEP_SNAPSHOT_KEYS, (
+                f"{step_result.step} state_data 键族不一致: {set(snapshot.state_data) ^ EXPECTED_STEP_SNAPSHOT_KEYS}"
+            )
+            assert snapshot.state_data["step"] == step_result.step
+            assert snapshot.state_data["plan_id"] == PLAN_ID
+            assert snapshot.state_data["structured_output"] is not None
+
+    async def test_completed_steps_list_includes_gap_and_current(self) -> None:
+        """completed_steps 为含该步的已完成步骤标识清单（timeline 裸 step 值口径——R1-F5
+        校准；首步即含 performance_gap——R1-6 钉死）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+        await service.run_performance_gap_analysis(context)
+        await service.run_insight_step(MarketInsightStep.TREND, context, {"insight_steps": ()})
+        trend_save = next(
+            c.args[0]
+            for c in mocks["snapshot_repo"].save.await_args_list
+            if c.args[0].session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}:trend"
+        )
+        assert trend_save.state_data["completed_steps"] == ["performance_gap", "trend"], (
+            f"首步 completed_steps 应含阶段 1 与该步（timeline step 口径——R1-6 自然实现）: "
+            f"{trend_save.state_data['completed_steps']}"
+        )
+
+    async def test_degraded_step_snapshot_contains_marker(self) -> None:
+        """LLM 失败降级步同样触发 per-step 快照（degraded 标记 + structured_output 键恒在、值为 None）。"""
+        from src.application.services.blm_planning_prompts import TrendInsightSchema
+
+        llm = _make_fake_llm(fail_schemas=frozenset({TrendInsightSchema}))
+        service, mocks = _make_service(llm)
+        context = _make_context()
+        await _run_six_steps(service, context)
+        trend_save = next(
+            c.args[0]
+            for c in mocks["snapshot_repo"].save.await_args_list
+            if c.args[0].session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}:trend"
+        )
+        state = trend_save.state_data
+        assert state["degraded"] is True, "降级标记未入 state_data"
+        assert state["degrade_reason"], "降级原因未入 state_data"
+        assert "structured_output" in state, "structured_output 键缺失（键恒在契约）"
+        assert state["structured_output"] is None, "LLM 失败降级步 structured_output 应 None"
+
+    async def test_per_step_snapshot_write_failure_swallowed(self) -> None:
+        """per-step 快照写入异常被吞且流程不中断（容错——与 latest 同语义）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+
+        original_save = mocks["snapshot_repo"].save
+
+        async def _failing_save(snapshot: Any) -> None:
+            """per-step 键写入抛异常；latest 键正常（双契约分离容错验证）。"""
+            if f"{PLAN_ID}:" in snapshot.session_id:
+                raise RuntimeError("Redis 写入失败（注入）")
+            await original_save(snapshot)
+
+        mocks["snapshot_repo"].save.side_effect = _failing_save
+        results = await _run_six_steps(service, context)
+        assert len(results) == 6, "per-step 写入失败不应中断流程"
+        assert all(r.summary for r in results), "全部步骤产物正常（容错不降级）"
+
+    async def test_per_step_snapshot_ttl_default(self) -> None:
+        """TTL 沿用 CheckpointSnapshot 既有默认 86400（6-3 升级 30 天——OD-1）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+        await service.run_insight_step(MarketInsightStep.TREND, context, {"insight_steps": ()})
+        trend_save = next(
+            c.args[0]
+            for c in mocks["snapshot_repo"].save.await_args_list
+            if c.args[0].session_id == f"{BLM_PLANNING_SESSION_PREFIX}{PLAN_ID}:trend"
+        )
+        assert trend_save.ttl_seconds == 86400
 
 
 # ===================================================================
@@ -715,7 +1028,7 @@ class TestSpBlmGraphTopology:
 
     async def test_engine_degraded_steps_accumulated(self) -> None:
         """全链降级累积：LLM 全失败 → degraded_steps 含 8 步标识（481 上游数据面）。"""
-        llm = _make_fake_llm(fail_schemas=frozenset({GapAnalysisSchema, InsightStepSchema, InsightSynthesisSchema}))
+        llm = _make_fake_llm(fail_schemas=frozenset({GapAnalysisSchema, InsightSynthesisSchema}) | TYPED_STEP_SCHEMAS)
         service, _mocks = _make_service(llm)
         engine = _make_engine(service)
         run_id = await engine.submit_graph(

@@ -47,10 +47,11 @@ from src.application.services.blm_planning_prompts import (
     BLM_PER_CALL_TIMEOUT_SEC,
     BLM_TEMPERATURE_PROFILE,
     MARKET_INSIGHT_STEP_CONFIG,
+    MARKET_INSIGHT_STEP_SCHEMA,
     PERFORMANCE_GAP_CONFIG,
     GapAnalysisSchema,
-    InsightStepSchema,
     InsightSynthesisSchema,
+    MarketInsightSchemaBase,
     build_insight_step_prompt,
     build_performance_gap_prompt,
     build_synthesis_prompt,
@@ -334,9 +335,12 @@ class BlmPlanningService(BlmPlanningServicePort):
 
         degraded = False
         degrade_reason = ""
-        schema_result: InsightStepSchema | None = None
+        schema_result: MarketInsightSchemaBase | None = None
+        # 六步类型化分派（SSOT 映射查表——零 if-else 硬编码；每步专属 Schema，
+        # 校验失败/超时/异常统一走步级降级——AC-4）
+        schema_cls = MARKET_INSIGHT_STEP_SCHEMA[step]
         try:
-            schema_result = await self._structured_call_with_retry(step.value, prompt, InsightStepSchema, context)
+            schema_result = await self._structured_call_with_retry(step.value, prompt, schema_cls, context)
         except AgentWorkflowError as error:
             degraded = True
             degrade_reason = f"LLM 调用失败：{error.context.get('reason', error)}"
@@ -357,6 +361,7 @@ class BlmPlanningService(BlmPlanningServicePort):
                 degrade_reason=degrade_reason,
                 started_at=started_at,
                 completed_at=datetime.now(UTC),
+                structured_output=schema_result.model_dump(),
             )
             summary_excerpt = schema_result.summary
         else:
@@ -374,6 +379,8 @@ class BlmPlanningService(BlmPlanningServicePort):
             summary_excerpt = ""
 
         run_state.record_step(step.value, started_at, summary_excerpt, degraded=result.degraded)
+        # per-step Checkpoint 快照骨架（AC-2——先于 latest 写入；失败容错不阻断）
+        await self._write_step_checkpoint(context, step, result)
         await self._write_snapshot_and_publish(context, stage=f"market_insight_{step.value}", summary_excerpt=summary_excerpt)
         return result
 
@@ -649,6 +656,50 @@ class BlmPlanningService(BlmPlanningServicePort):
     # ------------------------------------------------------------------
     # 内部：快照写 + 事件发布（各方法末尾——DC-6/DC-8）
     # ------------------------------------------------------------------
+
+    async def _write_step_checkpoint(
+        self, context: BlmPlanningContext, step: MarketInsightStep, result: InsightStepResult
+    ) -> None:
+        """per-step Checkpoint 快照写入（Story 6-2——6-3 恢复点位数据面骨架）。
+
+        与 latest（_write_snapshot_and_publish）的职责边界：latest=读侧状态面
+        （GetBlmPlanningStatusUseCase 消费，七键全量投影）；per-step=恢复点位面
+        （每子步骤一份，state_data 七键契约见端口文件第三级登记——
+        structured_output 键恒在；其值为 None 当且仅当 LLM 调用/校验失败，
+        工具/检索面降级而 LLM 调用成功时为该步类型化产物（与 summary/findings
+        非空对称——代码审查 R1-F1 收窄口径）；completed_steps 为含该步的
+        已完成步骤标识清单（timeline 条目 step 字段同源——六子步骤为裸
+        step 值、performance_gap/synthesis 为 stage 形态，首步即含
+        performance_gap）。写入失败容错不阻断流程
+        （与 latest 同语义——步级容错）；TTL 沿用 CheckpointSnapshot 既有
+        默认 86400（6-3 升级 30 天完整形态）。
+
+        Args:
+            context: BLM 规划上下文（plan_id 归属锚）。
+            step: 该子步骤枚举（session_id 后缀与 stage_id 构造源）。
+            result: 该步信封（summary/structured_output/degraded 投影源）。
+        """
+        run_state = self._runs.get(context.plan_id)
+        if run_state is None:
+            return
+        try:
+            await self._snapshot_repository.save(
+                CheckpointSnapshot(
+                    session_id=f"{BLM_PLANNING_SESSION_PREFIX}{context.plan_id}:{step.value}",
+                    stage_id=f"market_insight_{step.value}",
+                    state_data={
+                        "step": step.value,
+                        "plan_id": context.plan_id,
+                        "summary": result.summary,
+                        "structured_output": result.structured_output,
+                        "degraded": result.degraded,
+                        "degrade_reason": result.degrade_reason,
+                        "completed_steps": [entry.step for entry in run_state.timeline],
+                    },
+                )
+            )
+        except Exception:
+            logger.exception("per-step 快照写入失败 [plan_id=%s step=%s]", context.plan_id, step.value)
 
     async def _write_snapshot_and_publish(self, context: BlmPlanningContext, *, stage: str, summary_excerpt: str) -> None:
         """步骤边界：快照 latest 写入 + BlmStageCompleted 发布（失败不阻断流程）。"""

@@ -33,6 +33,11 @@ BLM_TOTAL_STEPS: int = 8
 #: BlmTimelineEntry 摘要截断上限（fix_attempts violations_excerpt ≤200 先例）
 _TIMELINE_SUMMARY_MAX_CHARS: int = 200
 
+#: InsightStepResult.structured_output 标量值域白名单（守卫层——刻意比六类型化
+#: Schema 声明白名单 str/float/list[str] 宽一格：纵深防御，守卫是应用层值域
+#: 兜底而非生成面约束，两层集合各自冻结；list[str] 以元素级检查另行校验）
+_STRUCTURED_SCALAR_TYPES: tuple[type, ...] = (str, int, float, bool)
+
 
 class BlmPhase(str, Enum):
     """BLM 规划阶段枚举（前两阶段）。
@@ -197,7 +202,7 @@ class PerformanceGapArtifacts:
 
 @dataclass(frozen=True)
 class InsightStepResult:
-    """市场洞察子步骤通用信封（结构化程度止于信封层——类型化 Schema 归 6-2）。
+    """市场洞察子步骤通用信封（6-2 扩展 structured_output 承载类型化产物）。
 
     降级步=完整信封（degraded=True + degrade_reason + 空 summary/findings）
     ——insight_steps 恒满 6 元素的前提（R3-7 钦定）。
@@ -213,6 +218,19 @@ class InsightStepResult:
         degrade_reason: 降级原因
         started_at: 步骤开始时间（顺序断言观测面——服务方法填充）
         completed_at: 步骤完成时间（时间戳非重叠断言锚）
+        structured_output: 该步类型化 Schema 校验后的扁平化结构化产物
+           （model_dump 键值族——键 str、值 str/int/float/bool 或 list[str]；
+            为 None 当且仅当 LLM 调用/校验失败（与 summary/findings 空同步）
+            ——工具/检索面降级而 LLM 调用成功时仍为类型化产物（由服务层
+            保证——代码审查 R1-F1 收窄口径）；默认 None 向后兼容 6-1 既有构造）。
+            注：新增 dict 字段使 frozen dataclass 的 hash() 抛 TypeError
+            （dict 不可哈希）——当前消费面不哈希信封，属潜伏性契约变化，
+            若需哈希请先经 to_dict 形态转换。
+
+    Raises:
+        EntityValidationError: structured_output 值域违例（键非 str / 值非
+            JSON 标量或 list[str]——pydantic 对象与嵌套 dict 渗入领域层即拒，
+            domain 零依赖红线）。
     """
 
     step: str
@@ -224,6 +242,29 @@ class InsightStepResult:
     degrade_reason: str = ""
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    structured_output: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        """自校验：structured_output 值域守卫（None 短路——降级步/6-1 兼容形态）。"""
+        if self.structured_output is None:
+            return
+        for key, value in self.structured_output.items():
+            if not isinstance(key, str):
+                raise EntityValidationError(
+                    message="structured_output 键必须为 str",
+                    context={"entity_type": "InsightStepResult", "field": "structured_output", "key": key},
+                )
+            if isinstance(value, list):
+                if not all(isinstance(item, str) for item in value):
+                    raise EntityValidationError(
+                        message="structured_output 列表值元素必须全为 str（扁平化强制——OD-5）",
+                        context={"entity_type": "InsightStepResult", "field": "structured_output", "key": key},
+                    )
+            elif not isinstance(value, _STRUCTURED_SCALAR_TYPES):
+                raise EntityValidationError(
+                    message="structured_output 值必须为 JSON 标量（str/int/float/bool）或 list[str]",
+                    context={"entity_type": "InsightStepResult", "field": "structured_output", "key": key},
+                )
 
 
 @dataclass(frozen=True)

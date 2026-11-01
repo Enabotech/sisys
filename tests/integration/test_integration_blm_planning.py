@@ -101,9 +101,14 @@ def _make_fake_llm(
             raise LLMAPIError(f"Fake 注入失败（调用序 {call_index}）")
 
         from src.application.services.blm_planning_prompts import (
+            CompetitionInsightSchema,
             GapAnalysisSchema,
-            InsightStepSchema,
             InsightSynthesisSchema,
+            MarketCustomerInsightSchema,
+            OpportunityGapInsightSchema,
+            OpportunityInsightSchema,
+            SelfInsightSchema,
+            TrendInsightSchema,
         )
 
         if response_schema is GapAnalysisSchema:
@@ -113,8 +118,64 @@ def _make_fake_llm(
                 root_causes=["根因一", "根因二"],
                 portfolio_health="组合健康度（集成）",
             )
-        if response_schema is InsightStepSchema:
-            return InsightStepSchema(summary=f"洞察产物-{call_index}", findings=["发现"])
+        # 六类型化 Schema 分派（6-2 适配——summary 保留调用序标识形态）
+        if response_schema is TrendInsightSchema:
+            return TrendInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                pestel_political="政策维度（集成）",
+                pestel_economic="经济维度（集成）",
+                pestel_social="社会维度（集成）",
+                pestel_technological="技术维度（集成）",
+                pestel_environmental="环境维度（集成）",
+                pestel_legal="法律维度（集成）",
+                technology_roadmap=["技术演进要点"],
+                scenario_plans=["情景要点"],
+            )
+        if response_schema is MarketCustomerInsightSchema:
+            return MarketCustomerInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                customer_segments=["细分要点"],
+                demand_priority_matrix=["优先级要点"],
+                value_proposition_map=["价值主张要点"],
+            )
+        if response_schema is CompetitionInsightSchema:
+            return CompetitionInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                five_forces_supplier_power="供应商议价（集成）",
+                five_forces_buyer_power="购买者议价（集成）",
+                five_forces_new_entrants="新进入者威胁（集成）",
+                five_forces_substitutes="替代品威胁（集成）",
+                five_forces_rivalry="竞争强度（集成）",
+                competitor_radar=["雷达要点"],
+                strategy_recommendations=["策略要点"],
+            )
+        if response_schema is SelfInsightSchema:
+            return SelfInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                internal_capabilities=["能力要点"],
+                vrio_assessment=["VRIO 要点"],
+                resource_constraints=["约束要点"],
+            )
+        if response_schema is OpportunityInsightSchema:
+            return OpportunityInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                opportunity_list=["机会要点"],
+                priority_ranking=["排序要点"],
+                growth_path=["路径要点"],
+            )
+        if response_schema is OpportunityGapInsightSchema:
+            return OpportunityGapInsightSchema(
+                summary=f"洞察产物-{call_index}",
+                findings=["发现"],
+                gap_quantification=["量化要点"],
+                capability_match_matrix=["匹配要点"],
+                closure_strategies=["弥合要点"],
+            )
         if response_schema is InsightSynthesisSchema:
             return InsightSynthesisSchema(conclusions=["综合结论（集成）"])
         raise AssertionError(f"未知 response_schema: {response_schema!r}")

@@ -232,6 +232,107 @@ class TestInsightStepResult:
             setattr(result, "summary", "x")
 
 
+def _make_insight_step(**overrides: Any) -> InsightStepResult:
+    """InsightStepResult 工厂（默认最小合法形态 + 覆写——structured_output 扩展组共用）。"""
+    fields: dict[str, Any] = {
+        "step": "trend",
+        "summary": "宏观趋势要点",
+        "findings": ("发现一",),
+        "tool_used": "pestel-analysis",
+        "evidence_refs": ("doc_1",),
+    }
+    fields.update(overrides)
+    return InsightStepResult(**fields)
+
+
+class TestInsightStepResultStructuredOutput:
+    """信封扩展 structured_output（6-2 AC-1/AC-2 承载面——值域守卫白名单两层声明：
+    守卫白名单 str/int/float/bool + list[str] 刻意比 Schema 声明白名单
+    str/float/list[str] 宽一格——纵深防御：守卫是应用层值域兜底而非生成面约束）。"""
+
+    def test_defaults_to_none_backcompat(self) -> None:
+        """默认 None（向后兼容——6-1 既有构造/断言零破坏）。"""
+        result = _make_insight_step()
+        assert result.structured_output is None
+
+    def test_accepts_flat_scalars_and_str_lists(self) -> None:
+        """正常填充：键 str + 值 JSON 标量（str/int/float/bool）与 list[str]。"""
+        result = _make_insight_step(
+            structured_output={
+                "summary": "趋势结论",
+                "findings": ["发现一", "发现二"],
+                "pestel_political": "政策维度评估",
+                "priority_score": 9.5,
+                "rank": 2,
+                "confirmed": True,
+            }
+        )
+        assert result.structured_output is not None
+        assert result.structured_output["summary"] == "趋势结论"
+        assert result.structured_output["findings"] == ["发现一", "发现二"]
+        assert result.structured_output["priority_score"] == 9.5
+        assert result.structured_output["rank"] == 2
+        assert result.structured_output["confirmed"] is True
+
+    def test_rejects_non_str_key(self) -> None:
+        """键非 str 拒绝（构造器守卫 242）。"""
+        with pytest.raises(EntityValidationError):
+            _make_insight_step(structured_output={1: "非法键"})
+
+    def test_rejects_nested_dict_value(self) -> None:
+        """嵌套 dict 值拒绝（防 pydantic 对象/字典渗入领域层——domain 零依赖红线）。"""
+        with pytest.raises(EntityValidationError):
+            _make_insight_step(structured_output={"nested": {"inner": "违例"}})
+
+    def test_rejects_list_with_non_str_items(self) -> None:
+        """list[dict]/list[int] 等非 str 元素列表拒绝（扁平化强制——OD-5）。"""
+        with pytest.raises(EntityValidationError):
+            _make_insight_step(structured_output={"matrix": [{"row": "违例"}]})
+
+    def test_rejects_arbitrary_object_value(self) -> None:
+        """任意对象值拒绝（pydantic BaseModel 实例同族违例——model_dump 前渗入即拒）。"""
+
+        class _PydanticLike:
+            """pydantic 对象替身（属性载体——值域守卫不识别即拒）。"""
+
+            summary = "x"
+
+        with pytest.raises(EntityValidationError):
+            _make_insight_step(structured_output={"schema_object": _PydanticLike()})
+
+    def test_rejects_none_value(self) -> None:
+        """None 值拒绝（禁 Optional[X]/None 值——model_dump 对 Optional 字段产 None 会炸本守卫）。"""
+        with pytest.raises(EntityValidationError):
+            _make_insight_step(structured_output={"optional_field": None})
+
+    def test_empty_dict_allowed(self) -> None:
+        """空 dict 合法（键域守卫最小形态）。"""
+        result = _make_insight_step(structured_output={})
+        assert result.structured_output == {}
+
+    def test_degraded_step_envelope_with_none_structured(self) -> None:
+        """LLM 失败降级步语义约定：degraded=True + structured_output=None 完整信封
+        （None ⟺ LLM 调用/校验失败，由服务层保证——AC-4 收窄口径；VO 层不强制组合校验）。"""
+        result = _make_insight_step(summary="", findings=(), degraded=True, degrade_reason="LLM 调用失败（注入）")
+        assert result.degraded is True
+        assert result.structured_output is None
+
+    def test_hash_raises_typeerror_with_structured_output(self) -> None:
+        """携 dict 载荷的信封不可哈希（frozen dataclass hash 含 dict 字段——R1-F8 锚）。
+
+        潜伏性契约变化钉测：默认 None 形态 hash 正常（None 可哈希），携 dict
+        载荷形态抛 TypeError——消费面将信封入 set/dict 键前必须先经 to_dict
+        形态转换（docstring 契约的行为锚）。
+        """
+        import pytest
+
+        with_dict = _make_insight_step(structured_output={"summary": "趋势结论"})
+        with pytest.raises(TypeError, match="unhashable"):
+            hash(with_dict)
+        without_dict = _make_insight_step()
+        assert isinstance(hash(without_dict), int), "默认 None 形态 hash 正常（None 可哈希）"
+
+
 class TestInsightSynthesis:
     """综合洞察 VO（AC-6⑥ degraded_inputs 规则载体）。"""
 

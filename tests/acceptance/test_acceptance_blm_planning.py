@@ -94,6 +94,18 @@ _CORPUS_TEXTS: tuple[str, ...] = (
 # Fake LLM 各步骤产出语料（步骤可判别标记——顺序断言的产物侧观测锚）
 _FAKE_STEP_SUMMARY_PREFIX = "市场洞察产物"
 
+#: 六类型化 Schema 名族（6-2 适配——calls 过滤键字符串口径；独立字面量构造）
+_TYPED_SCHEMA_NAMES: frozenset[str] = frozenset(
+    {
+        "TrendInsightSchema",
+        "MarketCustomerInsightSchema",
+        "CompetitionInsightSchema",
+        "SelfInsightSchema",
+        "OpportunityInsightSchema",
+        "OpportunityGapInsightSchema",
+    }
+)
+
 #: 六子步骤显示名字面量（or.md 钦定序——Fake 步骤标识提取与断言期望共源）
 _STEP_DISPLAY_NAMES: tuple[str, ...] = (
     "看趋势",
@@ -282,8 +294,8 @@ def _make_fake_llm(
 ) -> Any:
     """BLM 面 Fake LLM 端口替身（外部 SaaS 豁免面——分派键 = response_schema 身份）。
 
-    分派键 = GapAnalysisSchema / InsightStepSchema / InsightSynthesisSchema 三者
-    身份互斥。注入控制：
+    分派键 = GapAnalysisSchema / 六类型化 Schema / InsightSynthesisSchema 八者
+    身份互斥（6-2 适配——六步全量切换类型化后通用信封 Schema 已移除）。注入控制：
     - fail_call_indices: 按调用序（0 基）注入 LLMAPIError——AC-6 受控失败采样
     - hold_at_call: 指定调用序挂起（await asyncio.Event——AC-3.1 门控构造）
     - delay_sec: 每调用延迟（AC-5 计时下界注入）
@@ -321,9 +333,14 @@ def _make_fake_llm(
             )
 
         from src.application.services.blm_planning_prompts import (
+            CompetitionInsightSchema,
             GapAnalysisSchema,
-            InsightStepSchema,
             InsightSynthesisSchema,
+            MarketCustomerInsightSchema,
+            OpportunityGapInsightSchema,
+            OpportunityInsightSchema,
+            SelfInsightSchema,
+            TrendInsightSchema,
         )
 
         if response_schema is GapAnalysisSchema:
@@ -333,11 +350,70 @@ def _make_fake_llm(
                 root_causes=["价格竞争侵蚀毛利", "供应链成本上升", "组织响应迟缓"],
                 portfolio_health="业务组合健康度：核心业务稳健，新兴业务双低",
             )
-        if response_schema is InsightStepSchema:
+        # 六类型化 Schema 分派（6-2 适配——summary 保持 display_name 标记形态，
+        # L887-890 六标识断言锚消费）
+        if response_schema is TrendInsightSchema:
             step_marker = _extract_step_display_name(prompt)
-            return InsightStepSchema(
+            return TrendInsightSchema(
                 summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
                 findings=["发现一：趋势信号明确", "发现二：竞争压力上升"],
+                pestel_political="政策维度：补贴退坡与准入收紧",
+                pestel_economic="经济维度：利率上行压制可选消费",
+                pestel_social="社会维度：绿色出行消费迁移",
+                pestel_technological="技术维度：固态电池与智驾演进",
+                pestel_environmental="环境维度：碳排法规趋严",
+                pestel_legal="法律维度：数据合规要求升级",
+                technology_roadmap=["短期：平台化架构降本", "中期：固态电池量产", "长期：智驾生态成型"],
+                scenario_plans=["基准情景：渗透率稳步提升", "乐观情景：政策加码提速", "悲观情景：价格战侵蚀利润"],
+            )
+        if response_schema is MarketCustomerInsightSchema:
+            step_marker = _extract_step_display_name(prompt)
+            return MarketCustomerInsightSchema(
+                summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
+                findings=["发现一：细分需求分化明显", "发现二：补能效率是首要痛点"],
+                customer_segments=["价格敏感型家庭用户", "科技尝鲜型年轻用户", "运营降本型企业客户"],
+                demand_priority_matrix=["续航与补能效率（最高优先）", "智能座舱体验（高优先）", "购车总价（中优先）"],
+                value_proposition_map=["痛点：补能焦虑→收益：超充网络覆盖", "痛点：保值率低→收益：电池质保计划"],
+            )
+        if response_schema is CompetitionInsightSchema:
+            step_marker = _extract_step_display_name(prompt)
+            return CompetitionInsightSchema(
+                summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
+                findings=["发现一：竞争强度处历史高位", "发现二：头部厂商成本优势扩大"],
+                five_forces_supplier_power="供应商议价能力：中高（电池厂商集中度高）",
+                five_forces_buyer_power="购买者议价能力：中（选择增多但转换成本存在）",
+                five_forces_new_entrants="新进入者威胁：高（跨界造车与代工模式降低门槛）",
+                five_forces_substitutes="替代品威胁：中（公共交通与共享出行部分替代）",
+                five_forces_rivalry="现有竞争者强度：极高（价格战与渠道战并发）",
+                competitor_radar=["研发能力：头部厂商 9/10", "成本控制：二线厂商 6/10", "渠道下沉：新势力 5/10"],
+                strategy_recommendations=["以差异化配置避开正面价格战", "锁定上游电池产能对冲供应风险"],
+            )
+        if response_schema is SelfInsightSchema:
+            step_marker = _extract_step_display_name(prompt)
+            return SelfInsightSchema(
+                summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
+                findings=["发现一：三电自研是核心能力", "发现二：渠道与品牌存在短板"],
+                internal_capabilities=["三电自研平台", "软件 OTA 体系", "海外渠道初步布局"],
+                vrio_assessment=["三电平台：价值+稀有+难模仿+组织适配（核心能力）", "软件体系：价值+稀有（潜力能力）"],
+                resource_constraints=["研发预算受限", "电池产能依赖外部", "组织数字化人才缺口"],
+            )
+        if response_schema is OpportunityInsightSchema:
+            step_marker = _extract_step_display_name(prompt)
+            return OpportunityInsightSchema(
+                summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
+                findings=["发现一：海外市场窗口期明确", "发现二：高端智能化溢价空间大"],
+                opportunity_list=["海外新兴市场渗透", "高端智能化细分", "电池银行服务模式"],
+                priority_ranking=["海外新兴市场（评分 9）", "高端智能化（评分 8）", "电池银行（评分 6）"],
+                growth_path=["现产品×新市场：出海优先", "新产品×现市场：高端智能款", "新产品×新市场：能源服务"],
+            )
+        if response_schema is OpportunityGapInsightSchema:
+            step_marker = _extract_step_display_name(prompt)
+            return OpportunityGapInsightSchema(
+                summary=f"{_FAKE_STEP_SUMMARY_PREFIX}:{step_marker}（结构化要点）",
+                findings=["发现一：渠道差距是首要瓶颈", "发现二：品牌溢价能力不足"],
+                gap_quantification=["海外渠道覆盖差距 40%", "高端品牌溢价能力差距 25%"],
+                capability_match_matrix=["海外机会×渠道能力：弱匹配", "高端机会×品牌能力：中匹配"],
+                closure_strategies=["合资并购获取渠道", "联名合作提升品牌溢价"],
             )
         if response_schema is InsightSynthesisSchema:
             return InsightSynthesisSchema(conclusions=["综合结论一：优先补强内部能力", "综合结论二：把握海外机会窗口"])
@@ -877,8 +953,6 @@ def synthesis_prompt_contains_six_step_summaries(context: dict[str, Any]) -> Non
 
     Fake summary 按步骤 display_name 携带标识（prompt 提取判定——与调用
     计数解耦，失败注入场景不错位）；断言六标识逐一出现（漏传任一步即红）。"""
-    from src.application.services.blm_planning_prompts import InsightStepSchema
-
     calls = context["fake_llm"]._blm_state["calls"]
     synthesis_calls = [c for c in calls if c["schema"].__name__ == "InsightSynthesisSchema"]
     assert synthesis_calls, "未捕获 synthesize_insights 的 LLM 调用"
@@ -888,7 +962,7 @@ def synthesis_prompt_contains_six_step_summaries(context: dict[str, Any]) -> Non
         assert f"{_FAKE_STEP_SUMMARY_PREFIX}:{display_name}" in prompt, (
             f"综合 prompt 缺「{display_name}」产物摘要（漏传即红——R1-7）"
         )
-    insight_call_count = sum(1 for c in calls if c["schema"] is InsightStepSchema)
+    insight_call_count = sum(1 for c in calls if c["schema"].__name__ in _TYPED_SCHEMA_NAMES)
     assert insight_call_count == 6, f"六子步骤 LLM 调用计数 {insight_call_count} != 6"
 
 
@@ -928,7 +1002,7 @@ def prompts_contain_role_prefix_and_tool_whitelist(context: dict[str, Any]) -> N
     from src.application.services.blm_planning_prompts import MARKET_INSIGHT_STEP_CONFIG
 
     calls = context["fake_llm"]._blm_state["calls"]
-    step_calls = [c for c in calls if c["schema"].__name__ == "InsightStepSchema"]
+    step_calls = [c for c in calls if c["schema"].__name__ in _TYPED_SCHEMA_NAMES]
     assert len(step_calls) == 6
     for call, (step_key, config) in zip(step_calls, MARKET_INSIGHT_STEP_CONFIG.items()):
         assert "视角" in call["prompt"], f"{step_key} prompt 缺角色视角前缀"

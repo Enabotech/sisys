@@ -20,6 +20,28 @@ BlmPlanningService 于 application/services/ 编排注入）。
   最终键 sisys:snapshot:blm-planning-{plan_id}
   （RedisSnapshotStore.build_key("snapshot", session_id)——5-10 Recorder
   键控先例形态）。
+- per-step Checkpoint 快照（6-2 新增——第三级契约，Story 6-3 Checkpoint
+  完整机制的恢复点位数据面）：每个市场洞察子步骤完成时在 latest 之外
+  额外写入一份独立快照，键/session_id/stage_id/state_data 契约：
+  session_id = f"{BLM_PLANNING_SESSION_PREFIX}{plan_id}:{step.value}"
+  （最终键 sisys:snapshot:blm-planning-{plan_id}:{step_value}——step_value
+  为 MarketInsightStep 枚举值；RedisSnapshotStore 键仅由 session_id 决定，
+  内部冒号原样保留）；stage_id = f"market_insight_{step.value}"（与
+  STAGE_VALUE_DOMAIN 同源）；state_data 七键
+  {"step": str, "plan_id": str, "summary": str,
+   "structured_output": dict[str, Any] | None, "degraded": bool,
+   "degrade_reason": str, "completed_steps": list[str]}——
+  structured_output 键恒存在（值为 None 当且仅当 LLM 调用/校验失败降级步；
+  工具/检索面降级而 LLM 调用成功时为该步类型化产物 dict（与 summary/findings
+  非空对称——代码审查 R1-F1 收窄口径）；禁"降级时键缺失"形态——
+  6-3 读侧免双兼容）；completed_steps 为截至该步（含该步）的已完成
+  步骤标识清单（timeline 条目 step 字段同源口径——六子步骤为裸 step
+  值（trend 等），performance_gap/synthesis 为 stage 形态；自然实现
+  [e.step for e in run_state.timeline]，首步快照即含 performance_gap
+  ——与 latest 的 int 计数语义显式区分）；TTL 沿用 CheckpointSnapshot
+  既有默认 86400（6-3 升级 30 天完整形态）；读侧判别规则 = session_id
+  键后缀 + state_data 含 plan_id/step 双锚（区分 latest 与 per-step
+  两契约）；写入失败容错不阻断流程（与 latest 写入同语义）。
 """
 
 from __future__ import annotations

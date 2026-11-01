@@ -37,11 +37,89 @@ class GapAnalysisSchema(BaseModel):
     portfolio_health: str = Field(description="业务组合健康度评估（GE-麦肯锡矩阵语义）")
 
 
-class InsightStepSchema(BaseModel):
-    """市场洞察子步骤结构化输出（通用信封层——类型化 Schema 归 6-2）。"""
+class MarketInsightSchemaBase(BaseModel):
+    """六步类型化 Schema 公共基类（R3-1 双公共字段单源——代码审查 R1-F4）。
+
+    六子步骤 Schema 共有的信封双字段在此单源定义；各步 Schema 继承后仅声明
+    领域要素字段。pydantic 继承形态与手工重复形态的 model_json_schema 逐字节
+    等价（字段顺序=基类字段先序，与既有手工顺序一致）。注意：本基类不进
+    MARKET_INSIGHT_STEP_SCHEMA 值域（非第七个业务 Schema）。
+    """
 
     summary: str = Field(description="步骤结论摘要（≤200 字）")
     findings: list[str] = Field(description="结构化发现清单")
+
+
+class TrendInsightSchema(MarketInsightSchemaBase):
+    """看趋势类型化结构化输出（PESTEL/情景规划——or.md「宏观趋势报告」经
+    PESTEL 六维度工具产物化——OD-8）。"""
+
+    pestel_political: str = Field(description="PESTEL 政治维度评估（宏观趋势报告工具产物化——OD-8）")
+    pestel_economic: str = Field(description="PESTEL 经济维度评估")
+    pestel_social: str = Field(description="PESTEL 社会维度评估")
+    pestel_technological: str = Field(description="PESTEL 技术维度评估")
+    pestel_environmental: str = Field(description="PESTEL 环境维度评估")
+    pestel_legal: str = Field(description="PESTEL 法律维度评估")
+    technology_roadmap: list[str] = Field(description="技术演进路线图（演进阶段要点清单）")
+    scenario_plans: list[str] = Field(description="情景规划方案集（多趋势组合推演要点）")
+
+
+class MarketCustomerInsightSchema(MarketInsightSchemaBase):
+    """看市场与客户类型化结构化输出（$APPEALS/价值主张画布）。"""
+
+    customer_segments: list[str] = Field(description="客户细分画像（细分群体要点）")
+    demand_priority_matrix: list[str] = Field(description="需求优先级矩阵（$APPEALS 需求排序要点）")
+    value_proposition_map: list[str] = Field(description="价值主张地图（客户痛点-收益映射要点）")
+
+
+class CompetitionInsightSchema(MarketInsightSchemaBase):
+    """看竞争类型化结构化输出（波特五力/竞争对手分析——or.md「行业竞争结构图」
+    经波特五力五维工具产物化——OD-8）。"""
+
+    five_forces_supplier_power: str = Field(description="波特五力：供应商议价能力评估（行业竞争结构图工具产物化——OD-8）")
+    five_forces_buyer_power: str = Field(description="波特五力：购买者议价能力评估")
+    five_forces_new_entrants: str = Field(description="波特五力：新进入者威胁评估")
+    five_forces_substitutes: str = Field(description="波特五力：替代品威胁评估")
+    five_forces_rivalry: str = Field(description="波特五力：现有竞争者强度评估")
+    competitor_radar: list[str] = Field(description="竞争对手能力雷达图评估（能力维度要点）")
+    strategy_recommendations: list[str] = Field(description="竞争策略建议")
+
+
+class SelfInsightSchema(MarketInsightSchemaBase):
+    """看自己类型化结构化输出（价值链分析/SWOT-TOWS/VRIO 框架）。"""
+
+    internal_capabilities: list[str] = Field(description="内部能力清单")
+    vrio_assessment: list[str] = Field(description="核心能力 VRIO 评估（价值/稀缺/难模仿/组织维度要点）")
+    resource_constraints: list[str] = Field(description="资源约束分析")
+
+
+class OpportunityInsightSchema(MarketInsightSchemaBase):
+    """看机会类型化结构化输出（SWOT-TOWS/安索夫矩阵）。"""
+
+    opportunity_list: list[str] = Field(description="机会清单")
+    priority_ranking: list[str] = Field(description="机会优先级排序")
+    growth_path: list[str] = Field(description="增长路径图（安索夫矩阵路径要点）")
+
+
+class OpportunityGapInsightSchema(MarketInsightSchemaBase):
+    """机会差距分析类型化结构化输出（GE-麦肯锡矩阵/SWOT-TOWS）。"""
+
+    gap_quantification: list[str] = Field(description="机会差距量化报告要点")
+    capability_match_matrix: list[str] = Field(description="能力-机会匹配矩阵（GE-麦肯锡矩阵匹配要点）")
+    closure_strategies: list[str] = Field(description="差距弥合策略")
+
+
+#: 六步类型化 Schema SSOT 映射（形态 A 独立 dict——Subtask 0.1 钦定：不用
+#: StepSemanticConfig 加 schema_cls 字段形态，避免配置表承载类型对象使耦合扩散；
+#: 服务层 run_insight_step 经此查表分派，零 if-else 硬编码）
+MARKET_INSIGHT_STEP_SCHEMA: dict[MarketInsightStep, type[BaseModel]] = {
+    MarketInsightStep.TREND: TrendInsightSchema,
+    MarketInsightStep.MARKET_CUSTOMER: MarketCustomerInsightSchema,
+    MarketInsightStep.COMPETITION: CompetitionInsightSchema,
+    MarketInsightStep.SELF: SelfInsightSchema,
+    MarketInsightStep.OPPORTUNITY: OpportunityInsightSchema,
+    MarketInsightStep.OPPORTUNITY_GAP: OpportunityGapInsightSchema,
+}
 
 
 class InsightSynthesisSchema(BaseModel):
@@ -280,30 +358,44 @@ def summarize_step_for_downstream(step_result: Any) -> str:
 def summarize_gap_for_downstream(gap_artifacts: Any) -> str:
     """构造阶段 1 产物注入阶段 2 各步的摘要（跨阶段传导——AC-6⑥ 规则 1）。
 
+    四字段全量传导（6-2 OD-6——执行 6-1 代码审查 R2-3 成文裁定：扩展自
+    financial_gap 单字段）；「财务差距=」标签子串兼容 6-1 先例（R2-3 钉死）。
     降级时以「[降级]+原因」显式标注（与 summarize_step_for_downstream 同款
-    形态——DEGRADATION_MARKER_PREFIX 单源）。
+    形态——DEGRADATION_MARKER_PREFIX 单源；降级分支零改动不携带四字段内容）。
 
     Args:
         gap_artifacts: PerformanceGapArtifacts 产物。
 
     Returns:
-        摘要字符串。
+        摘要字符串（四标签「财务差距=/运营差距=/根因=/组合健康度=」全量形态）。
     """
     if getattr(gap_artifacts, "degraded", False):
         reason = getattr(gap_artifacts, "degrade_reason", "")
         return f"{DEGRADATION_MARKER_PREFIX} 步骤 performance_gap 降级（{reason}）"
-    return f"步骤 performance_gap：财务差距={getattr(gap_artifacts, 'financial_gap', '')}"
+    return (
+        f"步骤 performance_gap：财务差距={getattr(gap_artifacts, 'financial_gap', '')}"
+        f"；运营差距={getattr(gap_artifacts, 'operational_gap', '')}"
+        f"；根因={'、'.join(getattr(gap_artifacts, 'root_causes', ()))}"
+        f"；组合健康度={getattr(gap_artifacts, 'portfolio_health', '')}"
+    )
 
 
 __all__ = [
     "BLM_PER_CALL_TIMEOUT_SEC",
     "BLM_TEMPERATURE_PROFILE",
     "DEGRADATION_MARKER_PREFIX",
+    "CompetitionInsightSchema",
     "GapAnalysisSchema",
     "MARKET_INSIGHT_STEP_CONFIG",
+    "MARKET_INSIGHT_STEP_SCHEMA",
+    "MarketCustomerInsightSchema",
+    "MarketInsightSchemaBase",
+    "OpportunityGapInsightSchema",
+    "OpportunityInsightSchema",
     "PERFORMANCE_GAP_CONFIG",
+    "SelfInsightSchema",
     "StepSemanticConfig",
-    "InsightStepSchema",
+    "TrendInsightSchema",
     "InsightSynthesisSchema",
     "build_insight_step_prompt",
     "build_performance_gap_prompt",

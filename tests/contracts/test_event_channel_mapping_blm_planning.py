@@ -90,7 +90,8 @@ class TestBlmPlanningEventChannelMapping:
 
         CheckpointReached 事件类与通道登记是 Epic 1 既有资产（1-2 领域事件
         定义）——断言语义是「本 Story 交付面零发布点」：BLM 服务与用例源码
-        零 CheckpointReached 引用（发布归 6.3）。"""
+        零 CheckpointReached 引用（发布归 6.3）。6-2 per-step Checkpoint 快照
+        是存储面恢复点位骨架（OD-1），不产生事件——负向断言沿袭零扩展。"""
 
         repo_src = _REPO_ROOT / "src"
         blm_files = [
@@ -99,5 +100,35 @@ class TestBlmPlanningEventChannelMapping:
             "application/use_cases/get_blm_planning_status.py",
         ]
         for relative in blm_files:
+            content = (repo_src / relative).read_text(encoding="utf-8")
+            assert "CheckpointReached" not in content, f"{relative} 不得发布 CheckpointReached（6.3 语义分立）"
+
+    def test_no_market_insight_channel_keys_added(self) -> None:
+        """6-2 零事件新增守护：event_channels.yaml 与 DEFAULT_MAPPINGS 无
+        market-insight 新键（per-step 快照键是存储键非事件键——AC-3 负向）。"""
+        channels = _yaml_channels()
+        market_insight_keys = [key for key in channels if "market_insight" in key.lower() or "MarketInsight" in key]
+        assert not market_insight_keys, f"event_channels.yaml 出现 6-2 新增事件键: {market_insight_keys}（零事件新增钦定）"
+        mapping_keys = [
+            key for key in ChannelRouter.DEFAULT_MAPPINGS if "market_insight" in key.lower() or "MarketInsight" in key
+        ]
+        assert not mapping_keys, f"DEFAULT_MAPPINGS 出现 6-2 新增事件键: {mapping_keys}（零事件新增钦定）"
+
+    def test_blm_event_family_unchanged(self) -> None:
+        """BLM 事件族仍仅 PlanningStarted/BlmStageCompleted（+既有全局族
+        StrategicDeviationWarning 非本面）——AC-3 值域零扩展守护。"""
+        blm_family = {"PlanningStarted", "BlmStageCompleted"}
+        channels = _yaml_channels()
+        for event_type in blm_family:
+            assert event_type in channels, f"{event_type} 通道登记消失（6-1 资产回归）"
+        # CheckpointReached 有通道登记（Epic 1 既有）但 BLM 面零发布——发布面守护见上用例
+
+    def test_checkpoint_reached_negative_in_6_2_delivery_files(self) -> None:
+        """6-2 交付面源码零 CheckpointReached（per-step 快照写入是存储动作非事件）。"""
+        repo_src = _REPO_ROOT / "src"
+        six_two_files = [
+            "application/services/blm_planning_prompts.py",
+        ]
+        for relative in six_two_files:
             content = (repo_src / relative).read_text(encoding="utf-8")
             assert "CheckpointReached" not in content, f"{relative} 不得发布 CheckpointReached（6.3 语义分立）"
