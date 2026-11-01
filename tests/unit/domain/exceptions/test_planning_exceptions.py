@@ -35,7 +35,7 @@ class TestPlanningExceptions:
         assert "8 步" in exc.context["reason"]
 
     def test_planning_state_error_code_482(self) -> None:
-        """482 编码（状态机非法推进——预留）。"""
+        """482 编码（状态机非法推进——已激活：同 plan_id 重跑守卫 R1-5）。"""
         exc = PlanningStateError(plan_id="plan-123", transition="market_insight→performance_gap")
         assert exc.code == "EXCEPTION_482"
         assert exc.context["transition"] == "market_insight→performance_gap"

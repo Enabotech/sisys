@@ -114,7 +114,7 @@ class RunBlmPlanningUseCase:
         # 步 4：档案加载（5-2 复用）
         profile_result = await self._profile_use_case.execute(agent_id=agent_id)
 
-        # 步 5：BLM 上下文装配（阶段 1 检索证据一次性注入）
+        # 步 5：BLM 上下文装配（检索证据在各阶段方法内异步检索——R1-12① 口径）
         resolved_plan_id = plan_id or str(uuid.uuid4())
         context = self._blm_service.build_planning_context(profile_result, task, plan_id=resolved_plan_id)
 

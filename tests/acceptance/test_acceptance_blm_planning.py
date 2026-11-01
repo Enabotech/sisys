@@ -901,9 +901,8 @@ def prompts_contain_role_prefix_and_tool_whitelist(context: dict[str, Any]) -> N
     assert len(step_calls) == 6
     for call, (step_key, config) in zip(step_calls, MARKET_INSIGHT_STEP_CONFIG.items()):
         assert "视角" in call["prompt"], f"{step_key} prompt 缺角色视角前缀"
-        assert any(slug in call["prompt"] for slug in config.tool_candidates), (
-            f"{step_key} prompt 缺工具候选白名单（期望含 {config.tool_candidates} 之一）"
-        )
+        for slug in config.tool_candidates:
+            assert slug in call["prompt"], f"{step_key} prompt 缺工具候选 {slug}（全量白名单注入——R2-6⑨ 与单测对齐）"
 
 
 @then("没有新增非 CEO 角色实例化")

@@ -472,14 +472,15 @@ class BlmPlanningService(BlmPlanningServicePort):
     def _build_system_prompt(self, context: BlmPlanningContext | None) -> str:
         """构造 system 面 prompt（DC-5：档案 tools_l1 全量注入——R2 幻觉名缓解）。
 
-        5-3 先例形态（agent_workflow_service system_prompt 透传）；tools_l1
-        缺失/为空时返回空串（structured_generate 按空串退化 user-only）。
+        5-3 先例形态（agent_workflow_prompts.build_l1_view 取 tool_name——
+        R2-1 字段口径对齐）；tools_l1 缺失/为空时返回空串（structured_generate
+        按空串退化 user-only）。
         """
         if context is None:
             return ""
         profile_result = getattr(context, "profile_result", None)
         tools_l1 = getattr(profile_result, "tools_l1", None) or ()
-        names = [str(tool) if isinstance(tool, str) else str(getattr(tool, "name", "")) for tool in tools_l1]
+        names = [str(getattr(tool, "tool_name", "")) for tool in tools_l1]
         names = [name for name in names if name]
         if not names:
             return ""

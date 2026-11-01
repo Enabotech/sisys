@@ -279,6 +279,29 @@ class TestPerformanceGapAnalysis:
         prompt = mocks["llm"]._state["calls"][0]["prompt"]
         assert "组织能力评估要点" in prompt, "content 键形态未命中（生产链提取断裂）"
 
+    async def test_system_prompt_injects_tools_l1_tool_name(self) -> None:
+        """system 面注入档案 tools_l1 全量（DC-5）——真实 ToolMetadata 字段口径（R2-1）。
+
+        ToolMetadata 字段是 tool_name（非 name）——字段错配即 system_prompt
+        恒空转（R2-1 判定的生产断裂形态）。
+        """
+        from src.application.ports.skill_loader import ToolMetadata
+
+        profile = MagicMock()
+        profile.agent_id = AGENT_ID
+        profile.tools_l1 = (
+            ToolMetadata(tool_name="PESTEL 分析", slug="pestel-analysis", category="market", input_schema={}, output_schema={}),
+            ToolMetadata(tool_name="SWOT-TOWS", slug="swot-tows", category="strategy", input_schema={}, output_schema={}),
+        )
+        context = BlmPlanningContext(plan_id=PLAN_ID, agent_id=AGENT_ID, profile_result=profile, task=TASK)
+        service, mocks = _make_service()
+        await service.run_performance_gap_analysis(context)
+        system_prompt = mocks["llm"]._state["calls"][0].get("system_prompt")
+        assert system_prompt, "system_prompt 不应为空（tools_l1 全量注入——DC-5，R2-1）"
+        assert "PESTEL 分析" in system_prompt and "SWOT-TOWS" in system_prompt, (
+            "system 面应含 tool_name 清单（字段口径 tool_name——R2-1）"
+        )
+
     async def test_same_plan_id_rerun_rejected_482(self) -> None:
         """同 plan_id 重跑 → PlanningStateError(482)（run 入口守卫——R1-5）。
 
@@ -296,10 +319,11 @@ class TestPerformanceGapAnalysis:
         assert exc_info.value.context.get("plan_id") == PLAN_ID
 
     async def test_tool_used_filled_on_success(self) -> None:
-        """工具成功步 tool_used 回填 slug（VO 契约——真执行与直接推理可判别，R1-10⑤）。"""
+        """工具成功步 tool_used 回填 slug + evidence_refs 回填检索命中 id（VO 契约，R1-10⑤/R2-2）。"""
         service, _mocks = _make_service()
         result = await service.run_insight_step(MarketInsightStep.TREND, _make_context(), {})
         assert result.tool_used == "swot-tows", "工具成功步应回填 slug（tool.slug 口径钦定）"
+        assert result.evidence_refs == ("chunk-001",), "检索命中的证据 id 应回填 evidence_refs（R2-2）"
 
     async def test_snapshot_written_and_event_published(self) -> None:
         """方法末尾：快照写（snapshot_repository.save）+ BlmStageCompleted 发布。"""
@@ -495,6 +519,18 @@ class TestDegradationDownstreamRules:
         # 综合报告携带标记：degraded_inputs 含 performance_gap（规则 3 半句）
         synthesis = await service.synthesize_insights({"insight_steps": tuple(steps), "performance_gap": gap}, context)
         assert "performance_gap" in synthesis.degraded_inputs, "综合报告未携带阶段 1 降级标记（规则 3）"
+
+    async def test_gap_normal_summary_injected_into_phase2_prompt(self) -> None:
+        """规则 1 正常形态：gap 非 None 非 degraded → 阶段 2 prompt 含 gap 摘要段（R2-3）。"""
+        service, mocks = _make_service()
+        context = _make_context()
+        gap = await service.run_performance_gap_analysis(context)
+        assert not gap.degraded
+        await service.run_insight_step(MarketInsightStep.TREND, context, {"performance_gap": gap, "insight_steps": ()})
+        trend_calls = [c for c in mocks["llm"]._state["calls"] if c["schema"] is InsightStepSchema and "看趋势" in c["prompt"]]
+        assert trend_calls, "未捕获看趋势步骤调用"
+        assert "阶段 1 业绩差距分析产物摘要" in trend_calls[0]["prompt"], "gap 正常摘要段未注入阶段 2 prompt（R2-3）"
+        assert "财务差距=" in trend_calls[0]["prompt"], "gap 摘要应含财务差距字段摘要（正常态单字段口径）"
 
     async def test_synthesis_empty_conclusions_self_marks(self) -> None:
         """synthesis LLM 成功但空结论 → 视同降级自含（R3-4 两分支对称——R1-10②）。"""

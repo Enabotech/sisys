@@ -206,7 +206,8 @@ class InsightStepResult:
         step: 子步骤标识（MarketInsightStep 值）
         summary: 步骤结论摘要
         findings: 结构化发现清单
-        tool_used: 实际执行的工具 slug（直接推理时空串）
+        tool_used: 实际执行的工具 slug（slug 缺失时回落显示名 name——
+            tool.slug or tool.name 口径；直接推理时空串）
         evidence_refs: 检索证据引用清单（evidence_refs 直存——压缩循环归后续 Story）
         degraded: 是否降级
         degrade_reason: 降级原因

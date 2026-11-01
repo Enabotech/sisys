@@ -53,8 +53,8 @@ class BlmPlanningContext:
         profile_result: 档案加载结果（AgentProfileLoadResult——六档案 VO + tools_l1）
         task: 规划任务描述
         tenant_id: 租户标识
-        retrieved_evidence: 阶段 1 差距量化检索证据（build 时一次性检索——
-            阶段 2 每步证据在 run_insight_step 内部按步骤 query 模板检索）
+        retrieved_evidence: 预留注入位（当前恒空——检索证据在各阶段方法内
+            按步骤 query 模板异步检索，R1-12① 勘误口径）
     """
 
     plan_id: str
@@ -108,7 +108,7 @@ class BlmPlanningServicePort(Protocol):
         plan_id: str,
         tenant_id: str = "",
     ) -> BlmPlanningContext:
-        """装配 BLM 规划上下文（同步——阶段 1 检索证据一次性注入）。
+        """装配 BLM 规划上下文（同步——检索证据在各阶段方法内异步检索）。
 
         Args:
             profile_result: 档案加载结果。

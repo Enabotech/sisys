@@ -13,8 +13,8 @@ sisys-uni-exception-design.md §3.3.2 编码表双处成文）不可占用——
 - PlanningNotFoundError (480)——plan_id 不存在（状态查询无快照第三态）
 - PlanningExecutionError (481)——全流程失败终态（RunBlmPlanningUseCase
   终态组装处：len(degraded_steps) == total_steps 时抛出）
-- PlanningStateError (482)——状态机非法推进（预留——6.3 Checkpoint 恢复面
-  消费时激活）
+- PlanningStateError (482)——状态机非法推进（已激活：同 plan_id 重跑守卫
+  ——R1-5；阶段位点跃迁扩展位归 6.3）
 """
 
 from __future__ import annotations
