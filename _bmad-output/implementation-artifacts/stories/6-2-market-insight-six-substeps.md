@@ -357,7 +357,7 @@
 | **真实服务清理** | teardown 链式清理：outbox 按 event_id 精确 DELETE / 检索 collection 删除 / Redis 键逐键精确删除（禁 flush）/ 端口覆写还原 | 跨场景污染 |
 | **快照键隔离** | 并发场景 5 plan_id 用 UUID 前缀生成，per-step/latest 快照键按 plan_id 天然隔离 | 键冲突 |
 | **性能场景缓存** | `_CachedEmbedding` 模块级缓存代理（embedding 查询去重——6-1 收敛先例 -98%） | 性能场景分钟级膨胀 |
-| **xdist 分组** | 性能场景 `xdist_group("market-insight-perf")` 与验收共享采样缓存禁双跑 | 采样冲突 |
+| **xdist 分组** | 性能/采样场景全模块挂 `xdist_group("blm-planning-perf")`——**复用 6-1 组名**（R2 修订：pyproject addopts `-n auto --dist loadgroup` 为默认态，原钦定新组名 `market-insight-perf` 会与 6-1 旧组跨 worker 并行——冷启动 embed 并行抬双方 P95；共组使 6-1+6-2 全部采样场景全局同 worker 串行）；注：`_CachedEmbedding` 模块级缓存按文件隔离**不跨文件共享**，跨场景共享面是外部 embedding 服务——原"共享采样缓存"表述失实 | 采样冲突 |
 | **事件清理** | 事件 outbox 登记入 context（`_outbox_event_ids`）供 teardown 精确删除 | 残留行 |
 | **pytestmark** | 显式 `pytestmark = [pytest.mark.acceptance, pytest.mark.redis, ...]`（`market_insight` 文件名不含任何服务关键词、无自动 marker——必须显式声明全套 marker） | marker 漏打 |
 
@@ -419,7 +419,7 @@
 
 - [ ] Subtask 0.1: 定稿六类型化 Schema 字段级契约（按上文规范表逐字段定义：字段名/类型（限 str/float/list[str]、禁 Optional/None 默认值字段——R1 修订）/中文 description（领域语义）/**按 OD-8 产物化映射核对** or.md L386-415：or.md 产物名逐项映射到字段族，两处工具产物化（PESTEL/波特五力）附 delta 注记——非逐字核对）；冻结后登记于本 Story 文件（实现 Task 不得增删字段）
 - [ ] Subtask 0.2: 钦定 per-step 快照形态：session_id = `f"{BLM_PLANNING_SESSION_PREFIX}{plan_id}:{step.value}"`、stage_id = `market_insight_{step.value}`、state_data **七键**契约（step/plan_id/summary/structured_output/degraded/degrade_reason/completed_steps——completed_steps 为含该步的 stage 值清单 `list[str]`，structured_output 键恒在恒 null，见数据模型节 R1 修订）、TTL 沿用 `CheckpointSnapshot` 既有默认 86400（6-3 升级 30 天）；登记端口文件序列化契约区（latest 两级契约外新增第三级）
-- [ ] Subtask 0.3: 裁定事件面零新增（`CheckpointReached` 继续不发布）与异常面零新增（预留 483-489 说明）；偏离声明 OD-1~OD-7 落档（见 Dev Notes「关键架构决策」）
+- [ ] Subtask 0.3: 裁定事件面零新增（`CheckpointReached` 继续不发布）与异常面零新增（预留 483-489 说明）；偏离声明 OD-1~OD-8 落档（见 Dev Notes「关键架构决策」——R2 勘误：OD-8 已于 R1 新增，落档指令同步）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_market_insight.feature`（13~14 场景上限内**定稿钉死确定值**，AC 横幅分组——钉死后全文同步，禁范围值进入后续 Task）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_market_insight.py`（docstring 五段：模板基准声明/场景三属性分档表/门控档位/延迟 import 纪律/Run with + 隔离清单；模块级期望常量独立构造——六步领域要素键族禁经被测服务生成）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——预期运行期 `ImportError`（延迟 import 缺失类名）或 `AssertionError`，收集期零错误；记录失败形态）
@@ -430,7 +430,7 @@
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（Schema 字段表冻结 / 快照键契约 / 三零裁定）
 - [ ] 验收测试运行失败（预期行为，红阶段确认）
-- [ ] OD-1~OD-7 落档 + deferred-work 台账更新
+- [ ] OD-1~OD-8 落档 + deferred-work 台账更新
 
 ---
 
@@ -443,7 +443,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/domain/test_blm_domain_models.py`：structured_output 默认 None 兼容 / 正常填充（键 str + 值标量与 list[str]） / 值域违例抛 `EntityValidationError`（pydantic 对象、嵌套 dict、list[dict] 三类违例用例）/ 降级步语义约定 |
-| 🟢 绿 | `src/domain/value_objects/blm_phases.py` `InsightStepResult` 就地新增 `structured_output: dict[str, Any] | None = None` + `__post_init__` 值域守卫（纯标准库校验——isinstance 白名单 + 递归 list 元素检查） |
+| 🟢 绿 | `src/domain/value_objects/blm_phases.py` `InsightStepResult` 就地新增字段 `structured_output`（类型注解 `dict[str, Any] | None = None`——签名移出表格单元格呈现，R2 修订：单元格内未转义管道符会裂列）+ `__post_init__` 值域守卫（纯标准库校验——isinstance 白名单 + 递归 list 元素检查） |
 | 🟡 变异 | 删除守卫分支 → 值域违例用例红 → 还原绿 |
 | 🔄 重构 | docstring 全中文 Google 风格更新（属性说明 + 降级语义）；`ruff` + `mypy` |
 
@@ -483,8 +483,8 @@
 
 - [ ] Subtask 2.1: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — 六类型化 Schema（循环 A）
 - [ ] Subtask 2.2: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — schema 映射 SSOT（循环 B）
-- [ ] Subtask 2.3: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — gap 四字段全量传导（循环 B）
-- [ ] Subtask 2.4: 🔄 重构 — `InsightStepSchema` deprecated 标注（docstring + `__all__` 保序暂留）；消费面清单核对移交 Task 3（生产消费方 = 服务层 import L52/注解 L337/调用 L339 三位；tests 消费面 3 文件 19 位——unit 11 位/验收 6 位/集成 3 位，含验收 L931 `__name__ == "InsightStepSchema"` 字符串口径断言）
+- [ ] Subtask 2.3: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — gap 四字段全量传导（循环 B；**子串兼容钦定**：四字段摘要必须保留 `财务差距=` 中文标签子串——6-1 单测 `test_gap_normal_summary_injected_into_phase2_prompt` L533 以此子串断言，扩展为四字段（`财务差距=…；运营差距=…` 形态）时该子串存活则 Task 2 自然全绿成立，改英文键/改标签措辞则 Task 2 结束即红——R2 修订，消解 Task 2 DoD"自然全绿"的隐含条件）
+- [ ] Subtask 2.4: 🔄 重构 — `InsightStepSchema` deprecated 标注（docstring + `__all__` 保序暂留）；消费面清单核对移交 Task 3（生产消费方 = 服务层 import L52/注解 L337/调用 L339 三位；tests 消费面 3 文件 19 位——unit 11 位/验收 6 位/集成 3 位，含验收 L931 `__name__ == "InsightStepSchema"` 字符串口径断言）；**Task 2 单测禁写 `__all__` 穷尽性/模块级全类反射穷尽断言**（deprecated 暂留期该形态必红——穷尽断言归 Task 3 移除后，R2 补）
 
 **完成标准/Definition of Done:**
 - [ ] 六 Schema + 映射 + gap 扩展全部实现，TDD 循环通过
@@ -502,7 +502,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/application/test_blm_planning_service.py`：六步各调用时传入的 response_schema 为该步类型化 Schema（Fake LLM calls 记录断言）/ 类型化结果填充 structured_output（model_dump 键域=Schema 字段族）/ 校验失败（Fake 返回不合 Schema 数据→pydantic 校验异常路径）→ 降级信封 + structured_output=None / 既有降级三规则与两级重试零回归 |
-| 🟢 绿 | `run_insight_step` L339 调用点由硬编码 `InsightStepSchema` 改为 SSOT 映射查表；结果组装填充 `structured_output=validated.model_dump()`；校验失败走既有步级降级路径；**同批完成**：①移除 `InsightStepSchema`（prompts 定义 L40 + `__all__` + 服务 import L52/注解 L337）②unit Fake 分派与返回体按六 Schema 八键族适配（`is InsightStepSchema` 过滤断言 6 位 + `fail_schemas` 注入位同步）③6-1 验收/集成 `_make_fake_llm` 分派面三 Schema 族扩展为八键族（GapAnalysis + 六类型化 + InsightSynthesis；验收 L931 字符串口径断言同步）——服务切换与三处 Fake 适配必须同一提交闭环（中间态必全红，R1-F2 裁定） |
+| 🟢 绿 | `run_insight_step` L339 调用点由硬编码 `InsightStepSchema` 改为 SSOT 映射查表；结果组装填充 `structured_output=validated.model_dump()`；校验失败走既有步级降级路径；**同批完成**：①移除 `InsightStepSchema`（prompts 定义 L40 + `__all__` + 服务 import L52/注解 L337）②unit Fake 分派与返回体按六 Schema 八键族适配（`is InsightStepSchema` 过滤断言 6 位 + `fail_schemas` 注入位同步）③6-1 验收/集成 `_make_fake_llm` 分派面三 Schema 族扩展为八键族（GapAnalysis + 六类型化 + InsightSynthesis；验收 L931 字符串口径断言同步）——服务切换与三处 Fake 适配必须同一提交闭环（中间态必全红，R1-2 裁定——R2 勘误：原悬空编号"R1-F2"） |
 | 🟡 变异 | 映射查询回退固定 Schema → 六步分派用例红 → 还原绿；structured_output 填充删除 → 填充用例红 → 还原绿 |
 | 🔄 重构 | 类型注解（`type[BaseModel]`）/docstring 更新 |
 
@@ -510,7 +510,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 同文件扩展：每步完成时额外 save 一份 per-step 快照（session_id 后缀 `:{step.value}` / stage_id=`market_insight_{step.value}` / state_data 六键契约）/ 降级步同样触发（degraded 标记入 state_data）/ 快照写入异常被吞且记日志（容错——AsyncMock 抛异常，流程不中断，后续步骤正常）/ latest 快照 save 调用形态与 6-1 一致（既有用例零回归） |
+| 🔴 红 | 同文件扩展：每步完成时额外 save 一份 per-step 快照（session_id 后缀 `:{step.value}` / stage_id=`market_insight_{step.value}` / state_data 七键契约——R2 勘误：原"六键"系 R1-6 漏改残留）/ 降级步同样触发（degraded 标记入 state_data）/ 快照写入异常被吞且记日志（容错——AsyncMock 抛异常，流程不中断，后续步骤正常）/ latest 快照 save 调用形态与 6-1 一致（既有用例零回归） |
 | 🟢 绿 | `_write_snapshot_and_publish` 扩展或新增私有助手 `_write_step_checkpoint(context, step, result)`：构造 per-step `CheckpointSnapshot` 经既有 `self._snapshot_repository.save()` 写入（零新依赖注入——repository 已在） |
 | 🟡 变异 | per-step 写入调用删除 → 用例红 → 还原绿；session_id 后缀删 → 键形态断言红 → 还原绿 |
 | 🔄 重构 | 与 `_write_snapshot_and_publish` 的职责边界注释（latest=读侧状态面 / per-step=6-3 恢复点位面） |
@@ -522,6 +522,7 @@
 **完成标准/Definition of Done:**
 - [ ] 服务层三分支（正常/降级/快照容错）关键路径 100% 覆盖
 - [ ] 6-1 既有 service 单测 **38** 用例零回归（信封构造兼容 + latest 行为不变 + Fake 分派面适配后全绿；R1 修订：原文"37"失实——以运行时收集数为准）
+- [ ] **6-1 验收 14 场景/集成 4 场景在 Fake 适配同批完成后全绿**（R1-2 裁定的提交闭环判据——服务切换/移除/三 Fake 适配同一提交，Task 3 结束时点无中间红窗口）
 - [ ] `ruff` + `mypy` 通过
 
 ---
@@ -535,12 +536,12 @@
 - [ ] Subtask 4.1: 扩展 `tests/contracts/test_event_channel_mapping_blm_planning.py`：零新增守护（event_channels.yaml 与 DEFAULT_MAPPINGS 无 market-insight 新键——快照键非事件键，负向断言 BLM 事件族仍仅 PlanningStarted/BlmStageCompleted/StrategicDeviationWarning）+ `CheckpointReached` 负向源码 grep 沿袭
 - [ ] Subtask 4.2: **6-1 回归面全量验证**（R1 修订：Fake 分派面/返回体适配已在 Task 3 循环 A 同批落码，本 Subtask 为验证+缺口兜底）：6-1 验收 14 场景/集成 4 场景/单测 38 用例在八键族分派下全绿；断言面核查（InsightStepResult 构造含新默认字段零破坏，findings/summary 语义未变；验收 L931 字符串口径断言已同步）；发现适配缺口即回补（兜底，主责在 Task 3）
 - [ ] Subtask 4.3: 组合根零 diff 复核 + `test_port_contract_blm_planning.py` 零修改回归 + CLI `test_agent_cli.py` 8 用例回归
-- [ ] Subtask 4.4: 全仓 grep `InsightStepSchema` 残留清零（生产 src/ 与 tests/ 适配后零引用——含字符串口径 `__name__ == "InsightStepSchema"` 断言位）
+- [ ] Subtask 4.4: 范围限定 grep `InsightStepSchema` 残留清零（**范围 = `src/` 与 `tests/`**：`grep -rn InsightStepSchema src/ tests/` 零输出——含字符串口径 `__name__ == "InsightStepSchema"` 断言位；**`_bmad-output` 两份 Story 文档中的历史引用是记录性审计轨迹、明确不在清零范围**——R2 修订：原"全仓 grep"字面会诱导 dev 删改 6-1 Story 审计记录）
 
 **完成标准/Definition of Done:**
 - [ ] 6-1 全部既有测试零回归通过（R1 修订按 HEAD 实测逐文件列基线，**以运行时收集数为准**：验收 14 场景 / 集成 4 场景 / 单测 domain models 38（31 函数含 8 值参数化）、service 38、exceptions 15、use_cases 18、arch 13 / 契约 端口契约 11（9 函数含 ×3 参数化）、事件通道 8 / CLI blm-plan 块 8——原文"38+37+17/契约 11+8"计数失实且两文件对调）
 - [ ] 守护测试通过（事件零新增/组合根零 diff）
-- [ ] `InsightStepSchema` 全仓零残留
+- [ ] `InsightStepSchema` 在 src/ 与 tests/ 零残留（范围限定口径——同 Subtask 4.4，_bmad-output 记录性引用除外）
 
 ---
 
@@ -551,8 +552,8 @@
 > **模式：** 6-1 `test_integration_blm_planning.py` 同款——真实 Redis/真实守卫链/真实实例化/真实档案加载/真实工具链/真实检索（门控 `_ensure_retrieval()` 双探测 skip）/真实图引擎 + **Fake LLM 唯一豁免**；`try/finally` 自包含（teardown：`_dispose_retrieval` + outbox 按 event_id 精确 DELETE + Redis 键逐键删除）。
 
 - [ ] Subtask 5.1: 场景① 类型化全链：真实链完整跑通，六步 structured_output 领域要素键族逐步断言（期望键族独立构造）
-- [ ] Subtask 5.2: 场景② per-step 快照读回：`snapshot_repository.load()` 逐键读回 6 份 per-step 快照 + latest，stage/state_data（七键契约含 plan_id 归属锚）/版本断言；outbox 零 CheckpointReached 负向（行筛选路径 `payload->'payload'->>'plan_id'`——AC-3 R1 修订）
-- [ ] Subtask 5.3: 场景③ 降级：双杀注入（相邻两步的两 Schema 按 response_schema 身份恒败——AC-4 R1 钦定注入键；集成 Fake 需扩展 schema 身份注入参数）→ 恰两步降级、信封完整、per-step 快照含降级标记、20 轮采样成功率 100%（信封完整口径）
+- [ ] Subtask 5.2: 场景② per-step 快照读回：`snapshot_repository.load()` 逐键读回 6 份 per-step 快照 + latest，stage/state_data（七键契约含 plan_id 归属锚）/**版本写读一致**断言（R2 修订措辞：服务构造 `CheckpointSnapshot` 不传 state_version——实体默认 0 且无递增语义，断言口径 = 写读一致为 0，非版本递增）；outbox 零 CheckpointReached 负向（行筛选路径 `payload->'payload'->>'plan_id'`——AC-3 R1 修订）
+- [ ] Subtask 5.3: 场景③ 降级：双杀注入（相邻两步的两 Schema 按 response_schema 身份恒败——AC-4 R1 钦定注入键；集成 Fake 需扩展 schema 身份注入参数）→ 恰两步降级、信封完整、per-step 快照含降级标记、20 轮采样成功率 100%（信封完整口径）；**采样轮边界钦定（R2 补）**：①每轮新铸 plan_id（`run_blm_planning` execute 内 uuid——禁固定 plan_id 复用，第 2 轮起触发 482 重跑守卫全轮炸）②20 轮采样用 recorder 总线口径（6-1 场景④先例——真实发布形态下 20×9=180 outbox 行的清理成本无谓）③快照键清理：采样轮 latest/per-step 键沿 6-1 先例 TTL 86400 吸收（20 轮 × 7 键 ≈ 140 键不逐删），断言场景（5.2/并发）才逐键精确删除
 - [ ] Subtask 5.4a: 场景④-A 并发正确性：5 个不同 plan_id（UUID 前缀）`asyncio.gather` 全成功 + 互不串扰（per-step 键/outbox 计数按 `payload->'payload'->>'plan_id'` 逐 plan 断言）——**不断言 P95**（R1 修订：并发争用延迟与 AC-5 单任务串行口径不同质，混测即口径污染）
 - [ ] Subtask 5.4b: 场景④-B 性能采样：市场洞察段 P95<25s 独立串行采样（**≥20 轮**，`_CachedEmbedding` 缓存代理，Fake LLM 管线开销口径——docstring 声明 OD-3 口径差；观测点 = timeline 两端 started_at/completed_at，AC-5 R1 修订）
 - [ ] Subtask 5.5: 验证型变异：对 5.1 领域要素断言与 5.2 键形态断言做突变注入-还原实证（集成层断言活体证明）
@@ -631,7 +632,7 @@
 | **OD-5** | 类型化 Schema **扁平化强制**：字段仅 str/float/list[str]，禁嵌套 | GLM-5.3 anthropic 端点嵌套 Schema 服务端栈溢出（litellm_llm_client.py L631-637 注记） |
 | **OD-6** | gap 四字段全量传导（执行 6-1 **代码审查** R2-3 成文裁定：扩展 `summarize_gap_for_downstream`——"四字段全量传导归 6-2 类型化 Schema 消费面定夺"） | 6-1 代码审查 R2-3 + 看自己/机会差距分析步需 gap 数据 |
 | **OD-7** | 测试文件命名：unit/architecture 用 epics 钦定 `test_market_insight.py`（恰为功能名族）；integration 调整为 `test_integration_market_insight.py`（仓规 `test_integration_` 前缀——6-1 先例）；acceptance `test_acceptance_market_insight.feature/.py`；**禁止故事编号后缀** | 6-1 OD-1 先例 + 记忆「禁止故事编号命名文件」 |
-| **OD-8** | **输出产物工具产物化映射**（R1 新增）：六 Schema 必含领域要素以 or.md L386-415 输出产物栏为基准，其中两处以方法论工具产物化替换——看趋势"宏观趋势报告"→"PESTEL 六维度评估"（or.md 建议工具栏 L389 产物化，结构化粒度改进）、看竞争"行业竞争结构图"→"波特五力五维评估"（L399 同理）；"图/报告"类产物（价值主张地图/增长路径图/机会差距量化报告/雷达图）以**要点字段族**承载，图本体生成归 6-5 报告面；要素命名与 or.md 原产物名逐字对齐（尾词不漂移） | R1 审查发现：原表头声称"or.md 输出产物推导"但六步中五步改写（工具名替换×2/尾词漂移×5），下游 6-5/6-7 以本表为契约源做 or.md 引文锚会引用不存在的产物名——溯源链源头断裂 |
+| **OD-8** | **输出产物工具产物化映射**（R1 新增）：六 Schema 必含领域要素以 or.md L386-415 输出产物栏为基准，其中两处以方法论工具产物化替换——看趋势"宏观趋势报告"→"PESTEL 六维度评估"（or.md 建议工具栏 L389 产物化，结构化粒度改进）、看竞争"行业竞争结构图"→"波特五力五维评估"（L399 同理）；"图/报告"类产物（价值主张地图/增长路径图/机会差距量化报告/雷达图）以**要点字段族**承载，图本体生成归 6-5 报告面；要素命名与 or.md 原产物名逐字对齐（尾词不漂移；**空格归一例外**：or.md"能力 - 机会匹配矩阵"连字符两侧空格在本文档归一为"能力-机会匹配矩阵"——R2 注记，实害为零仅声明精度） | R1 审查发现：原表头声称"or.md 输出产物推导"但六步中五步改写（工具名替换×2/尾词漂移×5），下游 6-5/6-7 以本表为契约源做 or.md 引文锚会引用不存在的产物名——溯源链源头断裂 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
 
@@ -643,7 +644,7 @@ src/
 ├── application/
 │   ├── ports/blm_planning.py                ▲ 序列化契约区扩展 per-step state_data 键契约（Task 0）
 │   ├── services/
-│   │   ├── blm_planning_prompts.py          ▲ 六类型化 Schema 新增 + InsightStepSchema 移除 + SSOT 映射 + gap 四字段（Task 2）
+│   │   ├── blm_planning_prompts.py          ▲ 六类型化 Schema 新增 + InsightStepSchema deprecated 暂留（Task 2；移除归 Task 3——R2 勘误：原标 Task 2 与 R1-2 边界裁定矛盾）+ SSOT 映射 + gap 四字段（Task 2）
 │   │   └── blm_planning_service.py          ▲ run_insight_step 类型化分派 + per-step 快照写入（Task 3）
 │   └── use_cases/                           = 零改动
 ├── infrastructure/
@@ -698,14 +699,14 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - **断言判别力**：禁恒真断言（any()/键存在/循环自证）；期望值**独立构造**禁经被测服务生成；本 Story 六步领域要素键族常量独立定义
 - **双杀注入**：单点失败注入可能被重试兜住（20 轮 degraded 恒 0 教训）——降级验证必须相邻两步 {k,k+1} 同时注入 + "每轮恰 N 降级"鉴别锚
 - **工具候选口径**：中文显示名（与 `ceo_agent.yaml allowed_tools` 及 `get_tool(tool_name=)` 同口径）——6-2 勿动 tool_candidates，白名单名必已注册（R3-3 生产不可达前提）
-- **Fake LLM 分派键 = response_schema 身份**：6-1 Fake 只认三 Schema——本 Story 六新 Schema 上线 = 6-1 Fake 必失配（Task 4 强制适配，最大回归风险点）
+- **Fake LLM 分派键 = response_schema 身份**：6-1 Fake 只认三 Schema——本 Story 六新 Schema 上线 = 6-1 Fake 必失配（**Task 3 服务切换同批适配**三处 Fake（unit 返回体/验收/集成分派）+ Task 4 验证兜底——R2 勘误：原"Task 4 强制适配"与 R1-2 边界裁定矛盾，最大回归风险点）
 - **BDD 三件套**：模块级 event_loop + context dict fixture + `_run_async`；teardown 五步链"断言失败也执行"（K8 先例）
 - **性能场景 embedding 缓存**：`_CachedEmbedding` 模块级缓存代理（-98%）——性能/并发场景必配
 - **图身份锚**：图挂载双点漏分支会静默回退 BasicAgent——本 Story 图零改动，但集成测试保留图身份断言
 - **红线三处漏网教训**（R5）：tests 中 `# type: ignore[method-assign]` 用 stub 属性根因修复——本 Story 全程零抑制注释
 
 **应用到本故事/Applied to This Story:**
-- [ ] Task 4 Fake 分派面适配清单化（6-1 验收+集成双文件）
+- [ ] Task 3 Fake 分派面适配清单化（三处：unit 返回体 + 6-1 验收/集成双文件——R2 勘误归属）；Task 4 回归验证兜底
 - [ ] 领域要素期望键族独立构造（验收/集成/单测三面）
 - [ ] 双杀注入降级验证（AC-4）
 - [ ] 性能场景 `_CachedEmbedding` + xdist_group 串行
@@ -772,7 +773,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - `src/application/ports/blm_planning.py` - 序列化契约区扩展（Task 0）
 - `tests/unit/domain/test_blm_domain_models.py` / `tests/unit/application/test_blm_planning_service.py` - 扩展（Task 1/3）
 - `tests/contracts/test_event_channel_mapping_blm_planning.py` - 守护扩展（Task 4）
-- `tests/acceptance/test_acceptance_blm_planning.py` / `tests/integration/test_integration_blm_planning.py` - Fake 分派面适配（Task 4）
+- `tests/acceptance/test_acceptance_blm_planning.py` / `tests/integration/test_integration_blm_planning.py` - Fake 分派面适配（**Task 3 同批**——R2 勘误：原标 Task 4 会复活中间全红窗口；Task 4 仅回归验证兜底）
 - `_bmad-output/implementation-artifacts/deferred-work.md` - 留项裁定更新（Task 0/7）
 
 ---
@@ -821,6 +822,17 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 
 > **Round 1 审查方法记录**：四视角并行调研（服务层 VO/快照基建组合根/6-1 测试资产/规划文档一致性）+ 双评审员并行审查（科学性正确性可行性 / 一致性完备性结构性）+ 主会话独立取证定谳（outbox payload 嵌套形态、build_key 冒号保留实测、评审员误报 2 例驳回）。误报驳回记录：调研 Agent 判"per-step 键形失实"系将 Story 目标态误读为现状声称（AC-2 括号内已注明 session_id 后缀机制，build_key 实测支持）；评审员 B 对计数的"17"溯源（use_cases 18/arch 13/exceptions 15 均不匹配）确认为 6-1 创建期陈旧值。
 
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-1 | R1-2 Task 边界重划的传播漏网 5 处：循环B 红行"六键"残留、结构树 Lessons/File List 三处"Task 4 适配"旧归属（File List 残留会复活中间全红窗口——服务切换在 Task 3 而 Fake 适配推迟 Task 4）、Subtask 0.3 与 Task 0 DoD "OD-1~OD-7"未升 OD-8 | P2 | 六键→七键勘误；三处 Task 4 归属改"Task 3 同批 + Task 4 验证兜底"；Task 3 DoD 补提交闭环判据（验收/集成 Fake 适配同批完成）；OD-1~OD-8 两处升级 + sprint-status 注释同步 |
+| R2-2 | xdist 组名钦定冲突：pyproject `-n auto --dist loadgroup` 默认态下新组名 `market-insight-perf` 与 6-1 `blm-planning-perf` 跨 worker 并行采样（冷启动 embed 并行抬双方 P95）；"与验收共享采样缓存"表述失实（`_CachedEmbedding` 按文件模块级隔离，共享面是外部 embedding 服务） | P2 | 复用 6-1 组名 `blm-planning-perf`（跨 Story 采样场景全局同 worker 串行）；隔离表行改写并注明缓存隔离事实 |
+| R2-3 | Task 2.3 gap 四字段扩展非行为中性：6-1 单测 L533 以 `财务差距=` 子串断言（注释"正常态单字段口径"），四字段实现若改英文键/改标签则 Task 2 结束即红——"自然全绿" DoD 是未声明条件命题 | P2 | Subtask 2.3 钉死子串兼容（四字段摘要保留 `财务差距=` 中文标签子串） |
+| R2-4 | "全仓 grep InsightStepSchema 清零"字面会诱导 dev 删改 6-1 Story 审计记录（_bmad-output 历史引用是记录性轨迹） | P3 | Task 4.4 与 DoD 改范围限定口径（`grep -rn InsightStepSchema src/ tests/` 零输出；_bmad-output 明确除外） |
+| R2-5 | 组合推演边界批：场景③ 20 轮采样未声明 recorder 总线口径（真实发布 180 行清理无谓）/禁固定 plan_id（第 2 轮触发 482）/快照键 TTL 吸收 vs 逐删二选一；5.2"版本断言"超实际可断言面（state_version 恒 0 无递增）；Task 2 测试若写 `__all__` 穷尽断言在暂留期必红；OD-8"逐字对齐"空格自违（or.md"能力 - 机会"两侧空格） | P3 | 5.3 三边界钦定；5.2 改"版本写读一致"口径；2.4 禁穷尽断言注记；OD-8 空格归一例外声明 |
+| R2-6 | 形态批：Task 1 循环A 绿行表格单元格内 `dict[str, Any] \| None` 未转义管道符裂列；Task 3 绿行悬空编号"R1-F2" | P3 | 签名移出单元格文字化呈现；编号改 R1-2 |
+
+> **Round 2 审查方法记录**：回归核查双 Agent——①传播完备性（git show 取证 + 修复关键词 17 组全出现位 grep + R1 标注文本 20+ 处破损抽查 + 40 Subtask 点数复核 + 外部事实锚点独立验证全通过）②组合交互推演（8 组合面：R1-2×R1-5/R1-2×4.4/R1-1×R1-3×20轮/R1-6×归属锚×并发/R1-7×xdist/R1-4×键族/R1-2×R1-9×DoD/R1-2×FileList）+ 主会话预验组合面 7（6-1 L533 子串断言——与 Agent 结论互证）。
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -851,9 +863,10 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-01
 **最后更新/Last Updated:** 2026-11-01
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（五 Agent 并行调研 + 关键代码事实独立核验；钦定 OD-1~OD-7 偏离声明；六类型化 Schema 规范冻结表；per-step 快照键契约）
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 双评审员 + 主会话独立定谳；P1×3 + P2×10 + P3×15；修复 R1-1~R1-14 详见 Docs Review Fixes 表；新增 OD-8；Task 2/3 边界重划——InsightStepSchema 移除与三 Fake 适配归 Task 3 同批；outbox 断言主键改两级 JSONB 路径；双杀注入键钦定 schema 身份）
+- v1.2.0: Round 2 回归核查修订（传播完备性 + 组合交互推演双 Agent + 主会话预验互证；P2×3 + P3×3 簇 R2-1~R2-6：R1-2 传播漏网 5 处收敛（File List 残留复活中间红窗口）、xdist 组名钦定复用 blm-planning-perf、Task 2.3 财务差距=子串兼容钉死、全仓 grep 范围限定、采样轮三边界、形态批）
