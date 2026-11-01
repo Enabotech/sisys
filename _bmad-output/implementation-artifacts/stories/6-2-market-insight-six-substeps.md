@@ -53,7 +53,7 @@
 - [ ] 机会差距分析产出含机会差距量化报告 + 能力-机会匹配矩阵 + 差距弥合策略
 - [ ] 产物命名以 or.md L386-415 原产物名为准（图/报告类产物以要点字段族承载——图本体生成归 6-5 报告面，OD-8 声明）
 - [ ] 每个 Schema 字段类型仅限 `str` / `float` / `list[str]`（嵌套对象禁入——OD-5 扁平化强制）
-- [ ] 每步 Schema 均含公共字段 `summary: str` + `findings: list[str]`（信封同源双公共字段——R3 修订，服务 L350-352 直读两字段）
+- [ ] 每步 Schema 均含公共字段 `summary: str` + `findings: list[str]`（信封同源双公共字段——R3 修订，服务 L350-353 直读两字段——R5 勘误：findings 实在 L353）
 
 ### AC-2: 每子步骤触发 Checkpoint 快照骨架
 
@@ -171,7 +171,7 @@
 | `opportunity` | `OpportunityInsightSchema` | 机会清单、机会优先级排序、增长路径图 | SWOT-TOWS/安索夫矩阵 |
 | `opportunity_gap` | `OpportunityGapInsightSchema` | 机会差距量化报告、能力-机会匹配矩阵、差距弥合策略 | GE-麦肯锡矩阵/SWOT-TOWS |
 
-  - **公共字段（R3 修订——P1 修复）**：每 Schema 含 **`summary: str` + `findings: list[str]` 双公共字段**（信封同源：服务成功分支信封构造 L350-352 直读 `schema_result.summary`/`schema_result.findings` 填充 `InsightStepResult`——六 Schema 缺 findings 字段则切表即 AttributeError，Task 3 阻断；双公共字段使 6-1「findings/summary 语义未变」回归声明成立、降级分支空 summary/空 findings 对称保持）
+  - **公共字段（R3 修订——P1 修复）**：每 Schema 含 **`summary: str` + `findings: list[str]` 双公共字段**（信封同源：服务成功分支信封构造 L350-353 直读 `schema_result.summary`/`schema_result.findings` 填充 `InsightStepResult`——六 Schema 缺 findings 字段则切表即 AttributeError，Task 3 阻断；双公共字段使 6-1「findings/summary 语义未变」回归声明成立、降级分支空 summary/空 findings 对称保持；R5 勘误：findings 行实在 L353，原引 L350-352 偏一行）
   - **扁平化强制（OD-5）**：字段类型仅限 `str` / `float` / `list[str]`；禁嵌套 BaseModel / 禁 `list[dict]` / **禁 Optional[X] / None 默认值字段**（`model_dump()` 对 Optional 字段产 `None`——VO 守卫拒 None 且拒绝点在信封构造处、位于步级降级 try/except 之外，会炸整轮 run 而非降级该步）；GLM-5.3 anthropic 端点对嵌套 Schema 服务端栈溢出 500（`src/infrastructure/external_services/llm/litellm_llm_client.py` L631-637 注记成文）；字段命名 snake_case
   - 领域要素 → 字段的精确映射在 Task 0 定稿并冻结（后续 Task 不得擅自增删字段——契约面变更需过 Contract Gate 思路评审）
 - [ ] `InsightStepSchema`（两字段通用信封 Schema）**移除**：六步全量切换类型化后生产调用点归零，保留即双源（YAGNI）；其 `summary` 语义并入各类型化 Schema 公共字段。引用面清理见"6-1 回归面"
@@ -485,7 +485,7 @@
 - [ ] Subtask 2.1: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — 六类型化 Schema（循环 A）
 - [ ] Subtask 2.2: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — schema 映射 SSOT（循环 B）
 - [ ] Subtask 2.3: 🔴 红/🟢 绿/🟡 变异/🔄 重构 — gap 四字段全量传导（循环 B；**子串兼容钦定**：四字段摘要必须保留 `财务差距=` 中文标签子串——6-1 单测 `test_gap_normal_summary_injected_into_phase2_prompt` L533 以此子串断言，扩展为四字段（`财务差距=…；运营差距=…` 形态）时该子串存活则 Task 2 自然全绿成立，改英文键/改标签措辞则 Task 2 结束即红——R2 修订，消解 Task 2 DoD"自然全绿"的隐含条件）
-- [ ] Subtask 2.4: 🔄 重构 — `InsightStepSchema` deprecated 标注（docstring + `__all__` 保序暂留）；消费面清单核对移交 Task 3（生产消费方 = 服务层 import L52/注解 L337/调用 L339 三位；tests 消费面 3 文件 19 位——unit 11 位/验收 6 位/集成 3 位，含验收 L931 `__name__ == "InsightStepSchema"` 字符串口径断言）；**Task 2 单测禁写 `__all__` 穷尽性/模块级全类反射穷尽断言**（deprecated 暂留期该形态必红——穷尽断言归 Task 3 移除后，R2 补）
+- [ ] Subtask 2.4: 🔄 重构 — `InsightStepSchema` deprecated 标注（docstring + `__all__` 保序暂留）；消费面清单核对移交 Task 3（生产消费方 = 服务层 import L52/注解 L337/调用 L339 三位；tests 消费面 3 文件 21 位——unit 12 位（R5 勘误：原记 11 位，import×1+is 分派/过滤×6+fail_schemas 注入×4+返回体×1）/验收 6 位/集成 3 位，含验收 L931 `__name__ == "InsightStepSchema"` 字符串口径断言）；**Task 2 单测禁写 `__all__` 穷尽性/模块级全类反射穷尽断言**（deprecated 暂留期该形态必红——穷尽断言归 Task 3 移除后，R2 补）
 
 **完成标准/Definition of Done:**
 - [ ] 六 Schema + 映射 + gap 扩展全部实现，TDD 循环通过
@@ -836,7 +836,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R3-1 | **findings 信封契约三叉未定（P1）**：服务成功分支信封构造 L350-352 直读 `schema_result.findings`——六类型化 Schema 仅钦定 summary 公共字段，缺 findings 则切表即 AttributeError（Task 3 阻断）；Task 4.2"findings/summary 语义未变"声明在未冻结形态下不成立 | P1 | 六 Schema 钦定 `summary: str` + `findings: list[str]` **双公共字段**（数据模型节/AC-1 VC/Task 2 循环A 红行三处同步）——服务直读成立、降级空分支对称、4.2 回归声明成立 |
+| R3-1 | **findings 信封契约三叉未定（P1）**：服务成功分支信封构造 L350-353（R5 勘误：原记 L350-352，findings 实在 L353）直读 `schema_result.findings`——六类型化 Schema 仅钦定 summary 公共字段，缺 findings 则切表即 AttributeError（Task 3 阻断）；Task 4.2"findings/summary 语义未变"声明在未冻结形态下不成立 | P1 | 六 Schema 钦定 `summary: str` + `findings: list[str]` **双公共字段**（数据模型节/AC-1 VC/Task 2 循环A 红行三处同步）——服务直读成立、降级空分支对称、4.2 回归声明成立 |
 | R3-2 | SSOT 映射容器形态悬空引用：Task 2 循环 B"按 Task 0 定稿形态"但 Task 0 无钦定载体（0.1~0.9 均不涉映射容器） | P2 | Subtask 0.1 钦定形态 A 独立 dict `MARKET_INSIGHT_STEP_SCHEMA`（避免 StepSemanticConfig 承载类型对象耦合扩散）；Task 2 循环 B 去悬空 |
 | R3-3 | 5.4a/AC-3/AC-6 的 outbox 断言隐含真实 publisher + PG 装配但全文未钦定总线形态（默认 recorder 零落行使断言空真或被弱化降维）；AC-3 负向断言 recorder 下空真恒过 | P2 | 5.4a 钦定沿 6-1 集成场景③ 真实发布装配先例 + per-plan 计数钉死 9 行（PlanningStarted×1+BlmStageCompleted×8，AgentDecided 无 plan_id 子键天然排除）；AC-3 补非空锚前置（≥9 行再负向） |
 | R3-4 | AC-2×3 场景分化维度未钦定（降级步快照与 AC-4 场景天然同质，dev 易写出重复覆盖）；"快照写入失败容错"列为验收 Edge Case 与 no-mock 红线互斥（真实 Redis 写失败不可构造、stub 抛异常 = mock 真实服务） | P2 | BDD 约束节补场景分化维度表（AC-1/AC-2/AC-4/AC-7 逐组钦定）；写失败容错归属单测层 Task 3 循环 B，验收 Edge Cases 剔除 |
@@ -844,6 +844,10 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 | R3-6 | P3 簇：Task 7.1"降级双杀×2"标签致单点覆盖丢失；AC-7 场景数 7.2 未同步（钉 2：正常+降级标注）；5.4b 采样轮 task 文本未钉固定（每轮换文本则 140 次 embed 全 miss 假红）；completed_steps 是否含 performance_gap 未钉；VO 加 dict 字段后 hash() 抛 TypeError 未注记；20 轮采样验收/集成双层未分配 | P3 | 7.1 改"单点+双杀×2"；7.2 钉 2 场景同步；5.4b 钉 task 固定；completed_steps 钉"首步即含 performance_gap"；Task 1 重构行补可哈希性注记；20 轮归属集成 5.3、验收单轮（分化维度表载明） |
 
 > **Round 3 审查方法记录**：单深度推演 Agent（8 项推演：场景期望唯一性干跑/P95 数学与预热口径/并发 outbox 全链/Task 0→7 依赖干跑/SSOT 形态×验证器 D/null round-trip/AC-7 摘要机制/信封语义层）+ 主会话 L350-352 实测定谳 P1。**安全定谳（免修留痕）**：P95 次大值数学自洽+预热属 DC-7 既定口径（次大值档自愈单冷轮）；structured_output=null 双层 JSON round-trip 全链闭合；图并发隔离三锚（thread_id=run_id/节点显式传 context/_runs 按 plan 键控）；Task 0→7 无硬倒挂（契约测试不钉 docstring，0.2 修改安全）。
+
+> **Round 4 纯验证 + Round 5 独立收敛终审（周期闭合）**：R4 主会话纯验证零发现零提交（锚点全量向 HEAD 实地核验/标题序列与 40 Subtask 连续性/OD 表 8 行/活体残留终扫全绿）。R5 独立终审 Agent 六节取证**全部通过**（不采信自报）：①周期闭合（3 提交恰量归属/工作区干净）②8 项高风险修复双向取证 8/8 成立（R1-2/R1-3/R2-2/R2-3/R3-1/R3-3/R3-4/R3-5——文档口径与仓库 HEAD 实证逐处吻合）③26 项台账全落点（24 项关键词组抽验命中）④32 组事实锚点向 HEAD 实地核验通过（src/tests 本周期零改动，HEAD@d1af99bd 行号基准仍准）⑤红线零违背（三提交零 AI 署名/零活体抑制注释/Fake LLM 豁免注记齐）⑥SDD 三判据齐备（Task 0 冻结面确定/AC 可写可达/Task 间无中间红窗口）——dev agent 可零歧义开工。终审特权发现 3 项 P3（前三轮全漏）：F-1 sprint-status 注释版本滞后、F-2 findings 行实在 L353（原记 L350-352 偏一行）、F-3 unit 消费面实测 12 位（原记 11 位）——三项经主会话逐条复核属实，按「成本趋零应做」随本收敛提交清偿（活体口径位更正，历史方法记录保留原貌）。**周期收敛判定：收敛**。
+
+**收敛声明**：Story 6-2 文档审查周期（R1 修订/R2 回归/R3 推演/R4 纯验证/R5 独立终审）五轮收敛，版本 v1.0.0→v1.3.1，累计 P1×4 + P2×18 + P3 簇（26 项台账 + 3 项终审特权），4 提交（48b5959d/788da409/750820be/本次收敛提交）。六节终审取证全过、32 组锚点实地命中、红线零违背、SDD 三判据齐备。Story 维持 `ready-for-dev`，进入 `dev-story`。
 
 ---
 
@@ -875,7 +879,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-01
 **最后更新/Last Updated:** 2026-11-01
 **更新说明/Description:**
@@ -883,3 +887,4 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 留项裁定更新�
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 双评审员 + 主会话独立定谳；P1×3 + P2×10 + P3×15；修复 R1-1~R1-14 详见 Docs Review Fixes 表；新增 OD-8；Task 2/3 边界重划——InsightStepSchema 移除与三 Fake 适配归 Task 3 同批；outbox 断言主键改两级 JSONB 路径；双杀注入键钦定 schema 身份）
 - v1.2.0: Round 2 回归核查修订（传播完备性 + 组合交互推演双 Agent + 主会话预验互证；P2×3 + P3×3 簇 R2-1~R2-6：R1-2 传播漏网 5 处收敛（File List 残留复活中间红窗口）、xdist 组名钦定复用 blm-planning-perf、Task 2.3 财务差距=子串兼容钉死、全仓 grep 范围限定、采样轮三边界、形态批）
 - v1.3.0: Round 3 深度推演修订（单深度 Agent 8 项推演 + 主会话 L350-352 实测定谳；P1×1 + P2×5 + P3 簇 R3-1~R3-6：findings 双公共字段钦定（切表 AttributeError 阻断修复）、SSOT 映射形态 A 钦定、outbox 真实发布装配+非空锚+9 行计数钉死、场景分化维度表（快照写失败容错与 no-mock 红线互斥裁定）、AC-7 摘要机制消歧、P3 簇批）
+- v1.3.1: Round 4 纯验证 + Round 5 独立收敛终审（六节取证全过/8 项高风险修复双向取证 8÷8/32 组锚点实地命中/红线零违背/SDD 三判据齐备）；终审特权发现 3 项 P3 随收敛提交清偿（F-1 sprint-status 注释滞后/F-2 findings 行 L353 勘误/F-3 unit 12 位勘误）；**周期收敛**，维持 ready-for-dev

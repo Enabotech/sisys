@@ -176,7 +176,7 @@ development_status:
   # ===========================================================================
   epic-6: in-progress
   6-1-blm-first-two-phases: done  # 代码审查 R1~R5 五轮收敛（2026-11-01——v1.5.3 终审五节全过）
-  6-2-market-insight-six-substeps: ready-for-dev  # 六类型化 Schema + per-step Checkpoint 快照骨架（OD-1~8 落档 2026-11-01，R2 文档审查 v1.2.0）
+  6-2-market-insight-six-substeps: ready-for-dev  # 六类型化 Schema + per-step Checkpoint 快照骨架（OD-1~8 落档 2026-11-01，五轮文档审查收敛 v1.3.1）
   6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
   6-4-json-chain-of-thought-output: backlog
   6-5a-markdown-report-basic: backlog
