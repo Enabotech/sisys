@@ -1001,13 +1001,17 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ L180 TODO 注释清
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R8-F1 | `recover_checkpoint(...)` 是四个端口方法中唯一未展开签名的——入参面（plan_id+checkpoint_no）与「后续 checkpoint 清单」推导算法（值域 8 键 probe-load/升序/损坏键跳过语义）均未钦定，dev 分叉自由度 | P2 | 签名补全 `(plan_id, checkpoint_no)` + 推导算法钦定（值域序号大于当前者逐一 load 探测、非 None 升序入清单、None 者静默跳过——清单服务模式判定非完整性断言面） |
+| R8-F1 | `recover_checkpoint(...)` 是四个必选端口方法（create/build/apply/recover——第五 recommend 标记可选）中唯一未展开签名的——入参面（plan_id+checkpoint_no）与「后续 checkpoint 清单」推导算法（值域 8 键 probe-load/升序/损坏键跳过语义）均未钦定，dev 分叉自由度 | P2 | 签名补全 `(plan_id, checkpoint_no)` + 推导算法钦定（值域序号大于当前者逐一 load 探测、非 None 升序入清单、None 者静默跳过——清单服务模式判定非完整性断言面） |
 | R8-F2 | R6-6 互锁安全实际依赖的结构前提（6-2 两文件已模块级 blm-planning-perf 组+本 Story 同组挂法→同 worker 串行）未注记；非互证场景（CP-2/3/5 值域行）在 teardown 失败残局下仍有 LIKE 暴露面 | P3 | AC-4 VC 补结构前提注记（串行前提+残局防线=teardown 链纪律） |
 | R8-F3 | StrategicArchive 结构字段与冻结载荷映射均无 checkpoint 维度——同 plan 多 checkpoint 归档（含重复创建追加行）经 plan_id 关联查询返回全集不可判别，6-6 读侧可用性缺口 | P3 | 钦定 checkpoint_no→decision_basis（dict 自由字段零契约变更——归档行 checkpoint 语境锚，读侧可按 checkpoint 精确过滤）；AC-5/0.8② 两处 |
 | R8-F4 | ttl_seconds=2592000 赋值点未钦定——实体默认 86400，性能直调路径（build→save）TTL 断言依赖构造方法落值 | P3 | build_snapshot 行钦定显式落值 2592000 |
 | R8-F5 | 预热含④save 建连接池为隐式事实（防首轮建连抬 P95）未注记；correction_history 条目 dict 投影（applied_at isoformat 字符串化）无映射表 | P3 | AC-8 预热注记（禁窄化预热）+ 键族行投影映射钦定（asdict 等价形态） |
 
 **Round 8 推演留痕（证伪不成立的疑点与自洽结论——防后续轮重推）**：T1 修正链全推演（v0→v1→v2/history 累积/checksum 每步重算/snapshot_id 轮换——store 仅写 latest 单 hash field :120，单键单版本结构保证）；T2 重复创建后乐观锁（重置后旧 expected 重新有效是「版本重置 0」+「与存活版本比较」的确定推论，非未定义行为；红测首建步骤自带归零+UUID plan_id 键隔离双保险）；T4 互锁全链（CP-1 行双通道皆不命中：LIKE 前缀不匹配+plan_id 通道对 CheckpointReached 恒 NULL 比较 NULL 不命中）；T6 采样链（stage_number 派生/20 键独立/TTL 读法三钦定闭合）；T7 三场景期望唯一性（AC-2 双响应/AC-6 v0→1+use_case/AC-7 三分配方可从签名注记+维度表拼接——无歧义）。R6/R7 新钦定语义三组交互面（重置×乐观锁/派生×采样/plan_type SP×R3-E 关联查询）均收敛。
+
+**Round 10 独立终审（五节全过——「不轻信自报」双向取证）**：①周期闭合：3 提交（fcab4a56/fbeb3aef/403dd073）无游离、版本链 v1.3.1→v1.4.0→v1.4.1→v1.4.2 与提交信息逐一一致、R9 纯验证零发现零提交符合「不强行造提交」纪律（R9 留痕由本节承载）；②双向取证 10÷10（R6-1/R6-2/R6-4/R6-5/R6-6/R6-9/R7-1/R7-2/R8-F1/R8-F3 逐项「修复表声明↔正文钦定句↔源码实测」三方一致——含 EntityValidationError=242/实体默认 0/LIKE SQL 块 :1334-1341/decision_basis dict 自由字段等代码实证）；③独立快扫：端口五方法测试承载无孤儿（recommend 可选性钦定）、R6-1 P0 定级论证链完整（v1.3.1 按旧文实施必撞 :101 守卫且两文件不在改动清单自锁）、随机行号抽测 8/8 精确、13 场景/13 键/OD-1~12/三条红线终扫一致；④文档门禁：Status 维持 ready-for-dev 无越权流转、Next Steps 与实施未启动事实相符、版本页 8 版本全链完整；⑤收敛判定：零 P0/P1/P2/P3 残留——**收敛**。R10 新发现 P4×2（F-1「四个必选端口方法」计数歧义注记——随本收敛提交清偿；F-2 R9 留痕——本节承载）。
+
+**收敛声明（Round 10 终审落档）**：Story 6-3 收敛后再审周期 Round 6~10 五轮收敛：R6 增量修订 25 项（P0×1 `plan_type="checkpoint"` 被 archive_plan 双道校验物理拒绝的实施阻断 + P2×5 + P3×18 + P4×1）/ R7 回归核查 7 项（含 R6-21 标签错挂等修复自引入破口订正）/ R8 单深度推演 5 项（recover 签名补全 + 四项注记钦定）/ R9 纯验证零发现 / R10 独立终审五节全过——周期闭合 3 提交无游离、双向取证 10÷10 三方一致、随机行号抽测 8/8 精确、文档门禁通过、Status 维持 ready-for-dev 无越权流转。**残留 P0/P1/P2/P3 清单为空**（R10 P4×2 均已处置）。文档 v1.4.2 → v1.4.3 维持 **dev-ready**，可进入 `dev-story` 实施与后续代码审查周期。
 
 ---
 
@@ -1040,10 +1044,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ L180 TODO 注释清
 
 ---
 
-**故事版本/Story Version:** v1.4.2
+**故事版本/Story Version:** v1.4.3
 **创建日期/Created:** 2026-11-02
 **最后更新/Last Updated:** 2026-11-02
 **更新说明/Description:**
+- v1.4.3: 收敛后再审周期 Round 10 独立终审收敛（五节终审全过）：周期闭合 3 提交无游离/双向取证 10÷10「声明↔正文↔代码」三方一致/独立快扫（端口五方法无孤儿+R6-1 P0 定级论证链完整+随机行号抽测 8/8 精确+13 场景/键/OD/红线终扫）/文档门禁（Status 维持 ready-for-dev 无越权流转）/收敛判定——零 P0/P1/P2/P3 残留；R10 新发现 P4×2（「四个必选端口方法」计数歧义注记随本提交清偿；R9 纯验证零留痕由终审节承载）；收敛声明落档：**文档 dev-ready，可进入 dev-story 实施**
 - v1.4.2: 收敛后再审周期 Round 8 单深度推演（七条长状态时间线+组合可达性——实体/store/6-2 查询/archive_plan 结构全实测支撑）：**P2×1** R8-F1 recover_checkpoint 签名补全+后续清单推导算法钦定（值域 probe-load/升序/损坏键静默跳过——四端口方法唯一未展开者）；**P3×4** R8-F2 互锁结构前提注记（xdist 同组串行+teardown 残局防线）/R8-F3 checkpoint_no→decision_basis 钦定（归档行 checkpoint 语境锚——同 plan 多归档判别缺口）/R8-F4 ttl_seconds 赋值点钦定（build_snapshot 落 2592000）/R8-F5 预热建连注记+correction_history 投影映射；**推演留痕**：T1 修正链/T2 重复创建乐观锁/T4 互锁双通道/T6 采样链/T7 期望唯一性全自洽；R6/R7 新语义三组交互面均收敛
 - v1.4.1: 收敛后再审周期 Round 7 回归核查（双 Agent：R6 修复回归取证+传播完备性扫描+主会话独立发现）：**P3×5** R7-1 stage_number 派生规则钦定（"CP-n" 后缀解析——R6-5 引入的自由度）/R7-2 R6-21 标签错挂订正（R6 修复自引入破口——两处 R6-8 误标）/R7-3 L894 历史行双重旧表述勘误（R6-3/R6-16 传播漏网）/R7-4 分类表 CheckpointService 行同步/R7-5 期望常量 created_via 钦定；**P4×2** R7-6 计数口径注记/R7-7 累积↔重置交叉引用。正面核验：R6 传播 24/25 落地+零结构破坏+新行号 6 组实测精确+机理断言 8 条自洽+七关键词传播完备；REST schema ^(SP|BP)$ 第三道校验佐证 R6-1
 - v1.4.0: 收敛后再审周期 Round 6（定位=增量修订面+终态存续+组合交互面；D1 四调研+D2 双审查员+主会话亲证定谳）：**P0×1** R6-1 `plan_type="checkpoint"` 被 archive_plan 双道校验物理拒绝（strategic_archive_service.py:101-105+实体 validate——改钦 "SP"+关联承载）；**P2×5** R6-2 首建 state_version=0 钦定（同仓 6-2 先例）+两步构造法/R6-3 482「状态非法」悬空收窄（归 6-6 扩展位+场景名改「非法操作三分」）/R6-4 created_via 注入通道（签名补参+CLI 硬编码 "cli"）/R6-5 build_snapshot 纯构造方法（性能窗口 checksum 同构）/R6-6 互证互锁解除（创建侧 CP-1+执行序钦定——6-2 LIKE 通道无 plan_id 过滤实测）；**P3×18** R6-7~R6-24（覆盖重置语义/聚合名义校准/结构树归位+R5-2 勘误/分类表补行/血缘豁免/标记统一/R5-4 校正反噬勘误/弱断言校准/计数订正/措辞校准/部分核销限定/同键覆盖断言/DF3 分工/TTL 读法/argparse 机制/参数映射/Fake 双响应/UUID 类型注记）；**P4×1** 登记不修。正面核验留痕：机理断言 13/13 一致、锚点 26/26 精确、Task 2 红测可写性闭合
