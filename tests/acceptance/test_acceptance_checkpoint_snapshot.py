@@ -58,7 +58,8 @@ BDD 步骤禁 @pytest.mark.asyncio（context 数据丢失——用模块级 even
 后的「build_snapshot 构造起点（含 checksum 计算——R6-5）→ Redis save
 返回」窗口；持久化笔记实体抽取与 LLM 压缩延迟显式出栈独立计量（Fake LLM
 固定产物使压缩延迟出栈——6-1 DC-7/6-2 OD-3 先例）。20 轮 = 20 个独立
-plan_id 各建 CP-1（值域 8 上限下同 plan 不可承载 20 键——R1-F17）；采样
+plan_id 各建 CP-1（值域 8 上限下同 plan 不可承载 20 键——R1-F2 守卫值域，
+R5-1 勘误：原误挂 R1-F17 与集成侧 R2-5 同型）；采样
 复用预热轮压缩产物（含 persistent_note_ref 血缘——R6-11 性能口径豁免，
 断言面仅验键存在与 TTL）。
 

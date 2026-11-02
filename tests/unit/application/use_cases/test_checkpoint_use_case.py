@@ -168,7 +168,12 @@ class TestRecoverCheckpointUseCase:
         service.recover_checkpoint.assert_not_awaited()
 
     async def test_execute_propagates_domain_errors(self) -> None:
-        """恢复面领域异常透传（480/484 零包装——恢复三分语义在服务层承载）。"""
+        """恢复面领域异常透传（480/484 零包装——恢复三分语义在服务层承载）。
+
+        R3-5 薄透传格豁免注记：Create 用例 483 透传/Recover 用例 480 透传
+        两格不建独立用例——薄透传无自身逻辑+服务层全承载+242 守卫自测在位
+        （R5-2 补可检索注记）。
+        """
         from src.application.use_cases.create_checkpoint import RecoverCheckpointUseCase
         from src.domain.exceptions import CheckpointIntegrityError
 
