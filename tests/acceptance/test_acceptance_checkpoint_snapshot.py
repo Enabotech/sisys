@@ -581,8 +581,29 @@ def _assemble_checkpoint_chain(context: dict[str, Any], *, dual_response_llm: bo
     context["_redis_client"] = redis_client
     redis_adapter = RedisAdapter(redis_client=redis_client)
 
-    # 2) 领域服务链（真实规则基抽取 + Fake LLM 压缩 + 真实 L1 缓存）
-    note_taker = PersistentNoteTaker(
+    # 2) 领域服务链（真实规则基抽取 + Fake LLM 压缩 + 真实 L1 缓存；note_taker
+    #    套记录壳——R2 审查 R2-2：note:/compressed: 键随 take_notes 全路径登记进
+    #    清理面，消灭「step① 成功后②③④失败」的登记窗口（与集成侧同形态——
+    #    note_id 是内部 uuid4 调用前不可知，记录壳是唯一完备登记形态））
+    from src.domain.ports.l3_vector import SearchResult
+    from src.domain.services.persistent_note_taker import PersistentNote
+
+    class _RecordingNoteTaker(PersistentNoteTaker):
+        """take_notes 记录壳（本地子类——登记缓存键进 context 清理面）。"""
+
+        async def take_notes(
+            self,
+            query: str,
+            retrieved_docs: list[SearchResult],
+            user_id: str,
+            session_id: str,
+        ) -> PersistentNote:
+            note = await super().take_notes(query=query, retrieved_docs=retrieved_docs, user_id=user_id, session_id=session_id)
+            context["_note_cache_keys"].append(f"{NOTE_CACHE_KEY_PREFIX}{note.note_id}")
+            context["_compressed_cache_keys"].append(f"{COMPRESSED_CACHE_KEY_PREFIX}{note.note_id}")
+            return note
+
+    note_taker = _RecordingNoteTaker(
         entity_extractor=RuleBasedExtractor(),
         audit_service=None,
         l1_cache=redis_adapter,
@@ -661,11 +682,8 @@ def _create_checkpoint(context: dict[str, Any], *, plan_id: str, checkpoint_no: 
             summary=f"{checkpoint_no} 阶段摘要（验收直供）",
         ),
     )
-    # 缓存键统一登记（R1 审查 FR-1：创建时点登记——消灭 then 步登记的
-    # 「断言失败即泄漏」时间窗；note:{id}/compressed:{id} 同 note_id 派生）
-    note_ref = result.state_data["persistent_note_ref"]
-    context["_note_cache_keys"].append(f"{NOTE_CACHE_KEY_PREFIX}{note_ref}")
-    context["_compressed_cache_keys"].append(f"{COMPRESSED_CACHE_KEY_PREFIX}{note_ref}")
+    # 缓存键登记经装配链记录壳全路径承载（R2 审查 R2-2——含失败路径；R1 的
+    # 返回后登记形态被壳取代，此函数不再重复登记）
     return result
 
 

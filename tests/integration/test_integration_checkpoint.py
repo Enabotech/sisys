@@ -725,6 +725,11 @@ async def test_scenario3_axiom_two_and_guards() -> None:
         #    双指标不足固定形态）→ 483 且零落库
         async with _CheckpointChain(llm_responses=["".join(_CORPUS_TEXTS), "".join(_CORPUS_TEXTS)]) as gate_chain:
             plan_id = str(uuid.uuid4())
+            # 快照键预登记（R2 审查 R2-3：防御纵深——门禁回归失效致快照落库时
+            # 不产生未登记键泄漏；当前 483 在④前抛零写入，delete 不存在键 no-op）
+            from src.application.ports.checkpoint import CHECKPOINT_SESSION_PREFIX
+
+            gate_chain.redis_keys.append(f"sisys:snapshot:{CHECKPOINT_SESSION_PREFIX}{plan_id}:CP-1")
             gate_chain.register_plan(plan_id)
             with pytest.raises(CheckpointCreationError) as exc_info:
                 await gate_chain.service.create_checkpoint(
@@ -816,7 +821,7 @@ async def test_scenario5_creation_window_p95() -> None:
         durations: list[float] = []
         sessions: list[str] = []
         for _round in range(20):
-            plan_id = str(uuid.uuid4())  # 20 独立 plan_id（R1-F17——值域 8 上限）
+            plan_id = str(uuid.uuid4())  # 20 独立 plan_id（R1-F2 守卫值域 8 上限——R2 审查 R2-5 勘误：原误挂 F17）
             start = time.monotonic()
             snapshot = chain.service.build_snapshot(
                 plan_id=plan_id,

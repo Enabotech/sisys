@@ -73,6 +73,9 @@ def _extract_imports(file_path: Path) -> list[str]:
         if isinstance(node, ast.Import):
             targets.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            # 相对导入（level>0）不进本检查面——domain 三文件现状全绝对导入；
+            # 相对导入不脱离 src 包、无第三方逃逸面，import-linter 为二线防线
+            # 兜底（R2 审查 R2-4 旁路注记）
             targets.append(node.module)
     return targets
 
