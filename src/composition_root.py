@@ -2275,6 +2275,56 @@ def bootstrap() -> None:
         tags=("retrieval", "compression", "domain"),
     )
 
+    # === Story 6-3 — Checkpoint 完整形态快照（五步编排：持久化笔记→压缩→归档→落库→发布）===
+    # checkpoint_service：SINGLETON 编排服务注入四 SCOPED 依赖（blm_planning_service
+    # :1580-1598 直接先例——单例捕获首次 resolve 的 SCOPED 实例，进程级共享既有形态）；
+    # 检索-压缩循环激活：persistent_note_taker/context_compressor 首个生产消费方
+    # （deferred-work L132 部分核销——循环主链三组件）
+    from src.application.ports.checkpoint import CheckpointServicePort
+    from src.application.services.checkpoint_service import CheckpointService
+    from src.application.use_cases.create_checkpoint import CreateCheckpointUseCase, RecoverCheckpointUseCase
+
+    register_port(
+        name="checkpoint_service",
+        version="v1.0.0",
+        interface=CheckpointServicePort,
+        impl=lambda resolver: CheckpointService(
+            note_taker=resolver.resolve("persistent_note_taker"),
+            compressor=resolver.resolve("context_compressor"),
+            archive_service=resolver.resolve("strategic_archive_service"),
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.checkpoint_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("checkpoint", "sp", "application"),
+    )
+    register_port(
+        name="checkpoint_use_case",
+        version="v1.0.0",
+        interface=CreateCheckpointUseCase,
+        impl=lambda resolver: CreateCheckpointUseCase(
+            checkpoint_service=resolver.resolve("checkpoint_service"),
+        ),
+        module="src.application.use_cases.create_checkpoint",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("checkpoint", "use_case", "application"),
+    )
+    register_port(
+        name="checkpoint_recovery_use_case",
+        version="v1.0.0",
+        interface=RecoverCheckpointUseCase,
+        impl=lambda resolver: RecoverCheckpointUseCase(
+            checkpoint_service=resolver.resolve("checkpoint_service"),
+        ),
+        module="src.application.use_cases.create_checkpoint",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("checkpoint", "use_case", "application"),
+    )
+
     # === Strategic Toolbox Ports (Story 4.1) ===
     from src.application.ports.tool_registry_service import ToolRegistryServicePort
     from src.domain.ports.tool_repository import ToolRepositoryPort

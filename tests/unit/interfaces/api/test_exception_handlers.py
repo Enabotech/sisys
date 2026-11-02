@@ -39,6 +39,8 @@ from src.domain.exceptions import (
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
     ChainOfThoughtValidationError,
+    CheckpointCreationError,
+    CheckpointIntegrityError,
     ChunkingError,
     ComplianceLockError,
     ConfigurationError,
@@ -368,9 +370,16 @@ class TestExceptionHttpMap:
             PlanningNotFoundError,  # 480 — Story 6.1 规划任务不存在（404）
             PlanningExecutionError,  # 481 — Story 6.1 规划执行失败终态（500）
             PlanningStateError,  # 482 — Story 6.1 状态机非法推进（409——已激活：重跑守卫 R1-5）
+            CheckpointCreationError,  # 483 — Story 6.3 Checkpoint 五步编排强制环节失败（500）
+            CheckpointIntegrityError,  # 484 — Story 6.3 完整性守卫/校验失败（409）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types
+
+    def test_checkpoint_exception_http_map_values(self):
+        """验证 483→500 / 484→409 值级映射（Story 6.3——改挂状态码即红）。"""
+        assert EXCEPTION_HTTP_MAP[CheckpointCreationError] == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert EXCEPTION_HTTP_MAP[CheckpointIntegrityError] == status.HTTP_409_CONFLICT
 
     def test_system_exception_maps_to_500(self):
         """验证系统级异常映射到 500."""

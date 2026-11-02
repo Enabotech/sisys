@@ -132,3 +132,109 @@ class TestBlmPlanningEventChannelMapping:
         for relative in six_two_files:
             content = (repo_src / relative).read_text(encoding="utf-8")
             assert "CheckpointReached" not in content, f"{relative} 不得发布 CheckpointReached（6.3 语义分立）"
+
+
+class TestCheckpointReachedPublishWiring:
+    """Story 6-3 — CheckpointReached 发布接线守护（发布点落位 OD-4 + 双登记零 diff）。
+
+    发布接线断言清单②承载（Task 0.9）：发布点代码位在 checkpoint 应用服务新
+    文件 + 既有负向断言（上两用例）零修改通过 = 落位正确的行为级证据。
+    """
+
+    def test_publish_call_present_in_checkpoint_service(self) -> None:
+        """正向守护：checkpoint 应用服务源码含 CheckpointReached 发布调用。"""
+        service_src = _REPO_ROOT / "src" / "application" / "services" / "checkpoint_service.py"
+        assert service_src.is_file(), "checkpoint_service.py 缺失（发布点文件）"
+        content = service_src.read_text(encoding="utf-8")
+        assert "CheckpointReached" in content, "checkpoint_service 无 CheckpointReached 发布调用（⑤步缺失）"
+        assert "publish" in content, "checkpoint_service 无 publish 调用"
+
+    def test_publish_point_not_in_blm_planning_four_files(self) -> None:
+        """负向守护：发布点仅存在于 checkpoint 应用服务面（四文件零引用——OD-4）。
+
+        与既有两用例（三文件 + 一文件）合成四文件全量；本用例断言"唯一发布面"
+        ——src/ 下 CheckpointReached 的实例化构造仅 checkpoint_service 一处。
+        """
+        import re
+
+        src_root = _REPO_ROOT / "src"
+        construction_pattern = re.compile(r"CheckpointReached\(")
+        publishers: list[str] = []
+        for path in sorted(src_root.rglob("*.py")):
+            content = path.read_text(encoding="utf-8")
+            if path.name == "checkpoint_events.py":
+                continue  # 事件定义文件（类定义非发布）
+            if construction_pattern.search(content):
+                publishers.append(str(path.relative_to(src_root)))
+        assert publishers == ["application/services/checkpoint_service.py"], (
+            f"CheckpointReached 构造位实测={publishers} 期望仅 checkpoint_service（发布点唯一落位）"
+        )
+
+    def test_dual_registration_zero_diff(self) -> None:
+        """双登记零 diff 守护：yaml 与 DEFAULT_MAPPINGS 对 CheckpointReached 登记保持。"""
+        channels = _yaml_channels()
+        assert "CheckpointReached" in channels, "yaml 通道登记消失（Epic 1 既有资产回归）"
+        mapping = ChannelRouter.DEFAULT_MAPPINGS.get("CheckpointReached")
+        assert mapping is not None, "DEFAULT_MAPPINGS 登记消失（Epic 1 既有资产回归）"
+        assert mapping.delivery_mode == DeliveryMode.RELIABLE, "通道模式漂移（reliable 单通道钦定）"
+        assert mapping.rabbitmq_routing_key == channels["CheckpointReached"]["rabbitmq_routing_key"], (
+            "双登记路由键漂移（CLAUDE.md 硬约束——两处必须同步）"
+        )
+
+
+def _like_pattern_underscores_escaped(pattern: str) -> bool:
+    r"""LIKE 模式串下划线转义判定（DF3 守护 helper——纯模式级检测函数）。
+
+    未转义的下划线在 SQL LIKE 中是单字符通配符——`market_insight%` 会误命中
+    Epic 1 既有 "market-insight" 连字符形态（6-2 SQL 探针实证 2 vs 1）。
+
+    Args:
+        pattern: LIKE 模式串字面量（如 r"market\_insight%"）。
+
+    Returns:
+        全部 `_` 均被 `\` 转义返回 True；存在裸 `_` 返回 False。
+    """
+    for index, char in enumerate(pattern):
+        if char == "_" and (index == 0 or pattern[index - 1] != "\\"):
+            return False
+    return True
+
+
+class TestCheckpointReachedLikeEscapeGuard:
+    """Story 6-3 — 6.2-DF3 清偿：LIKE 转义独立守护（纯模式级断言——零 DB 依赖）。
+
+    行级真实红路径由集成 5.2 互证承载（R6-19 分工声明——本守护是模式级：
+    转义形态在位；发布者在位后负向断言获得真实红路径由行为级测试闭环）。
+    """
+
+    def test_escape_detector_judgment_power(self) -> None:
+        """检测函数判定力自证（注入未转义形态可检出——guard 的 guard）。"""
+        assert _like_pattern_underscores_escaped(r"market\_insight%") is True
+        assert _like_pattern_underscores_escaped("market_insight%") is False, "未转义形态必须可检出（恒真断言防线）"
+        assert _like_pattern_underscores_escaped(r"market\_insight\_trend%") is True
+        assert _like_pattern_underscores_escaped("a_b_c") is False
+
+    def test_6_2_negative_query_patterns_escaped(self) -> None:
+        """6-2 侧负向查询的 LIKE 模式串为转义形态（验收+集成两文件字面校验）。
+
+        源文件字面形态为 market\\\\_insight%（Python 源码双反斜杠——SQL 实参
+        是 market\\_insight% 转义下划线）。
+        """
+        guard_targets = (
+            "tests/acceptance/test_acceptance_market_insight.py",
+            "tests/integration/test_integration_market_insight.py",
+        )
+        escaped_pattern = "LIKE 'market\\\\_insight%'"  # 源文件字面（双反斜杠转义形态）
+        unescaped_pattern = "LIKE 'market_insight%"  # 未转义形态（裸下划线——禁止出现）
+        for relative in guard_targets:
+            content = (_REPO_ROOT / relative).read_text(encoding="utf-8")
+            assert escaped_pattern in content, (
+                f"{relative} 缺转义形态 {escaped_pattern!r}（DF3 守护——未转义会误命中连字符形态）"
+            )
+            assert unescaped_pattern not in content, f"{relative} 含未转义 LIKE 模式（裸下划线单字符通配符——假阳性风险）"
+
+    def test_6_3_self_guard_patterns_escaped(self) -> None:
+        """6-3 自身互证查询通道同样保持转义形态（LIKE 通道无 plan_id 过滤——R6-6）。"""
+        content = (_REPO_ROOT / "tests" / "acceptance" / "test_acceptance_checkpoint_snapshot.py").read_text(encoding="utf-8")
+        assert r"LIKE 'market\\_insight%'" in content, "6-3 验收互证查询缺转义形态"
+        assert "LIKE 'market_insight%'" not in content.replace("\\_insight", ""), "6-3 含未转义 LIKE 模式"

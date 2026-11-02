@@ -102,6 +102,8 @@ from src.domain.exceptions.ocr_exceptions import (
 )
 from src.domain.exceptions.permission_exceptions import InsufficientTokenError
 from src.domain.exceptions.planning_exceptions import (
+    CheckpointCreationError,
+    CheckpointIntegrityError,
     PlanningExecutionError,
     PlanningNotFoundError,
     PlanningStateError,
@@ -339,6 +341,8 @@ __all__ = [
     "PlanningNotFoundError",
     "PlanningExecutionError",
     "PlanningStateError",
+    "CheckpointCreationError",
+    "CheckpointIntegrityError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

@@ -133,3 +133,118 @@ def test_exception_is_domain_error_subclass(exc_cls: type) -> None:
     from src.domain.exceptions.base_exceptions import DomainError
 
     assert issubclass(exc_cls, DomainError)
+
+
+class TestCheckpointExceptions:
+    """Story 6-3 — Checkpoint 异常（483/484；485 不设码——OD-7）。
+
+    延迟 import 形态：类未定义时红 = 运行期 ImportError（R2B-13 owning 落位）。
+    """
+
+    def test_checkpoint_creation_error_code_483(self) -> None:
+        """483 编码 + context 领域上下文（五步编排强制环节失败——含压缩终态门禁）。"""
+        from src.domain.exceptions import CheckpointCreationError
+
+        exc = CheckpointCreationError(
+            plan_id="plan-1",
+            checkpoint_no="CP-1",
+            reason="压缩二次路径耗尽仍不达标（编排层终态门禁）",
+        )
+
+        assert exc.code == "EXCEPTION_483"
+        assert exc.context["plan_id"] == "plan-1"
+        assert exc.context["checkpoint_no"] == "CP-1"
+        assert exc.context["reason"].startswith("压缩二次路径耗尽")
+
+    def test_checkpoint_creation_error_default_message_combines_reason(self) -> None:
+        """默认 message 双形态（R1 审查 FR-3——有意变更留痕）。
+
+        reason 非空 → 默认 message 组合根因（CLI/API 人机消费面可见——实测
+        静态文案使 483 真实根因对操作者不可见）；reason 空 → 回落类静态文案。
+        context["reason"] 结构化字段两形态均保持不变。
+        """
+        from src.domain.exceptions import CheckpointCreationError
+
+        with_reason = CheckpointCreationError(plan_id="p", checkpoint_no="CP-1", reason="持久化笔记失败: LLM 未配置")
+        assert with_reason.message == "Checkpoint 创建失败: 持久化笔记失败: LLM 未配置"
+        assert with_reason.message.startswith("Checkpoint 创建失败")
+        assert "持久化笔记失败" in with_reason.message
+
+        without_reason = CheckpointCreationError(plan_id="p", checkpoint_no="CP-1")
+        assert without_reason.message == "Checkpoint 创建失败"
+
+        overridden = CheckpointCreationError(plan_id="p", checkpoint_no="CP-1", reason="r", message="自定义消息")
+        assert overridden.message == "自定义消息"
+
+    def test_checkpoint_creation_error_to_dict_shape(self) -> None:
+        """to_dict 含 code/message/context 三键（DomainError 契约）。"""
+        from src.domain.exceptions import CheckpointCreationError
+
+        payload = CheckpointCreationError(plan_id="p", checkpoint_no="CP-1", reason="r").to_dict()
+        assert payload["code"] == "EXCEPTION_483"
+        assert payload["message"]
+        assert payload["context"]["checkpoint_no"] == "CP-1"
+
+    def test_checkpoint_integrity_error_code_484(self) -> None:
+        """484 编码（引用缺失守卫 + checksum 校验失败双场景——AC-2/AC-3）。"""
+        from src.domain.exceptions import CheckpointIntegrityError
+
+        exc = CheckpointIntegrityError(
+            session_id="blm-checkpoint-plan-1:CP-1",
+            checkpoint_no="CP-1",
+            reason="checksum_mismatch",
+        )
+
+        assert exc.code == "EXCEPTION_484"
+        assert exc.context["session_id"] == "blm-checkpoint-plan-1:CP-1"
+        assert exc.context["checkpoint_no"] == "CP-1"
+
+    def test_checkpoint_integrity_error_cause_chain(self) -> None:
+        """cause 链透传（to_dict 含 cause——底层异常可追溯）。"""
+        from src.domain.exceptions import CheckpointIntegrityError
+
+        root = ValueError("底层损坏")
+        exc = CheckpointIntegrityError(session_id="s", checkpoint_no="CP-1", reason="r", cause=root)
+
+        assert exc.cause is root
+        assert exc.to_dict().get("cause") is not None
+
+    def test_checkpoint_exceptions_subclass_business_error(self) -> None:
+        """两异常均为 BusinessException 子类（planning 段语义继承）。"""
+        from src.domain.exceptions import CheckpointCreationError, CheckpointIntegrityError
+
+        assert issubclass(CheckpointCreationError, BusinessException)
+        assert issubclass(CheckpointIntegrityError, BusinessException)
+
+    def test_checkpoint_exception_codes_distinct_from_existing(self) -> None:
+        """483/484 与既有 480/481/482 编码互异（编码唯一性联动由 test_error_code_uniqueness 承载）。"""
+        from src.domain.exceptions import CheckpointCreationError, CheckpointIntegrityError
+
+        existing = {PlanningNotFoundError.code, PlanningExecutionError.code, PlanningStateError.code}
+        assert CheckpointCreationError.code == "EXCEPTION_483"
+        assert CheckpointIntegrityError.code == "EXCEPTION_484"
+        assert CheckpointCreationError.code not in existing
+        assert CheckpointIntegrityError.code not in existing
+
+    def test_http_map_registered_value_level(self) -> None:
+        """EXCEPTION_HTTP_MAP 值级断言（483→500 / 484→409——改挂状态码即红）。"""
+        from fastapi import status
+
+        from src.domain.exceptions import CheckpointCreationError, CheckpointIntegrityError
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert EXCEPTION_HTTP_MAP[CheckpointCreationError] == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert EXCEPTION_HTTP_MAP[CheckpointIntegrityError] == status.HTTP_409_CONFLICT
+
+    def test_class_registry_registered_in_code_ranges(self) -> None:
+        """_CLASS_TO_SUBDOMAIN 注册（planning 子域——码段校验 Rule 联动）。"""
+        from src.domain.exceptions._code_ranges import _CLASS_TO_SUBDOMAIN
+
+        assert _CLASS_TO_SUBDOMAIN["CheckpointCreationError"] == "planning"
+        assert _CLASS_TO_SUBDOMAIN["CheckpointIntegrityError"] == "planning"
+
+    def test_485_not_occupied(self) -> None:
+        """485 不设码钦定（OD-7——独立码语义冗余；编排层终态门禁由 483 承载）。"""
+        from src.domain.exceptions.planning_exceptions import __all__ as planning_all
+
+        assert "CheckpointCompressionError" not in planning_all

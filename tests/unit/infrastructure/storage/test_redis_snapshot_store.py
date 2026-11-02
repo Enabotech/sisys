@@ -163,3 +163,107 @@ class TestRedisSnapshotStore:
             await store.delete("test-session")
 
         assert "Failed to delete snapshot" in str(exc_info.value)
+
+
+class TestCompleteFormSerialization:
+    """Story 6-3 — 完整形态新四字段序列化 round-trip（白名单扩列——OD-2/R2A-1）。
+
+    序列化直测：_snapshot_to_hash/_hash_to_snapshot 对称性（新四字段不丢 +
+    旧七字段数据缺键回退默认值——白名单失误的唯一拦截面，R6-14）。
+    """
+
+    @pytest.fixture
+    def mock_adapter_holder(self) -> MagicMock:
+        """创建 mock RedisAdapter 及 raw_client（形态同 TestRedisSnapshotStore.mock_adapter）。"""
+        adapter = MagicMock(spec=RedisAdapter)
+        adapter.delete = AsyncMock()
+        adapter.exists = AsyncMock()
+        raw = MagicMock()
+        raw.hget = AsyncMock()
+        pipe = MagicMock()
+        pipe.hset = MagicMock()
+        pipe.expire = MagicMock()
+        pipe.execute = AsyncMock(return_value=[1, True])
+        pipe.__aenter__ = AsyncMock(return_value=pipe)
+        pipe.__aexit__ = AsyncMock(return_value=None)
+        raw.pipeline = MagicMock(return_value=pipe)
+        adapter.raw_client = raw
+        return adapter
+
+    def _make_complete_snapshot(self) -> CheckpointSnapshot:
+        """完整形态快照工厂（新四字段填充）。"""
+        import uuid
+
+        return CheckpointSnapshot(
+            session_id="blm-checkpoint-plan-1:CP-1",
+            stage_id="performance_gap",
+            state_version=0,
+            ttl_seconds=2592000,
+            checkpoint_no="CP-1",
+            persistent_note_ref=str(uuid.uuid4()),
+            checksum="a" * 64,
+            snapshot_metadata={"compression_ratio": 0.85, "rerun_count": 1},
+            state_data={"checkpoint_no": "CP-1", "compressed_context": "压缩上下文"},
+        )
+
+    def test_new_four_fields_roundtrip(self) -> None:
+        """新四字段经 _snapshot_to_hash→_hash_to_snapshot 读回不丢失（白名单扩列验证）。"""
+        snapshot = self._make_complete_snapshot()
+
+        hash_data = RedisSnapshotStore._snapshot_to_hash(snapshot)
+        loaded = RedisSnapshotStore._hash_to_snapshot(hash_data)
+
+        assert loaded.checkpoint_no == snapshot.checkpoint_no
+        assert loaded.persistent_note_ref == snapshot.persistent_note_ref
+        assert loaded.checksum == snapshot.checksum
+        assert loaded.snapshot_metadata == snapshot.snapshot_metadata
+        # 既有七字段不回归
+        assert loaded.session_id == snapshot.session_id
+        assert loaded.stage_id == snapshot.stage_id
+        assert loaded.state_version == snapshot.state_version
+        assert loaded.state_data == snapshot.state_data
+        assert loaded.ttl_seconds == snapshot.ttl_seconds
+
+    def test_legacy_seven_fields_missing_keys_fallback(self) -> None:
+        """旧七字段数据 load 缺键回退默认值（6-1/6-2/5-10 旧数据向后兼容——不抛）。"""
+        import json
+        from datetime import UTC, datetime
+
+        legacy_hash = {
+            "snapshot_id": "0b6bb6b7-0c5d-4f9e-9d3a-1f2e3d4c5b6a",
+            "session_id": "blm-planning-plan-1",
+            "stage_id": "blm_planning",
+            "state_version": "3",
+            "state_data": json.dumps({"plan_id": "plan-1"}),
+            "timestamp": datetime.now(UTC).isoformat(),
+            "ttl_seconds": "86400",
+        }
+
+        loaded = RedisSnapshotStore._hash_to_snapshot(legacy_hash)
+
+        assert loaded.checkpoint_no == ""
+        assert loaded.persistent_note_ref == ""
+        assert loaded.checksum == ""
+        assert loaded.snapshot_metadata == {}
+
+    async def test_save_load_full_roundtrip_via_adapter(self, mock_adapter_holder: MagicMock) -> None:
+        """save→load 全链 round-trip（经 adapter pipeline 写入后回读——含新四字段）。"""
+        store = RedisSnapshotStore(adapter=mock_adapter_holder)
+        snapshot = self._make_complete_snapshot()
+
+        # 捕获 pipeline hset 写入值（latest 字段 JSON）
+        written: dict[str, str] = {}
+        pipe = mock_adapter_holder.raw_client.pipeline.return_value
+        pipe.hset.side_effect = lambda key, field, value: written.update({field: value})
+        await store.save(snapshot)
+
+        mock_adapter_holder.raw_client.hget = AsyncMock(return_value=written["latest"])
+        loaded = await store.load(snapshot.session_id)
+
+        assert loaded is not None
+        assert loaded.checkpoint_no == snapshot.checkpoint_no
+        assert loaded.persistent_note_ref == snapshot.persistent_note_ref
+        assert loaded.checksum == snapshot.checksum
+        assert loaded.snapshot_metadata == snapshot.snapshot_metadata
+        # state_data 反序列化回 dict（R1 审查 FR-11 收紧——原 json.dumps 恒 str 恒真）
+        assert isinstance(loaded.state_data, dict)

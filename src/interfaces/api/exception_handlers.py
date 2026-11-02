@@ -32,6 +32,8 @@ from src.domain.exceptions import (
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
     ChainOfThoughtValidationError,
+    CheckpointCreationError,
+    CheckpointIntegrityError,
     ChunkingError,
     ComplianceLockError,
     ConfigurationError,
@@ -303,7 +305,9 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     # 规划子域异常（Story 6-1 BLM 前两阶段——planning 段 480-489 新开）
     PlanningNotFoundError: status.HTTP_404_NOT_FOUND,  # 480 — 规划任务不存在（状态查询无快照第三态）
     PlanningExecutionError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 481 — 全流程失败终态（444 先例）
-    PlanningStateError: status.HTTP_409_CONFLICT,  # 482 — 状态机非法推进（预留——6.3 恢复面消费）
+    PlanningStateError: status.HTTP_409_CONFLICT,  # 482 — 状态机非法推进（第二触发点——6.3 修正面乐观锁）
+    CheckpointCreationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 483 — Checkpoint 五步编排强制环节失败（Story 6.3）
+    CheckpointIntegrityError: status.HTTP_409_CONFLICT,  # 484 — Checkpoint 完整性守卫/校验失败（Story 6.3）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

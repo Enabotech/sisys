@@ -179,8 +179,14 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   8 步降级时 RunBlmPlanningUseCase 终态组装处抛出；系统执行语义 500；
     #   部分降级返回成功 DTO 成文语义不触发)
     # EXCEPTION_482 PlanningStateError (Story 6-1, 规划状态机非法推进——预留，
-    #   6.3 Checkpoint 恢复面消费时激活)
-    # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；483-489 预留 planning 域
+    #   6.3 Checkpoint 恢复面消费时激活；6-3 追加第二触发点：Checkpoint 修正面
+    #   apply_correction 乐观锁版本倒退/并发过期)
+    # EXCEPTION_483 CheckpointCreationError (Story 6-3, Checkpoint 五步编排强制
+    #   环节失败——持久化笔记/压缩终态门禁/归档 L2·L4 及 ArchiveCreated 发布/
+    #   快照落库；485 独立码不设——OD-7 门禁落编排层恰是 483 触发面)
+    # EXCEPTION_484 CheckpointIntegrityError (Story 6-3, 完整性违约——完整形态
+    #   缺失 persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测)
+    # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；485-489 预留 planning 域（486-489 留 6-6 恢复执行面）
     "planning": (480, 489),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -355,10 +361,13 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "SAPBlackboardWriteError": "sap",
     # financial_exceptions.py (Story 5.12 新增 1 个异常——财务建模估值计算失败码)
     "FinancialCalculationError": "financial",
-    # planning_exceptions.py (Story 6-1 新增 3 个异常——BLM 规划流程三码)
+    # planning_exceptions.py (Story 6-1 新增 3 个异常——BLM 规划流程三码；
+    #   Story 6-3 追加 2 个——Checkpoint 创建/完整性)
     "PlanningNotFoundError": "planning",
     "PlanningExecutionError": "planning",
     "PlanningStateError": "planning",
+    "CheckpointCreationError": "planning",
+    "CheckpointIntegrityError": "planning",
 }
 
 

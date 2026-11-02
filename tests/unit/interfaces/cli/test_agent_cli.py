@@ -1279,3 +1279,227 @@ class TestBlmPlanExecution:
         agent_id = uuid.uuid4()
         agent_cli.main(["blm-plan", "-a", str(agent_id), "-t", "任务", "--plan-id", "plan-77"])
         assert stub.calls[0][2] == "plan-77"
+
+
+# ===================================================================
+# Story 6-3: checkpoint-create 子命令（扁平子命令——R2-F18 钦定 argparse 形态）
+# ===================================================================
+
+
+class _StubCheckpointSnapshot:
+    """Checkpoint 快照替身（_print_checkpoint_result getattr 消费面）。"""
+
+    def __init__(self, *, plan_id: str, checkpoint_no: str = "CP-1") -> None:
+        self.snapshot_id = uuid.uuid4()
+        self.session_id = f"blm-checkpoint-{plan_id}:{checkpoint_no}"
+        self.checkpoint_no = checkpoint_no
+        self.stage_id = "performance_gap"
+        self.state_version = 0
+        self.state_data = {"created_via": "cli"}
+
+
+class _StubCheckpointUseCase:
+    """Checkpoint 创建用例替身（calls 记录 + 可编程异常）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+
+    async def execute(self, **kwargs) -> _StubCheckpointSnapshot:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return _StubCheckpointSnapshot(plan_id=kwargs["plan_id"], checkpoint_no=kwargs["checkpoint_no"])
+
+
+def _patch_checkpoint_create_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubCheckpointUseCase) -> None:
+    """checkpoint-create 入口注入（bootstrap/resolve 三件套替身——blm-plan 先例）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: use_case)
+
+
+class TestCheckpointCreateParser:
+    """checkpoint-create 子命令解析（六参数面 + BooleanOptionalAction）。"""
+
+    def test_checkpoint_create_requires_core_params(self) -> None:
+        """必填参数缺失 usage error exit 2（--plan-id/--checkpoint-no/--stage-id/--query/--user-id/--summary）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["checkpoint-create"])
+        assert exc_info.value.code == 2
+
+    def test_checkpoint_create_full_arguments(self) -> None:
+        """全参数解析（含 --completed/--no-completed 双旗标——R6-21 BooleanOptionalAction）。"""
+        args = agent_cli.build_parser().parse_args(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "五年战略规划",
+                "--user-id",
+                "exec-001",
+                "--summary",
+                "阶段摘要",
+            ]
+        )
+        assert args.command == "checkpoint-create"
+        assert args.completed is True  # 默认 True（R6-21——裸 store_true 默认 False 不符钦定）
+
+        args_no = agent_cli.build_parser().parse_args(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "q",
+                "--user-id",
+                "u",
+                "--summary",
+                "s",
+                "--no-completed",
+            ]
+        )
+        assert args_no.completed is False
+
+    def test_checkpoint_create_no_created_via_flag(self) -> None:
+        """CLI 入口不暴露 created_via 参数（硬编码传 "cli"——R6-4）。"""
+        with pytest.raises(SystemExit):
+            agent_cli.build_parser().parse_args(["checkpoint-create", "--plan-id", str(uuid.uuid4()), "--created-via", "cli"])
+
+
+class TestCheckpointCreateExecution:
+    """checkpoint-create 执行（五步定式——_run_blm_plan_cli 先例）。"""
+
+    def test_success_exit_0_with_checkpoint_no_output(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功路径：exit 0 + 输出含 checkpoint_no + created_via 硬编码 "cli"。"""
+        stub = _StubCheckpointUseCase()
+        _patch_checkpoint_create_entry(monkeypatch, stub)
+        plan_id = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                plan_id,
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "五年战略规划",
+                "--user-id",
+                "exec-001",
+                "--summary",
+                "阶段摘要",
+            ]
+        )
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "checkpoint_no" in out, "输出缺 checkpoint_no 标签（进度摘要断言——标签锚防漂移）"
+        assert "CP-1" in out, "输出缺 checkpoint 编号值"
+        assert stub.calls, "用例未被调用"
+        assert stub.calls[0]["created_via"] == "cli"  # 硬编码传值（R6-4）
+        assert stub.calls[0]["retrieved_docs"] == []  # argparse 不接收检索证据（空列表构造）
+
+    def test_business_exception_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """业务异常路径：DomainError → exit 1 + stderr 含 code（五步定式）。"""
+        from src.domain.exceptions import CheckpointCreationError
+
+        stub = _StubCheckpointUseCase()
+        stub.error = CheckpointCreationError(plan_id="p", checkpoint_no="CP-1", reason="归档失败")
+        _patch_checkpoint_create_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "q",
+                "--user-id",
+                "u",
+                "--summary",
+                "s",
+            ]
+        )
+
+        assert exit_code == 1
+        stderr = capsys.readouterr().err
+        assert "EXCEPTION_483" in stderr
+        # R1 审查 FR-3：message 组合 reason 后 CLI 人机面可见根因（原静态文案掩蔽）
+        assert "归档失败" in stderr, f"stderr 缺 reason 根因（实测={stderr!r}）"
+
+    def test_invalid_plan_id_exit_1_before_bootstrap(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """plan_id 非 UUID：守卫先于 bootstrap（UUID 解析失败 exit 1）。"""
+        stub = _StubCheckpointUseCase()
+        _patch_checkpoint_create_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                "not-a-uuid",
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "q",
+                "--user-id",
+                "u",
+                "--summary",
+                "s",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not stub.calls, "守卫失败后不得触达用例"
+        # R1 审查 FR-18：守卫错误走真实 EntityValidationError 的 [code] 统一形态
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+    def test_success_exit_0(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功路径 exit 0（R3-D：exit 0 判据=快照落库成功）。
+
+        R1 审查 FR-12 改名注记：本用例未构造发布降态（CLI 层物理不可观测——
+        发布降级在服务层吸收）；降级语义的真测在服务单测
+        test_publish_failure_does_not_rollback_snapshot（R6-25 原登记维持）。
+        """
+        stub = _StubCheckpointUseCase()
+        _patch_checkpoint_create_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-create",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--stage-id",
+                "performance_gap",
+                "--query",
+                "q",
+                "--user-id",
+                "u",
+                "--summary",
+                "s",
+            ]
+        )
+
+        assert exit_code == 0  # 用例成功即 exit 0（服务层发布降级已被吸收）

@@ -14,7 +14,13 @@ sisys-uni-exception-design.md §3.3.2 编码表双处成文）不可占用——
 - PlanningExecutionError (481)——全流程失败终态（RunBlmPlanningUseCase
   终态组装处：len(degraded_steps) == total_steps 时抛出）
 - PlanningStateError (482)——状态机非法推进（已激活：同 plan_id 重跑守卫
-  ——R1-5；阶段位点跃迁扩展位归 6.3）
+  ——R1-5；482 第二触发点=Checkpoint 修正面乐观锁版本倒退——Story 6-3）
+- CheckpointCreationError (483)——Checkpoint 五步编排强制环节失败
+  （Story 6-3：持久化笔记失败/压缩终态门禁/快照落库失败等——AC-1 负向；
+  485 独立码不设——OD-7：compress 二次路径耗尽静默返回，门禁落编排层后
+  恰是 483 触发面，独立码语义冗余）
+- CheckpointIntegrityError (484)——完整性违约（Story 6-3：完整形态缺失
+  persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测——AC-2/AC-3）
 """
 
 from __future__ import annotations
@@ -22,6 +28,8 @@ from __future__ import annotations
 from src.domain.exceptions.business_exceptions import BusinessException
 
 __all__ = [
+    "CheckpointCreationError",
+    "CheckpointIntegrityError",
     "PlanningExecutionError",
     "PlanningNotFoundError",
     "PlanningStateError",
@@ -125,6 +133,87 @@ class PlanningStateError(BusinessException):
             context_extra: 附加领域上下文。
         """
         context: dict[str, str] = {"plan_id": plan_id, "transition": transition}
+        if context_extra:
+            context.update(context_extra)
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class CheckpointCreationError(BusinessException):
+    """Checkpoint 创建编排失败（EXCEPTION_483——系统执行语义 500）。
+
+    触发场景（Story 6-3 五步编排强制环节失败——AC-1 负向）：①持久化笔记
+    失败；②压缩终态门禁（compress 二次路径耗尽仍不达标——编排层校验双
+    指标 fail-loud，R1-F2/OD-7）；③StrategicArchive 归档 L2/L4 失败及
+    归档内 ArchiveCreated 发布失败（ArchiveStorageError 284 包装透传）；
+    ④快照落库失败。任一强制环节失败抛出且不产出半成品快照。
+    """
+
+    code = "EXCEPTION_483"
+    message = "Checkpoint 创建失败"
+
+    def __init__(
+        self,
+        plan_id: str = "",
+        checkpoint_no: str = "",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """构造 Checkpoint 创建失败异常。
+
+        Args:
+            plan_id: 规划任务标识。
+            checkpoint_no: 检查点编号（如 "CP-1"）。
+            reason: 失败环节描述（如 "压缩终态门禁：双指标不足"）。
+            message: 覆写消息（缺省回落类静态文案）。
+            cause: 底层异常（可选）。
+            context_extra: 附加领域上下文（合并进 context）。
+        """
+        context: dict[str, str] = {"plan_id": plan_id, "checkpoint_no": checkpoint_no, "reason": reason}
+        if context_extra:
+            context.update(context_extra)
+        # message 组合语义（R1 审查 FR-3——有意变更留痕）：reason 非空且调用方未覆写
+        # message 时，默认 message 组合根因描述（CLI/6-6/API 等人机消费面可见——
+        # 实测静态文案使 483 的真实根因只存于 context 对操作者不可见）；context
+        # 中的结构化 reason 字段保持不变，to_dict 契约零变更
+        if message is None and reason:
+            message = f"Checkpoint 创建失败: {reason}"
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class CheckpointIntegrityError(BusinessException):
+    """Checkpoint 完整性违约（EXCEPTION_484——冲突语义 409）。
+
+    触发场景（Story 6-3）：①完整形态快照构造守卫——checkpoint_no 非空而
+    persistent_note_ref 为空（系统公理二：禁止无持久化引用的完整形态快照
+    ——AC-2）；②checksum 校验失败/篡改检测（恢复入口强制先
+    verify_integrity，校验失败拒绝恢复——AC-3）。
+    """
+
+    code = "EXCEPTION_484"
+    message = "Checkpoint 完整性违约"
+
+    def __init__(
+        self,
+        session_id: str = "",
+        checkpoint_no: str = "",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """构造 Checkpoint 完整性违约异常。
+
+        Args:
+            session_id: 快照会话键（blm-checkpoint-{plan_id}:{checkpoint_no}）。
+            checkpoint_no: 检查点编号（如 "CP-1"）。
+            reason: 违约原因（如 "empty_persistent_note_ref"/"checksum_mismatch"）。
+            message: 覆写消息（缺省回落类静态文案）。
+            cause: 底层异常（可选）。
+            context_extra: 附加领域上下文（合并进 context）。
+        """
+        context: dict[str, str] = {"session_id": session_id, "checkpoint_no": checkpoint_no, "reason": reason}
         if context_extra:
             context.update(context_extra)
         super().__init__(message=message, cause=cause, context=context)

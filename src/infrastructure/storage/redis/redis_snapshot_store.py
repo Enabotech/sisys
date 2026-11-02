@@ -64,11 +64,20 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
             "state_data": json_dumps(snapshot.state_data),
             "timestamp": snapshot.timestamp.isoformat(),
             "ttl_seconds": str(snapshot.ttl_seconds),
+            # Story 6-3 完整形态四字段（OD-2 白名单扩列——不扩列则 save 静默丢弃
+            # → load 缺失 → checksum 恒空 → 恢复恒误报 484，R2A-1）
+            "persistent_note_ref": snapshot.persistent_note_ref,
+            "checksum": snapshot.checksum,
+            "snapshot_metadata": json_dumps(snapshot.snapshot_metadata),
+            "checkpoint_no": snapshot.checkpoint_no,
         }
 
     @staticmethod
     def _hash_to_snapshot(data: dict[str, Any]) -> CheckpointSnapshot:
         """从 Redis Hash 字段反序列化为 CheckpointSnapshot
+
+        新四字段读侧缺键回退默认值（6-1/6-2/5-10 旧七字段数据向后兼容
+        ——Story 6-3，OD-2/R2A-1）。
 
         Args:
             data: Redis Hash 字段字典
@@ -84,6 +93,14 @@ class RedisSnapshotStore(SnapshotRepositoryProtocol):
             state_data=json_loads(data["state_data"]) if isinstance(data["state_data"], str) else data["state_data"],
             timestamp=datetime.fromisoformat(data["timestamp"]),
             ttl_seconds=int(data["ttl_seconds"]),
+            persistent_note_ref=data.get("persistent_note_ref", ""),
+            checksum=data.get("checksum", ""),
+            snapshot_metadata=(
+                json_loads(data["snapshot_metadata"])
+                if isinstance(data.get("snapshot_metadata"), str)
+                else data.get("snapshot_metadata", {})
+            ),
+            checkpoint_no=data.get("checkpoint_no", ""),
         )
 
     def set_ttl(self, ttl_seconds: int) -> None:

@@ -313,6 +313,63 @@ def build_parser() -> argparse.ArgumentParser:
         help="规划任务标识（缺省新铸——同 id 重跑将被拒绝 482，重试请用新 id）",
     )
 
+    # Story 6-3: checkpoint-create 扁平子命令（Checkpoint 完整形态快照显式创建——
+    # OD-5：MVP 同步链下"阶段完成即暂停等审批"物理不可达，由显式调用触发；
+    # created_via 不暴露参数（硬编码传 "cli"——R6-4）；retrieved_docs 不可经
+    # argparse（空列表构造——take_notes 实体抽取对空检索证据降级容忍 :238-246）
+    checkpoint_create = subparsers.add_parser(
+        "checkpoint-create",
+        help="显式创建 Checkpoint 完整形态快照（持久化笔记→压缩→归档→落库→发布五步机制）",
+    )
+    checkpoint_create.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串——与 BLM plan_id 同源）",
+    )
+    checkpoint_create.add_argument(
+        "--checkpoint-no",
+        type=str,
+        required=True,
+        metavar="CP_NO",
+        help='检查点编号（"CP-1".."CP-8"——BLM 前两阶段 8 恢复点）',
+    )
+    checkpoint_create.add_argument(
+        "--stage-id",
+        type=str,
+        required=True,
+        metavar="STAGE_ID",
+        help="阶段标识（STAGE_VALUE_DOMAIN 值域，如 performance_gap）",
+    )
+    checkpoint_create.add_argument(
+        "--query",
+        type=str,
+        required=True,
+        metavar="QUERY",
+        help="原始查询文本（持久化笔记输入）",
+    )
+    checkpoint_create.add_argument(
+        "--user-id",
+        type=str,
+        required=True,
+        metavar="USER_ID",
+        help="执行用户标识",
+    )
+    checkpoint_create.add_argument(
+        "--summary",
+        type=str,
+        required=True,
+        metavar="SUMMARY",
+        help="阶段摘要（调用方直供）",
+    )
+    checkpoint_create.add_argument(
+        "--completed",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="完成状态（默认 True；--no-completed 构造未完成恢复点——R6-21）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -664,6 +721,120 @@ def _run_blm_plan_cli(agent_id_raw: str, task: str, plan_id: str | None) -> int:
         return 1
 
 
+async def _run_checkpoint_create(
+    plan_id: str,
+    checkpoint_no: str,
+    stage_id: str,
+    query: str,
+    user_id: str,
+    summary: str,
+    completed: bool,
+) -> object:
+    """执行 Checkpoint 创建用例（resolve → execute；连接池 finally 关闭）。
+
+    Args:
+        plan_id: 规划任务标识（UUID 字符串——CLI 守卫已校验）。
+        checkpoint_no: 检查点编号。
+        stage_id: 阶段标识。
+        query: 原始查询文本。
+        user_id: 执行用户标识。
+        summary: 阶段摘要。
+        completed: 完成状态。
+
+    Returns:
+        已落库的完整形态快照。
+    """
+    use_case = resolve("checkpoint_use_case")
+    try:
+        return await use_case.execute(
+            plan_id=plan_id,
+            checkpoint_no=checkpoint_no,
+            stage_id=stage_id,
+            query=query,
+            retrieved_docs=[],  # argparse 不接收检索证据（空列表构造——实体抽取降级容忍）
+            user_id=user_id,
+            summary=summary,
+            completed=completed,
+            created_via="cli",  # R6-4 钦定：CLI 入口硬编码传值（不暴露参数）
+        )
+    finally:
+        await _close_connection_pools()
+
+
+def _print_checkpoint_result(result: object) -> None:
+    """打印 Checkpoint 创建结果摘要（getattr 属性访问——与 _print_blm_progress 同风格）。
+
+    Args:
+        result: 完整形态快照实体。
+    """
+    print("Checkpoint 创建完成：")
+    print(f"  checkpoint_no: {getattr(result, 'checkpoint_no', '')}")
+    print(f"  session_id: {getattr(result, 'session_id', '')}")
+    print(f"  stage_id: {getattr(result, 'stage_id', '')}")
+    print(f"  state_version: {getattr(result, 'state_version', 0)}")
+    print(f"  TTL: {getattr(result, 'ttl_seconds', 0)} 秒（30 天）")
+
+
+def _run_checkpoint_create_cli(
+    plan_id: str,
+    checkpoint_no: str,
+    stage_id: str,
+    query: str,
+    user_id: str,
+    summary: str,
+    completed: bool,
+) -> int:
+    """checkpoint-create 子命令执行（五步定式——_run_blm_plan_cli 先例）。
+
+    exit 0 判据 = 快照落库成功（R3-D 钦定——⑤发布降级不改变 exit code，
+    仅 warning 日志；重复创建语义：MVP 允许同 checkpoint_no 重复创建=覆盖
+    快照+追加归档行，correction_history 重置初始（R3-D/R6-7 已知 MVP 语义）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        checkpoint_no: --checkpoint-no 原始字符串。
+        stage_id: --stage-id 原始字符串。
+        query: --query 原始字符串。
+        user_id: --user-id 原始字符串。
+        summary: --summary 原始字符串。
+        completed: --completed/--no-completed（默认 True）。
+
+    Returns:
+        退出码（0=快照落库成功（含发布降级），1=业务异常）。
+    """
+    # UUID 守卫（先于 bootstrap——argparse type= 禁 uuid.UUID 纪律；构造真实
+    # EntityValidationError 走 [{code}] {message} 统一形态——与 DomainError 分支
+    # 一致，R1 审查 FR-18：禁字面前缀假统一）
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "checkpoint-create", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("Checkpoint 创建失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_checkpoint_create(plan_id, checkpoint_no, stage_id, query, user_id, summary, completed))
+        _print_checkpoint_result(result)
+        logger.info(
+            "Checkpoint 创建完成: plan_id=%s checkpoint_no=%s",
+            plan_id,
+            checkpoint_no,
+        )
+        return 0
+    except DomainError as error:
+        logger.error("Checkpoint 创建失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Checkpoint 创建异常: %s", error, exc_info=True)
+        return 1
+
+
 def _run_instantiate_cli(role_raw: str) -> int:
     """instantiate 子命令执行（守卫 → bootstrap → 执行 → UUID 输出）。
 
@@ -974,6 +1145,16 @@ def main(argv: list[str] | None = None) -> int:
         return _run_task_cli(args.agent_id, args.task)
     if args.command == "blm-plan":
         return _run_blm_plan_cli(args.agent_id, args.task, args.plan_id)
+    if args.command == "checkpoint-create":
+        return _run_checkpoint_create_cli(
+            args.plan_id,
+            args.checkpoint_no,
+            args.stage_id,
+            args.query,
+            args.user_id,
+            args.summary,
+            args.completed,
+        )
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":

@@ -17,8 +17,17 @@ from src.domain.exceptions import EntityStateTransitionError, EntityValidationEr
 class CorrectionRecord:
     """检查点纠正记录
 
+    Story 6-3 复用激活注记：五字段族对齐 or.md L305 修正日志要素 5/7 MVP
+    子集（correction_type=修正类型/previous_value·new_value=修正前后值/
+    applied_by=修正人/applied_at=修正时间）。correction_id 仅本 docstring
+    提及、类中无此字段（R1-F5 定谳的差异注记——MVP 修正定位经前后值与
+    调用上下文承载）；「置信度变化/影响因子」等 6-6 审批面要素届时再扩展。
+    序列化投影：经 dataclasses.asdict 等价形态入快照 state_data.
+    correction_history 键（applied_at 取 isoformat() 字符串化——R8-F5）。
+
     Attributes:
         correction_id: Unique identifier for this correction.
+            （注：仅文档语义说明，类字段区不存在 correction_id 字段。）
         correction_type: Type of correction (e.g., L0, L1, L2, L3).
         previous_value: The value before correction.
         new_value: The value after correction.
@@ -52,6 +61,15 @@ class CheckpointStatus(str, Enum):
 @dataclass
 class Checkpoint:
     """检查点实体，包含阶段标识和恢复能力
+
+    Story 6-3 聚合激活注记（OD-12 附则 a 驱动点钦定）：创建面④步内仅当
+    completed=True 时构造本聚合并调 complete()（checksum 计算前——R2A-5）；
+    修正面经快照 state_data.correction_history 键投影承载（不重建聚合实例
+    ——R6-8）；恢复面只读不驱动 recover()（恢复执行引擎归 6-6——R2A-4 防
+    「已 completed 拒绝 recover → 243」陷阱）。序列化取舍：聚合不整体序列化
+    进 state_data——仅 status 经映射进 completed 键、correction_records 经
+    五字段投影进 correction_history 键。phase_identifier 复用 stage 值域
+    （STAGE_VALUE_DOMAIN 同源——与 CheckpointReached.phase_identifier 同口径）。
 
     不变量约束:
     - checkpoint_id 必须为有效 UUID
