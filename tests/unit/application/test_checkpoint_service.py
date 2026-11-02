@@ -251,6 +251,38 @@ class TestCreateCheckpointFiveStepOrchestration:
         assert event.phase_identifier == "performance_gap"
         assert event.user_feedback_request is True
         assert event.metadata.get("plan_id") == plan_id
+        assert event.metadata.get("checkpoint_no") == "CP-1"  # R3-3：双关联键（6-6 免 probe 反查）
+
+    async def test_step1_validation_error_passthrough(self) -> None:
+        """①步 242 透传（R3-5——take_notes 抛 242 原样透传非 483 包装，同族断言面补齐）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        service, mocks = _make_service()
+
+        async def _note_fails(**kwargs: Any) -> Any:
+            mocks["call_order"].append("take_notes")
+            raise EntityValidationError(message="笔记守卫", context={"step": "take_notes"})
+
+        mocks["note_taker"].take_notes = AsyncMock(side_effect=_note_fails)
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await _create(service)
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert mocks["call_order"] == ["take_notes"]  # ①即拦截，②③④⑤零触达
+
+    async def test_step3_validation_error_passthrough(self) -> None:
+        """③步 242 透传（R3-5——archive_plan 入口守卫（plan_type/validate）242 透传契约的直接承载）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        archive_error = EntityValidationError(message="plan_type 守卫", context={"step": "archive"})
+        service, mocks = _make_service(archive_side_effect=archive_error)
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await _create(service)
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert mocks["call_order"] == ["take_notes", "compress", "archive_plan"]  # ③即拦截，④⑤零触达
 
     async def test_archive_payload_mapping(self) -> None:
         """归档载荷映射（Task 0.8② 冻结）：compressed_context→evidence_blob bytes/
@@ -668,6 +700,8 @@ class TestRecoverCheckpoint:
             "correction_history",
             "subsequent_checkpoints",
             "recommended_mode",
+            "state_version",  # R3-2：6-6 修正面乐观锁基线
+            "snapshot_id",  # R3-2：事件关联比对用
         }
 
     async def test_recovery_subsequent_and_mode_boundary(self) -> None:
@@ -697,6 +731,109 @@ class TestRecoverCheckpoint:
         assert view.compressed_context == _make_compressed_context().context
         assert view.state_data["checkpoint_no"] == "CP-1"
         assert view.correction_history == []
+
+    async def test_recovery_view_version_and_snapshot_id_filled(self) -> None:
+        """恢复视图 state_version/snapshot_id 填充值正确（R3-2 值级断言——防「忘填用默认值」零检出）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-1")
+
+        # 修正确认一轮使版本递增（v0→v1——验证非默认值的真实透传）
+        from src.domain.entities.checkpoint import CorrectionRecord
+
+        updated = await service.apply_correction(
+            session_id=seeded.session_id,
+            correction=CorrectionRecord(correction_type="c", previous_value="a", new_value="b", applied_by="e"),
+            expected_state_version=0,
+        )
+
+        view = await service.recover_checkpoint(plan_id=plan_id, checkpoint_no="CP-1")
+        assert view.state_version == updated.state_version == 1  # 值级（非默认 0）
+        assert view.snapshot_id == str(updated.snapshot_id)  # 与事件 checkpoint_id 序列化面同形态
+
+    async def test_recovery_cp8_upper_boundary_empty_subsequent(self) -> None:
+        """CP-8 上界恢复：range(9,9) 空清单 → OVERRIDE（R3-5——上界 probe 路径直接承载）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed(service, mocks, plan_id, "CP-8")
+
+        view = await service.recover_checkpoint(plan_id=plan_id, checkpoint_no="CP-8")
+
+        assert view.subsequent_checkpoints == []  # 上界后无候选
+        assert view.recommended_mode == "override"
+
+    async def test_apply_correction_on_tampered_snapshot_raises_484(self) -> None:
+        """篡改快照修正 → 484 拒绝且零写回（R3-1——防 checksum 封印洗白）。"""
+        from dataclasses import replace as dc_replace
+
+        from src.domain.entities.checkpoint import CorrectionRecord
+        from src.domain.exceptions import CheckpointIntegrityError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-1")
+
+        tampered_state = dict(seeded.state_data)
+        tampered_state["compressed_context"] = "被篡改的压缩上下文"
+        mocks["store"][seeded.session_id] = dc_replace(seeded, state_data=tampered_state)
+
+        with pytest.raises(CheckpointIntegrityError) as exc_info:
+            await service.apply_correction(
+                session_id=seeded.session_id,
+                correction=CorrectionRecord(correction_type="c", previous_value="a", new_value="b", applied_by="e"),
+                expected_state_version=0,
+            )
+
+        assert exc_info.value.code == "EXCEPTION_484"
+        assert exc_info.value.context["reason"] == "checksum_mismatch_before_correction"
+        # 零写回：correction_history 未追加（store 内仍是篡改态单条）
+        assert mocks["store"][seeded.session_id].state_data.get("correction_history") == []
+
+    async def test_apply_correction_tampered_note_ref_raises_484(self) -> None:
+        """篡改 persistent_note_ref 的修正 → 484（血缘伪造不可经修正面洗白——R3-1）。"""
+        from dataclasses import replace as dc_replace
+
+        from src.domain.entities.checkpoint import CorrectionRecord
+        from src.domain.exceptions import CheckpointIntegrityError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-1")
+
+        tampered_state = dict(seeded.state_data)
+        tampered_state["persistent_note_ref"] = str(uuid.uuid4())  # 伪造血缘
+        mocks["store"][seeded.session_id] = dc_replace(seeded, state_data=tampered_state)
+
+        with pytest.raises(CheckpointIntegrityError):
+            await service.apply_correction(
+                session_id=seeded.session_id,
+                correction=CorrectionRecord(correction_type="c", previous_value="a", new_value="b", applied_by="e"),
+                expected_state_version=0,
+            )
+
+    async def test_apply_correction_tampered_plus_version_mismatch_prefers_484(self) -> None:
+        """篡改+版本不匹配并存 → 484 优先非 482（R3-1——完整性优先于并发语义钉死）。"""
+        from dataclasses import replace as dc_replace
+
+        from src.domain.entities.checkpoint import CorrectionRecord
+        from src.domain.exceptions import CheckpointIntegrityError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-1")
+
+        tampered_state = dict(seeded.state_data)
+        tampered_state["summary"] = "被篡改的摘要"
+        mocks["store"][seeded.session_id] = dc_replace(seeded, state_data=tampered_state)
+
+        with pytest.raises(CheckpointIntegrityError) as exc_info:
+            await service.apply_correction(
+                session_id=seeded.session_id,
+                correction=CorrectionRecord(correction_type="c", previous_value="a", new_value="b", applied_by="e"),
+                expected_state_version=99,  # 版本同时不匹配——484 仍优先
+            )
+
+        assert exc_info.value.code == "EXCEPTION_484"
 
     async def test_recovery_missing_key_raises_480(self) -> None:
         """不存在键恢复 → 480（含 JSON 损坏同路径统一承载——Task 0.3 钦定）。"""

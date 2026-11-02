@@ -114,7 +114,7 @@
   场景: 非法操作三分（不存在 480 与校验失败 484 与版本倒退 482）
     假如 Checkpoint 创建链服务可用
     并且 已创建一个完整形态快照并应用一次修正产出版本 v1
-    当 依次尝试恢复不存在的 checkpoint 键与恢复被篡改快照与以过期版本提交修正
+    当 依次尝试恢复不存在的 checkpoint 键与以过期版本提交修正与恢复被篡改快照
     那么 不存在键抛 480（PlanningNotFoundError 承载 checkpoint 语境）
     并且 checksum 不匹配抛 484（CheckpointIntegrityError）
     并且 版本倒退抛 482（PlanningStateError 第二触发点）

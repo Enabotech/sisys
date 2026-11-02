@@ -149,7 +149,7 @@ EXPECTED_CREATED_VIA: str = "use_case"
 
 #: 恢复视图 DTO 键契约（Task 0 冻结——AC-7 VC：checkpoint_no/stage/
 #: compressed_context/state_data/修正历史/后续 checkpoint 清单/建议恢复模式）
-EXPECTED_RECOVERY_VIEW_KEYS: tuple[str, ...] = (
+EXPECTED_RECOVERY_VIEW_KEYS: tuple[str, ...] = (  # 7 键 + R3-2 增补 state_version/snapshot_id
     "checkpoint_no",
     "stage",
     "compressed_context",
@@ -157,6 +157,8 @@ EXPECTED_RECOVERY_VIEW_KEYS: tuple[str, ...] = (
     "correction_history",
     "subsequent_checkpoints",
     "recommended_mode",
+    "state_version",
+    "snapshot_id",
 )
 
 #: 快照会话前缀字面量（OD-3 双轨制——与 6-2 blm-planning- 前缀显式区分；
@@ -1709,10 +1711,17 @@ def recovery_view_key_contract(context: dict[str, Any]) -> None:
 
 @then("CP-3 恢复视图后续清单为 CP-5 且建议恢复模式为 override（1 小于 2）")
 def cp3_view_subsequent_and_override(context: dict[str, Any]) -> None:
-    """CP-3 视图（后续 [CP-5] → 1<2 → OVERRIDE 推荐）。"""
+    """CP-3 视图（后续 [CP-5] → 1<2 → OVERRIDE 推荐）+ R3-2 增补键值级断言。"""
     view = context["_recovery_views"]["CP-3"]
     assert view.subsequent_checkpoints == ["CP-5"], f"后续清单实测={view.subsequent_checkpoints}"
     assert view.recommended_mode == "override", f"建议模式实测={view.recommended_mode!r}"
+    # R3-2 值级断言：state_version/snapshot_id 真实填充（防「忘填用默认值」零检出）
+    assert view.state_version == 0, f"首建快照版本实测={view.state_version} 期望=0（R6-2 基线）"
+    loaded = _run_async(
+        context["_loop"], context["_snapshot_repository"].load(_snapshot_session_id(context["_plan_id"], "CP-3"))
+    )
+    assert loaded is not None
+    assert view.snapshot_id == str(loaded.snapshot_id), "视图 snapshot_id 与存储快照不一致（填充断裂）"
 
 
 @then("CP-1 恢复视图后续清单为 CP-3 与 CP-5 且判定恰 2 后续强制 replay")
@@ -1758,9 +1767,14 @@ def snapshot_created_and_corrected_to_v1(context: dict[str, Any]) -> None:
     assert context["corrected"].state_version == 1, "两步构造法第一步失败（v0→v1）"
 
 
-@when("依次尝试恢复不存在的 checkpoint 键与恢复被篡改快照与以过期版本提交修正")
+@when("依次尝试恢复不存在的 checkpoint 键与以过期版本提交修正与恢复被篡改快照")
 def attempt_three_illegal_operations(context: dict[str, Any]) -> None:
-    """三分构造（480 不存在键/484 篡改/482 过期版本——Task 0.3 钦定口径）。"""
+    """三分构造（480 不存在键/482 过期版本/484 篡改——Task 0.3 钦定口径）。
+
+    执行序钦定（R3-1）：482 构造先于篡改——修正作用于**未篡改**存活 v1
+    （R3-1 写前完整性门禁落位后，对篡改体的修正会先抛 484 遮蔽 482 断言）；
+    篡改保 state_version=1 后存储态即篡改体，482 在 save 前抛出不污染。
+    """
     from dataclasses import replace as dc_replace
 
     from src.domain.entities.checkpoint import CorrectionRecord
@@ -1776,19 +1790,8 @@ def attempt_three_illegal_operations(context: dict[str, Any]) -> None:
     except Exception as error:  # 三分异常类型本身是断言对象（类型/编码在 Then 步骤断言）
         context["_three_way"]["missing"] = error
 
-    # ② 恢复被篡改快照 → 484（读回后篡改 state_data 再存——checksum 不匹配构造）
-    loaded = _run_async(context["_loop"], context["_snapshot_repository"].load(context["result"].session_id))
-    tampered_state = dict(loaded.state_data)
-    tampered_state["summary"] = "被篡改的摘要（场景注入）"
-    tampered = dc_replace(loaded, state_data=tampered_state)
-    _run_async(context["_loop"], context["_snapshot_repository"].save(tampered))
-    try:
-        _run_async(context["_loop"], service.recover_checkpoint(plan_id=plan_id, checkpoint_no="CP-1"))
-        context["_three_way"]["tampered"] = None
-    except Exception as error:  # 三分异常类型本身是断言对象（类型/编码在 Then 步骤断言）
-        context["_three_way"]["tampered"] = error
-
-    # ③ 以过期版本提交修正 → 482（对存活 v1 传 expected=0——两步构造法第二步）
+    # ② 以过期版本提交修正 → 482（对存活 v1 传 expected=0——两步构造法第二步；
+    #    先于篡改执行——修正面作用于未篡改 v1，R3-1 门禁不触发）
     correction = CorrectionRecord(
         correction_type="stale",
         previous_value="v1",
@@ -1807,6 +1810,18 @@ def attempt_three_illegal_operations(context: dict[str, Any]) -> None:
         context["_three_way"]["stale"] = None
     except Exception as error:  # 三分异常类型本身是断言对象（类型/编码在 Then 步骤断言）
         context["_three_way"]["stale"] = error
+
+    # ③ 恢复被篡改快照 → 484（读回后篡改 state_data 再存——checksum 不匹配构造）
+    loaded = _run_async(context["_loop"], context["_snapshot_repository"].load(context["result"].session_id))
+    tampered_state = dict(loaded.state_data)
+    tampered_state["summary"] = "被篡改的摘要（场景注入）"
+    tampered = dc_replace(loaded, state_data=tampered_state)
+    _run_async(context["_loop"], context["_snapshot_repository"].save(tampered))
+    try:
+        _run_async(context["_loop"], service.recover_checkpoint(plan_id=plan_id, checkpoint_no="CP-1"))
+        context["_three_way"]["tampered"] = None
+    except Exception as error:  # 三分异常类型本身是断言对象（类型/编码在 Then 步骤断言）
+        context["_three_way"]["tampered"] = error
 
 
 @then("不存在键抛 480（PlanningNotFoundError 承载 checkpoint 语境）")

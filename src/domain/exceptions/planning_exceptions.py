@@ -188,7 +188,9 @@ class CheckpointIntegrityError(BusinessException):
     触发场景（Story 6-3）：①完整形态快照构造守卫——checkpoint_no 非空而
     persistent_note_ref 为空（系统公理二：禁止无持久化引用的完整形态快照
     ——AC-2）；②checksum 校验失败/篡改检测（恢复入口强制先
-    verify_integrity，校验失败拒绝恢复——AC-3）。
+    verify_integrity，校验失败拒绝恢复——AC-3）；③修正入口写前验证
+    （R3-1——篡改/损坏快照的修正会把 checksum 重算封印到篡改载荷上使
+    本门禁永久失效，写前 verify 拒绝使完整性信封不可经修正面洗白）。
     """
 
     code = "EXCEPTION_484"

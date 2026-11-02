@@ -282,7 +282,9 @@ class CheckpointService:
             checkpoint_id=snapshot.snapshot_id,  # UUID 同型直传（R6-24）
             phase_identifier=stage_id,
             user_feedback_request=True,  # 阶段审批请求语义（AC-6 联动）
-            metadata={"plan_id": plan_id},  # plan 关联经 metadata 顶层通道（OD-9）
+            # metadata 通道承载 plan_id+checkpoint_no 双关联键（OD-9 扩展——R3-3：
+            # 6-6 审批通知免 probe 8 键反查；dict 内容扩展不动 frozen 事件类字段族）
+            metadata={"plan_id": plan_id, "checkpoint_no": checkpoint_no},
         )
         try:
             await self._event_publisher.publish(event)
@@ -400,8 +402,22 @@ class CheckpointService:
         Raises:
             PlanningNotFoundError: 480——键不存在（含 JSON 损坏同路径统一承载）。
             PlanningStateError: 482——版本倒退/并发过期（第二触发点，R6-3）。
+            CheckpointIntegrityError: 484——修正前置完整性校验失败（R3-1——
+                篡改/损坏快照的修正会把 checksum 重算封印到篡改载荷上使
+                484 门禁永久失效，写前验证使完整性信封不可经修正面洗白）。
         """
         current = await self._load_or_480(session_id)
+
+        # 修正前置完整性校验（R3-1：与恢复面 :454 读写面对称——版本比对**前**，
+        # 因 state_version 在 checksum 参与集内，checksum 失败的版本号本身不可信，
+        # 在其上裁决 482 语义不成立；两缺陷并存时完整性优先）
+        if not current.verify_integrity():
+            raise CheckpointIntegrityError(
+                session_id=session_id,
+                checkpoint_no=current.checkpoint_no,
+                reason="checksum_mismatch_before_correction",
+                message="修正前置完整性校验失败（checksum 不匹配——疑似篡改或损坏），拒绝修正",
+            )
 
         # 乐观锁比对（版本倒退/并发过期 → 482 第二触发点——唯一构造通道）
         if current.state_version != expected_state_version:
@@ -478,6 +494,8 @@ class CheckpointService:
             correction_history=list(snapshot.state_data.get("correction_history", [])),
             subsequent_checkpoints=subsequent,
             recommended_mode=mode,
+            state_version=snapshot.state_version,  # R3-2：6-6 修正面乐观锁基线
+            snapshot_id=str(snapshot.snapshot_id),  # R3-2：与事件 checkpoint_id 序列化面同形态
         )
 
     def recommend_recovery_mode(self, affected_checkpoint_count: int) -> RecoveryMode:

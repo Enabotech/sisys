@@ -159,6 +159,8 @@ class CheckpointServicePort(Protocol):
         Raises:
             PlanningNotFoundError: 480——键不存在（含 JSON 损坏同路径统一承载）。
             PlanningStateError: 482——版本倒退/并发过期（第二触发点）。
+            CheckpointIntegrityError: 484——修正前置完整性校验失败（R3-1——
+                篡改/损坏快照禁止修正，防 checksum 封印洗白）。
         """
         ...
 
@@ -198,8 +200,11 @@ class CheckpointRecoveryView:
     """恢复视图 DTO。
 
     恢复数据面产物：load→verify→反序列化→组装，供 6-6 审批/恢复执行面消费。
-    键契约（Task 0 冻结——7 键）：checkpoint_no/stage/compressed_context/
-    state_data/correction_history/subsequent_checkpoints/recommended_mode。
+    键契约（Task 0 冻结 7 键 + R3-2 增补 2 键——消费面预演发现的契约缺口：
+    6-6 审批「审阅→修正」闭环必须持 expected_state_version 供 apply_correction
+    乐观锁，视图不携带将迫使消费方旁路服务直连仓储）：checkpoint_no/stage/
+    compressed_context/state_data/correction_history/subsequent_checkpoints/
+    recommended_mode + state_version/snapshot_id。
 
     Attributes:
         checkpoint_no: 恢复起点检查点编号（"CP-n"）。
@@ -209,6 +214,9 @@ class CheckpointRecoveryView:
         correction_history: 修正历史清单（五字段投影累积）。
         subsequent_checkpoints: 后续仍存活 checkpoint 清单（probe-load 推导升序）。
         recommended_mode: 建议恢复模式（str Enum——"replay"/"override" 可直比）。
+        state_version: 快照当前版本（R3-2——6-6 修正面乐观锁基线）。
+        snapshot_id: 快照标识字符串（R3-2——与 outbox CheckpointReached.
+            checkpoint_id 序列化面同形态，6-6 事件关联比对用）。
     """
 
     checkpoint_no: str
@@ -218,3 +226,5 @@ class CheckpointRecoveryView:
     correction_history: list[dict[str, Any]] = field(default_factory=list)
     subsequent_checkpoints: list[str] = field(default_factory=list)
     recommended_mode: RecoveryMode = RecoveryMode.OVERRIDE
+    state_version: int = 0
+    snapshot_id: str = ""
