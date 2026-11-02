@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-11-01
+last_updated: 2026-11-02
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -177,7 +177,7 @@ development_status:
   epic-6: in-progress
   6-1-blm-first-two-phases: done  # 代码审查 R1~R5 五轮收敛（2026-11-01——v1.5.3 终审五节全过）
   6-2-market-insight-six-substeps: done  # 六类型化 Schema + per-step Checkpoint 快照骨架（代码审查周期五轮收敛 2026-11-01——R1~R5：15 修复 + 双向取证 8÷8 + HEAD 实跑 162 全绿/四目录回归 14178×2 轮稳定）
-  6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
+  6-3-checkpoint-snapshot-creation: ready-for-dev  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发（清偿归 Story Task 7.5）——Story 文件已建 2026-11-02（OD-1~OD-10：快照双轨制/CheckpointReached 发布点新文件落位/异常 483-489 段/检索-压缩循环激活/Epic1 骨架 checkpoint.py 四类复用）
   6-4-json-chain-of-thought-output: backlog
   6-5a-markdown-report-basic: backlog
   6-5b-pdf-report-citation-index: backlog
