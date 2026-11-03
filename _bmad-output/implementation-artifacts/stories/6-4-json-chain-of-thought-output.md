@@ -1,6 +1,6 @@
 # Story 6-4: JSON 思维链输出（BLM 面五段规范化组装 + EVIDENCE_PACKAGE 战略档案归档 + 决策追溯查询面）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -993,6 +993,30 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - [x] **CR3-F2（P3）**：6.4-DF3 登记 deferred-work（6-7 消费边界承接）
 - [x] **验证**：集成 5 passed + 验收 13 passed（R1/R2 修复后全链真实服务回归——主会话实跑）
 
+#### Round 4（2026-11-03，纯验证轮——零发现不造提交）
+
+- [x] 四目录全量回归 **14444 passed, 3 skipped**（显式四目录命令；较 dev 基线 14438 增 6 = CLI +1 + 架构 +1 + archive 仓储 +4，与修复计数自洽；3 skip 为既有环境门控）
+- [x] 三红线终扫 src 全仓零输出（raise ValueError / 抑制注释双 grep 零命中）
+- [x] 四守护文件 + domain 零 diff（提交后干净核验）
+- [x] 锚点存续抽查 6 组全在位（chain_records×5/图适配器×3/session_factory×8/EVIDENCE_PACKAGE×4/tuple[ChainRecord]×1/CLI except Exception×10）
+- [x] mypy 736 零错误 + ruff 全过（Round 2 后已复跑）
+
+#### Round 5（2026-11-03，独立终审五节——收敛）
+
+> **收敛声明（代码审查 Round 5 独立终审，2026-11-03，v2.1.2 → 收敛）**
+>
+> Story 6-4（JSON 思维链输出）代码审查五轮循环收敛。周期结构：Round 1 四视角并行调研 + 主会话亲验定谳（CR1-F1~F9 + 改判 8 项留痕）→ C3 双评审员修订（CR1-R1~R6）→ Round 2 回归核查双 Agent（R2-A 传播完备性 + R2-B 增量面组合，CR2-F1~F3）→ Round 3 单深度推演三轴 + 16 条证伪留痕（CR3-F1~F2）→ Round 4 纯验证（零发现）→ Round 5 独立终审五节。
+>
+> **发现与修复计数**：14 项 finding（P0×1 + P1×1 + P2×5 + P3×7）——12 项修复 + 2 项 deferred（6.4-DF2 fallback 覆盖缺口 / 6.4-DF3 482 跨进程判别——五要素登记 deferred-work）；改判留痕 9 项。核心修复：CR1-F1（P0）archive_repository save/find 双模式 session fallback + 组合根 v1.1.0 lambda 注入（CLI 归档/追溯结构性不可用 → 可达——audit R1-DF1 家族第五成员）。
+>
+> **提交清单**：78da3c91（实施交付 + Round 1）、b19e93d4（Round 2）、f32ea059（Round 3）——与台账三轮一一对应，无游离提交，工作树干净。
+>
+> **终审核验数据**（Round 5 独立实跑）：双向取证 8/8 一致（fallback 三形态 / 零 type:ignore / tuple[ChainRecord, ...] 双断言 / 零 git diff 断言依赖 / 挂接宽捕 logger.exception / chain-query 兜底+单测 / feature 11 行三替身 / DF 五要素）；47↔47 BDD 绑定独立复现；mypy 736 文件零错误；ruff 全过；抽跑 49 passed（架构 23 + 仓储 26）；全量四目录 14444 passed（主会话实跑，增量链 14438+5+1 自洽）。
+>
+> **终审注记（不阻塞）**：CR1-F1「单测三例」系方案期语义分组口径，落码四例与 Patch/CR2-F3 口径一致；CR1-R2 行号 :205/:238 因后续插入漂移至 :241/:276（断言内容命中）；v2.0.0「架构 22」时点数与当前 23 系 CR1-F4 改写正常增量。
+>
+> **判定**：零 P0/P1/P2/P3 残留，台账完整闭合，**Status 流转 review → done**（本轮执行）。
+
 #### 已修复 Patch
 
 - [x] **CR1-F1（P0）**：`archive_repository.py` save/find 双模式 session fallback + 组合根 v1.1.0 lambda 注入 + 单测四例（`tests/unit/infrastructure/storage/test_archive_repository.py::TestDualModeSession`）+ 既有 test_save_executes_merge 套 with_session 适配——CLI blm-plan/chain-query 归档追溯链路可达（消费方回归：契约 15 passed、单测 26 passed；集成/验收面 Round 4 全量承载）
@@ -1022,16 +1046,16 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `validate-create-story` 质量检查
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `validate-create-story` 质量检查
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查（五轮循环收敛——2026-11-03）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v2.0.0
+**故事版本/Story Version:** v2.1.3
 **创建日期/Created:** 2026-11-03
-**最后更新/Last Updated:** 2026-11-03（五轮审查收敛）
+**最后更新/Last Updated:** 2026-11-03（代码审查五轮收敛——Status → done）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研+主会话亲验：5-3 ChainOfThought VO 复用定位/3-10 EVIDENCE_PACKAGE 零使用实证/6-1 边界表 L37 钦定 BLM 面/6-3 归档与清理先例；四冻结规范：确定性组装映射（OD-2）/归档载荷映射（OD-4）/端口契约/异常复用清单（OD-6 零新增）；AC-1~AC-7 + Task 0~7 + 13 验收场景规划；Status → ready-for-dev）
 - v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×8+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第七投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
@@ -1042,3 +1066,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - v2.1.0: 代码审查 Round 1（四视角调研+双评审员+复评达标，P0×1+P1×1+P2×4+P3×3+改判 8 项；提交 78da3c91）——**CR1-F1(P0) archive_repository save/find 双模式 session fallback**（CLI 归档/追溯结构性不可用修复——audit R1-DF1 家族第五成员）；CR1-F2 两处 type: ignore 根因清偿；CR1-F3 端口类型精确化；CR1-F4 git diff 断言族 5 处转持久断言；CR1-F5 三替身豁免声明；CR1-F6 挂接段宽捕兜底；CR1-F7~F9 P3 批
 - v2.1.1: 代码审查 Round 2（回归核查双 Agent：传播完备性全落地+组合面自洽真实探针实证；CR2-F1(P2) chain-query CLI Exception 兜底+CR2-F2 口径批+CR2-F3 6.4-DF2 登记）
 - v2.1.2: 代码审查 Round 3 单深度推演（三轴+16 条证伪留痕，零 P0/P1/P2；CR3-F1(P3) blm-plan help UUID 提示+CR3-F2(P3) 6.4-DF3 登记——482 跨进程/6-7 消费边界）
+- v2.1.3: Round 4 纯验证（四目录全量 14444 passed 零发现不造提交）+ Round 5 独立终审五节全过（周期闭合/双向取证 8÷8/独立快扫/门禁实跑/收敛判定）——收敛声明入档，零 P0-P3 残留，Status → done（sprint-status.yaml 同步流转）
