@@ -978,6 +978,21 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | CR2-F3 | CR1-F1 fallback 分支集成/验收零覆盖（集成全 session_context 请求路径、验收手动 set_session——CLI fallback 端到端仅单测 mock 三例承载）+ 组合根 `resolve("session_factory")` 接线无自动化守卫（注册名漂移不红）；配置分叉事实：CLI bootstrap 指向 .env dev 库、测试装配走测试库（5433）——测试永远看不到 CLI 真实落库目标。R2-B 已以真实探针补证代码正确性（盲区是测试形态非代码缺陷）；与 audit R1-DF1 核销时补真实路径验证的家族先例不对称 | **P3** | deferred-work 登记 6.4-DF2（核销触发：7-2 REST 化立项或下一 CLI 归档消费 Story——届时补无 session 上下文的集成场景+接线守卫断言；audit 核销先例为参照） |
 | CR2-改判 | S13 feature 文本「四守护文件零改动」与实现（token 缺席+预留码缺席）语义收窄——CR1-F4 已知权衡、docstring 在位（R2-B 附注）；R2-B 另证 F1 对既有归档域请求路径零变化（代码级+55 个真实服务测试实证 34+21 passed） | — | 留痕不动作 |
 
+#### Round 3（2026-11-03，单深度推演——8 步时间线全边界/读侧消费面/R1-R2 修复二次效应三轴 + 16 条证伪留痕）
+
+> **结论：零 P0/P1/P2**。R1/R2 修复组合交互语义自洽（半行场景被 R3-F5 钦定完整覆盖且 round-trip 无炸点/UUID 守卫与兜底代码序正确/宽捕与 mock 断言无冲突——推演 Agent 实跑 63+144+38 passed 佐证）。16 条证伪留痕（LLM 失败支素材完整性/部分降级字段/早退不触发/482 残留无暴露/半行 blob_ref 静默 None/守卫先于 try/AsyncMock 调用登记序/blob 三形态同形/取消语义穿透/构造面无异常源等——详见审查会话记录，防下轮重推）。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| CR3-F1 | blm-plan `--plan-id` 入口无 UUID 守卫（写读不对称：chain-query 读侧有前置守卫，写侧透传）——畸形 plan_id 下 8 步挂接段全部 warning 降级、L2 零归档行、CLI 汇总行不打印且 **exit 0**：归档全灭对 stdout 不可见（仅日志层 8 条 warning） | **P3** | help 文案补 UUID 提示（「非 UUID 形态思维链归档将全程静默缺席」——零行为变化；入口 fail-fast 守卫被排除：6-1 既有链路对非 UUID plan_id 全程 str 兼容是挂接段守卫钦定的前提，入口加守卫破坏既有兼容面） |
+| CR3-F2 | 482 防线跨进程失效：CLI 一次性进程模型下同 plan_id 跨进程重跑必然叠加 L2 行（run1 崩溃 k 步已 commit→重跑 +8）；decision_basis 无 run 锚——追溯输出重复 stage 无 run 判别（6-7 溯源树按 stage 过滤将现双节点）；≥7 次重跑超 50 行 desc+limit 静默丢最旧、total 封顶无截断可见性。CR1-改判①「482 防线下多 run 不可达」仅同进程内成立——CLI 主通道每次调用均新进程 | **P3** | deferred-work 登记 6.4-DF3（核销触发：6-7 溯源树展示立项——届时 archived_at 时间窗聚簇判 run 或 decision_basis 增 run 锚 + 截断面 count() 对照；行数据本身忠实，--plan-id help 与 482 消息均明示「重试请用新 id」纪律） |
+
+#### Round 3 已修复 Patch
+
+- [x] **CR3-F1（P3）**：blm-plan --plan-id help 文案补 UUID 提示（agent_cli.py 一行）
+- [x] **CR3-F2（P3）**：6.4-DF3 登记 deferred-work（6-7 消费边界承接）
+- [x] **验证**：集成 5 passed + 验收 13 passed（R1/R2 修复后全链真实服务回归——主会话实跑）
+
 #### 已修复 Patch
 
 - [x] **CR1-F1（P0）**：`archive_repository.py` save/find 双模式 session fallback + 组合根 v1.1.0 lambda 注入 + 单测四例（`tests/unit/infrastructure/storage/test_archive_repository.py::TestDualModeSession`）+ 既有 test_save_executes_merge 套 with_session 适配——CLI blm-plan/chain-query 归档追溯链路可达（消费方回归：契约 15 passed、单测 26 passed；集成/验收面 Round 4 全量承载）
@@ -1026,3 +1041,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - v2.0.0: dev-story 实施完成（2026-11-03）——Task 0~7 全部执行：四冻结规范+13 验收场景全红→全绿；端口/服务/用例/挂接/组合根/CLI 全交付（src 3 新建+8 修改；组合根 diff 纯新增 35 行+恰 1 行版本变更）；测试 8 文件新建/3 文件扩展（单测 41+图链路 3+CLI 8+契约 9+架构 22+集成 5+验收 13）；四目录全量回归 14438 passed×2 轮零适配；mypy/ruff 全过；覆盖率 95%/100%；零新事件零新异常（四守护文件零 diff+domain 零改动终验）；环境事实沉淀一处（tests/environments MINIO ROOT 命名双轨缝隙根因修复——计划外追加修改，Task 5）；Status → review
 - v2.1.0: 代码审查 Round 1（四视角调研+双评审员+复评达标，P0×1+P1×1+P2×4+P3×3+改判 8 项；提交 78da3c91）——**CR1-F1(P0) archive_repository save/find 双模式 session fallback**（CLI 归档/追溯结构性不可用修复——audit R1-DF1 家族第五成员）；CR1-F2 两处 type: ignore 根因清偿；CR1-F3 端口类型精确化；CR1-F4 git diff 断言族 5 处转持久断言；CR1-F5 三替身豁免声明；CR1-F6 挂接段宽捕兜底；CR1-F7~F9 P3 批
 - v2.1.1: 代码审查 Round 2（回归核查双 Agent：传播完备性全落地+组合面自洽真实探针实证；CR2-F1(P2) chain-query CLI Exception 兜底+CR2-F2 口径批+CR2-F3 6.4-DF2 登记）
+- v2.1.2: 代码审查 Round 3 单深度推演（三轴+16 条证伪留痕，零 P0/P1/P2；CR3-F1(P3) blm-plan help UUID 提示+CR3-F2(P3) 6.4-DF3 登记——482 跨进程/6-7 消费边界）

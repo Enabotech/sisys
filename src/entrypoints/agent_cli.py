@@ -310,7 +310,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         metavar="PLAN_ID",
-        help="规划任务标识（缺省新铸——同 id 重跑将被拒绝 482，重试请用新 id）",
+        help="规划任务标识（缺省新铸——同 id 重跑将被拒绝 482，重试请用新 id；"
+        "建议 UUID 字符串——非 UUID 形态思维链归档将全程静默缺席，CR3-F1）",
     )
 
     # Story 6-4: chain-query 扁平子命令（决策追溯查询——AC-5 CLI 消费入口；
