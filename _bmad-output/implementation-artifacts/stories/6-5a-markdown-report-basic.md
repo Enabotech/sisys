@@ -88,12 +88,12 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 **And** 数据源全缺（chain total==0）→ 抛 `ReportGenerationError`（EXCEPTION_490——404 语义；plan 从未跑过与跑过归档全失败两形态在持久真源同形同判，message 陈述可观测事实「该 plan_id 无思维链归档记录，无法生成报告」；最新快照在位亦同判：时间线摘要非报告素材）
 **And** latest 快照缺失/TTL 过期（86400）→ 附录 A 省略 + 实体标注，不阻断（可观测面）
 
-**验证标准/Validation Criteria:**
-- [ ] 部分缺失场景（**构造手段钦定：逐 stage 归档七次跳过目标步——6-3 `_archive_eight_steps` 先例变体；禁止跑完 8 步后删行构造**，仓内 `DELETE FROM strategic_archives` 仅 teardown 清理先例零场景构造先例）→ 章节标注 + degraded_section_count 正确 + 报告成功
-- [ ] 缺三步场景（六子缺三步 → degraded_section_count==3 ≤ section_count==11 不变量成立，无 242——锁死计数口径）
-- [ ] 全缺场景（**从未归档的独立 plan_id**——天然 total==0 无需清空）→ 异常 490（code/message/context 断言）
-- [ ] 快照缺失场景 → 无附录 A + 报告成功
-- [ ] 降级标注注入断言（6-1 R1-4「降级事实+原因完整传导」同语义；信封态断言 reason 传导 + 兜底文案形态各一用例）
+**验证标准/Validation Criteria:**（R2 逐条标层——验收 13 场景 AC-4×3=部分缺失/全缺/快照缺失三场景，其余归集成/单测）
+- [ ] 部分缺失场景【验收场景+集成场景③】（**构造手段钦定：逐 stage 归档七次跳过目标步——6-3 `_archive_eight_steps` 先例变体；禁止跑完 8 步后删行构造**，仓内 `DELETE FROM strategic_archives` 仅 teardown 清理先例零场景构造先例）→ 章节标注 + degraded_section_count 正确 + 报告成功
+- [ ] 缺三步场景【集成 5.2 ③b——不占 13 场景名额】（六子缺三步 → degraded_section_count==3 ≤ section_count==11 不变量成立，无 242——锁死计数口径）
+- [ ] 全缺场景【验收场景+集成场景④】（**从未归档的独立 plan_id**——天然 total==0 无需清空）→ 异常 490（code/message/context 断言）
+- [ ] 快照缺失场景【验收场景】→ 无附录 A + 报告成功
+- [ ] 降级标注注入断言【单测层——R1-8 钉死验收不含信封态注入】（6-1 R1-4「降级事实+原因完整传导」同语义；信封态断言 reason 传导 + 兜底文案形态各一用例；信封态计入/锚叠加不计入的 R2 口径各钉一用例）
 
 ### AC-5: ReportGenerated 事件首激活
 
@@ -101,12 +101,12 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 **When** 事件发布
 **Then** 发布 `ReportGenerated`（report_id=实体 report_id / report_type="markdown" / file_path=实体 file_path / aggregate_id=report_id / aggregate_type="Report"——**事件类字段面冻结零改动**，无 tenant_id 字段不得自行追加；**构造点必显式传 report_id/report_type/file_path 三键**——事件类三键均有缺省空串，漏传不炸产空串事件，唯一防线在构造点+单测三键非空断言）
 **And** 事件通道零新增零 diff（event_channels.yaml L273 + DEFAULT_MAPPINGS :346 既有登记直接复用——reliable 单通道 + Outbox）
-**And** 发布失败 → **宽容语义**（checkpoint ⑤ 同构裁定：L0/L2 是报告真相源、事件是通知面）：`logger.warning`（含 report_id/event_type/error）+ 报告正常返回成功，**不上抛**（491 上抛回滚不了已落盘 L0/L2，且 CLI exit 1 误导重跑叠加多份——OD-6 裁定）。**失败检出双防线强制**：`if not result.is_success` 先判（实现层 `RabbitMQEventBus.publish` 吞异常返回失败 `PublishResult`——纯 `except Exception` 恒不触发）+ `except Exception` 兜底；两防线任一命中均走 warning
+**And** 发布失败 → **宽容语义**（宽容**结果语义**同构 checkpoint ⑤——不回滚+返回成功；L0/L2 是报告真相源、事件是通知面。**防线形态为增强**：⑤先例仅单 `except` 在吞异常语义下对失败 PublishResult 静默无 warning，本 Story 显式加 `is_success` 判定修正该缺陷——R2 措辞精确化，勿照抄先例单防线）：`logger.warning`（含 report_id/event_type/error）+ 报告正常返回成功，**不上抛**（491 上抛回滚不了已落盘 L0/L2，且 CLI exit 1 误导重跑叠加多份——OD-6 裁定）。**失败检出双防线强制**：`if not result.is_success` 先判（实现层经 `DualChannelEventBus` 委托 `RabbitMQEventBus.publish`——吞异常返回失败 `PublishResult`，纯 `except Exception` 恒不触发）+ `except Exception` 兜底；两防线任一命中均走 warning。**outbox 断言等价机理注记**：publish 仅做 outbox 落行**无 MQ 直发**（MQ 投递归 AsyncOutboxPoller 基建——现状未运行，deferred-work L170）→ 「outbox 有行 ⟺ is_success True」是强信号等价——断言以 outbox 行为唯一面，**禁止追加 MQ 消费侧断言**（集成环境无 RabbitMQ 会挂）
 
 **验证标准/Validation Criteria:**
 - [ ] outbox 落行断言（event_type/report_id/file_path 三键值级断言——非仅存在性）
 - [ ] 组装映射值级断言（独立构造期望事件对象比对——非读回自比，6-3 R1-F6 教训；含三键非空断言）
-- [ ] 发布失败两形态单测（①mock 返回 `PublishResult(results=(ChannelResult("reliable", False, "..."),))` → 断言 warning + 返回成功 ②mock raise → 同断言——双防线各钉一用例，防只写 except 假绿）
+- [ ] 发布失败两形态单测（①mock 返回 `PublishResult(event_id=str(uuid4()), results=(ChannelResult("reliable", False, "..."),))`——**event_id 是必填无缺省首参（publish_result.py:30），漏传即 TypeError** → 断言 warning + 返回成功 ②mock raise → 同断言——双防线各钉一用例，防只写 except 假绿）
 - [ ] `configs/event_channels.yaml` 与 `channel_router.py` 零 diff（契约测试守护）
 
 ### AC-6: 契约零破坏（6-1/6-2/6-3/6-4/5-3 冻结面零触碰）
@@ -126,7 +126,7 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 **Given** 数据源在位
 **When** 生成报告
 **Then** 生成窗口 P95<30s（口径：数据聚合起点→事件发布返回；**不含 BLM 流程本身**——run 是前置，OD-8 口径差声明）
-**And** 生成成功率 100%（口径：正常路径 N 次生成 N 次文件可读回+元数据行在位+事件落行——N 与性能采样轮数同源（20）；数据源全缺 490 是业务异常非失败，6-4 OD-5 同款口径重读）
+**And** 生成成功率 100%（口径：正常路径 N 次生成 N 次文件可读回+元数据行在位+事件落行——N 与性能采样轮数同源（20）；**「文件可读回」=每轮生成后即时经该轮实体 file_path stem 反解读回**（秒级覆写形态下事后统一断言 20 文件会假失败——AC-1 秒级注记联动，件数断言豁免）；数据源全缺 490 是业务异常非失败，6-4 OD-5 同款口径重读）
 **And** 并发生成 3 个报告（asyncio.gather 独立 plan_id，互不干扰；**服务无状态约束**——`report_generation_service` SINGLETON 实例并发共享，实现禁持每次调用的可变实例态，并发安全仅依赖注入依赖的线程/协程安全性）
 
 **验证标准/Validation Criteria:**
@@ -160,7 +160,7 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 | `report_type` | `ReportType` | 枚举 `MARKDOWN="markdown"` / `PDF="pdf"`（6-5b 预留值，本 Story 仅产 MARKDOWN） |
 | `file_path` | `str` | 非空（**L0 逻辑路径** `reports/{memory_id}.md` 单源派生——非绝对路径：base 物理路径归 infrastructure `MemoryConfig`，application 层不得知悉（六边形依赖方向）；逻辑路径可移植（审计语义）且消费方经端口 `read(memory_id, "reports")` 读取无需 base；memory_id 可经 `Path(file_path).stem` 反解——OD-4 裁定） |
 | `section_count` | `int` | ≥0（**正文 H3 小节总数**——gap 4 + 六子 6 + synthesis 1 = 11；目录/附录不计。计数单位钦定 H3 小节而非 H2 章数（H2 口径=2 时缺 ≥3 步即破坏 degraded ≤ section 不变量炸 242——load-bearing 选择，AC-4 缺三步场景锁死） |
-| `degraded_section_count` | `int` | ≥0 且 ≤section_count（**受影响 H3 小节数**：六子缺一步→1 / synthesis 缺→1 / gap 行缺→4（1.1-1.4 四小节素材同源整体缺失）；上限 8 ≤ 11 恒成立） |
+| `degraded_section_count` | `int` | ≥0 且 ≤section_count（**内容缺失类 H3 小节数**——R2 钉死口径：①归档行缺→[数据缺失] 计入（六子缺→1/synthesis 缺→1/gap 缺→4）；②降级信封态（行在位但业务字段缺席跳过渲染）计入（六子信封→1/synthesis 无信封恒 asdict 走③）；③锚叠加类（payload 完整+degraded 锚 True，内容在位仅 [降级] 标注）**不计**——内容完整非缺失，可观测面归附录 B [降级] 行。上限 11 天然成立：单小节至多一种标注形态（缺行时无锚可叠/信封时锚 True 但算一种），极端形态 gap 缺行 4 + 六子全信封 6 + synthesis 缺行 1 = 11（缺行 2 条 total=6≠0 不触发 490；synthesis 恒 asdict 两键无信封形态——内容缺失只能来自缺行）） |
 | `generation_ms` | `int` | ≥0（生成窗口毫秒——AC-7 口径） |
 | `created_at` | `datetime` | default_factory=now(UTC) |
 
@@ -170,11 +170,11 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 
 | VO | 字段 | 说明 |
 |---|---|---|
-| `ReportSection` | `title: str` / `level: int`（1-4）/ `blocks: tuple[ReportBlock, ...]` | 章节（display_name 逐字源） |
+| `ReportSection` | `title: str` / `level: int`（**1-3**——R2 收窄：与冻结表「严格 1-3 不开 H4」/AC-3 字面/校验三方对齐，原 1-4 值域会放行无渲染语法的 level=4 对象）/ `blocks: tuple[ReportBlock, ...]` | 章节（display_name 逐字源） |
 | `ReportBlock`（联合形态单类+kind 判别） | `kind: str`（`paragraph`/`bullet_list`/`table`/`callout`）/ `text: str`（paragraph/callout）/ `items: tuple[str, ...]`（bullet_list）/ `headers: tuple[str, ...]` + `rows: tuple[tuple[str, ...], ...]`（table） | 四块型冻结——AC-3 三要素 + callout（降级/缺失标注） |
 | `MarkdownReportDocument` | `plan_id: str` / `title: str` / `meta_rows: tuple[tuple[str, str], ...]`（元信息表）/ `sections: tuple[ReportSection, ...]` / `toc_enabled: bool = True` | 文档根（应用层聚合产物→渲染器入参） |
 
-- [ ] `__post_init__` 校验：level 值域 1-4 / kind 白名单 / table 列数一致（rows 每行 len==len(headers)），违例抛 242
+- [ ] `__post_init__` 校验：level 值域 1-3（R2 收窄同 VO 表）/ kind 白名单 / table 列数一致（rows 每行 len==len(headers)），违例抛 242
 
 **L2 元数据表** `strategic_reports`（alembic `017_strategic_reports.py` ★ 新建——只增 migration，已合入 migration 禁改红线）：
 
@@ -209,7 +209,7 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 | 2.1~2.6 | `{看趋势}` 等（H3） | `MARKET_INSIGHT_STEP_CONFIG[step].display_name` 六值 | 各步归档行 payload | 见要素映射表 |
 | 2.7 | `{市场洞察综合}`（H3） | `SYNTHESIS_DISPLAY_NAME` | synthesis 归档行 payload | conclusions→bullet_list + degraded_inputs→callout 显式列举 |
 | 附录 A | `附录 A 执行时间线`（H2） | 固定 | latest 快照 timeline（在位时） | table（`| 步骤 | 开始 | 完成 | 状态 | 降级 |`） |
-| 附录 B | `附录 B 降级与数据缺失记录`（H2） | 固定 | 聚合过程登记清单 | table（`| 类型 | 步骤 | 原因 |`） |
+| 附录 B | `附录 B 降级与数据缺失记录`（H2） | 固定 | 聚合过程登记清单 | table（`| 类型 | 步骤 | 原因 |`——**类型列值域 {[数据缺失],[降级]}，收录范围=两类全收**：缺行→[数据缺失] 行/信封态与锚叠加态→[降级] 行（callout 即时可见 + 附录 B 汇总可观测双面；R2 口径与 degraded_section_count 只计内容缺失类相区分）；登记清单是**单次调用局部累积**（函数内列表随返回丢弃——非服务实例态，AC-7 并发/20 轮防互扰） |
 
 **六子步骤要素渲染映射冻结**（每步公共前缀：`summary`→paragraph + `findings`→bullet_list；标注 callout 见下）：
 
@@ -223,8 +223,8 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 | opportunity_gap | `gap_quantification`/`capability_match_matrix`/`closure_strategies` → 三组 bullet_list | 机会差距量化报告要点/能力-机会匹配矩阵/差距弥合策略 |
 
 **标注形态冻结**（callout 块型两形态——6-1「降级事实+原因完整传导」报告面延续；**三态判定与原因解析次序以 AC-4 冻结版为准**——payload 形态优先于 degraded 锚，信封态键集判定勿并入「解析失败」）：
-- 源步降级：`> ⚠️ [降级] {display_name}：{原因}`（章节标题后首块；原因 = `payload.get("degrade_reason")` 缺席时固定兜底「降级（原因未随归档行结构化持久化）」——synthesis payload 恒无 reason 键/六子部分降级（R2-F2）payload=structured_output 原样亦无——两形态走兜底；**禁止解析 chain VO reflection 文本后缀**）
-- 归档行缺失：`> ⚠️ [数据缺失] {display_name}：该步骤归档记录不可用`（章节标题后唯一块 + 附录 B 记录行 + degraded_section_count 计数）
+- 源步降级：`> ⚠️ [降级] {display_name}：{原因}`（章节标题后首块；原因 = `payload.get("degrade_reason")` 缺席时固定兜底「降级（原因未随归档行结构化持久化）」——synthesis payload 恒无 reason 键/六子部分降级（R2-F2）payload=structured_output 原样亦无——两形态走兜底；**禁止解析 chain VO reflection 文本后缀**；信封态与锚叠加态均落本形态 callout + 附录 B [降级] 行——**是否计入 degraded_section_count 见实体表 R2 口径**：信封态计（内容缺失）/锚叠加不计）
+- 归档行缺失：`> ⚠️ [数据缺失] {display_name}：该步骤归档记录不可用`（章节标题后唯一块 + 附录 B [数据缺失] 行 + degraded_section_count 计入）
 
 **渲染语法冻结**：ATX 标题（`#`/`##`/`###`，禁 Setext）；GFM 管道表格（表头 + `| --- |` 分隔行 + 数据行，列数严格一致）；无序列表 `- ` 前缀；callout `> ` 前缀；中文与特殊字符原样输出（渲染层禁转义——`ensure_ascii=False` 语义）。
 
@@ -282,7 +282,7 @@ class ReportRepositoryProtocol(Protocol):
 - [ ] 构造器参数（家族形态对齐——领域参在前 + 覆写参数缺省在后，284 `:88-93`/480 `:49-55` 同构）：`ReportGenerationError(plan_id, message=None, cause=None, context_extra=None)` / `ReportStorageError(layer, message=None, cause=None)`——context 字典暴露领域上下文（plan_id / layer），非法 layer 值抛 242
 - [ ] 消息安全性：面向调用方可理解，不泄露内部细节
 - [ ] 导出完整性：模块 `__all__` + `src/domain/exceptions/__init__.py` 导入 + `EXCEPTION_HTTP_MAP` 映射（490→404 / 491→500——未注册直系子类回退基类 400，精确注册是必要动作）
-- [ ] 编码分配表更新：`sisys-uni-exception-design.md` §3.3.2 完整编码分配表 + §3.3.2 子域编码范围表（business 段后追加 report 段行；**顺带回填既有文档债**：6-3 已落码的 483 CheckpointCreationError/484 CheckpointIntegrityError 两行按 `_code_ranges.py:178-181` 为准修正「483~489 预留」失实行——同表同次编辑两行修正，属偿还既有漂移非扩面，R1 裁定不留静默失真）
+- [ ] 编码分配表更新：`sisys-uni-exception-design.md` §3.3.2 完整编码分配表 + §3.3.2 子域编码范围表（business 段后追加 report 段行；**顺带回填既有文档债**：6-3 已落码的 483 CheckpointCreationError（500）/484 CheckpointIntegrityError（409）两行按 `_code_ranges.py:184-188`（R2 校正——原 :178-181 是 481/482 条目）+ `exception_handlers.py:309-310` 为准修正「483~489 预留」失实行——**同 §3.3.2 两张表**（:755 分配表与 :837 范围表）同次编辑修正，属偿还既有漂移非扩面，R1 裁定不留静默失真）
 - [ ] 测试覆盖：`tests/unit/domain/exceptions/` 构造/`to_dict()`/HTTP 映射 + 编码唯一性 + 子域范围（`test_error_code_uniqueness.py` + `test_code_ranges.py` 全绿——前者经 `__all__` 自动发现零改动，后者注意新子域继承 BusinessException 经 abstract_names 跳过无需白名单）+ `tests/unit/interfaces/api/test_exception_handlers.py`
 - [ ] BDD 验收场景：490 异常路径纳入 Gherkin Edge Cases（AC-4 全缺场景）；491 归单测层承载（BDD 约束节 no-mock 红线互斥裁定）
 
@@ -452,6 +452,7 @@ class ReportRepositoryProtocol(Protocol):
 | AC-2 | 全链章节断言 | Task 5 | 5.2 场景② | `test_integration_markdown_report.py` |
 | AC-3 | 标题/列表/表格格式化 | Task 1 | 1.4-1.5 渲染器块型 | `test_markdown_report_renderer.py` |
 | AC-4 | 部分缺失降级/全缺 490/快照过期容错 | Task 2 | 2.1-2.3 降级语义 | `test_report_generation_service.py` |
+| AC-4 | 缺失/缺三步/全缺集成验证 | Task 5 | 5.2 场景③③b④ | `test_integration_markdown_report.py` |
 | AC-4 | 异常 490 BDD 场景 | Task 0/7 | 0.4 Gherkin + 7.2 步骤 | `test_acceptance_markdown_report.py` |
 | AC-5 | ReportGenerated 发布 + outbox 断言 | Task 2 | 2.4-2.5 事件发布 | `test_report_generation_service.py` |
 | AC-5 | 事件零新增守护 | Task 4 | 4.1 契约测试 | `test_event_channel_mapping_report.py` |
@@ -480,7 +481,7 @@ class ReportRepositoryProtocol(Protocol):
 - [ ] Subtask 0.2: 冻结「性能口径差声明」（OD-8：生成窗口=聚合起点→事件发布返回，不含 BLM run 前置；P95 数学口径 `sorted(durations)[ceil(0.95*n)-1]`——n=20 即次大值噪声敏感如实承受；**采样形态=单一数据源 plan_id × 20 次生成**（OD-10 幂等锚合法采样，构造成本=归档链一次）——R1 裁定替代原「20 独立 plan_id」；成功率口径=正常路径 N 生成 N 三元可读回，N 与采样轮数同源=20）
 - [ ] Subtask 0.3: 定义端口契约（report_generation.py / report_repository.py 模块 docstring 契约区：L0 memory_type="reports" 命名约定/文件命名 `{plan_id}_{YYYYMMDDHHMMSS}`/双源读径契约/降级判别规则）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_markdown_report.feature`（13 场景钉死——AC-1×2/AC-2×2/AC-3×1/AC-4×3/AC-5×1/AC-6×1/AC-7×2/收尾×1）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_markdown_report.py`（三件套骨架 + 延迟 import + teardown 清理链设计：报告三元 + 6-4 `_cleanup_archive_residues` 移植）
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_markdown_report.py`（三件套骨架 + 延迟 import + teardown 清理链设计：报告三元 + 6-4 `_cleanup_archive_residues` 移植；**L0 写路径隔离验收层同钦定【R2 补——与 Task 5.1 同款三理由：真实 resolve 写运行机器 ~/.sisys/memory/reports/ 污染 + SCOPED lambda 缓存 resolve 后 setenv 不生效 + 并行计数互扰】**：tmp_path 自建 `FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))` 覆写注入 + _restorers 还原——6-3 端口覆写先例）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——运行期 ImportError 形态，13 场景收集期零错误）
 - [ ] Subtask 0.7: 链路接线断言清单落档（组合根三注册/事件发布点/outbox 断言键/alembic 017 幂等）+ deferred-work.md 台账处置（L129 data_pipeline 轨再锚定注记 + 新留项登记：REST 导出面触发条件）
 - [ ] Subtask 0.8: 关键代码锚点复核（并行会话提交会使行号漂移——上表锚点逐条 grep 复验；payload 三态/降级信封字段形态亲验定稿渲染容错规则）
@@ -564,7 +565,7 @@ class ReportRepositoryProtocol(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展同文件（L0 write 调用断言【memory_type="reports"/文件名锚 plan_id】+ L2 save 断言 + ReportGenerated 组装值级断言【独立构造期望事件比对——report_id/report_type/file_path 三键非空】+ **发布失败两形态**【①mock 返回 `PublishResult(results=(ChannelResult("reliable", False, "..."),))`→断言 warning+返回成功 ②mock raise→同断言——双防线各钉一用例，防只写 except 恒绿假象】+ L0/L2 失败→491【layer 二元】） |
+| 🔴 红 | 扩展同文件（L0 write 调用断言【memory_type="reports"/文件名锚 plan_id】+ L2 save 断言 + ReportGenerated 组装值级断言【独立构造期望事件比对——report_id/report_type/file_path 三键非空】+ **发布失败两形态**【①mock 返回 `PublishResult(event_id=str(uuid4()), results=(ChannelResult("reliable", False, "..."),))`→断言 warning+返回成功（event_id 必填首参） ②mock raise→同断言——双防线各钉一用例，防只写 except 恒绿假象】+ L0/L2 失败→491【layer 二元；L0 检出口径=R2 钦定：真实适配器 write 从不返回 False 只抛 OSError（目录创建/写文件失败均 OSError）——服务层 except OSError 包装 layer="l0" 为主，`write() is False` 返回值同查（端口契约面）】） |
 | 🟢 绿 | 实现五段编排尾部（L0 write→L2 save→事件发布→实体返回；发布失败双防线检出【`if not result.is_success` 先判 + `except Exception` 兜底】→warning 宽容；L0/L2 失败 491 包装【layer="l0"/"l2"】） |
 | 🔄 重构 | 无共同事务语境注释（save/publish 独立会话）+ 计时窗口（generation_ms） |
 
@@ -613,7 +614,7 @@ class ReportRepositoryProtocol(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（参数解析 `--plan-id`/成功打印【report_id/file_path/章节计数汇总行】/双层异常定式【DomainError 分支=`[{code}] {message}` stderr + return 1；Exception 分支=仅 logger.error + return 1】/CLI 生产通道 PG session 可达【组合根 session_factory 注入实证——**6-4 P0 排查法三步必跑**】） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（参数解析 `--plan-id`/成功打印【report_id/file_path（逻辑路径）/memory_id/章节计数汇总行——**R2 补 memory_id 打印**：人类用户经 memory_id + `L0StoragePort.read(memory_id,"reports")` 或 base 目录提示定位物理文件，逻辑路径单独打印不构成定位信息】/双层异常定式【DomainError 分支=`[{code}] {message}` stderr + return 1；Exception 分支=仅 logger.error + return 1】/CLI 生产通道 PG session 可达【组合根 session_factory 注入实证——**6-4 P0 排查法三步必跑**】） |
 | 🟢 绿 | 实现 `src/entrypoints/agent_cli.py` `report-generate` 子命令（argparse 扁平——checkpoint-create :320-371 模板；resolve `"report_generation_use_case"`） |
 | 🔄 重构 | 打印格式统一（`_print_report_summary` 辅助） |
 
@@ -646,7 +647,7 @@ class ReportRepositoryProtocol(Protocol):
 
 ---
 
-### Task 5: 集成测试——真实链五场景
+### Task 5: 集成测试——真实链五场景（①②③④⑤——③b 为③的第二断言块非独立场景，R2 计数澄清）
 
 **关联 AC:** AC-1 / AC-2 / AC-4 / AC-7
 
@@ -736,7 +737,7 @@ class ReportRepositoryProtocol(Protocol):
 | **OD-3** | **双源聚合**（gap 四字段无独立快照缺口的正解）：主源 = `query_chain_trace(plan_id)`（PG 档案行 7 年——八步 `final_answer` payload JSON 三态：gap asdict 六键/六子 structured_output 原样/synthesis asdict 两键 + degraded 锚 + stage 锚）；辅源 = latest 快照（timeline→附录 A + phase 元信息；TTL 86400 过期容错省略）。**不读 per-step 快照**（chain 归档已覆盖 structured_output，避免双源不一致 + TTL 事后不可靠）。**零改动**：6-1/6-2/6-3/6-4 全部冻结面零触碰（纯读侧） | chain 归档是全量结构化产物唯一持久面（agent 调研+主会话双验）+ 单源优先原则 + 6-2「下游 6-5 需要结构化字段而非自由文本」的契约源兑现 |
 | **OD-4** | **持久化三件**：L0 文件（`memory_type="reports"` 端口常量单源；`memory_id=f"{plan_id}_{YYYYMMDDHHMMSS}"`；**file_path=L0 逻辑路径 `reports/{memory_id}.md` 单源派生——R1 裁定（非绝对路径）**：`L0StoragePort.write` 返回 bool 不返回路径、base 物理路径归 infrastructure `MemoryConfig`（application 禁知悉），逻辑路径零端口契约变更+可移植审计语义+消费方经端口 read 无需 base；memory_id 可经 `Path(file_path).stem` 反解）+ L2 `strategic_reports` 表（alembic 017 只增——交互流程 37「元数据保存→Relational_Storage」钦定 + 三下游查询面 + 7 年审计；对照 6-3 Redis 先例：报告是交付产物非流程状态，L2 正当）+ ReportGenerated 事件。L4 WORM defer 6-5b（引文证据包同批——reportlab 依赖同样预留未用先例） | 架构钦定存储去向 + 消费方清单（6-5b 找报告/6-8 展示/6-11 多模板管理）+ 审计 7 年（§10.1）+ 六边形依赖方向（application-no-infrastructure） |
 | **OD-5** | **数据源降级语义**（可观测面非流程面——6-4 OD-5 同哲学；**R1 机理修正**：「archived=False」是 compose 返回的内存态不进快照，trace 读侧无此形态——「归档行缺」的物理形态= compose 445 失败 chain 缺席台账 / Step1 L2 写失败，284 后段失败形态下行通常在位正常渲染，报告读侧以 PG 行为准）：归档行部分缺 → 章节 `[数据缺失]` callout + degraded_section_count + 附录 B 记录，报告照常生成；**三态判定以 payload 形态为准**（解析失败→[数据缺失]/信封键集→[降级]带 reason/其余正常+锚叠加——AC-4 冻结版）+ 原因解析次序（payload.degrade_reason → 固定兜底文案，禁解析 reflection）；chain total==0 → `ReportGenerationError` 490（404——**最新快照在位亦同判**：时间线摘要非报告素材）；latest 快照缺/过期 → 附录 A 省略不阻断。epics「成功率 100%」口径重读 = 正常路径 N 生成 N 三元可读回，全缺 490 是业务异常非失败 | 降级可观测哲学三连先例（6-1 快照容错/6-4 归档降级）+ 报告完整性 vs 可用性权衡（部分数据报告 + 显式标注 > 全或无）+ 双 Agent 机理实证（archived=False 内存态/284 独立会话 commit） |
-| **OD-6** | **事件零新增 + 异常开新段 + 发布失败宽容语义（R1 裁定）**：ReportGenerated 复用首激活（Epic 1 定义 + 双登记在位零 diff——docstring 钦定 Epic 6 生产者）；新增 report 异常段 (490,499)（`ReportGenerationError` 490 BusinessException 404 语义 / `ReportStorageError` 491 BusinessException layer 二元 {l0,l2} 语境——**值域自有元组禁复用 284 常量**）——planning 段 485 预留 486-489 留 6-6 不可占，report 语义独立按八代开段先例（410/420/430/440/450/460/470/480）开 490 段。**发布失败处置 = checkpoint ⑤ 宽容语义同构**（warning + 返回成功——非 284 上抛族：①报告真相源是 L0/L2 落盘，事件是通知面 ②284 上抛的回滚价值在 HTTP 同事务，CLI/报告面 save 与 publish 分属独立会话无共同事务，上抛回滚不了任何东西 ③上抛→exit 1→误导重跑→OD-10 不拦截→L0/L2 叠加多份 ④outbox 无 poller 现状下上抛换不来投递成功）。**失败检出双防线强制**：`is_success` 判定 + except 兜底（实现层吞异常只返回失败 PublishResult——纯 except 恒不触发，AC-5 两形态单测锁死） | `_code_ranges.py:189` 成文预留 + `:170-175` 开段先例 + YAGNI（零新事件=零 yaml/router diff）+ 事件双登记纪律 + checkpoint ⑤ 成文先例（`checkpoint_service.py:285-296` 快照真相源/事件宽容分层）+ EventPublisher 端口契约「错误内部消化返回 PublishResult」 |
+| **OD-6** | **事件零新增 + 异常开新段 + 发布失败宽容语义（R1 裁定）**：ReportGenerated 复用首激活（Epic 1 定义 + 双登记在位零 diff——docstring 钦定 Epic 6 生产者）；新增 report 异常段 (490,499)（`ReportGenerationError` 490 BusinessException 404 语义 / `ReportStorageError` 491 BusinessException layer 二元 {l0,l2} 语境——**值域自有元组禁复用 284 常量**）——planning 段 485 预留 486-489 留 6-6 不可占，report 语义独立按八代开段先例（410/420/430/440/450/460/470/480）开 490 段。**发布失败处置 = checkpoint ⑤ 宽容语义同构**（warning + 返回成功——非 284 上抛族：①报告真相源是 L0/L2 落盘，事件是通知面 ②284 上抛的回滚价值在 HTTP 同事务，CLI/报告面 save 与 publish 分属独立会话无共同事务，上抛回滚不了任何东西 ③上抛→exit 1→误导重跑→OD-10 不拦截→L0/L2 叠加多份 ④outbox 无 poller 现状下上抛换不来投递成功）。**失败检出双防线强制**：`is_success` 判定 + except 兜底（实现层吞异常只返回失败 PublishResult——纯 except 恒不触发，AC-5 两形态单测锁死） | `_code_ranges.py:189` 成文预留 + `:170-175` 开段先例 + YAGNI（零新事件=零 yaml/router diff）+ 事件双登记纪律 + checkpoint ⑤ 成文先例（`checkpoint_service.py:285-296` 快照真相源/事件宽容分层——**结果语义同构、防线形态为增强**：先例单 except 对失败 PublishResult 静默，本 Story is_success 判定修正）+ EventPublisher 端口契约「错误内部消化返回 PublishResult」+ publish 仅 outbox 落行无 MQ 直发实证（断言等价机理） |
 | **OD-7** | 测试文件命名（禁故事编号后缀）：unit/architecture 用 epics 钦定 `test_markdown_report.py`（L2260 一致）；integration `test_integration_markdown_report.py`（**对 epics L2261 钦定名 `test_markdown_report_integration.py` 的显式偏离**——仓规 tests/integration/ 全目录 test_integration_* 惯例，6-3 OD-8/6-4 OD-7 双先例）；acceptance `test_acceptance_markdown_report.feature/.py`；服务单测 `test_report_generation_service.py`；渲染器 `test_markdown_report_renderer.py`；仓储 `test_report_repository.py`；用例 `test_generate_markdown_report_use_case.py` | epics 钦定名半采半离 + 记忆「禁止故事编号命名文件」+ 双先例 |
 | **OD-8** | **性能口径差声明**：生成窗口 P95<30s = 数据聚合起点→事件发布返回（纯内存渲染 + L0 写 + L2 insert + 事件发布）；**不含 BLM 流程本身**（run 是前置——epic 未预见 run 与报告生成两段分离，含 run 则物理不可达口径混淆）；**采样形态 = 单一数据源 plan_id × 20 次生成（R1 裁定）**——OD-10 幂等锚语义下重复生成是合法采样形态，构造成本=归档链一次（原「20 独立 plan_id」需 160 次 LLM+归档三面 I/O+三量级清理成本，与 6-3 先例【纯内存 25 次调用】不同量级）；成功率口径见 OD-5（N 与采样同源=20）；并发 3 = asyncio.gather 独立 plan_id + 服务无状态约束。口径差落测试 docstring（集成场景⑤） | 6-1 DC-7/6-2 OD-3/6-3 OD-6/6-4 OD-10 四连先例 + epic 指标物理可达性论证 + 构造成本工程评估（审查员 B 实证） |
 | **OD-9** | **图类产物表格承载**：6-2 OD-8「图本体生成归 6-5 报告面」的 6-5a 落位 = Markdown 表格/列表承载（雷达图→能力维度表/价值主张地图→要点列表/增长路径图→路径列表/机会差距量化报告→要点列表——六 Schema 字段本就是要点字段族形态）；位图/SVG/mermaid 渲染 defer 6-5b（PDF 排版同批）。6-2 预判「图本体生成」在 Markdown 基础版以结构化表格兑现，断链声明落档 | epics L2235「基础格式化（标题、列表、表格）」钦定三要素无图片项 + 6-2 OD-8 断链预防 + YAGNI |
@@ -979,7 +980,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | R1-10 | 性能场景「≥20 轮独立 plan_id」构造成本与 6-3 先例（纯内存 25 次调用）差三个量级（160 次 LLM+归档三面 I/O+三量级清理）；OD-10 幂等锚本就钦定重复生成合法 | P1 | AC-7/OD-8/Task 5.4：改**单一数据源 plan_id×20 次生成**（归档链一次；锚=新 report_id+L2 行数+20+集合无重复） |
 | R1-11 | AC-2「### 2.7 综合洞察」≠钦定逐字源 SYNTHESIS_DISPLAY_NAME=「市场洞察综合」——AC 正文自身违反「逐字源」纪律 | P1 | L59 改「### 2.7 市场洞察综合」 |
 | R1-12 | AC-2「元信息引用块」与冻结表/AC-3/VO 三处「table 两列表」互斥矛盾 | P1 | L59 改「元信息表（两列表）」 |
-| R1-13 | 追溯矩阵 Subtask 归属错位（1.1-1.3 渲染器实为 1.4-1.6 等 3 处）+ 缺 AC-6→Task 6 行 + 验收侧行整体缺席 | P2 | 矩阵重排 18 行：归属逐项校正 + 补 AC-6 架构行 + 补 Task 0/7 验收行 + AC-7 5.4/5.5 拆行 |
+| R1-13 | 追溯矩阵 Subtask 归属错位（1.1-1.3 渲染器实为 1.4-1.6 等 3 处）+ 缺 AC-6→Task 6 行 + 验收侧行整体缺席 | P2 | 矩阵重排（**R2 勘误：原记「18 行」实为 17 数据行**——表头计入才 18）：归属逐项校正 + 补 AC-6 架构行 + 补 Task 0/7 验收行 + AC-7 5.4/5.5 拆行 |
 | R1-14 | 完成总结「39 Subtask」与逐行点数「52」矛盾（grep 实证 52） | P2 | 改 52 |
 | R1-15 | 同 plan_id 秒内重复生成 memory_id 相同 → L0 覆盖，「新文件名」断言同秒窗口假 | P2 | AC-1/OD-10：秒级窗口注记（锚 report_id/L2 行；件数断言需跨秒或不断言） |
 | R1-16 | 「构造缺一步归档」构造手段未钦定——跑后删行零先例且定向 DELETE 例外限清理语境 | P2 | AC-4/Task 5.2：钦定**逐 stage 归档七次跳过目标步**（6-3 `_archive_eight_steps` 变体；禁删行构造）+ 场景④改「从未归档的独立 plan_id」 |
@@ -995,6 +996,25 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | R1-26 | 行号锚点漂移簇（display_name :194/:202→:191/:199；checkpoint_service :2287-2302→:2293-2308；「6-4 三注册块 :2339-2363」实为 2 块；CLI 两子命令区间对调；验收样板六步链区间；ReportGenerated :57→:56；6-4 docstring L17-18→L16-17）+ 构造签名偏离家族形态 + 490 消息文案 + 章节编号拼接/目录锚点算法/附录 A 两处未定稿 + tenant_id 死参数 + File List 缺 sprint-status + n=20 P95 次大值注记 + 服务无状态约束 + mock 工厂提示 | P3 | 锚点表/异常契约/冻结表/端口定义/AC-7/Task 2.1 逐项修正（构造签名对齐家族 `(layer, message=None, cause=None)`；490 message 可观测事实口径；拼接规范 `{编号} {display_name}`；GitHub slug 锚点；附录 A display_name 映射+summary_excerpt 显式省略；删 tenant_id；补 File List） |
 
 Round 1 未修留项：无 P0/P1 残留（34 项全部处置：26 修复簇 + 8 项并入修复簇）。
+
+**Round 2**（回归核查 Agent + 组合交互面审查 Agent 并行——R1 八裁定单独 8/8 成立实证 + 两两组合推演；P1×1 + P2×6 + P3×6）：
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-1 | 计数语义空洞：degraded_section_count 与附录 B 只定义了「归档行缺」形态——三态②信封态（内容缺失）与③锚叠加（内容在位仅标注）是否计入/入册零裁定，信封态场景验收期望值不可写 | P1 | 实体表/标注形态冻结/附录 B 行 R2 口径钉死：**degraded_section_count 计内容缺失类**（缺行+信封态；锚叠加不计——内容完整归附录 B [降级] 行可观测）；附录 B 类型列值域 {[数据缺失],[降级]} 两类全收；登记清单单次调用局部累积非实例态 |
+| R2-2 | 实体表「上限 8 ≤ 11」算术失实（任何一致口径推不出 8；错误上限诱导反推错误口径） | P2 | 重算：极端形态 gap 缺行 4 + 六子全信封 6 + synthesis 缺行 1 = 11（缺行 2 条 total=6≠0）；补「单小节至多一种标注形态，不变量天然成立」 |
+| R2-3 | `PublishResult(results=...)` 测试处方缺必填首参 `event_id`（publish_result.py:30）——照抄必 TypeError | P2 | AC-5 验证标准/Task 2.4 两处补 `event_id=str(uuid4())` |
+| R2-4 | AC-4 验证标准 5 条与 13 场景/集成③b/单测的层级映射缺口 + 追溯矩阵缺 AC-4→Task 5 行 | P2 | 验证标准逐条标层【验收/集成/单测】+ 矩阵补 AC-4 Task 5 行（5.2 场景③③b④） |
+| R2-5 | R1-17 L0 写路径隔离未传播到验收层（三理由对验收层同样成立） | P2 | Task 0.5 补同款 tmp_path FileMemoryAdapter 覆写注入 + _restorers 还原钦定 |
+| R2-6 | `ReportSection.level` 值域 1-4 与「严格 1-3 不开 H4」冻结矛盾（level=4 渲染行为未定义） | P2 | VO 表与 __post_init__ 校验双处收窄 1-3（三方对齐） |
+| R2-7 | AC-7「N 次文件可读回」在单 plan_id×20 同秒覆写形态下事后断言 20 文件会假失败 | P3 | 钦定「每轮生成后即时经该轮 file_path stem 反解读回；件数断言按 AC-1 注记豁免」 |
+| R2-8 | 集成「五场景」声明与清单编号（含 ③b 共 6）不一致——R1 两修复各自增补的接缝 | P3 | Task 5 标题声明「③b 为③的第二断言块非独立场景」 |
+| R2-9 | 「checkpoint ⑤ 同构」措辞弱化双防线裁定（⑤先例单 except 对失败 PublishResult 静默——是缺陷非范本） | P3 | AC-5/OD-6 措辞改「宽容结果语义同构 + 防线形态为增强（is_success 判定修正先例缺陷）」 |
+| R2-10 | CLI 打印逻辑路径无定位信息（人类用户拿相对路径找不到物理文件） | P3 | Task 3 CLI 测试处方补 memory_id 打印（经端口 read / base 目录提示定位） |
+| R2-11 | 「outbox 落行 ⟺ is_success」等价机理未点破（publish 无 MQ 直发）——误追加 MQ 消费侧断言在无 MQ 集成环境会挂 | P3 | AC-5 补机理注记：断言以 outbox 行为唯一面，禁止追加 MQ 断言（投递归 poller 基建 L170） |
+| R2-12 | R1 修订文本的次生修正簇：`_code_ranges.py` 回填锚点 :178-181→:184-188（481/482 vs 483/484 错位）；「同表」→「同 §3.3.2 两张表」；L0 失败检出口径未钉死（真实适配器从不返回 False 只抛 OSError）；「实现层 RabbitMQEventBus」漏「经 DualChannelEventBus 委托」；R1-13 台账「18 行」勘误 17 数据行 | P3 | 异常契约/Task 2.4/AC-5/R1-13 台账逐处修正 |
+
+Round 2 未修留项：无 P0/P1 残留（13 项全部处置：12 修复 + R1-13 勘误内联）。
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -1024,9 +1044,10 @@ Round 1 未修留项：无 P0/P1 残留（34 项全部处置：26 修复簇 + 8 
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-03
 **最后更新/Last Updated:** 2026-11-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（五 Agent 并行调研 + 主会话九项亲验；OD-1~OD-10 十项架构裁定落档——宿主形态偏离声明/双源聚合/持久化三件/异常开段 490/图类表格承载为五大关键裁定）
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 三视角审查并行，34 项处置——P0×2：file_path 改 L0 逻辑路径裁定（write 不返回路径三路全断）/发布失败 is_success 双防线（实现层吞异常）；P1×10：491 宽容语义改判（无共同事务上抛无效）/archived=False 机理修正/渲染三态判定冻结/原因解析次序/计数单位 H3 口径/491-Gherkin 矛盾/事件守护范式重设计/性能采样单 plan_id×20/2.7 标题逐字源/元信息表；OD-4/5/6/8/10 五项修订 + 26 修复簇详见 Docs Review Fixes 表）
+- v1.2.0: Round 2 回归核查+组合交互面修订（R1 八裁定单独 8/8 成立实证；13 项处置——P1×1：degraded_section_count 计数语义空洞（信封态计入/锚叠加不计/附录 B 两类全收 R2 口径）；P2×5：上限算术重算/PublishResult event_id 必填/AC-4 层级映射/验收层 L0 隔离传播/level 值域收窄 1-3；P3×6：同构措辞增强/outbox 断言等价机理/CLI memory_id 打印等——R2-1~R2-12 详见修复台账）
