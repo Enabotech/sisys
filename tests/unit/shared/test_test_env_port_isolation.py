@@ -192,6 +192,39 @@ class TestCiEnvKeepsPortOverrideSemantics:
         assert config.redis.host == "host.docker.internal", "CI_CONFIG 预设 host 选择锁定"
         assert config.redis.port == 6390, "CI 形态下端口 env 覆盖应保留（门控不得误扩到 CI）"
 
+    def test_ci_bare_run_minio_from_env_keys_backfilled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CI 裸跑形态（无测试端口开关）下 MINIO_HOST/API_PORT 双键回填（CI split-brain 修复锁）。
+
+        组合根 MinIOConfig.from_env 读 MINIO_HOST+MINIO_API_PORT（非 ENDPOINT）
+        ——修复前非测试端口分支只同步 ENDPOINT，CI 下 HOST/PORT 未写 →
+        from_env 默认 localhost:9000 ≠ 门控探测的 env.minio.endpoint
+        （host.docker.internal:9000），门控过而归档拒（6-4 CI 集成失败根因
+        ——R2-F02 单轴复发的补齐轴）。判别力：修复前 from_env 一致性断言红。
+        """
+        from src.infrastructure.config.minio import MinIOConfig
+        from tests.environments import reset_test_env
+
+        reset_test_env()  # 清单例——防既有 local 形态缓存遮蔽 CI 解析（:247 同款）
+        for key in ("MINIO_HOST", "MINIO_API_PORT", "MINIO_ENDPOINT"):
+            monkeypatch.delenv(key, raising=False)  # 清进程残留（CI 基线 host 键/本地 dev 值均屏蔽）
+        monkeypatch.setenv("SISYS_TEST_ENV", "ci")
+        monkeypatch.delenv("SISYS_USE_TEST_PORTS", raising=False)  # CI 集成 job 裸跑 pytest 形态
+
+        try:
+            config = get_test_env()
+
+            assert config.env.value == "ci"
+            assert config.minio.endpoint == "host.docker.internal:9000", "CI_CONFIG 预设 endpoint 锁定"
+            assert os.environ["MINIO_ENDPOINT"] == "host.docker.internal:9000"
+            # from_env 双键一致性（修复锚：拆分回填使生产读取面 == 测试配置面）
+            from_env_config = MinIOConfig.from_env()
+            assert f"{from_env_config.host}:{from_env_config.port}" == config.minio.endpoint, (
+                "组合根 from_env 端点与门控探测端点 split-brain"
+                "（MINIO_HOST/MINIO_API_PORT 未回填——CI 集成归档将连 localhost:9000 被拒）"
+            )
+        finally:
+            reset_test_env()  # 尾清单例——CI 形态缓存不遮蔽同 worker 后续用例
+
     def test_ci_sync_writes_restored_and_local_parse_not_breaking(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CI 形态解析的 sync 写入面被快照恢复回收，后续 local 形态解析不被击穿。
 

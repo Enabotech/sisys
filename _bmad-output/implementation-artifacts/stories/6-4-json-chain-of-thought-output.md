@@ -1017,6 +1017,17 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 >
 > **判定**：零 P0/P1/P2/P3 残留，台账完整闭合，**Status 流转 review → done**（本轮执行）。
 
+#### Round 6（2026-11-03，CI 首跑回归修复——收敛后 CI 触发暴露的共享测试基建缺口）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| CR6-F1 | **CI 集成测试失败（本地 PASS 分叉根因）**：`tests/environments.py` MinIO 同步的非测试端口分支漏 `MINIO_HOST/MINIO_API_PORT` 双键回填——CI 形态（`SISYS_TEST_ENV=ci` 裸跑 pytest，无 `SISYS_USE_TEST_PORTS`）下组合根 `MinIOConfig.from_env()` 读未设的两键默认 `localhost:9000` ≠ 门控探测的 `env.minio.endpoint`（CI_CONFIG 预设 `host.docker.internal:9000`，compose 服务可达）——**门控过而归档拒**（split-brain）：6-4 集成三场景（8/8 归档断言/blob 解引用/并发 10）+ 6-3 checkpoint 集成两场景（284→CheckpointCreationError）CI 红。**根因定性**：R2-F02 split-brain 修复的**单轴复发**（只修测试端口轴，remote_env/默认轴漏修——「沿单轴修复必漏多轴」教训的代码版）；**审查周期盲区**：本地验证命令恒带 `SISYS_USE_TEST_PORTS=1`（该轴恒绿），R4 全量/R5 门禁实跑均未覆盖 CI 裸跑形态——本地与 CI 的**命令形态分叉**是盲区本体 | **P1** | else 分支补双键回填（`_set_host_env`/`_set_port_env` 语义——远程 localhost 污染强覆写/其余 setdefault 尊重显式值；测试端口分支三键强写原样保持——既有测试 :154-156 锁定）+ CI 裸跑形态单测锁 `test_ci_bare_run_minio_from_env_keys_backfilled`（from_env 端点==门控端点一致性断言；**变异实证**：临时还原修复精确红 split-brain 消息）+ 受影响面回归（CI 失败五用例全绿 5 passed） |
+
+#### Round 6 已修复 Patch
+
+- [x] **CR6-F1（P1）**：environments.py else 分支双键回填 + 单测锁（变异实证红→还原绿）+ 回归（6-4/6-3 集成+验收 23 passed、CI 失败五用例 5 passed、端口隔离文件双形态 7 passed）
+- [x] **教训沉淀**：审查周期的验证命令形态必须与 CI 形态对齐核验（env 开关集分叉=盲区）；已入记忆 6-4-code-review-cycle
+
 #### 已修复 Patch
 
 - [x] **CR1-F1（P0）**：`archive_repository.py` save/find 双模式 session fallback + 组合根 v1.1.0 lambda 注入 + 单测四例（`tests/unit/infrastructure/storage/test_archive_repository.py::TestDualModeSession`）+ 既有 test_save_executes_merge 套 with_session 适配——CLI blm-plan/chain-query 归档追溯链路可达（消费方回归：契约 15 passed、单测 26 passed；集成/验收面 Round 4 全量承载）
@@ -1053,9 +1064,9 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 ---
 
-**故事版本/Story Version:** v2.1.3
+**故事版本/Story Version:** v2.1.4
 **创建日期/Created:** 2026-11-03
-**最后更新/Last Updated:** 2026-11-03（代码审查五轮收敛——Status → done）
+**最后更新/Last Updated:** 2026-11-03（代码审查五轮收敛 + CI 首跑回归修复——Status → done）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研+主会话亲验：5-3 ChainOfThought VO 复用定位/3-10 EVIDENCE_PACKAGE 零使用实证/6-1 边界表 L37 钦定 BLM 面/6-3 归档与清理先例；四冻结规范：确定性组装映射（OD-2）/归档载荷映射（OD-4）/端口契约/异常复用清单（OD-6 零新增）；AC-1~AC-7 + Task 0~7 + 13 验收场景规划；Status → ready-for-dev）
 - v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×8+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第七投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
@@ -1067,3 +1078,4 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - v2.1.1: 代码审查 Round 2（回归核查双 Agent：传播完备性全落地+组合面自洽真实探针实证；CR2-F1(P2) chain-query CLI Exception 兜底+CR2-F2 口径批+CR2-F3 6.4-DF2 登记）
 - v2.1.2: 代码审查 Round 3 单深度推演（三轴+16 条证伪留痕，零 P0/P1/P2；CR3-F1(P3) blm-plan help UUID 提示+CR3-F2(P3) 6.4-DF3 登记——482 跨进程/6-7 消费边界）
 - v2.1.3: Round 4 纯验证（四目录全量 14444 passed 零发现不造提交）+ Round 5 独立终审五节全过（周期闭合/双向取证 8÷8/独立快扫/门禁实跑/收敛判定）——收敛声明入档，零 P0-P3 残留，Status → done（sprint-status.yaml 同步流转）
+- v2.1.4: Round 6 CI 首跑回归修复（CR6-F1 P1——environments.py MinIO 同步非测试端口分支双键回填：CI 裸跑形态 split-brain 使门控过而归档连 localhost:9000 被拒，6-4/6-3 集成 CI 红；R2-F02 单轴复发的补齐轴 + CI 形态单测锁变异实证）

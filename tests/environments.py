@@ -681,18 +681,29 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
 
     # MinIO - endpoint 是 "host:port" 格式，host 部分同样可能被污染。
     # 生产 MinIOConfig.from_env 读 MINIO_HOST+MINIO_API_PORT（非 endpoint）——
-    # 测试端口模式下两键一并强覆写（endpoint 解析回填），防 MinIO 腿 split-brain
-    # （R2-F02：.env 注入的 MINIO_API_PORT=9000 会使 from_env 得 9000 ≠ 测试 9010）
+    # 测试端口模式下三键一并强覆写（endpoint 解析回填），防 MinIO 腿 split-brain
+    # （R2-F02：.env 注入的 MINIO_API_PORT=9000 会使 from_env 得 9000 ≠ 测试 9010）。
+    # 非测试端口分支同样双键回填（CI split-brain 修复——R2-F02 单轴复发补齐：
+    # 原仅测试端口分支覆写 HOST/PORT，CI（SISYS_TEST_ENV=ci 裸跑）下 ENDPOINT
+    # setdefault 而 HOST/API_PORT 未写——组合根 from_env 得默认 localhost:9000
+    # ≠ 门控探测的 host.docker.internal:9000，门控过而归档拒——6-4 CI 集成
+    # 失败根因；回填走 _set_host_env/_set_port_env 语义：远程 localhost 污染
+    # 强覆写、其余 setdefault 尊重显式值）
     if _use_test_ports:
         os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
         _endpoint_parts = config.minio.endpoint.rsplit(":", 1)
         if len(_endpoint_parts) == 2:  # 守卫：endpoint 恒含端口（四预设均含；异常形态跳过覆写不炸）
             os.environ["MINIO_HOST"] = _endpoint_parts[0]
             os.environ["MINIO_API_PORT"] = _endpoint_parts[1]
-    elif _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
-        os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
     else:
-        os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
+        if _is_remote_env and (os.getenv("MINIO_HOST") == "localhost" or os.getenv("MINIO_ENDPOINT") == "localhost:9000"):
+            os.environ["MINIO_ENDPOINT"] = config.minio.endpoint
+        else:
+            os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
+        _endpoint_parts = os.environ["MINIO_ENDPOINT"].rsplit(":", 1)
+        if len(_endpoint_parts) == 2:  # 守卫同上——异常形态跳过回填不炸
+            _set_host_env("MINIO_HOST", _endpoint_parts[0])
+            _set_port_env("MINIO_API_PORT", _endpoint_parts[1])
     os.environ.setdefault("MINIO_ACCESS_KEY", config.minio.access_key)
     os.environ.setdefault("MINIO_SECRET_KEY", config.minio.secret_key)
     # ROOT 命名双轨同步（Story 6-4 环境事实）：MinIOConfig.from_env() 读
