@@ -244,7 +244,7 @@ class ReportGenerationServicePort(Protocol):
 ```
 （R1 修订：删除 `tenant_id: str = ""` 死参数——L2 表无 tenant 列/事件无 tenant_id 字段（AC-5 禁追加）/L0 无租户隔离，全链零消费面）
 - 模块常量：`REPORT_FILE_MEMORY_TYPE = "reports"`（L0 memory_type 单源——禁两处字面量）、`REPORT_TITLE_TEMPLATE = "战略规划报告（BLM 前两阶段）"`
-- **八 stage 期望集派生公式**（缺失判定单源——禁硬编码八清单，配置增步自动跟随）：`expected_stages = ("performance_gap", *(f"market_insight_{key}" for key in MARKET_INSIGHT_STEP_CONFIG), "market_insight_synthesis")`；缺失集 = expected_stages − {record["stage"] for record in records}（注：`STAGE_VALUE_DOMAIN` 全仓仅 docstring 引用无运行时定义——6-4 既有漂移不修不依赖）
+- **八 stage 期望集派生公式**（缺失判定单源——禁硬编码八清单，配置增步自动跟随）：`expected_stages = ("performance_gap", *(f"market_insight_{key}" for key in MARKET_INSIGHT_STEP_CONFIG), "market_insight_synthesis")`；缺失集 = expected_stages − {record["stage"] for record in records}（注【R5 改述】：`STAGE_VALUE_DOMAIN` **有**运行时 frozenset 定义（`src/domain/value_objects/blm_phases.py:69-71`，`__all__` :324 导出）——R1 原注「仅 docstring 无定义+6-4 漂移」双重失实（6-4 Story 正确引用无漂移）；本 Story 派生公式仍取 `MARKET_INSIGHT_STEP_CONFIG` 键序而非该常量，因键序**有序**且与章节标题 display_name 同源，frozenset 无序不适配差集判定与渲染顺序）
 
 **新建端口 2：领域层 `ReportRepositoryProtocol`**（`src/domain/ports/report_repository.py` ★——R1 基础端口；查询参数决策规则：单字段标识查找→直接参数）：
 
@@ -607,7 +607,7 @@ class ReportRepositoryProtocol(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/application/use_cases/test_generate_markdown_report_use_case.py`（plan_id UUID 守卫【非法→EntityValidationError 242——get_blm_chain_trace 先例】/透传/返回实体） |
-| 🟢 绿 | 实现 `src/application/use_cases/generate_markdown_report.py` + 组合根三注册块（report_repository SCOPED session_factory 注入 / report_generation_service SINGLETON 五依赖 resolve / report_generation_use_case SINGLETON——`=== Story 6-5a ===` 分节注释，checkpoint_service :2287-2302 形态模板） |
+| 🟢 绿 | 实现 `src/application/use_cases/generate_markdown_report.py` + 组合根三注册块（report_repository SCOPED session_factory 注入 / report_generation_service SINGLETON 五依赖 resolve / report_generation_use_case SINGLETON——`=== Story 6-5a ===` 分节注释，checkpoint_service :2293-2308 形态模板——R4 传播修复：锚点表 R1 校正值同步） |
 | 🔄 重构 | 契约测试 resolve 断言转绿 + 既有组合根断言零破坏复核（增量注册不动既有 lambda——6-4 0.8⑥ 亲验先例） |
 
 - [ ] Subtask 3.4: 🔴 红 — 编写用例失败测试
@@ -619,7 +619,7 @@ class ReportRepositoryProtocol(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（参数解析 `--plan-id`/成功打印【report_id/file_path（逻辑路径）/memory_id/章节计数汇总行——**R2 补 memory_id 打印**：人类用户经 memory_id + `L0StoragePort.read(memory_id,"reports")` 或 base 目录提示定位物理文件，逻辑路径单独打印不构成定位信息】/双层异常定式【DomainError 分支=`[{code}] {message}` stderr + return 1；Exception 分支=仅 logger.error + return 1】/CLI 生产通道 PG session 可达【组合根 session_factory 注入实证——**6-4 P0 排查法三步必跑**】） |
-| 🟢 绿 | 实现 `src/entrypoints/agent_cli.py` `report-generate` 子命令（argparse 扁平——checkpoint-create :320-371 模板；resolve `"report_generation_use_case"`） |
+| 🟢 绿 | 实现 `src/entrypoints/agent_cli.py` `report-generate` 子命令（argparse 扁平——checkpoint-create :337-392 模板——R4 传播修复：锚点表 R1 校正值同步；resolve `"report_generation_use_case"`） |
 | 🔄 重构 | 打印格式统一（`_print_report_summary` 辅助） |
 
 - [ ] Subtask 3.7: 🔴 红 — 编写 CLI 失败测试
@@ -741,7 +741,7 @@ class ReportRepositoryProtocol(Protocol):
 | **OD-3** | **双源聚合**（gap 四字段无独立快照缺口的正解）：主源 = `query_chain_trace(plan_id)`（PG 档案行 7 年——八步 `final_answer` payload JSON 三态：gap asdict 六键/六子 structured_output 原样/synthesis asdict 两键 + degraded 锚 + stage 锚）；辅源 = latest 快照（timeline→附录 A + phase 元信息；TTL 86400 过期容错省略）。**不读 per-step 快照**（chain 归档已覆盖 structured_output，避免双源不一致 + TTL 事后不可靠）。**零改动**：6-1/6-2/6-3/6-4 全部冻结面零触碰（纯读侧） | chain 归档是全量结构化产物唯一持久面（agent 调研+主会话双验）+ 单源优先原则 + 6-2「下游 6-5 需要结构化字段而非自由文本」的契约源兑现 |
 | **OD-4** | **持久化三件**：L0 文件（`memory_type="reports"` 端口常量单源；`memory_id=f"{plan_id}_{YYYYMMDDHHMMSS}"`；**file_path=L0 逻辑路径 `reports/{memory_id}.md` 单源派生——R1 裁定（非绝对路径）**：`L0StoragePort.write` 返回 bool 不返回路径、base 物理路径归 infrastructure `MemoryConfig`（application 禁知悉），逻辑路径零端口契约变更+可移植审计语义+消费方经端口 read 无需 base；memory_id 可经 `Path(file_path).stem` 反解）+ L2 `strategic_reports` 表（alembic 017 只增——交互流程 37「元数据保存→Relational_Storage」钦定 + 三下游查询面 + 7 年审计；对照 6-3 Redis 先例：报告是交付产物非流程状态，L2 正当）+ ReportGenerated 事件。L4 WORM defer 6-5b（引文证据包同批——reportlab 依赖同样预留未用先例） | 架构钦定存储去向 + 消费方清单（6-5b 找报告/6-8 展示/6-11 多模板管理）+ 审计 7 年（§10.1）+ 六边形依赖方向（application-no-infrastructure） |
 | **OD-5** | **数据源降级语义**（可观测面非流程面——6-4 OD-5 同哲学；**R1 机理修正**：「archived=False」是 compose 返回的内存态不进快照，trace 读侧无此形态——「归档行缺」的物理形态= compose 445 失败 chain 缺席台账 / Step1 L2 写失败，284 后段失败形态下行通常在位正常渲染，报告读侧以 PG 行为准）：归档行部分缺 → 章节 `[数据缺失]` callout + degraded_section_count + 附录 B 记录，报告照常生成；**三态判定以 payload 形态为准**（解析失败→[数据缺失]/信封键集→[降级]带 reason/其余正常+锚叠加——AC-4 冻结版）+ 原因解析次序（payload.degrade_reason → 固定兜底文案，禁解析 reflection）；chain total==0 → `ReportGenerationError` 490（404——**最新快照在位亦同判**：时间线摘要非报告素材）；latest 快照缺/过期 → 附录 A 省略不阻断。epics「成功率 100%」口径重读 = 正常路径 N 生成 N 三元可读回，全缺 490 是业务异常非失败 | 降级可观测哲学三连先例（6-1 快照容错/6-4 归档降级）+ 报告完整性 vs 可用性权衡（部分数据报告 + 显式标注 > 全或无）+ 双 Agent 机理实证（archived=False 内存态/284 独立会话 commit） |
-| **OD-6** | **事件零新增 + 异常开新段 + 发布失败宽容语义（R1 裁定）**：ReportGenerated 复用首激活（Epic 1 定义 + 双登记在位零 diff——docstring 钦定 Epic 6 生产者）；新增 report 异常段 (490,499)（`ReportGenerationError` 490 BusinessException 404 语义 / `ReportStorageError` 491 BusinessException layer 二元 {l0,l2} 语境——**值域自有元组禁复用 284 常量**）——planning 段 485 预留 486-489 留 6-6 不可占，report 语义独立按八代开段先例（410/420/430/440/450/460/470/480）开 490 段。**发布失败处置 = checkpoint ⑤ 宽容语义同构**（warning + 返回成功——非 284 上抛族：①报告真相源是 L0/L2 落盘，事件是通知面 ②284 上抛的回滚价值在 HTTP 同事务，CLI/报告面 save 与 publish 分属独立会话无共同事务，上抛回滚不了任何东西 ③上抛→exit 1→误导重跑→OD-10 不拦截→L0/L2 叠加多份 ④outbox 无 poller 现状下上抛换不来投递成功）。**失败检出双防线强制**：`is_success` 判定 + except 兜底（实现层吞异常只返回失败 PublishResult——纯 except 恒不触发，AC-5 两形态单测锁死） | `_code_ranges.py:189` 成文预留 + `:170-175` 开段先例 + YAGNI（零新事件=零 yaml/router diff）+ 事件双登记纪律 + checkpoint ⑤ 成文先例（`checkpoint_service.py:285-296` 快照真相源/事件宽容分层——**结果语义同构、防线形态为增强**：先例单 except 对失败 PublishResult 静默，本 Story is_success 判定修正）+ EventPublisher 端口契约「错误内部消化返回 PublishResult」+ publish 仅 outbox 落行无 MQ 直发实证（断言等价机理） |
+| **OD-6** | **事件零新增 + 异常开新段 + 发布失败宽容语义（R1 裁定）**：ReportGenerated 复用首激活（Epic 1 定义 + 双登记在位零 diff——docstring 钦定 Epic 6 生产者）；新增 report 异常段 (490,499)（`ReportGenerationError` 490 BusinessException 404 语义 / `ReportStorageError` 491 BusinessException layer 二元 {l0,l2} 语境——**值域自有元组禁复用 284 常量**）——planning 段 485 预留 486-489 留 6-6 不可占，report 语义独立按八代开段先例（410/420/430/440/450/460/470/480）开 490 段。**发布失败处置 = checkpoint ⑤ 宽容语义同构**（warning + 返回成功——非 284 上抛族：①报告真相源是 L0/L2 落盘，事件是通知面 ②284 上抛的回滚价值在 HTTP 同事务，CLI/报告面 save 与 publish 分属独立会话无共同事务，上抛回滚不了任何东西 ③上抛→exit 1→误导重跑→OD-10 不拦截→L0/L2 叠加多份 ④outbox 无 poller 现状下上抛换不来投递成功）。**失败检出双防线强制**：`is_success` 判定 + except 兜底（实现层吞异常只返回失败 PublishResult——纯 except 恒不触发，AC-5 两形态单测锁死） | `_code_ranges.py:189` 成文预留 + `:170-175` 开段先例 + YAGNI（零新事件=零 yaml/router diff）+ 事件双登记纪律 + checkpoint ⑤ 成文先例（`checkpoint_service.py:280`（快照真相源语义声明）+`:289-296`（宽容块）——R5 锚校正：原 :285-296 引述词与区间头错位；**结果语义同构、防线形态为增强**：先例单 except 对失败 PublishResult 静默，本 Story is_success 判定修正）+ EventPublisher 端口契约「错误内部消化返回 PublishResult」+ publish 仅 outbox 落行无 MQ 直发实证（断言等价机理） |
 | **OD-7** | 测试文件命名（禁故事编号后缀）：unit/architecture 用 epics 钦定 `test_markdown_report.py`（L2260 一致）；integration `test_integration_markdown_report.py`（**对 epics L2261 钦定名 `test_markdown_report_integration.py` 的显式偏离**——仓规 tests/integration/ 全目录 test_integration_* 惯例，6-3 OD-8/6-4 OD-7 双先例）；acceptance `test_acceptance_markdown_report.feature/.py`；服务单测 `test_report_generation_service.py`；渲染器 `test_markdown_report_renderer.py`；仓储 `test_report_repository.py`；用例 `test_generate_markdown_report_use_case.py` | epics 钦定名半采半离 + 记忆「禁止故事编号命名文件」+ 双先例 |
 | **OD-8** | **性能口径差声明**：生成窗口 P95<30s = 数据聚合起点→事件发布返回（纯内存渲染 + L0 写 + L2 insert + 事件发布）；**不含 BLM 流程本身**（run 是前置——epic 未预见 run 与报告生成两段分离，含 run 则物理不可达口径混淆）；**采样形态 = 单一数据源 plan_id × 20 次生成（R1 裁定）**——OD-10 幂等锚语义下重复生成是合法采样形态，构造成本=归档链一次（原「20 独立 plan_id」需 160 次 LLM+归档三面 I/O+三量级清理成本，与 6-3 先例【纯内存 25 次调用】不同量级）；成功率口径见 OD-5（N 与采样同源=20）；并发 3 = asyncio.gather 独立 plan_id + 服务无状态约束。口径差落测试 docstring（集成场景⑤） | 6-1 DC-7/6-2 OD-3/6-3 OD-6/6-4 OD-10 四连先例 + epic 指标物理可达性论证 + 构造成本工程评估（审查员 B 实证） |
 | **OD-9** | **图类产物表格承载**：6-2 OD-8「图本体生成归 6-5 报告面」的 6-5a 落位 = Markdown 表格/列表承载（雷达图→能力维度表/价值主张地图→要点列表/增长路径图→路径列表/机会差距量化报告→要点列表——六 Schema 字段本就是要点字段族形态）；位图/SVG/mermaid 渲染 defer 6-5b（PDF 排版同批）。6-2 预判「图本体生成」在 Markdown 基础版以结构化表格兑现，断链声明落档 | epics L2235「基础格式化（标题、列表、表格）」钦定三要素无图片项 + 6-2 OD-8 断链预防 + YAGNI |
@@ -819,7 +819,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | 组合根注册模板 | `src/composition_root.py:2293-2308`（checkpoint_service——R1 校正原 :2287-2302）+ `:2339-2363`（chain_of_thought_archive_service + blm_chain_trace_use_case 两注册块；**6-4 三处改动=本两块 + archive_repository v1.1.0 升级 :2185-2194 + blm_planning_service 尾部注入 :1584——原表述「三注册块 :2339-2363」失实，R1 校正**） | 分节注释两先例并存（6-3 包裹式 `# === Story 6-3 — 标题 ===` / 6-4 无包裹式）——6-5a 取 6-3 包裹式 `# === Story 6-5a — ... ===`；register_port(name/version/interface/impl/module/lifetime/owner/tags)；PortSpec 全字段另含 compatibility/deprecated 共 10；纯新增块零既有 lambda 改动 |
 | CLI 先例 | `src/entrypoints/agent_cli.py:317-335`（chain-query）+ `:337-392`（checkpoint-create——R1 校正：原两区间混叠错标） | argparse 扁平+守卫形态；resolve `"report_generation_use_case"`；**双层异常定式**（DomainError=`[{code}] {message}` stderr+return 1 / Exception=仅 logger.error+return 1——6-4 终审形态）；**CLI 生产通道 PG session P0 排查法三步必跑**（6-4 教训：①组合根 impl=lambda 是否带 session_factory ②家族成员缺口排查 ③CLI 入口 grep set_session/session_context 断链检查——实证：agent_cli 全文零 set_session 调用，CLI 可达性全靠组合根 lambda 带 session_factory + 仓储双模式 fallback） |
 | 验收装配先例 | `tests/acceptance/test_acceptance_checkpoint_snapshot.py:274-300`（teardown 六步链）+ `:346-430`（`_cleanup_archive_residues`——R1 校正区间）+ `test_acceptance_json_chain_of_thought.py:318-350` | teardown 六步链+`_cleanup_archive_residues`（PG 档案行/Qdrant 点/MinIO WORM 三面）——**本 Story 直接移植 + 报告三元清理扩展**（L0 文件 delete/L2 行定向 DELETE/outbox 行）；Fake LLM 复用 6-2 `_make_fake_llm` **八键族**身份分派（六类型化 + GapAnalysis + InsightSynthesis） |
-| 集成真实链先例 | `tests/integration/test_integration_checkpoint.py` + `test_integration_chain_of_thought.py` | 四真实+双豁免+性能采样数学口径+真实提交定向清理（savepoint 不适用钦定 docstring L16-17）；async 探测禁 run_until_complete（L125-126）；P95 采样先例 :616-621（**纯内存 25 次调用**——非全链采样，本 Story 构造成本对照见 OD-8） |
+| 集成真实链先例 | `tests/integration/test_integration_checkpoint.py` + `test_integration_chain_of_thought.py` | 四真实+双豁免+性能采样数学口径+真实提交定向清理（savepoint 不适用钦定 docstring L17-18——R4 勘误：R1-26 将原锚误校为 L16-17 偏前 1 行，实证语句跨 L17-18）；async 探测禁 run_until_complete（L125-126）；P95 采样先例 :616-621（**纯内存 25 次调用**——非全链采样，本 Story 构造成本对照见 OD-8） |
 | 异常开段先例 | `src/domain/exceptions/_code_ranges.py:170-175`（八代开段成文）+ `:189`（planning 段预留声明） | 「前段满/双重成文预留不可占/语义独立→开独立段」；report 段 (490,499) 空置实证（grep EXCEPTION_49 零命中——Task 0.1 复跑） |
 | pytest 配置 | `pyproject.toml:245-299` | asyncio_mode=auto/-n auto --dist loadgroup/--strict-markers；marker 注册清单（database 非 postgresql——R2-F23）；验收 conftest 自动加 acceptance+服务 marker（文件名关键词） |
 
@@ -990,14 +990,14 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | R1-16 | 「构造缺一步归档」构造手段未钦定——跑后删行零先例且定向 DELETE 例外限清理语境 | P2 | AC-4/Task 5.2：钦定**逐 stage 归档七次跳过目标步**（6-3 `_archive_eight_steps` 变体；禁删行构造）+ 场景④改「从未归档的独立 plan_id」 |
 | R1-17 | L0 测试写路径污染：真实 resolve 通道写运行机器 `~/.sisys/memory/reports/`；组合根 SCOPED lambda 缓存使 resolve 后 setenv 不生效；xdist 净增 0 计数互扰 | P2 | Task 5.1：tmp_path 自建 FileMemoryAdapter 覆写注入（_restorers 还原——6-3 端口覆写先例） |
 | R1-18 | §3.3.2 既有漂移：6-3 落码 483/484 未回填（仍写「483~489 预留」），Task 1 同表编辑相撞 | P2 | 异常契约节/File List：钦定**顺带回填**（同表同次编辑两行修正——偿还既有债非扩面） |
-| R1-19 | 八 stage 期望集派生源未定义（STAGE_VALUE_DOMAIN 仅 docstring 无运行时定义）——硬编码八清单将随配置增步静默漂移 | P2 | 端口契约节：派生公式钦定（`performance_gap` + 配置键序 + `market_insight_synthesis`） |
+| R1-19 | 八 stage 期望集派生源未定义——硬编码八清单将随配置增步静默漂移【R5 勘误：本行括号注「STAGE_VALUE_DOMAIN 仅 docstring 无运行时定义」失实——`blm_phases.py:68-71` frozenset 定义在位，见 L247 R5 改述】 | P2 | 端口契约节：派生公式钦定（`performance_gap` + 配置键序 + `market_insight_synthesis`） |
 | R1-20 | ReportGenerated 三键有缺省空串，漏传不炸产空串事件 | P2 | AC-5：构造点必显式传三键 + 单测三键非空断言 |
 | R1-21 | AC-1「内容与返回实体一致」无可断言载体（实体无 content 字段）；memory_id 时间戳测试不可预知 | P2 | AC-1 验证标准：改「memory_id 经 file_path stem 反解 + 读回内容含冻结章节标题族（display_name 源独立构造期望）」 |
 | R1-22 | outbox 断言先例引用失实（6-3 集成键实为 plan_id，仓内无 archive_id 键 outbox 断言） | P2 | AC-1/锚点表：改「plan_id 键先例同构」+ 两级路径机理解注 |
 | R1-23 | 标题层级口径三处不一致（1-3 vs 1-4/H4 二选一开放） | P2 | 章节结构冻结：预裁定**加粗行标签不开 H4**（与 AC-3 字面锁定）；Task 0.1 同步 |
 | R1-24 | synthesis 降级 callout `{degrade_reason}` 无数据源（asdict 两键无 reason） | P2 | 并入 R1-6 原因解析次序（synthesis 走兜底文案） |
 | R1-25 | 284 layer 值域实为 (l2,l3,l4,l5) 不含 l0/event——「同构」措辞诱导照抄值域 | P2 | 异常契约：改「语境借鉴值域自有」+ `_VALID_LAYERS=("l0","l2")` 自有元组钦定 |
-| R1-26 | 行号锚点漂移簇（display_name :194/:202→:191/:199；checkpoint_service :2287-2302→:2293-2308；「6-4 三注册块 :2339-2363」实为 2 块；CLI 两子命令区间对调；验收样板六步链区间；ReportGenerated :57→:56；6-4 docstring L17-18→L16-17）+ 构造签名偏离家族形态 + 490 消息文案 + 章节编号拼接/目录锚点算法/附录 A 两处未定稿 + tenant_id 死参数 + File List 缺 sprint-status + n=20 P95 次大值注记 + 服务无状态约束 + mock 工厂提示 | P3 | 锚点表/异常契约/冻结表/端口定义/AC-7/Task 2.1 逐项修正（构造签名对齐家族 `(layer, message=None, cause=None)`；490 message 可观测事实口径；拼接规范 `{编号} {display_name}`；GitHub slug 锚点；附录 A display_name 映射+summary_excerpt 显式省略；删 tenant_id；补 File List） |
+| R1-26 | 行号锚点漂移簇（display_name :194/:202→:191/:199；checkpoint_service :2287-2302→:2293-2308；「6-4 三注册块 :2339-2363」实为 2 块；CLI 两子命令区间对调；验收样板六步链区间；ReportGenerated :57→:56；6-4 docstring L17-18→L16-17【**R4 勘误：此项校正反了——原锚 L17-18 才与仓库吻合，已在锚点表回调**】）+ 构造签名偏离家族形态 + 490 消息文案 + 章节编号拼接/目录锚点算法/附录 A 两处未定稿 + tenant_id 死参数 + File List 缺 sprint-status + n=20 P95 次大值注记 + 服务无状态约束 + mock 工厂提示 | P3 | 锚点表/异常契约/冻结表/端口定义/AC-7/Task 2.1 逐项修正（构造签名对齐家族 `(layer, message=None, cause=None)`；490 message 可观测事实口径；拼接规范 `{编号} {display_name}`；GitHub slug 锚点；附录 A display_name 映射+summary_excerpt 显式省略；删 tenant_id；补 File List） |
 
 Round 1 未修留项：无 P0/P1 残留（34 项全部处置：26 修复簇 + 8 项并入修复簇）。
 
@@ -1032,9 +1032,25 @@ Round 2 未修留项：无 P0/P1 残留（13 项全部处置：12 修复 + R1-13
 | R3-6 | 附录 A「步骤」列映射源清单缺 synthesis 条目（timeline 第三种 step 值无源——期望不唯一：裸值直显 vs 显示名两实现都对） | P3 | 补第三源 SYNTHESIS_DISPLAY_NAME + 映射 miss 直显裸值钦定 |
 | R3-7 | 目录收录粒度未冻结（仅 H2 vs H2+H3 两种实现都满足现文本——目录条目断言期望不唯一） | P3 | 冻结收录面 = H2 章级 + 附录（H3 不进目录；条目数随附录 A 有无非恒定注记） |
 
-Round 3 证伪留痕（推演过并排除的疑点——防后续轮重推）：①AC-1 sleep≥1.05s 跨秒数学恒成立（T1+1.05>S+1）②同秒覆写 teardown delete 契约返 False 不抛（l0_storage.py:46-53）③SINGLETON 缓存冻结 L0 覆写——6-3 先例 clear_singleton() 还原链关闭（checkpoint_snapshot.py:1275-1281）④并发 3 会话隔离——session_factory 每操作独立会话 + 6-4 gather 10 并发先例实证⑤发布失败轮不破坏「N 次事件落行」（采样纯正常路径，失败注入钦定单测层）⑥缺步 plan_id 重复生成计数恒稳定⑦信封+快照缺失组合期望唯一（R2 口径三分支互斥）⑧P95 n=20 数学正确（次大值=已注记设计选择）⑨13/52/23/③b 四组计数全自洽⑩③态单字段缺席真实链不可达（instructor 全 schema 或信封二值 + Fake 八键族恒全字段）⑪覆盖率分层无数学矛盾。
+Round 3 证伪留痕（推演过并排除的疑点——防后续轮重推）：①AC-1 sleep≥1.05s 跨秒数学恒成立（T1+1.05>S+1）②同秒覆写 teardown delete 契约返 False 不抛（l0_storage.py:53-62——R4 校正区间，原记 :46-53 偏前）③SINGLETON 缓存冻结 L0 覆写——6-3 先例 clear_singleton() 还原链关闭（checkpoint_snapshot.py:1275-1281）④并发 3 会话隔离——session_factory 每操作独立会话 + 6-4 gather 10 并发先例实证⑤发布失败轮不破坏「N 次事件落行」（采样纯正常路径，失败注入钦定单测层）⑥缺步 plan_id 重复生成计数恒稳定⑦信封+快照缺失组合期望唯一（R2 口径三分支互斥）⑧P95 n=20 数学正确（次大值=已注记设计选择）⑨13/52/23/③b 四组计数全自洽⑩③态单字段缺席真实链不可达（instructor 全 schema 或信封二值 + Fake 八键族恒全字段）⑪覆盖率分层无数学矛盾。
 
 Round 3 未修留项：无 P0/P1 残留（7 项全部修复）。
+
+**Round 4**（纯验证轮——锚点存续 36 处实地核验 + 三轮修复传播 19 项旧措辞 grep + 结构四线核验；零 P0/P1/P2，5 项 P3 随 R5 收敛提交清偿）：
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R4-1 | R1-26 校正值「checkpoint_service :2293-2308」未传播到 Task 3 TDD 循环 B 绿阶段（仍 :2287-2302） | P3 | L610 同步 :2293-2308 |
+| R4-2 | 同族：Task 3 TDD 循环 C 绿阶段仍「checkpoint-create :320-371」（正确 :337-392） | P3 | L622 同步 :337-392 |
+| R4-3 | **R1-26 对 6-4 docstring 锚「L17-18→L16-17」的校正反向**（实证语句跨 L17-18，原锚才对）——锚点表 L822 已回调 + R1-26 台账勘误注记 | P3 | L822 回调 L17-18 + R1-26 内联勘误 |
+| R4-4 | R3 证伪留痕②「l0_storage.py:46-53」区间错位（delete 契约实在 :53-62） | P3 | 留痕②校正 :53-62 |
+| R4-5 | v1.2.0 版本说明「P2×5（分项和 12）」与 Round 2 节头「P2×6（和 13）」口径不齐（第 13 项勘误未纳入分项） | P3 | 版本说明改「12 命名修复 + 1 项勘误内联」口径与节头对齐 |
+
+Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项旧措辞 13 项干净零残留（其余 6 项中 3 项为 R4-1/2/3 传播缝隙已修、3 项为台账/勘误历史语境预期命中）；标题序列 58 个连续完整/Subtask 52 无跳号/13 场景三处一致/文件清单与结构树逐名一致；版本链 v1.0.0→v1.3.0 与提交链 440d9dae→b41858ff→722fb1a7 对应；sprint-status ready-for-dev 同步。
+
+**Round 5 独立终审（收敛——2026-11-03）**：五节终审（周期闭合/十项双向取证/一致性快扫/红线终扫/收敛判定）全数通过。周期闭合——提交链 440d9dae→b41858ff→722fb1a7 三审查提交零游离，工作区 R4 五项 P3 修复逐块核验在位；十项关键修复（file_path 逻辑路径/is_success 双防线/宽容语义/三态判定/计数口径 11≤11/491 家族形态/采样口径/逐 stage 构造/事件守护全等/派生公式键序）经文档-代码双侧独立取证全部成立，不采信台账自述；20+ 组正文内嵌锚点与 File List 快扫吻合；红线终扫零违规（grep 处方/三层 mock 纪律/冻结面与修改清单零矛盾）。R5 特权发现 R5-1（P3）：L247 `STAGE_VALUE_DOMAIN`「仅 docstring 无运行时定义 + 6-4 漂移」双重失实（`blm_phases.py:69-71` frozenset 定义在位、6-4 Story 正确引用无漂移）——已随本轮清偿改述（派生公式仍取 CONFIG 键序：有序 + display_name 同源）；OD-6 ⑤先例锚微瑕（引述词与区间头错位 5 行）一并校正。
+
+**五轮总账**：R1 34（P0×2+P1×10+P2×10+P3×12）+ R2 13（P1×1+P2×6+P3×6）+ R3 7（P1×1+P2×2+P3×4）+ R4 5（P3×5 纯验证轮）+ R5 终审（R5-1 + OD-6 锚微瑕）= **60 项处置**；投入递减 34→13→7→5→终审；**P0/P1/P2/P3 残留均为零**。Story 文档收敛于 v1.4.0，`ready-for-dev` 状态维持，可进入 `dev-story` 实施。
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -1064,11 +1080,12 @@ Round 3 未修留项：无 P0/P1 残留（7 项全部修复）。
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-11-03
 **最后更新/Last Updated:** 2026-11-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（五 Agent 并行调研 + 主会话九项亲验；OD-1~OD-10 十项架构裁定落档——宿主形态偏离声明/双源聚合/持久化三件/异常开段 490/图类表格承载为五大关键裁定）
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 三视角审查并行，34 项处置——P0×2：file_path 改 L0 逻辑路径裁定（write 不返回路径三路全断）/发布失败 is_success 双防线（实现层吞异常）；P1×10：491 宽容语义改判（无共同事务上抛无效）/archived=False 机理修正/渲染三态判定冻结/原因解析次序/计数单位 H3 口径/491-Gherkin 矛盾/事件守护范式重设计/性能采样单 plan_id×20/2.7 标题逐字源/元信息表；OD-4/5/6/8/10 五项修订 + 26 修复簇详见 Docs Review Fixes 表）
-- v1.2.0: Round 2 回归核查+组合交互面修订（R1 八裁定单独 8/8 成立实证；13 项处置——P1×1：degraded_section_count 计数语义空洞（信封态计入/锚叠加不计/附录 B 两类全收 R2 口径）；P2×5：上限算术重算/PublishResult event_id 必填/AC-4 层级映射/验收层 L0 隔离传播/level 值域收窄 1-3；P3×6：同构措辞增强/outbox 断言等价机理/CLI memory_id 打印等——R2-1~R2-12 详见修复台账）
+- v1.2.0: Round 2 回归核查+组合交互面修订（R1 八裁定单独 8/8 成立实证；13 项处置=P1×1+P2×6+P3×6 的 12 命名修复 + 1 项 R1-13 勘误内联——P1：degraded_section_count 计数语义空洞（信封态计入/锚叠加不计/附录 B 两类全收 R2 口径）；P2：上限算术重算/PublishResult event_id 必填/AC-4 层级映射/验收层 L0 隔离传播/level 值域收窄 1-3 等；P3：同构措辞增强/outbox 断言等价机理/CLI memory_id 打印等——R2-1~R2-12 详见修复台账；分项口径 R4 对齐节头）
 - v1.3.0: Round 3 单深度推演修订（13 场景三轴推演+6 时间线+不变量数学；7 项处置——P1×1：缺行小节 H3 骨架渲染冻结（R2-2 算术证明的隐含前提显式化——省略分叉下极端形态炸 242）+ 跳步类别钦定六子步；P2×2：AC-6×1 断言面处方（字面基线全等形态）/「实体标注」载体修正（metadata.timeline_available 直查）；P3×4：矩阵场景号校正/gather 形态锚（跨 loop 陷阱）/附录 A 第三映射源/目录收录面冻结；11 条证伪留痕防重推——R3-1~R3-7 详见修复台账）
+- v1.4.0: Round 4 纯验证 + Round 5 独立终审收敛（R4：36 锚点 34 匹配+结构四线全过，5 项 P3 传播缝隙/勘误修复——R1-26「L17-18→L16-17」校正反向回调等；R5：五节终审全过——十项关键修复文档-代码双向取证 10/10 成立、周期闭合零游离提交、红线零违规；特权发现 R5-1 清偿：STAGE_VALUE_DOMAIN 注记双重失实改述（blm_phases.py:69 frozenset 在位）+ OD-6 ⑤锚校正；五轮总账 60 项处置、P0-P3 残留全零、投入递减 34→13→7→5→终审收敛）
