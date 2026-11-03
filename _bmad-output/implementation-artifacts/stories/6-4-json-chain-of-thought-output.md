@@ -49,14 +49,14 @@
 - `tools_used` ← 该步**实际执行的工具 slug**（`_execute_candidate_tools` 返回三元组的第三位 tool_slug——`tool.slug or tool.name` :600，**首个成功候选即返回 :601 故每步至多 1 项；slug 为 kebab-case 无版本后缀，缺失时回落中文显示名**；包装为 `(tool_slug,) if tool_slug else ()`；无工具步/工具降级步合法空元组——「清单+版本后缀」是 5-3 任务级 tool_trace 语义（agent_workflow_service.py:273 `f"{name}:{version}"`），BLM 面不存在该形态，R1-F2 口径差钦定）
 - `reflection` ← 规则模板合成（**按步骤型分列素材**——六子步骤：summary + findings 计数；performance_gap：summary（=financial_gap）+ root_causes 计数；synthesis：conclusions 计数 + degraded_inputs；三者均拼降级信息）
 - `constraints_check` ← 规则模板合成（**按步骤型分列素材**——六子步骤：structured_output 值域守卫结果（InsightStepResult :247-267 既有校验）+ 证据充分性；performance_gap：四字段产物完整性（成功支）或降级信封标注（降级支）+ 证据充分性；synthesis：结论产出判定（conclusions 非空）+ degraded_inputs 标注（无检索面故无证据充分性段）；三者均拼降级标记）
-- `final_answer` ← 该步结构化产物的 JSON 序列化（六子步骤=structured_output dict 原样 / performance_gap=`dataclasses.asdict(PerformanceGapArtifacts)` **六键 dict**（financial_gap/operational_gap/root_causes/portfolio_health/degraded/degrade_reason——blm_phases.py:195-200，R1-F4 口径）/ synthesis=`dataclasses.asdict(InsightSynthesis)` **两键 dict**（conclusions/degraded_inputs）/ **降级步=降级信封 dict {degraded, degrade_reason}——降级也是决策过程，可追溯性恰恰要求记录降级原因**）
+- `final_answer` ← 该步结构化产物的 JSON 序列化（六子步骤=structured_output dict 原样 / performance_gap=`dataclasses.asdict(PerformanceGapArtifacts)` **六键 dict**（financial_gap/operational_gap/root_causes/portfolio_health/degraded/degrade_reason——blm_phases.py:195-200，R1-F4 口径）/ synthesis=`dataclasses.asdict(InsightSynthesis)` **两键 dict**（conclusions/degraded_inputs）/ **降级信封 dict {degraded, degrade_reason} 仅适用于结构化产物缺席形态**（R2-F2 钦定——六子=structured_output None（LLM 失败支）；**部分降级形态**（degraded=True 且产物在位——检索/工具降级而 LLM 成功，:348-351 常态路径）**payload=产物原样**（丢弃真实产物恰违背审计初衷），降级事实经 reflection 降级后缀+constraints_check 降级标记+decision_basis.degraded 三处承载；gap/synthesis 两型 asdict 自含 degraded 字段一种形态通吃无此分叉——降级也是决策过程，可追溯性恰恰要求记录降级原因）
 **And** 一次完整 run 产出 **8 条思维链**（每步一条——OD-3 粒度钦定：or.md 五.5「SP/BP 各个阶段」的步骤级落位，stage 锚对齐 STAGE_VALUE_DOMAIN 八值），VO 构造经 `__post_init__` 242 校验（既有），组装层捕获 242 改写 **445** `ChainOfThoughtValidationError`（context.missing_fields——5-3 package_evidence :386-393 同款先例）
 
 **验证标准/Validation Criteria:**
-- [ ] 8 条思维链全量五字段非空（Fake LLM 确定性产出下 100% 完整率——epic「完整率≥98%」MVP 口径）
+- [ ] 8 条思维链**四文本字段非空白**（input_summary/reflection/constraints_check/final_answer）+ **tools_used 形态合法**（空元组合法——synthesis 步恒空；非空时元素级非空白）（R2-F7 口径订正——「五字段非空」与空元组合法矛盾；Fake LLM 确定性产出下 100% 完整率——epic「完整率≥98%」MVP 口径）
 - [ ] **组装映射判别力**：tools_used 断言=独立构造的期望轨迹（该步实际执行的工具 slug 单元组或空元组——**非 Fake LLM 回声**，组装面素材来自执行轨迹与既有产物，Fake 回声值泄漏即红——5-3 `test_chain_assembly_overwrite` :680-695 判别力先例）；final_answer 经 `json.loads` round-trip 解回等于该步 structured_output（六子步骤）/ asdict 六键等值（gap——list 归一口径：root_causes 解回为 list，与 asdict tuple 比较前显式 `tuple()` 归一——R1-F9 钦定）/ 两键等值（synthesis，同款 list 归一）
-- [ ] 降级步（Fake LLM 注入失败形态——6-1 降级注入先例）思维链仍产出：final_answer 为降级信封 JSON 且 degrade_reason 在位、constraints_check 含降级标注
-- [ ] 组装素材含 LLM 不可达字段时（构造性红测——单测层）：445 触发且 missing_fields 携缺失字段名
+- [ ] 降级步（Fake LLM 注入失败形态——6-1 降级注入先例）思维链仍产出：final_answer 为降级信封 JSON 且 degrade_reason 在位、constraints_check 含降级标注；**部分降级形态**（R2-F2——Fake 检索降级+LLM 成功注入，6-1 既有注入先例）payload=structured_output 原样（非信封）+降级事实三处承载（reflection 后缀/constraints_check 标记/decision_basis.degraded）
+- [ ] 组装素材缺陷时（构造性红测——单测层）：445 触发且 missing_fields 携缺失字段名——**构造配方钦定**（R2-F3）：冻结公式四文本字段恒非空白/final_answer 恒非空，**唯一可达 242 通道是 tools_used 元素级守卫**（`StepChainMaterial(tool_slug=" ")` 纯空白串——truthy 进元组后被 VO `not item.strip()` 拒绝，chain_of_thought.py:76-81）；空 payload 不可达（`json.dumps({})`="{}" 非空白）；payload 含不可 JSON 序列化对象抛 TypeError 非 242——生产素材源受控（model_dump/asdict/信封三态）注记不设防
 - [ ] `to_display()` 展示形态正确（五段顺序 + 三个 XML 标签闭合对 + JSON 尾段——5-3 既有 VO 方法零改动复用，验收仅断言组装产物经展示面输出）
 
 ### AC-2: 输出包含完整思维链（Result 携带 + 事件投影真实化）
@@ -64,11 +64,11 @@
 **Given** BLM 流程全链完成（8 步均执行）
 **When** 组装执行结果（`RunBlmPlanningUseCase._assemble_result`）
 **Then** `BlmPlanningResult` 携带 **`chain_records`** 新字段（默认尾字段 `()` 零破坏——6-3 R3-2 先例）：`tuple[ChainRecord, ...]` 每步一条（`ChainRecord` dataclass 定义在端口文件——`stage: str` / `chain: ChainOfThought` / `archive_id: str`（归档成功非空）/ `archived: bool`）
-**And** 图 state 新增 `chain_records` 键（`SpBlmState` TypedDict `total=False` 加键零破坏）累积承载——**回传通道三件套**（R1-F1 钦定，`degraded_steps`/`timeline` 完全同构先例）：① `_PlanRunState` 加 `chain_records` 累积列表（服务侧 per-run 键控隔离——`_ensure_run_state` 通道 :732；三方法返回 VO 非 dict，累积**不经**方法返回值）；② `BlmPlanningServicePort` 协议追加 `project_chain_records(plan_id)` **第六方法**（`project_timeline`/`project_degraded_steps` :193/:197 同构第三投影；既有五方法零改动）；③ `sp_blm_graph.py` 三类节点适配器（:44-48/:61-65/:77-81）返回 dict 各加 `"chain_records": service.project_chain_records(state["plan_id"])` 直写全量行（schemas.py:43-45 键覆盖语义钦定——适配器直写全量勿二次合并，八节点对称）——**不进快照 state_data**（OD-8）、**不进事件 payload**（投影白名单钦定）
+**And** 图 state 新增 `chain_records` 键（`SpBlmState` TypedDict `total=False` 加键零破坏）累积承载——**回传通道三件套**（R1-F1 钦定，`degraded_steps`/`timeline` 完全同构先例）：① `_PlanRunState` 加 `chain_records` 累积列表（服务侧 per-run 键控隔离——`_ensure_run_state` 通道 :732；三方法返回 VO 非 dict，累积**不经**方法返回值；**残留语义注记**（R2-F10）：`_runs` 无清理是既有模式（timeline/degraded_steps 同款 SINGLETON 进程级驻留，482 重跑防线恰依赖其残留 :240-246）——6-4 不新增清理机制，后续如引入 run_state 回收须三键同收）；② `BlmPlanningServicePort` 协议追加 `project_chain_records(plan_id)` **第七方法**（`project_timeline`/`project_degraded_steps` :193/:197 同构第三投影；既有六方法零改动）；③ `sp_blm_graph.py` 三类节点适配器（:44-48/:61-65/:77-81）返回 dict 各加 `"chain_records": service.project_chain_records(state["plan_id"])` 直写全量行（schemas.py:96-99 SpBlmState docstring「服务投影直写全量」钦定——纯 TypedDict 无 reducer 键覆盖（:43-45 为 5-3 AgentWorkflowState 同语义泛化注）、适配器直写全量勿二次合并，八节点对称）——**不进快照 state_data**（OD-8）、**不进事件 payload**（投影白名单钦定）
 **And** AgentDecided 事件投影 **chain_summary 真实化**：SpBlmGraph 投影分支（`langgraph_engine.py:270` 现取 `first_conclusion`——synthesis 首结论）改为末条思维链 `final_answer[:200]` 截断（SingleAgentWorkflow :254 同款取值语义；**空回退分支钦定**（R1-F12）：chain_records 为空时（尾参 None 未注入/组装全失败）回退 `(first_conclusion or "")[:200]` 现值——synthesis 结论信息不因观测面缺席而丢失；五键白名单结构零变化——DC-11 投影纪律维持，VO 实例仍禁入 payload）
 
 **验证标准/Validation Criteria:**
-- [ ] `result.chain_records` 恰 8 条，stage 锚与 STAGE_VALUE_DOMAIN 八值一一对应（执行序排列）
+- [ ] `result.chain_records` 恰 8 条，stage 锚与 STAGE_VALUE_DOMAIN 八值一一对应（执行序排列；**读侧 tuple 归一**（R2-F5）：state 承载 list（投影返回 list——project_timeline 同构），`_assemble_result` 构造 Result 时显式 `tuple(final_state.get("chain_records") or ())` 归一防 list/注解漂移）
 - [ ] 既有 `BlmPlanningResult` 消费面（CLI `_print_blm_progress` :655-680 / 6-1 单元引擎测试图身份锚 `test_blm_planning_service.py:976-984` + 验收/集成 DTO 面断言）**零适配通过**（默认尾字段向后兼容——Task 4.3 实证，6-3「零适配假设验证闭环」同款）
 - [ ] AgentDecided 投影断言：chain_summary == 末条思维链 final_answer 前 200 字符（纯标量断言——值级非仅类型级）；**空回退分支断言**：chain_records 空时 == `(first_conclusion or "")[:200]` 现值（R1-F12）
 - [ ] 图身份锚不受影响（终态 state 含 BLM 专属键 insight_step_results/synthesis——6-1 既有断言零修改通过）
@@ -94,8 +94,8 @@
 **Given** 某步思维链组装成功、归档调用执行
 **When** 归档强制环节失败（L2/L4 存储失败或归档内 ArchiveCreated 发布失败——`ArchiveStorageError` 284 透传面）
 **Then** **降级不阻断 BLM 流程**：捕获 284 → 该步 `ChainRecord(archived=False, archive_id="")` → warning 日志（含 stage/plan_id/失败原因）→ 流程继续（后续步骤正常执行；该步领域产物/快照/事件不受影响——思维链是可观测面，因观测面失败丢弃已产出的领域结果是错误的权衡，OD-5）
-**And** **零静默吞错**：失败可见可数——chain_records 中 archived=False 条目即失败台账；CLI blm-plan 汇总行输出归档成功/失败计数
-**And** 组装失败（445）同降级语义（该步 chain 缺席于 chain_records——`chain_records` 条目数在 445 降级下 <8，计数断言可见；**不抛出中断 run**——同 OD-5 权衡）；**边界注记**（R1-F15）：`synthesize_insights` 早退分支（:411-413 `effective_context is None`——无步骤先行调用）不写快照不发事件亦**不触发挂接段**，该路径 synthesis chain 缺席合法（<8 台账口径覆盖）；AC-2 空回退分支（R1-F12）承接投影面
+**And** **零静默吞错**：失败可见可数——chain_records 中 archived=False 条目即失败台账；CLI blm-plan 汇总行输出归档计数（**三段式口径**（R2-F8）：「思维链归档 成功 N/失败 M/预期 8」——分母 8 使组装缺席 K=8-N-M 可推算，Task 3 断言同步）
+**And** 组装失败（445）同降级语义（该步 chain 缺席于 chain_records——`chain_records` 条目数在 445 降级下 <8，计数断言可见；**不抛出中断 run**——同 OD-5 权衡）；**边界注记**（R1-F15）：`synthesize_insights` 早退分支（:410-412 `effective_context is None`——无步骤先行调用）不写快照不发事件亦**不触发挂接段**，该路径 synthesis chain 缺席合法（<8 台账口径覆盖）；AC-2 空回退分支（R1-F12）承接投影面
 
 **验证标准/Validation Criteria:**
 - [ ] 单测层 L4 失败注入（`AsyncMock(spec=L4ObjectPort)` archive 抛 284——**mock 仅限单元测试**红线合规）：run 完成 8 步、失败步 archived=False、其余步归档不受影响、快照写与 BlmStageCompleted 发布零调用次数变化
@@ -107,14 +107,14 @@
 
 **Given** 某 plan_id 的 BLM run 已完成且思维链已归档（≥1 条 EVIDENCE_PACKAGE 档案）
 **When** 执行决策追溯查询（`GetBlmChainTraceUseCase`（新用例）或 CLI `chain-query --plan-id`）
-**Then** 经 `StrategicArchiveService.query_archive(ArchiveQuery(plan_id=..., archive_type=ArchiveType.EVIDENCE_PACKAGE))`（既有查询面零改动）读回档案清单，组装 `ChainOfThoughtTraceView`（视图 DTO 定义在端口文件——6-3 `CheckpointRecoveryView` 先例）：`plan_id` / `records`（每条：stage 锚 + 五字段 + archive_id + degraded）/ `total` / `archived_count`
-**And** 追溯语义：按执行序（archived_at 升序）排列；五字段从 decision_basis.chain 反序列化重构 `ChainOfThought` VO（**round-trip 等值**——重构 VO 经既有 242 校验，归档载荷完整性自证；**tuple 归一钦定**（R1-F9）：PG JSONB 读回 `tools_used` 为 list，VO `__post_init__` tuple 类型守卫（chain_of_thought.py:71-75）必拒 list——`query_chain_trace` 重构前显式 `tools_used=tuple(chain["tools_used"])` 归一，断言侧同口径）；WORM blob 深度解引用为**可选**参数（`include_blob: bool = False`——默认读 L2 决策依据足够，深度审计时解 L4；**解引用通道**（R1-F6）：经本服务第二注入 `object_storage: L4ObjectPort` 直调 `retrieve(bucket_type="archive-evidence", object_key=blob_ref)`（l4_object.py:53 流式下载）——StrategicArchiveService 无读 blob 公开方法且被验证器 C 钉死零 diff，不经其转发）
+**Then** 经 `StrategicArchiveService.query_archive(ArchiveQuery(plan_id=..., archive_type=ArchiveType.EVIDENCE_PACKAGE))`（既有查询面零改动）读回档案清单，组装 `ChainOfThoughtTraceView`（视图 DTO 定义在端口文件——6-3 `CheckpointRecoveryView` 先例）：`plan_id` / `records`（每条：stage 锚 + 五字段 + archive_id + degraded + **`blob_content: dict | None = None`**（R2-F4——include_blob=True 且解引用成功时填充 JSON dict，否则 None））/ `total` / `archived_count`
+**And** 追溯语义：按执行序（archived_at 升序）排列；五字段从 decision_basis.chain 反序列化重构 `ChainOfThought` VO（**round-trip 等值**——重构 VO 经既有 242 校验，归档载荷完整性自证；**tuple 归一钦定**（R1-F9）：PG JSONB 读回 `tools_used` 为 list，VO `__post_init__` tuple 类型守卫（chain_of_thought.py:71-75）必拒 list——`query_chain_trace` 重构前显式 `tools_used=tuple(chain["tools_used"])` 归一，断言侧同口径）；WORM blob 深度解引用为**可选**参数（`include_blob: bool = False`——默认读 L2 决策依据足够，深度审计时解 L4；**解引用通道**（R1-F6）：经本服务第二注入 `object_storage: L4ObjectPort` 直调 `retrieve(bucket_type="archive-evidence", object_key=blob_ref)`（l4_object.py:53 流式下载，累积后 json.loads）——StrategicArchiveService 无读 blob 公开方法且被验证器 C 钉死零 diff，不经其转发；**None 行为钦定**（R2-F4）：`object_storage=None` 且 `include_blob=True` → warning 日志 + records 槽位 blob_content=None + 不抛异常——与查询面幂等读语义对齐）
 **And** 不存在（无档案的合法 UUID）plan_id 查询 → 空清单 + total=0（**查询面空结果不抛异常**——与恢复面 480 语义分立：查询是幂等读，无结果也是合法答案；**边界裁定**（R1-F14）：空串/畸形 plan_id 属非法形态走 242 守卫（AC-5 验证标准第 5 条），与「空清单」语义分立——「空 plan_id」措辞统一为「无档案的合法 plan_id」）；**ArchiveQuery limit 注记**（R1-F17）：默认 limit=20（archive_repository.py:74-75），8 条/run 无碍，追溯构造钦定显式 `limit=50`（单 run 满量+余量）
 
 **验证标准/Validation Criteria:**
 - [ ] 追溯 round-trip：查回 8 条、stage 锚齐备、每条五字段与组装期期望值等值（独立构造期望——非读回值自比）
 - [ ] CLI `chain-query` 输出每条 to_display() 五段形态（展示面消费——DC-2 展示用标签）
-- [ ] include_blob=True 时 L4 blob 解引用内容与 decision_basis.chain 等值（WORM 真源一致性）
+- [ ] include_blob=True 时 `records[i].blob_content` 与独立构造的期望五字段 dict 等值（R2-F4 落位断言——非「retrieve 被 call 过」交互回声；WORM 真源一致性；None 注入分支 blob_content=None + 不抛异常）
 - [ ] 不存在 plan_id 查询 → 空清单 + total=0（负向：禁 480——查询/恢复语义分立声明）
 - [ ] 非法 plan_id 形态（非 UUID）→ 242 `EntityValidationError`（CLI 守卫构造真实异常——6-3 R1-F18 统一形态先例）
 
@@ -124,7 +124,7 @@
 **When** 运行 6-1/6-2/6-3 既有测试资产与契约守护
 **Then** **零新事件**（epic 未钦定思维链事件；归档事实经既有 `ArchiveCreated` 承载——event_channels.yaml 与 ChannelRouter.DEFAULT_MAPPINGS 零 diff）；**零新异常**（445/284/242 全复用——`_code_ranges.py` 零 diff、`EXCEPTION_HTTP_MAP` 零 diff）
 **And** 6-1/6-2/6-3 回归面**零适配通过**：6-2 per-step 七键契约与 latest 七键（快照 state_data 零新键——OD-8）/ 6-3 完整形态 13 键与 TTL / **负向契约断言面零修改**（`test_event_channel_mapping_blm_planning.py:88-104,126-134` 四文件零 CheckpointReached 引用断言——6-4 改动 blm_planning_service.py 不引入该引用即零适配通过）/ 5-3 任务级思维链测试（agent_workflow_service 零触碰）
-**And** 组合根 diff = 纯新增 + **恰 1 行版本号变更**（新注册块 + blm_planning_service lambda 增量注入实参 + version 行 v1.0.0→v1.1.0 修改——agent_engine v1.0.0→v1.1.0 先例 :1555-1574 同款单行变更；R1-F11 口径：version 升级必然修改既有 version 行，「零删改」按字面不可满足，精确口径=纯新增行+恰 1 行版本变更）；**端口协议面声明**（R1-F1）：`BlmPlanningServicePort` 追加 `project_chain_records` 第六方法（既有五方法零改动——增量方法追加非语义变更，契约测试断言面同步核验）
+**And** 组合根 diff = 纯新增 + **恰 1 行版本号变更**（新注册块 + blm_planning_service lambda 增量注入实参 + version 行 v1.0.0→v1.1.0 修改——agent_engine v1.0.0→v1.1.0 先例 :1555-1574 同款单行变更；R1-F11 口径：version 升级必然修改既有 version 行，「零删改」按字面不可满足，精确口径=纯新增行+恰 1 行版本变更）；**端口协议面声明**（R1-F1）：`BlmPlanningServicePort` 追加 `project_chain_records` 第七方法（既有六方法零改动——增量方法追加非语义变更，契约测试断言面同步核验）
 
 **验证标准/Validation Criteria:**
 - [ ] 6-1 验收/集成 + 6-2 验收/集成 + 6-3 验收/集成 + 5-3 agent_workflow 测试面全量零修改通过（Task 4.3 回归实证——「零适配假设」验证闭环）
@@ -170,7 +170,7 @@
 | `tools_used: tuple[str, ...]` | `_execute_candidate_tools`（blm_planning_service.py:559-608）返回三元组 `(输出摘要, 工具面降级原因, tool_slug)` 的**第三位单数 slug**——`tool.slug or tool.name` :600（slug 可选 kebab-case 无版本后缀，缺失回落中文显示名）；**首个成功候选即返回 :601，每步至多 1 项**（R1-F2 实测定谳——「清单+版本后缀」是 5-3 任务级 tool_trace 语义，BLM 面不存在） | `(tool_slug,) if tool_slug else ()`；空元组合法（无工具步/工具降级步/工具候选全部失败步——`(none)` 展示占位由 to_display 既有处理） |
 | `reflection: str` | **按步骤型分列**（R1-F3）：六子步骤=`result.summary`+`len(result.findings)`；performance_gap=`summary`（=financial_gap :284）+`len(artifacts.root_causes)`；synthesis=`len(synthesis.conclusions)`+`len(synthesis.degraded_inputs)`（**无 summary 字段**——InsightSynthesis 仅两字段 blm_phases.py:271-286） | 六子：`f"步骤产出: {summary[:120]}；要点 {len(findings)} 项{'；降级: ' + degrade_reason if degraded else '；流程正常'}"`；gap：`f"步骤产出: {summary[:120]}；根因 {len(root_causes)} 项{...}"`；synthesis：`f"综合结论 {len(conclusions)} 项；降级输入 {len(degraded_inputs)} 项{...}"`（降级信息入反思——降级是决策过程的一部分） |
 | `constraints_check: str` | **按步骤型分列**（R1-F3）：六子步骤=structured_output 值域守卫（InsightStepResult :247-267 既有校验）+证据充分性 `n>=3`（n=`len(evidence_texts)`）；performance_gap=四字段产物完整性（成功支 financial_gap 非空）+证据充分性（n 同源）；synthesis=结论产出判定（conclusions 非空）+degraded_inputs 标注（**无检索面无证据充分性段**——:391-449 无 _retrieve_evidence 调用） | 六子：`f"结构化输出值域校验: {'通过' if ok else '缺失'}；证据充分性: {'充足' if n>=3 else '不足'}；降级标记: {degraded}"`；gap/synthesis 同构按型替换首段 |
-| `final_answer: str` | 六子步骤=`structured_output` dict 原样；performance_gap=`dataclasses.asdict(PerformanceGapArtifacts)` **六键**（blm_phases.py:195-200 含 degraded/degrade_reason——R1-F4）；synthesis=`dataclasses.asdict(InsightSynthesis)` **两键**（conclusions/degraded_inputs）；**降级步=`{"degraded": True, "degrade_reason": ...}` 信封** | `json.dumps(payload, ensure_ascii=False)`（排序不强制——round-trip 判别经 json.loads 等值；**list 归一口径**：asdict 的 tuple 字段经 json 回解为 list，断言比较前显式 `tuple()` 归一——R1-F9） |
+| `final_answer: str` | 六子步骤=`structured_output` dict 原样；performance_gap=`dataclasses.asdict(PerformanceGapArtifacts)` **六键**（blm_phases.py:195-200 含 degraded/degrade_reason——R1-F4）；synthesis=`dataclasses.asdict(InsightSynthesis)` **两键**（conclusions/degraded_inputs）；**降级信封 `{"degraded": True, "degrade_reason": ...}` 仅适用于产物缺席形态**（六子=structured_output None；部分降级=产物原样——R2-F2） | `json.dumps(payload, ensure_ascii=False)`（排序不强制——round-trip 判别经 json.loads 等值；**list 归一口径**：asdict 的 tuple 字段经 json 回解为 list，断言比较前显式 `tuple()` 归一——R1-F9） |
 
 - [ ] **归档载荷映射冻结**（Task 0.3——AC-3 唯一真源）：见 AC-3 Then 载荷三键（decision_basis kind+stage 锚 / assumptions 过程素材 / evidence_blob 结构化 JSON——DC-2 存储用结构化；**tools_used tuple 经 json.dumps 转 JSON array，读回 list 需 `tuple()` 归一——R1-F9 AC-5 钦定**）
 - [ ] **ChainRecord / StepChainMaterial / ChainOfThoughtTraceView** 三 dataclass 定义在端口文件（application 层——多字段组合载体放端口文件先例，5-3 七 dataclass 同款；Task 0.4 终稿）。**StepChainMaterial 字段表冻结**（R1-F10——AC 未逐字段钦定，此处直接落档）：
@@ -199,7 +199,7 @@
 - [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
 
 #### 端口契约清单执行约束（强制）
-- [ ] 本 Story 端口清单是唯一事实源：新增 1 个端口（chain_of_thought_archive_service）+ 1 个用例端口（blm_chain_trace_use_case）；既有端口零语义变更——`blm_planning_service` 构造器增量注入第九可选尾参 + **协议追加 `project_chain_records` 第六方法**（R1-F1：`project_timeline`/`project_degraded_steps` :193/:197 同构第三投影，增量方法追加非语义变更，既有五方法零改动；`sp_blm_graph.py` 节点适配器消费该方法直写 state——见 AC-2 三件套）
+- [ ] 本 Story 端口清单是唯一事实源：新增 1 个端口（chain_of_thought_archive_service）+ 1 个用例端口（blm_chain_trace_use_case）；既有端口零语义变更——`blm_planning_service` 构造器增量注入第九可选尾参 + **协议追加 `project_chain_records` 第七方法**（R1-F1：`project_timeline`/`project_degraded_steps` :193/:197 同构第三投影，增量方法追加非语义变更，既有六方法零改动；`sp_blm_graph.py` 节点适配器消费该方法直写 state——见 AC-2 三件套）
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
@@ -392,7 +392,7 @@
 - [ ] Subtask 0.2: 组装映射冻结（五字段素材源表——本文件「数据模型」节为唯一真源；`_execute_candidate_tools` 返回形态亲验定谳工具轨迹提取规则）
 - [ ] Subtask 0.3: 归档载荷映射冻结（decision_basis kind+stage 锚 / assumptions 过程素材 / evidence_blob 结构化 JSON——AC-3 唯一真源；embedding_text 构造亲验——`strategic_archive_service.py:148` 上游确认）
 - [ ] Subtask 0.4: 端口契约定稿（ChainOfThoughtArchiveServicePort 两方法 + StepChainMaterial/ChainRecord/ChainOfThoughtTraceView 三 dataclass 字段表）
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_json_chain_of_thought.feature`（**13 场景编号连续钉死**（R1-F8 重排——AC-5 拆正向/负向两场景消除 S11 空洞与 S6 二义，to_display 场景归 AC-1）：S1 全链 8 条（AC-1，含 AC-7 成功率断言并入）/S2 组装映射判别力（AC-1）/S3 降级步形态（AC-1）/S4 Result 携带+投影真实化（AC-2）/S5 归档真实落位（AC-3）/S6 追溯查询正向（AC-5）/S7 追溯负向两形态（AC-5——无档案合法 plan_id 空清单+非法 plan_id 242）/S8 零回归守护（AC-6）/S9 事件零新增+ArchiveCreated 落行（AC-6）/S10 to_display 展示形态（AC-1 验证标准 5——原 S12 归位）/S11 P95 组装窗口（AC-7）/S12 并发 10（AC-7——原 S10+S11 并入）/S13 收尾清单）
+- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_json_chain_of_thought.feature`（**13 场景编号连续钉死**（R1-F8 重排——AC-5 拆正向/负向两场景消除 S11 空洞与 S6 二义，to_display 场景归 AC-1）：S1 全链 8 条（AC-1，含 AC-7 成功率断言并入）/S2 组装映射判别力（AC-1）/S3 降级步形态（AC-1）/S4 Result 携带+投影真实化（AC-2）/S5 归档真实落位（AC-3）/S6 追溯查询正向（AC-5）/S7 追溯负向两形态（AC-5——**单 Scenario 含两段 Given-When-Then**（R2-F9）：无档案合法 plan_id 空清单段+非法 plan_id 242 段串联，@scenario 绑单场景名，拆两 Scenario 则计数 14≠13 失配）/S8 零回归守护（AC-6）/S9 事件零新增+ArchiveCreated 落行（AC-6）/S10 to_display 展示形态（AC-1 验证标准 5——原 S12 归位）/S11 P95 组装窗口（AC-7）/S12 并发 10（AC-7——原 S10+S11 并入）/S13 收尾清单）
 - [ ] Subtask 0.6: 编写 BDD 步骤实现（**含延迟 import 的完整步骤体**——非占位骨架，0.7 全红失败形态依赖完整实现；R1-P3 措辞订正）`tests/acceptance/test_acceptance_json_chain_of_thought.py`（docstring 五段+场景三属性分档表/pytestmark 全套+xdist_group blm-planning-perf/13 场景全绑定 @scenario/模块级 event_loop+context dict+_run_async 三件套/teardown 链含 PG 档案行+Qdrant 点+MinIO WORM 对象三清理步（6-3 `_cleanup_archive_residues` :346-430 形态移植）/Fake LLM 双 Schema 族分派工厂（复用 6-2 `_make_fake_llm` 按 response_schema 身份分派形态——test_acceptance_market_insight.py:365 先例；6-4 组装零新增 LLM 调用故 Fake 面不扩）/Fake Embedding 豁免工厂/延迟 import 纪律）
 - [ ] Subtask 0.7: 运行验收测试，确认 13 场景全红零 skip（四真实服务门控全过；失败形态钦定：ModuleNotFoundError×N（端口/服务缺失）+AttributeError（chain_records 缺失）+AssertionError（收尾清单）——收集期零错误）
 - [ ] Subtask 0.8: 既有资产复核（八项亲验——**①② 已于文档审查 R1 实测定谳**（R1-F2/F3，正文冻结表已按实测形态书写，本 Subtask 复跑确认而非重新定谳）：① `_execute_candidate_tools`（blm_planning_service.py:559-608）返回三元组 `(输出摘要, 降级原因, tool_slug)`——**单数 slug 至多 1 项无版本后缀**（:600-601 首个成功即返回）；② **双单数形态断裂**：`InsightStepResult.tool_used` 是单数 str（blm_phases.py:239）**且执行轨迹第三返回值同为单数 str**——ChainOfThought.tools_used 是 tuple[str,...]，包装 `(tool_slug,)`（6-1 属性形态断裂族教训直接应用：素材采集从执行轨迹取而非信封字段，且**不得假设清单形态**）；③ `archive_plan` embedding_text 构造（:144-148 上游）；④ `PerformanceGapArtifacts` asdict **六键**/`InsightSynthesis` asdict **两键**（frozen dataclass 标准库形态亲验——R1-F4 口径）；⑤ AgentDecided SpBlmGraph 投影分支（langgraph_engine.py:258-279）chain_summary 现值形态；⑥ 组合根 blm_planning_service lambda（:1580-1598）注入实参断言面（test_port_contract_blm_planning.py:89-98 inspect.getsource——增量注入不破坏既有断言亲验）；⑦ 三方法挂接点素材可见性（六子步骤：result 信封+裸变量全可见；**performance_gap：无 findings/structured_output——素材=artifacts 六属性+summary+evidence_texts（:249-297 作用域）；synthesis：conclusions/degraded_inputs，无工具无检索（:391-449）——R1-F3 三型分列依据**）；⑧ SpBlmState TypedDict（schemas.py:84-110）加键零破坏亲验（total=False——**写侧经 sp_blm_graph 节点适配器（R1-F1 三件套③），加键本身不产生写入**）
@@ -412,7 +412,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_chain_of_thought_archive_service.py`（组装映射**三型×五字段**参数化（R1-F3——gap/六子/synthesis 素材分列）/降级信封/445 改写（素材缺陷构造→**返回 None** R1-F5）/284 捕获降级台账（AsyncMock spec=StrategicArchiveService 抛 ArchiveStorageError→ChainRecord(archived=False)）/归档载荷三键映射断言（期望值独立构造）/8 条 run 形态/纯组装函数 compose_step_chain 独立单测（R1-F13——P95 采样对象）） |
+| 🔴 红 | 编写 `tests/unit/application/test_chain_of_thought_archive_service.py`（组装映射**三型×五字段**参数化（R1-F3——gap/六子/synthesis 素材分列）/降级信封+**部分降级产物原样**（R2-F2 两形态各一用例）/445 改写（**构造配方 `tool_slug=" "`**（R2-F3）→**返回 None** R1-F5）/284 捕获降级台账（AsyncMock spec=StrategicArchiveService 抛 ArchiveStorageError→ChainRecord(archived=False)）/归档载荷三键映射断言（期望值独立构造）/8 条 run 形态/纯组装函数 compose_step_chain 独立单测（R1-F13——P95 采样对象）） |
 | 🟢 绿 | 实现 `src/application/ports/chain_of_thought_archive.py`（Protocol + 三 dataclass + CHAIN_ARCHIVE_KIND 常量）+ `src/application/services/chain_of_thought_archive_service.py`（**模块级纯函数 compose_step_chain(material)→ChainOfThought**（R1-F13）+ compose_and_archive_step_chain：素材→纯函数组装→VO 构造 242 捕获改写 445 **返回 None**（R1-F5）→archive_plan 载荷映射→284 捕获 archived=False→ChainRecord 返回）最小代码 |
 | 🟡 变异 | 组装映射改坏（tools_used 置空/final_answer 换回声）→红；归档调用删除→archived 断言红；还原→绿 |
 | 🔄 重构 | 类型注解/docstring（Google 风格全中文）/ruff+mypy |
@@ -426,7 +426,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展同文件（query_chain_trace：档案清单→视图组装/五字段 round-trip 重构 VO（**tools_used=tuple(...) 归一断言**——R1-F9）/include_blob 解引用（L4ObjectPort.retrieve mock 注入——单测层）/空清单/排序 archived_at 升序） |
+| 🔴 红 | 扩展同文件（query_chain_trace：档案清单→视图组装/五字段 round-trip 重构 VO（**tools_used=tuple(...) 归一断言**——R1-F9）/include_blob 解引用（L4ObjectPort.retrieve mock 注入——单测层；**blob_content 落位断言 + object_storage=None 分支**（R2-F4——warning+槽位 None 不抛异常）/空清单/排序 archived_at 升序） |
 | 🟢 绿 | 实现 query_chain_trace 最小代码（query_archive 既有面（**ArchiveQuery 显式 limit=50**——R1-F17）+ decision_basis.chain 反序列化（tools_used tuple 归一）+ include_blob 经 object_storage.retrieve 解引用） |
 | 🟡 变异 | stage 锚丢失→排序断言红；blob 跳过→深度断言红；还原→绿 |
 | 🔄 重构 | 优化代码 |
@@ -469,7 +469,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `TestSpBlmGraphTopology`（R1-P3 目标订正：sp_blm_graph 图链路用例在本文件——节点适配器直写断言：六子步骤后中间 state chain_records 递增/终态恰 8 条；投影 chain_summary == 末条 final_answer[:200] 值级断言+**空回退分支断言**（R1-F12））+ 用例测试扩展（_assemble_result 读 chain_records 默认 () 零破坏） |
-| 🟢 绿 | `SpBlmState` 加 chain_records 键（total=False）+ **`sp_blm_graph.py` 三类节点适配器返回 dict 各加 `"chain_records": service.project_chain_records(state["plan_id"])` 直写行**（R1-F1③——degraded_steps/timeline 同构、八节点对称、`BlmPlanningServicePort` 协议同步追加第六方法）+ `BlmPlanningResult` 加默认尾字段 `chain_records: tuple[ChainRecord, ...] = ()` + `_assemble_result` 读 `final_state.get("chain_records")` + 投影分支 chain_summary 取值源改末条思维链（空回退 `(first_conclusion or "")[:200]`） |
+| 🟢 绿 | `SpBlmState` 加 chain_records 键（total=False）+ **`sp_blm_graph.py` 三类节点适配器返回 dict 各加 `"chain_records": service.project_chain_records(state["plan_id"])` 直写行**（R1-F1③——degraded_steps/timeline 同构、八节点对称、`BlmPlanningServicePort` 协议同步追加第七方法）+ `BlmPlanningResult` 加默认尾字段 `chain_records: tuple[ChainRecord, ...] = ()` + `_assemble_result` 读 `final_state.get("chain_records")` + 投影分支 chain_summary 取值源改末条思维链（空回退 `(first_conclusion or "")[:200]`） |
 | 🟡 变异 | 投影改回 first_conclusion→值级断言红；Result 字段删除→类型断言红；**适配器直写行删除→终态 8 条断言红（回传通道活着）**；还原→绿 |
 | 🔄 重构 | 优化代码 |
 
@@ -508,7 +508,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（chain-query：正常输出 to_display 每条五段+归档计数/空清单 exit 0/非法 plan_id → stderr `[EXCEPTION_242]` 形态/blm-plan 汇总行含思维链归档计数） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（chain-query：正常输出 to_display 每条五段+归档计数/空清单 exit 0/非法 plan_id → stderr `[EXCEPTION_242]` 形态/blm-plan 汇总行**三段式**「成功 N/失败 M/预期 8」（R2-F8）） |
 | 🟢 绿 | `src/entrypoints/agent_cli.py` 增 chain-query 子命令（argparse 扁平——6-3 checkpoint-create 先例；`--plan-id`/`--include-blob` 两参数）+ blm-plan `_print_blm_progress` 尾部思维链计数行 |
 | 🟡 变异 | 输出漂移→断言红；还原→绿 |
 | 🔄 重构 | 优化代码 |
@@ -633,7 +633,7 @@
 | **OD-6** | **零新事件 + 零新异常**：归档事实经既有 `ArchiveCreated`（archive_plan 内部发布 :270-294，双登记在位——6-3 集成②断言先例）承载；异常复用 445（组装终态门禁——5-3 :386-393 捕获改写同款）/284（归档层透传）/242（VO 校验+CLI 守卫）。epic 6.4 文本未钦定思维链事件/异常；planning 段 485-489 预留（6-6）不侵占 | YAGNI + 既有资产复用优先（checklist 红线）+ `_code_ranges.py:189` 预留声明 + 事件双登记纪律（新事件须 yaml+router 双更新——本 Story 零新增即零 diff） |
 | **OD-7** | 测试文件命名（禁故事编号后缀）：unit/architecture 用 epics 钦定 `test_json_chain_of_thought.py`（**epics L2218 一致**；同名冲突检查+包链预案）；integration `test_integration_chain_of_thought.py`（**对 epics L2219 钦定名 `test_json_chain_of_thought_integration.py` 的显式偏离**——仓规 tests/integration/ 全目录 test_integration_* 惯例，6-3 OD-8 同款拆分声明）；acceptance `test_acceptance_json_chain_of_thought.feature/.py`；服务单测 `test_chain_of_thought_archive_service.py`；用例单测 `test_blm_chain_trace_use_case.py` | epics L2218-2219 钦定名（半采半离）+ 记忆「禁止故事编号命名文件」+ 6-3 OD-7/OD-8 双先例 |
 | **OD-8** | **快照面零改动**：思维链不进 Redis state_data（6-2 per-step 七键契约/latest 七键/6-3 完整形态 13 键全部零触碰）——思维链的持久化归宿是战略档案库（AC 钦定「存储至战略档案库」），Redis 快照是流程状态面非推理证据面；图 state `chain_records` 键仅内存流转（LangGraph 内存图无序列化需求——快照写不读该键）。**6-2「structured_output 键恒在」契约零破坏**；读侧判别不受影响 | AC「存储至战略档案库」单一归宿 + 6-2 端口契约冻结面 + 双轨制先例（6-3 OD-3 键族职责分离——流程状态面 vs 审批恢复面 vs 推理证据面三分） |
-| **OD-9** | 扩展形态**四**钦定（R1-F1 扩展）：① `SpBlmState` 加 chain_records 键（TypedDict `total=False` 加键零破坏——6-1 交付形态；**写侧经三件套，加键本身不产生写入**）；①′ **回传通道三件套**：`_PlanRunState.chain_records` 累积（degraded_steps/timeline 同构第三累积位）+ `BlmPlanningServicePort` 追加 `project_chain_records` 第六方法（既有五方法零改动）+ `sp_blm_graph.py` 三类节点适配器返回 dict 各加直写行（八节点对称——schemas.py:43-45 键覆盖语义）；② `BlmPlanningResult` 加默认尾字段 `chain_records: tuple[ChainRecord, ...] = ()`（零破坏——6-3 R3-2 先例）；③ AgentDecided 投影 chain_summary 取值源真实化（SpBlmGraph 分支 `first_conclusion` → 末条思维链 final_answer[:200]——SingleAgentWorkflow :254 同款取值语义；**空回退** `(first_conclusion or "")[:200]`（R1-F12）；五键白名单结构零变化，VO 仍禁入 payload——DC-11 纪律维持） | 6-1 state/投影形态 + degraded_steps/timeline 投影同构先例（sp_blm_graph.py:46-47/63-64/79-80）+ 6-3 R3-2 默认尾字段先例 + DC-11 投影纪律 + 「输出包含思维链」的事件面体现（最小改动大语义） |
+| **OD-9** | 扩展形态**四**钦定（R1-F1 扩展）：① `SpBlmState` 加 chain_records 键（TypedDict `total=False` 加键零破坏——6-1 交付形态；**写侧经三件套，加键本身不产生写入**）；①′ **回传通道三件套**：`_PlanRunState.chain_records` 累积（degraded_steps/timeline 同构第三累积位）+ `BlmPlanningServicePort` 追加 `project_chain_records` 第七方法（既有六方法零改动）+ `sp_blm_graph.py` 三类节点适配器返回 dict 各加直写行（八节点对称——schemas.py:43-45 键覆盖语义）；② `BlmPlanningResult` 加默认尾字段 `chain_records: tuple[ChainRecord, ...] = ()`（零破坏——6-3 R3-2 先例）；③ AgentDecided 投影 chain_summary 取值源真实化（SpBlmGraph 分支 `first_conclusion` → 末条思维链 final_answer[:200]——SingleAgentWorkflow :254 同款取值语义；**空回退** `(first_conclusion or "")[:200]`（R1-F12）；五键白名单结构零变化，VO 仍禁入 payload——DC-11 纪律维持） | 6-1 state/投影形态 + degraded_steps/timeline 投影同构先例（sp_blm_graph.py:46-47/63-64/79-80）+ 6-3 R3-2 默认尾字段先例 + DC-11 投影纪律 + 「输出包含思维链」的事件面体现（最小改动大语义） |
 | **OD-10** | 性能口径差声明：**组装窗口 P95<50ms** = 素材就绪→VO 构造完成（纯内存——OD-2 确定性组装使指标物理可达）；归档 I/O（L2/L3/L4）与 LLM 延迟显式出栈独立计量（不进 P95 口径——epic 未预见组装/归档/LLM 三段分离）；成功率口径见 OD-5；并发 10=asyncio.gather 独立素材归档。口径差落测试 docstring | 6-1 DC-7/6-2 OD-3/6-3 OD-6 三先例 + epic 指标物理可达性论证 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
@@ -644,7 +644,7 @@ src/
 ├── application/
 │   ├── ports/chain_of_thought_archive.py      ★ 新建（Protocol+三 dataclass+CHAIN_ARCHIVE_KIND——Task 1）
 │   ├── services/chain_of_thought_archive_service.py ★ 新建（组装+归档+追溯+纯函数 compose_step_chain——Task 1）
-│   ├── ports/blm_planning.py                  ▲ BlmPlanningResult 加默认尾字段+协议追加 project_chain_records 第六方法（Task 2——R1-F1）
+│   ├── ports/blm_planning.py                  ▲ BlmPlanningResult 加默认尾字段+协议追加 project_chain_records 第七方法（Task 2——R1-F1）
 │   ├── services/blm_planning_service.py       ▲ 尾参可选注入+_PlanRunState 加累积位+project_chain_records 投影+三方法挂接段（Task 2——既有语句零改动）
 │   └── use_cases/get_blm_chain_trace.py       ★ 新建（追溯用例——Task 3）
 ├── infrastructure/
@@ -684,13 +684,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | `StrategicArchiveService.archive_plan` | `src/application/services/strategic_archive_service.py:71-296` | 七参数（plan_id/plan_type/archive_type/assumptions/decision_basis/execution_deviation/evidence_blob: bytes）；五步序 L2 强制 :122-127→L3 降级 :139-187（embedding :148+upsert collection="strategic_archive"）→L4 强制 :189-210（bucket_type="archive-evidence" retention 2555）→L5 降级 :214-241→引用回写 :243-268→ArchiveCreated :270-294（发布失败抛 284）；**零改动复用** |
 | 6-3 归档调用先例 | `src/application/services/checkpoint_service.py:222-257` | archive_plan 参数映射冻结形态（plan_type="SP" **:227**/载荷映射 **:233-238**/284 包装 :240-257——R1-P3 行号订正）——6-4 载荷映射的形态模板（**6-3 未传 archive_type 落库为默认 ASSUMPTION——6-4 必须显式传 `archive_type=ArchiveType.EVIDENCE_PACKAGE` 枚举成员**（R1-P3 补注：裸 str 被实体 validate :90-94 拒绝）；异常处置按 OD-5 改降级非包装阻断） |
 | `ArchiveQuery` 查询面 | `src/domain/ports/archive_repository.py:38-103` | frozen Query Object（plan_id/archive_type/...组合+分页）——追溯读侧零改动复用（`query_archive` strategic_archive_service.py:315） |
-| `BlmPlanningService` 三执行方法 | `src/application/services/blm_planning_service.py` | `run_performance_gap_analysis` :231-298（重跑 482 :241-246/成功四字段 :275-284/降级信封 :286-294/record_step+快照 :296-297）；`run_insight_step` :304-385（Schema 分派 :341/structured_output :364/per-step→latest :383-384）；`synthesize_insights` :391-449（**早退分支 :411-413** effective_context None 不触发挂接——R1-F15）——**挂接点=各方法末尾快照写之后、return 之前**（三方法返回 VO——累积进 `_PlanRunState` :94-129 非返回值，`_ensure_run_state` :732 键控隔离）；构造器八必填+base_config 可选尾参 :135-146（第九尾参注入位——本类可选尾参先例）；`project_timeline`/`project_degraded_steps` :455-465 投影先例 |
+| `BlmPlanningService` 三执行方法 | `src/application/services/blm_planning_service.py` | `run_performance_gap_analysis` :231-298（重跑 482 :241-246/成功四字段 :275-284/降级信封 :286-294/record_step+快照 :296-297）；`run_insight_step` :304-385（Schema 分派 :341/structured_output :364/per-step→latest :383-384）；`synthesize_insights` :391-449（**早退分支 :410-412** effective_context None 不触发挂接——R1-F15）——**挂接点=各方法末尾快照写之后、return 之前**（三方法返回 VO——累积进 `_PlanRunState` :94-129 非返回值，`_ensure_run_state` :732 键控隔离）；构造器八必填+base_config 可选尾参 :135-146（第九尾参注入位——本类可选尾参先例）；`project_timeline`/`project_degraded_steps` :455-465 投影先例 |
 | 工具执行轨迹源 | `src/application/services/blm_planning_service.py:559-608` | `_execute_candidate_tools`（449/380 步级捕获→直接推理续行）——**返回三元组 `(输出摘要, 工具面降级原因, tool_slug)`**（:560-572 docstring 钦定；`tool_slug = tool.slug or tool.name` :600 首个成功即返回 :601 **每步至多 1 项无版本后缀**——R1-F2 定谳；白名单空/全失败 `("", "", "")` :608） |
 | `InsightStepResult.tool_used` | `src/domain/value_objects/blm_phases.py:239` | **单数 str**（"实际执行的工具 slug（缺失回落显示名）"）——与 ChainOfThought.tools_used（tuple）**双单数形态断裂登记**（0.8②：执行轨迹第三返回值同为单数——素材从执行轨迹取包装 `(tool_slug,)`，非信封单值字段，**不得假设清单形态**） |
 | 六类型化 Schema | `src/application/services/blm_planning_prompts.py:53-128` | 六 Schema+GapAnalysisSchema :31-37+InsightSynthesisSchema :125-128——final_answer 素材源（structured_output=model_dump :364）；StepSemanticConfig :136-157（display_name/role_prefix——input_summary 素材） |
 | `SpBlmState` | `src/infrastructure/agent_orch/schemas.py:84-110` | TypedDict total=False 现九键（:102-110）——加 chain_records 键零破坏（0.8⑧；**写侧经三件套，:43-45 注释钦定纯 TypedDict 无 reducer 键覆盖语义**） |
 | **`sp_blm_graph` 图工厂**（R1-F1 新增锚点） | `src/infrastructure/agent_orch/graphs/sp_blm_graph.py:29-91` | `build_sp_blm_graph(service: BlmPlanningServicePort)` :29；三类节点适配器返回 dict——`_performance_gap_node` :44-48 / `_insight_node` :61-65 / `_synthesize_node` :77-81（`degraded_steps`/`timeline` 经 `service.project_*` 直写全量先例 :46-47/:63-64/:79-80；`prior_outputs` 组装 :55-58）；**chain_records 直写行挂接位=三返回 dict 各加一行**（八节点对称） |
-| **`BlmPlanningServicePort` 协议**（R1-F1 新增锚点） | `src/application/ports/blm_planning.py:117-199` | 现五方法（build_planning_context :126/run_performance_gap_analysis :146/run_insight_step :157/synthesize_insights :179/project_timeline :193/project_degraded_steps :197）——**追加 `project_chain_records` 第六方法**（增量追加非语义变更）；`BlmPlanningContext` :69-90（task :85 三方法可达） |
+| **`BlmPlanningServicePort` 协议**（R1-F1 新增锚点） | `src/application/ports/blm_planning.py:117-199` | 现六方法（build_planning_context :126/run_performance_gap_analysis :146/run_insight_step :157/synthesize_insights :179/project_timeline :193/project_degraded_steps :197）——**追加 `project_chain_records` 第七方法**（增量追加非语义变更）；`BlmPlanningContext` :69-90（task :85 三方法可达） |
 | `BlmPlanningResult` | `src/application/ports/blm_planning.py:93-114` | **七**字段 DTO（:108-114——R1-P3 计数订正）——加默认尾字段 chain_records（OD-9②）；`_assemble_result` 组装点 run_blm_planning.py:185-193（终态直读——final_state.get("chain_records") 扩展） |
 | AgentDecided 投影 | `src/infrastructure/agent_orch/langgraph_engine.py:258-279` | SpBlmGraph 分支五键纯标量白名单——chain_summary 现值 `(first_conclusion or "")[:200]` :270（synthesis 首结论）→ 改末条思维链 final_answer[:200]（OD-9③；SingleAgentWorkflow :254 取值语义同款）；confidence 显式 0.0 维持（DC-11） |
 | 负向契约断言面 | `tests/contracts/test_event_channel_mapping_blm_planning.py:88-104,126-134` | 四文件零 CheckpointReached 引用断言——6-4 改 blm_planning_service.py 不引入该引用即**零修改通过**（OD-4/AC-6 守护依据） |
@@ -794,7 +794,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - `tests/acceptance/test_acceptance_json_chain_of_thought.py` - BDD 步骤实现（Task 0/7）
 
 **待修改的文件/To Be Modified (Dev Story 实施):**
-- `src/application/ports/blm_planning.py` - BlmPlanningResult 默认尾字段+协议追加 project_chain_records 第六方法（Task 2——R1-F1）
+- `src/application/ports/blm_planning.py` - BlmPlanningResult 默认尾字段+协议追加 project_chain_records 第七方法（Task 2——R1-F1）
 - `src/application/services/blm_planning_service.py` - 尾参可选注入+_PlanRunState 累积位+投影方法+三方法挂接段（Task 2）
 - `src/infrastructure/agent_orch/graphs/sp_blm_graph.py` - 三类节点适配器 chain_records 直写行（Task 2——R1-F1③）
 - `src/infrastructure/agent_orch/schemas.py` - SpBlmState 加键（Task 2）
@@ -838,7 +838,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R1-F1 | chain_records 回传通道断裂：三方法返回 VO 非 dict「累积进返回 dict」无处落；SpBlmState 加键不产生写入（TypedDict 无 reducer 键覆盖——schemas.py:43-45 注释钦定）；`sp_blm_graph.py` 缺席修改清单→`final_state.get("chain_records")` 恒 `()`，AC-2「恰 8 条」物理不可达（三源确认：调研 B+评审 1+评审 2） | **P0** | 钦定回传通道三件套（degraded_steps/timeline 完全同构）：①`_PlanRunState` 加 chain_records 累积位+②`BlmPlanningServicePort` 追加 project_chain_records 第六方法（增量追加非语义变更——端口契约清单/AC-6 同步改口）+③sp_blm_graph 三类节点适配器直写全量（八节点对称）；sp_blm_graph.py 入项目结构/锚点表/文件清单；Task 2 红/绿/变异、验证器 D、OD-9①′ 四位面同步 |
+| R1-F1 | chain_records 回传通道断裂：三方法返回 VO 非 dict「累积进返回 dict」无处落；SpBlmState 加键不产生写入（TypedDict 无 reducer 键覆盖——schemas.py:43-45 注释钦定）；`sp_blm_graph.py` 缺席修改清单→`final_state.get("chain_records")` 恒 `()`，AC-2「恰 8 条」物理不可达（三源确认：调研 B+评审 1+评审 2） | **P0** | 钦定回传通道三件套（degraded_steps/timeline 完全同构）：①`_PlanRunState` 加 chain_records 累积位+②`BlmPlanningServicePort` 追加 project_chain_records 第七方法（增量追加非语义变更——端口契约清单/AC-6 同步改口）+③sp_blm_graph 三类节点适配器直写全量（八节点对称）；sp_blm_graph.py 入项目结构/锚点表/文件清单；Task 2 红/绿/变异、验证器 D、OD-9①′ 四位面同步 |
 | R1-F2 | tools_used 素材口径失实：「成功工具清单，含版本后缀」——实测返回三元组第三位单数 slug（:600-601 首个成功即返回，每步至多 1 项；slug 无版本后缀） | P1 | AC-1/冻结表/锚点表/0.8①② 五处统一改口：`(tool_slug,) if tool_slug else ()`；「清单+版本后缀」标注为 5-3 任务级语义 BLM 面不适用；判别力断言口径同步 |
 | R1-F3 | 素材映射表一行通吃三型：synthesis 无 StepSemanticConfig（语义配置仅 gap+六子七行）/无检索（n 无来源）；gap 无 findings/structured_output——「唯一真源」两型不可编译（假冻结） | P1 | 冻结表三型分列（input_summary/reflection/constraints_check 各三行）；synthesis 语义常量钦定服务模块级（不动 prompts.py 6-1 资产）；gap 用 root_causes 计数；AC-1 素材源映射同步 |
 | R1-F4 | PerformanceGapArtifacts asdict 是六键非「四字段」（blm_phases.py:195-200 含 degraded/degrade_reason）；InsightSynthesis 两键 | P1 | AC-1/冻结表改口六键/两键（round-trip 断言口径） |
@@ -852,11 +852,28 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | R1-F12 | 投影「末条思维链」缺空回退语义（chain_records 空时末条不存在——无条件替换丢 synthesis 现值信息） | P2 | 钦定空回退 `(first_conclusion or "")[:200]`；AC-2 验证标准补空回退断言 |
 | R1-F13 | P95 采样对象（纯组装函数）未在规范位定义——直调 async 复合函数必含 I/O 超预算 | P2 | 钦定模块级纯函数 `compose_step_chain(material) -> ChainOfThought`（Task 1 绿+端口节+Task 5.4 采样素材型=六子步骤型） |
 | R1-F14 | 「空 plan_id→空清单」与「非法 plan_id→242」边界互斥（空串也是非 UUID） | P2 | 措辞改「无档案的合法 plan_id→空清单」；空串/畸形走 242 守卫（两语义分立声明） |
-| R1-F15 | synthesize_insights 早退分支（:411-413）不触发挂接未声明 | P2 | AC-4 边界注记（该路径 chain 缺席合法，<8 台账口径覆盖） |
+| R1-F15 | synthesize_insights 早退分支（:410-412）不触发挂接未声明 | P2 | AC-4 边界注记（该路径 chain 缺席合法，<8 台账口径覆盖） |
 | R1-F16 | L4 隐性静默位：`evidence_blob and _object_storage is not None` 双条件——组合根 resolve_optional 未注册时 blob 静默丢弃无 284 无告警 | P2 | AC-3 落对象双前提注记（测试环境 6-3 装配覆盖；生产部署 L4 注册是 WORM 前提） |
 | R1-F17 | 杂项：ArchiveQuery limit 默认 20 未注记；missing_fields 单字段短路语义（VO 逐字段短路——断言勿假设多字段） | P2 | AC-5 显式 limit=50 钦定；异常契约表 445 行注记 |
 | R1-P3 | 行号/口径订正批：checkpoint plan_type :229→:227、载荷 :230-238→:233-238；LangGraphEngine 尾参 :51→:52-53；BlmPlanningResult 八字段→七字段；投影断言目标 agent_orch/→test_blm_planning_service.py::TestSpBlmGraphTopology（:1005-1027）；SP/BBP→SP/BP（or.md:480 原文）；6-1 断言位置口径（单元 :976-984+验收集成 DTO 面）；矩阵 AC-7 行集成③⑤→①③；`_cleanup_archive_residues` :346-427→:346-430；0.6「骨架」→「含延迟 import 的完整步骤体」；6-3 先例落库类型为默认 ASSUMPTION 非 EVIDENCE_PACKAGE（6-4 必须显式传枚举成员——锚点表补注） | P3 | 逐处订正（本表为索引——各落点位见正文 R1-P3 标记） |
 | R1-改判 | 评审 1 报「6-1 边界表 L36」——实测 L37 即思维链行（L36 是阶段位点行），文档原文正确不修（误报登记） | — | 不落修改；留痕防后续轮重查 |
+
+**Round 2（2026-11-03，回归核查双 Agent（传播完备性 R2-A + 增量面组合 R2-B）+ 主会话亲验定谳，v1.1.0→v1.2.0）：**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-F1 | 「第六方法/既有五方法」计数失实（R1-F1 修复自引入）：协议实有 6 方法（build_planning_context :126/run_performance_gap_analysis :146/run_insight_step :157/synthesize_insights :179/project_timeline :193/project_degraded_steps :197），追加 project_chain_records 是第七方法——9 处传播+锚点表行内自相矛盾（自列六名却称「现五方法」） | P1 | sed 批量「第六方法→第七方法/既有五方法→既有六方法/现五方法→现六方法」9 处；grep 验证零残留 |
+| R2-F2 | 部分降级形态 payload 两读（R1-F3 同病根「降级轴」漏修）：degraded=True 且 structured_output 在位（检索/工具降级而 LLM 成功——:348-351 常态路径）时「六子=原样」与「降级步=信封」冲突——按信封读则丢弃真实产物（违背审计初衷） | P1 | 钦定：降级信封仅适用于产物缺席形态（structured_output None）；部分降级 payload=产物原样+降级事实三处承载（reflection 后缀/constraints_check 标记/decision_basis.degraded）；AC-1 验证标准补部分降级断言+Task 1A 红补两形态用例 |
+| R2-F3 | 445 构造配方不可达：冻结公式四文本字段恒非空白/final_answer 恒非空——空 payload 红测写不出（json.dumps({})="{}"），唯一 242 通道是 tools_used 元素级守卫（tool_slug=" " 纯空白串 :76-81） | P2 | AC-1 验证标准钦定构造配方 `StepChainMaterial(tool_slug=" ")`；TypeError 面注记不设防理由（素材源受控三态） |
+| R2-F4 | include_blob 双缺口：object_storage=None × include_blob=True 行为未钦定（读侧对称 R1-F16 缺注记）；TraceView 无 blob 承载字段——「解引用内容等值」断言只能退化为交互回声（违背值级断言纪律） | P2 | None 行为钦定（warning+槽位 None 不抛异常）；records 补 `blob_content: dict \| None = None` 字段；验证标准改 records[i].blob_content 等值断言；Task 1B 红/绿同步 |
+| R2-F5 | project_chain_records 返回 list × Result 字段 tuple 归一未钦定（dict.get→Any 静默绕过 mypy——R1-F9 同款场景） | P2 | `_assemble_result` 读侧显式 `tuple(final_state.get("chain_records") or ())` 归一（AC-2 验证标准钦定） |
+| R2-F6 | 早退分支行号 :411-413 偏 1 行（if 在 :410；:413 是正常路径语句被错误包入）——R1-F15 自引入偏差 | P3 | 3 处批量订正 :410-412（主会话实测定谳） |
+| R2-F7 | AC-1「全量五字段非空」与空元组合法口径矛盾（synthesis 步 tool_slug 恒空→tools_used 恒空元组，字面断言假红） | P3 | 改「四文本字段非空白+tools_used 形态合法」 |
+| R2-F8 | CLI 汇总行计数口径未钦定（二态 vs 三态——445 组装缺席在 CLI 面不可见） | P3 | 三段式「成功 N/失败 M/预期 8」（缺席 K=8-N-M 可推算）；Task 3 断言同步 |
+| R2-F9 | S7「负向两形态」未声明单 Scenario 双段结构（拆两 Scenario 则计数 14≠13） | P3 | 0.5 补「单 Scenario 含两段 Given-When-Then」声明 |
+| R2-F10 | 锚点借用：schemas.py:43-45 是 5-3 AgentWorkflowState docstring（SpBlmState 自身直写行在 :96-99）；run_state 残留语义未注记（`_runs` 无清理是既有模式） | P3 | 锚点改引 :96-99（:43-45 降为泛化注）；AC-2 补残留语义注记（482 防线依赖残留、三键同收） |
+
+> R2-A 另证实：R1 十项修复传播完备性**全部落地**（含台账外超额传播位）；R2-B 证实「零适配」声称经全仓断言面实测成立（6-1 图身份锚为逐键成员断言非键全集；键全集断言仅在快照 state_data 面——OD-8 保护）+ R1-F7 并发会话模型验证最干净。
 
 ---
 
@@ -889,9 +906,10 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-03
 **最后更新/Last Updated:** 2026-11-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研+主会话亲验：5-3 ChainOfThought VO 复用定位/3-10 EVIDENCE_PACKAGE 零使用实证/6-1 边界表 L37 钦定 BLM 面/6-3 归档与清理先例；四冻结规范：确定性组装映射（OD-2）/归档载荷映射（OD-4）/端口契约/异常复用清单（OD-6 零新增）；AC-1~AC-7 + Task 0~7 + 13 验收场景规划；Status → ready-for-dev）
 - v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×9+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第六投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
+- v1.2.0: 文档审查 Round 2 回归核查（双 Agent：传播完备性+增量面组合；P1×2+P2×3+P3×5）：R2-F1 第七方法计数订正（R1 自引入 9 处）；R2-F2 部分降级 payload 钦定（降级信封仅产物缺席形态——R1-F3 降级轴漏修）；R2-F3 445 构造配方（tool_slug=" " 唯一通道）；R2-F4 include_blob None 行为+blob_content 落位字段；R2-F5 读侧 tuple 归一；R2-F6~F10 行号/口径/结构批（详见修复表）
