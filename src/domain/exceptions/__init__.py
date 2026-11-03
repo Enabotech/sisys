@@ -112,6 +112,10 @@ from src.domain.exceptions.relevance_exceptions import (
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
 )
+from src.domain.exceptions.report_exceptions import (
+    ReportGenerationError,
+    ReportStorageError,
+)
 from src.domain.exceptions.reranker_exceptions import RerankError
 from src.domain.exceptions.role_exceptions import (
     CannotDeleteRoleWithUsersError,
@@ -343,6 +347,10 @@ __all__ = [
     "PlanningStateError",
     "CheckpointCreationError",
     "CheckpointIntegrityError",
+    # 报告子域异常（Story 6-5a Markdown 报告生成——490 数据源全缺[404] +
+    # 491 持久化失败[layer 二元 500]）
+    "ReportGenerationError",
+    "ReportStorageError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

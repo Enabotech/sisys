@@ -93,6 +93,8 @@ from src.domain.exceptions import (
     PlanningStateError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
+    ReportGenerationError,
+    ReportStorageError,
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
@@ -308,6 +310,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     PlanningStateError: status.HTTP_409_CONFLICT,  # 482 — 状态机非法推进（第二触发点——6.3 修正面乐观锁）
     CheckpointCreationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 483 — Checkpoint 五步编排强制环节失败（Story 6.3）
     CheckpointIntegrityError: status.HTTP_409_CONFLICT,  # 484 — Checkpoint 完整性守卫/校验失败（Story 6.3）
+    ReportGenerationError: status.HTTP_404_NOT_FOUND,  # 490 — 报告数据源全缺（chain total==0——Story 6.5a）
+    ReportStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 491 — 报告持久化失败（layer 二元 l0/l2——Story 6.5a）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

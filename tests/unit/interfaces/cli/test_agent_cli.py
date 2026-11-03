@@ -1709,3 +1709,137 @@ class TestBlmPlanChainSummaryLine:
         agent_cli._print_blm_progress(result)
         out = capsys.readouterr().out
         assert "思维链归档" not in out, "chain_records 空时不应打印汇总行"
+
+
+# ======================================================================
+# Story 6-5a: report-generate 子命令（Markdown 报告生成 CLI 入口）
+# ======================================================================
+
+
+class _StubStrategicReport:
+    """StrategicReport 属性面替身（report_id/file_path/section_count 等）。"""
+
+    def __init__(self) -> None:
+        """初始化替身（getattr 打印面消费字段——CR1-F9：report_type 用真实枚举防形态掩蔽）。"""
+        import uuid as _uuid
+
+        from src.domain.entities.strategic_report import ReportType
+
+        self.report_id = _uuid.uuid4()
+        self.plan_id = "plan-1"
+        self.report_type = ReportType.MARKDOWN  # 真实枚举成员（CLI 打印取 .value——裸 str 替身会掩蔽 repr 形态缺陷）
+        self.file_path = "reports/plan-1_20261103120000.md"
+        self.section_count = 11
+        self.degraded_section_count = 0
+        self.generation_ms = 120
+
+
+class _StubReportGenerateUseCase:
+    """report_generation_use_case 替身（calls 记录 + 可注入 error）。"""
+
+    def __init__(self) -> None:
+        """初始化替身。"""
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.result = _StubStrategicReport()
+
+    async def execute(self, *, plan_id: str) -> object:
+        """替身 execute（记录调用）。"""
+        self.calls.append({"plan_id": plan_id})
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def _patch_report_generate_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubReportGenerateUseCase) -> None:
+    """CLI 入口替身注入（bootstrap/resolve 拦截——chain-query 精简版同款）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: use_case)
+
+
+class TestReportGenerateParser:
+    """report-generate 参数解析。"""
+
+    def test_missing_plan_id_exits_two(self) -> None:
+        """缺 --plan-id → argparse usage error exit 2。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["report-generate"])
+        assert exc_info.value.code == 2
+
+    def test_full_args_parsed(self) -> None:
+        """全参解析（--plan-id 必填）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["report-generate", "--plan-id", "plan-1"])
+        assert args.command == "report-generate"
+        assert args.plan_id == "plan-1"
+
+
+class TestReportGenerateExecution:
+    """report-generate 执行入口（五步定式——checkpoint-create 模板）。"""
+
+    def test_success_prints_summary_and_returns_zero(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功：打印 report_id/file_path（逻辑路径）/memory_id/章节计数汇总 + exit 0。"""
+        stub = _StubReportGenerateUseCase()
+        _patch_report_generate_entry(monkeypatch, stub)
+        passed_plan_id = str(uuid.uuid4())
+        exit_code = agent_cli.main(["report-generate", "--plan-id", passed_plan_id])
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "报告生成完成" in out
+        assert str(stub.result.report_id) in out
+        assert stub.result.file_path in out  # 逻辑路径打印
+        # CR1-F10：按行精确断言（file_path 行自含 memory_id 子串——裸 in 断言被子串遮蔽恒绿）
+        assert "  memory_id: plan-1_20261103120000" in out.splitlines()
+        # CR1-F9：枚举成员经 .value 打印为 "markdown"（打印 "ReportType.MARKDOWN" repr 即红）
+        assert "  报告类型: markdown" in out.splitlines()
+        assert "ReportType.MARKDOWN" not in out  # 枚举 repr 不得外泄
+        assert "正文章节数: 11（降级 0）" in out  # 章节计数汇总行（值级）
+        # CR1-F21（部分）：plan_id 向用例透传值级断言（独立构造期望——执行器传错/硬编码即红）
+        assert stub.calls == [{"plan_id": passed_plan_id}]
+
+    def test_domain_error_prints_code_and_returns_one(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """DomainError：[EXCEPTION_490] message stderr + exit 1（双层异常定式首层）。"""
+        from src.domain.exceptions import ReportGenerationError
+
+        stub = _StubReportGenerateUseCase()
+        stub.error = ReportGenerationError(plan_id="plan-x")
+        _patch_report_generate_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["report-generate", "--plan-id", str(uuid.uuid4())])
+        assert exit_code == 1
+        err = capsys.readouterr().err
+        assert "[EXCEPTION_490]" in err
+        assert "该 plan_id 无思维链归档记录" in err
+
+    def test_invalid_plan_id_guarded_before_use_case(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """非法 plan_id：[EXCEPTION_242] stderr + exit 1 + 守卫先于用例（零调用）。"""
+        stub = _StubReportGenerateUseCase()
+        _patch_report_generate_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["report-generate", "--plan-id", "not-a-uuid"])
+        assert exit_code == 1
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+        assert not stub.calls
+
+    def test_unexpected_error_logged_and_returns_one(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """意外异常：仅 logger.error（exc_info）+ exit 1（双层定式第二层——无 stderr print）。"""
+        stub = _StubReportGenerateUseCase()
+        stub.error = RuntimeError("意外故障")
+        _patch_report_generate_entry(monkeypatch, stub)
+        import logging
+
+        with caplog.at_level(logging.ERROR, logger="src.entrypoints.agent_cli"):
+            exit_code = agent_cli.main(["report-generate", "--plan-id", str(uuid.uuid4())])
+        assert exit_code == 1
+        assert caplog.records[-1].exc_info is not None
+        assert "[EXCEPTION" not in capsys.readouterr().err

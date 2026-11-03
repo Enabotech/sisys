@@ -1,6 +1,6 @@
 # Story 6-5a: Markdown 报告生成（基础）（BLM 面双源聚合 + 领域渲染纯函数 + L0/L2 持久化 + ReportGenerated 事件首激活）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -161,10 +161,10 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 | `file_path` | `str` | 非空（**L0 逻辑路径** `reports/{memory_id}.md` 单源派生——非绝对路径：base 物理路径归 infrastructure `MemoryConfig`，application 层不得知悉（六边形依赖方向）；逻辑路径可移植（审计语义）且消费方经端口 `read(memory_id, "reports")` 读取无需 base；memory_id 可经 `Path(file_path).stem` 反解——OD-4 裁定） |
 | `section_count` | `int` | ≥0（**正文 H3 小节总数**——gap 4 + 六子 6 + synthesis 1 = 11；目录/附录不计。计数单位钦定 H3 小节而非 H2 章数（H2 口径=2 时缺 ≥3 步即破坏 degraded ≤ section 不变量炸 242——load-bearing 选择，AC-4 缺三步场景锁死） |
 | `degraded_section_count` | `int` | ≥0 且 ≤section_count（**内容缺失类 H3 小节数**——R2 钉死口径：①归档行缺→[数据缺失] 计入（六子缺→1/synthesis 缺→1/gap 缺→4）；②降级信封态（行在位但业务字段缺席跳过渲染）计入（六子信封→1/synthesis 无信封恒 asdict 走③）；③锚叠加类（payload 完整+degraded 锚 True，内容在位仅 [降级] 标注）**不计**——内容完整非缺失，可观测面归附录 B [降级] 行。上限 11 天然成立：单小节至多一种标注形态（缺行时无锚可叠/信封时锚 True 但算一种），极端形态 gap 缺行 4 + 六子全信封 6 + synthesis 缺行 1 = 11（缺行 2 条 total=6≠0 不触发 490；synthesis 恒 asdict 两键无信封形态——内容缺失只能来自缺行）） |
-| `generation_ms` | `int` | ≥0（生成窗口毫秒——AC-7 口径） |
+| `generation_ms` | `int` | ≥0（生成窗口毫秒——**实际窗口 = 聚合起点→L2 落库前**【CR1-F16 勘误注记：frozen 实体须先于 save/publish 构造（publish 依赖 report_id），物理上不可能含发布段；AC-7 全窗口「→事件发布返回」口径由测试侧 execute 包裹计时承载——OD-8 联动】） |
 | `created_at` | `datetime` | default_factory=now(UTC) |
 
-- [ ] `__post_init__` 校验：report_type 枚举成员校验（裸 str 拒绝——ArchiveType validate :90-94 同款形态）/ file_path 非空 / 计数不变量（degraded ≤ total），违例抛 `EntityValidationError`（242 复用——实体不变量场景钦定）
+- [ ] `__post_init__` 校验（**CR1-F6 五查补全**——原三查漏 plan_id 非空与三计数非负值域）：report_type 枚举成员校验（裸 str 拒绝——ArchiveType validate :90-94 同款形态）/ file_path 非空（纯空白拒）/ **plan_id 非空**（字段表「非空（UUID 字符串）」契约落地）/ 计数不变量（degraded ≤ total）+ **三计数 ≥0**（section_count/degraded_section_count/generation_ms 负值拒——字段表 ≥0 约束），违例抛 `EntityValidationError`（242 复用——实体不变量场景钦定）
 
 **领域 VO——报告文档模型**（`src/domain/value_objects/markdown_report.py` ★ 新建，渲染器入参载体；**domain 不得依赖 application**——importlinter 方向矩阵，故不直接吃 `ChainOfThoughtTraceView`/`BlmPlanningResult` 等应用层 DTO）：
 
@@ -227,9 +227,9 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 - 源步降级：`> ⚠️ [降级] {display_name}：{原因}`（章节标题后首块；原因 = `payload.get("degrade_reason")` 缺席时固定兜底「降级（原因未随归档行结构化持久化）」——synthesis payload 恒无 reason 键/六子部分降级（R2-F2）payload=structured_output 原样亦无——两形态走兜底；**禁止解析 chain VO reflection 文本后缀**；信封态与锚叠加态均落本形态 callout + 附录 B [降级] 行——**是否计入 degraded_section_count 见实体表 R2 口径**：信封态计（内容缺失）/锚叠加不计）
 - 归档行缺失：`> ⚠️ [数据缺失] {display_name}：该步骤归档记录不可用`（章节标题后唯一块 + 附录 B [数据缺失] 行 + degraded_section_count 计入）
 
-**渲染语法冻结**：ATX 标题（`#`/`##`/`###`，禁 Setext）；GFM 管道表格（表头 + `| --- |` 分隔行 + 数据行，列数严格一致）；无序列表 `- ` 前缀；callout `> ` 前缀；中文与特殊字符原样输出（渲染层禁转义——`ensure_ascii=False` 语义）。
+**渲染语法冻结**：ATX 标题（`#`/`##`/`###`，禁 Setext）；GFM 管道表格（表头 + `| --- |` 分隔行 + 数据行，列数严格一致）；无序列表 `- ` 前缀；callout `> ` 前缀；中文与特殊字符原样输出（渲染层禁转义——`ensure_ascii=False` 语义）。**GFM 结构性字符处理限定（CR1-F4/F5 勘误）**：「禁转义」条款针对 unicode/中文语义转义，**不豁免 GFM 结构性字符**——表格单元格内 `|` 转义为 `\|`、换行符归一空格（GFM 语法内在要求，防 LLM 自由文本 payload 值破坏列对齐/注入表格行）；callout 文本多行时逐行补 `> ` 前缀（合法多行 blockquote，防后续行脱离标注形态）。
 
-**附录 A 表定稿（R3 补全映射源清单）**：「步骤」列取 **display_name 映射**——timeline 条目是三种 step 值形态（`src/application/ports/blm_planning.py:38-40`：六子裸值 trend 等/`performance_gap`/`synthesis`），映射源**三源**：`performance_gap`→`PERFORMANCE_GAP_CONFIG.display_name`、六子裸值→`MARKET_INSIGHT_STEP_CONFIG`、`synthesis`→`SYNTHESIS_DISPLAY_NAME`（R3 补第三源——两源版下 synthesis 条目无源可映射，期望不唯一）；映射 miss（未知 step 值）**直显裸值**（防未来配置增步炸渲染）；`summary_excerpt` 键**显式省略**（时间线表五列不含摘要——附录是执行过程记录非内容面）。
+**附录 A 表定稿（R3 补全映射源清单）**：「步骤」列取 **display_name 映射**——timeline 条目是三种 step 值形态（**CR1-F1 勘误：写侧实证 `blm_planning_service.py:309/:414/:504` record_step 三值**——六子裸值 trend 等（`step.value`）/`performance_gap`/`market_insight_synthesis`【原记裸值 `synthesis` 系对端口 docstring 简称的误读，写侧 timeline 实际记录 stage 全值——单测臆造值同步改喂真实值】），映射源**三源**：`performance_gap`→`PERFORMANCE_GAP_CONFIG.display_name`、六子裸值→`MARKET_INSIGHT_STEP_CONFIG`、`market_insight_synthesis`→`SYNTHESIS_DISPLAY_NAME`（R3 补第三源——两源版下 synthesis 条目无源可映射，期望不唯一）；映射 miss（未知 step 值）**直显裸值**（防未来配置增步炸渲染）；`summary_excerpt` 键**显式省略**（时间线表五列不含摘要——附录是执行过程记录非内容面）。
 
 **目录（TOC）收录面冻结（R3 补）**：收录 **H2 章级 + 附录**（第 1/2 章 + 附录 A/B——条目数随附录 A 有无非恒定，断言按实际收录数构造期望）；H3 小节不进目录（报告篇幅短，两级目录足够——渲染器单测断言目录条目数与收录规则联动）。
 
@@ -481,20 +481,20 @@ class ReportRepositoryProtocol(Protocol):
 
 > **目的：** 在进入代码实现前，明确章节结构冻结表、要素渲染映射、端口契约、异常契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 复核确认「报告章节结构与要素渲染映射冻结表」（本 Story SDD 节已定稿——四步「三组 bullet_list 前置行标签」已预裁定**加粗行标签**形态（章节结构冻结节——不开 H4，R1 裁定不再二选一）；六 Schema 全字段→块型映射不得增删；含图类产物表格承载映射 OD-9；**三态判定/原因解析次序/计数单位（section_count=11 口径）三项 R1 定稿复核确认**）；开 report 异常段 (490,499)——`grep -r "EXCEPTION_49" src/domain/exceptions/` 零碰撞实证；复核 chain 归档 `final_answer` payload 三态（gap asdict 六键 :327/六子 structured_output 原样 :436-440/synthesis asdict 两键 :527——**行号基准 HEAD@6bc6878f，Task 0.8 复核为准**）与降级信封态字段形态（信封键集 ⊆ {degraded, degrade_reason}——三态判定②的判别依据，AC-4 冻结版）
-- [ ] Subtask 0.2: 冻结「性能口径差声明」（OD-8：生成窗口=聚合起点→事件发布返回，不含 BLM run 前置；P95 数学口径 `sorted(durations)[ceil(0.95*n)-1]`——n=20 即次大值噪声敏感如实承受；**采样形态=单一数据源 plan_id × 20 次生成**（OD-10 幂等锚合法采样，构造成本=归档链一次）——R1 裁定替代原「20 独立 plan_id」；成功率口径=正常路径 N 生成 N 三元可读回，N 与采样轮数同源=20）
-- [ ] Subtask 0.3: 定义端口契约（report_generation.py / report_repository.py 模块 docstring 契约区：L0 memory_type="reports" 命名约定/文件命名 `{plan_id}_{YYYYMMDDHHMMSS}`/双源读径契约/降级判别规则）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_markdown_report.feature`（13 场景钉死——AC-1×2/AC-2×2/AC-3×1/AC-4×3/AC-5×1/AC-6×1/AC-7×2/收尾×1）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_markdown_report.py`（三件套骨架 + 延迟 import + teardown 清理链设计：报告三元 + 6-4 `_cleanup_archive_residues` 移植；**L0 写路径隔离验收层同钦定【R2 补——与 Task 5.1 同款三理由：真实 resolve 写运行机器 ~/.sisys/memory/reports/ 污染 + SCOPED lambda 缓存 resolve 后 setenv 不生效 + 并行计数互扰】**：tmp_path 自建 `FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))` 覆写注入 + _restorers 还原——6-3 端口覆写先例）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——运行期 ImportError 形态，13 场景收集期零错误）
-- [ ] Subtask 0.7: 链路接线断言清单落档（组合根三注册/事件发布点/outbox 断言键/alembic 017 幂等）+ deferred-work.md 台账处置（L129 data_pipeline 轨再锚定注记 + 新留项登记：REST 导出面触发条件）
-- [ ] Subtask 0.8: 关键代码锚点复核（并行会话提交会使行号漂移——上表锚点逐条 grep 复验；payload 三态/降级信封字段形态亲验定稿渲染容错规则）
-- [ ] Subtask 0.9: 既有契约测试回归基线（`pytest tests/contracts/ -q` 全绿记录）
+- [x] Subtask 0.1: 复核确认「报告章节结构与要素渲染映射冻结表」（本 Story SDD 节已定稿——四步「三组 bullet_list 前置行标签」已预裁定**加粗行标签**形态（章节结构冻结节——不开 H4，R1 裁定不再二选一）；六 Schema 全字段→块型映射不得增删；含图类产物表格承载映射 OD-9；**三态判定/原因解析次序/计数单位（section_count=11 口径）三项 R1 定稿复核确认**）；开 report 异常段 (490,499)——`grep -r "EXCEPTION_49" src/domain/exceptions/` 零碰撞实证；复核 chain 归档 `final_answer` payload 三态（gap asdict 六键 :327/六子 structured_output 原样 :436-440/synthesis asdict 两键 :527——**行号基准 HEAD@6bc6878f，Task 0.8 复核为准**）与降级信封态字段形态（信封键集 ⊆ {degraded, degrade_reason}——三态判定②的判别依据，AC-4 冻结版）
+- [x] Subtask 0.2: 冻结「性能口径差声明」（OD-8：生成窗口=聚合起点→事件发布返回，不含 BLM run 前置；P95 数学口径 `sorted(durations)[ceil(0.95*n)-1]`——n=20 即次大值噪声敏感如实承受；**采样形态=单一数据源 plan_id × 20 次生成**（OD-10 幂等锚合法采样，构造成本=归档链一次）——R1 裁定替代原「20 独立 plan_id」；成功率口径=正常路径 N 生成 N 三元可读回，N 与采样轮数同源=20）
+- [x] Subtask 0.3: 定义端口契约（report_generation.py / report_repository.py 模块 docstring 契约区：L0 memory_type="reports" 命名约定/文件命名 `{plan_id}_{YYYYMMDDHHMMSS}`/双源读径契约/降级判别规则）【Task 2/3 端口文件落地——report_generation.py 模块 docstring 全契约区在位（memory_type/文件命名/file_path 逻辑路径/双源读径/三态降级判别/八 stage 期望集派生公式 EXPECTED_REPORT_STAGES 常量）】
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_markdown_report.feature`（13 场景钉死——AC-1×2/AC-2×2/AC-3×1/AC-4×3/AC-5×1/AC-6×1/AC-7×2/收尾×1）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_markdown_report.py`（三件套骨架 + 延迟 import + teardown 清理链设计：报告三元 + 6-4 `_cleanup_archive_residues` 移植；**L0 写路径隔离验收层同钦定【R2 补——与 Task 5.1 同款三理由：真实 resolve 写运行机器 ~/.sisys/memory/reports/ 污染 + SCOPED lambda 缓存 resolve 后 setenv 不生效 + 并行计数互扰】**：tmp_path 自建 `FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))` 覆写注入 + _restorers 还原——6-3 端口覆写先例）【实施修正：注册表 register_port 同名异 spec 抛 ConflictError 不支持覆写——落地形态为服务实例层注入 tmp_path L0（6-3 验收 CheckpointService 手动构造同款先例），teardown ① restorers 链保留】
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——运行期 ImportError 形态，13 场景收集期零错误）【实证：13 collected 零收集错误；12 场景 ModuleNotFoundError(src.application.ports.report_generation) + S13 收尾场景 NotImplementedError——均为运行期失败】
+- [x] Subtask 0.7: 链路接线断言清单落档（组合根三注册/事件发布点/outbox 断言键/alembic 017 幂等）+ deferred-work.md 台账处置（L129 data_pipeline 轨再锚定注记 + 新留项登记：REST 导出面触发条件）【四处处置落档：L129 OD-2 偏离注记/L170 事件消费基建顺延注记/L192 ChainOfThoughtSchema 零触发注记/新登记 6.5a-DF1 REST 导出留项】
+- [x] Subtask 0.8: 关键代码锚点复核（并行会话提交会使行号漂移——上表锚点逐条 grep 复验；payload 三态/降级信封字段形态亲验定稿渲染容错规则）【五 Agent 并行调研+主会话亲验双重复核——锚点 36 处全量吻合 + 两处校正：484 是 CheckpointIntegrityError 非 CheckpointStorageError（(layer,...) 形态真身=ArchiveStorageError 284 archive_exceptions.py:77-111——491 直接模板）；EXCEPTION_HTTP_MAP 在 exception_handlers.py:152 非 exceptions/__init__.py】
+- [x] Subtask 0.9: 既有契约测试回归基线（`pytest tests/contracts/ -q` 全绿记录）【基线：1479 passed in 23.81s（2026-11-03）】
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（两张冻结表 + 口径 + 契约）
-- [ ] 验收测试运行失败（预期行为，红阶段确认——运行期 ImportError）
-- [ ] 台账处置落档
+- [x] 规范项全部定义完毕（两张冻结表 + 口径 + 契约）
+- [x] 验收测试运行失败（预期行为，红阶段确认——运行期 ImportError）
+- [x] 台账处置落档
 
 ---
 
@@ -512,9 +512,9 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/domain/entities/strategic_report.py` + `src/domain/value_objects/markdown_report.py` 最小代码 |
 | 🔄 重构 | 类型注解 + Google 风格全中文 docstring + `ruff`/`mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写实体/VO 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `StrategicReport`/`ReportType`/`ReportSection`/`ReportBlock`/`MarkdownReportDocument`
-- [ ] Subtask 1.3: 🔄 重构 — 优化实体/VO 代码
+- [x] Subtask 1.1: 🔴 红 — 编写实体/VO 失败测试【24 用例；实施发现并修复守卫盲区：str 行 len 巧合撞列数静默通过——VO 增 tuple 形态守卫先于列数校验】
+- [x] Subtask 1.2: 🟢 绿 — 实现 `StrategicReport`/`ReportType`/`ReportSection`/`ReportBlock`/`MarkdownReportDocument`
+- [x] Subtask 1.3: 🔄 重构 — 优化实体/VO 代码【ruff+mypy 零错误】
 
 #### TDD 循环 B：Markdown 渲染器纯函数
 
@@ -524,9 +524,9 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/domain/services/markdown_report_renderer.py`（`render_markdown_report(document: MarkdownReportDocument) -> str` 纯函数 + 块渲染私有函数族） |
 | 🔄 重构 | 函数拆分/命名统一/注解 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写渲染器失败测试（含变异实证：改坏表格分隔行渲染→红→还原→绿）
-- [ ] Subtask 1.5: 🟢 绿 — 实现渲染器
-- [ ] Subtask 1.6: 🔄 重构 — 优化渲染器
+- [x] Subtask 1.4: 🔴 红 — 编写渲染器失败测试（含变异实证：改坏表格分隔行渲染→红→还原→绿）【17 用例；变异实证完成：分隔行 `---`→`-` 注入 → 3 failed（断言活着）→ 还原 → 全绿】
+- [x] Subtask 1.5: 🟢 绿 — 实现渲染器【render_markdown_report 纯函数 + _render_block/_render_table/_github_slug/_render_section 私有函数族；GitHub slug 锚点（中文原样+空格→连字符）；目录收录 H2 章级冻结】
+- [x] Subtask 1.6: 🔄 重构 — 优化渲染器【walrus 过滤空块；空表头零列表格返回空列表；ruff+mypy 零错误】
 
 #### TDD 循环 C：report 异常双类
 
@@ -536,14 +536,14 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/domain/exceptions/report_exceptions.py` + `_code_ranges.py` 开段注册 + `__init__.py` 导出 + `EXCEPTION_HTTP_MAP` + design.md 编码分配表更新 |
 | 🔄 重构 | 全量异常回归（`pytest tests/unit/domain/exceptions/ -v` 含 uniqueness/code_ranges 8 项 + `test_exception_handlers.py`） |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写异常失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 实现异常双类 + 四处登记（文件/码段/导出/映射）
-- [ ] Subtask 1.9: 🔄 重构 — 异常回归全绿
+- [x] Subtask 1.7: 🔴 红 — 编写异常失败测试【20 用例（双类构造/登记联动——CR1-F28 勘误：原记 21，实测收集 20）】
+- [x] Subtask 1.8: 🟢 绿 — 实现异常双类 + 四处登记（文件/码段/导出/映射）【report_exceptions.py + _code_ranges 开 report 段 (490,499)+双类注册 + __init__ 导出 + EXCEPTION_HTTP_MAP（exception_handlers.py——调研校正：映射在 handlers 非 exceptions/__init__）+ design.md 两张表回填（report 段行 + 483/484 既有漂移顺带修正——R1-18 钦定）；联动既有 test_exception_handlers.py 键集合快照同步登记】
+- [x] Subtask 1.9: 🔄 重构 — 异常回归全绿【tests/unit/domain/exceptions/ 全量 672+ passed 含 uniqueness/code_ranges 自动发现零改动】
 
 **完成标准/Definition of Done:**
-- [ ] 实体/VO/渲染器/异常全部实现（domain 零依赖——importlinter 验证）
-- [ ] TDD 循环全部通过（含变异实证）
-- [ ] 覆盖率 domain ≥90%（本 Story 新增面 100% 关键路径）
+- [x] 实体/VO/渲染器/异常全部实现（domain 零依赖——importlinter 验证）【lint-imports 5 kept 0 broken】
+- [x] TDD 循环全部通过（含变异实证）【循环 A 24 用例 + 循环 B 17 用例（变异实证）+ 循环 C 20 用例（CR1-F28 勘误：原记 21 实测 20）；tests/unit/domain/ 全量 3620 passed】
+- [ ] 覆盖率 domain ≥90%（本 Story 新增面 100% 关键路径）【Task 7 全量覆盖率门禁复核】
 
 ---
 
@@ -561,9 +561,9 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/application/services/report_generation_service.py` + `src/application/ports/report_generation.py`（聚合私有函数族 + 文档 VO 组装 + 渲染调用） |
 | 🔄 重构 | 分派表驱动化/纯函数提取 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写聚合/降级失败测试（AsyncMock(spec=Port) 五依赖 + `_make_*` 工厂——6-4 `_make_material` 形态；**TraceView 构造面提示**：records 每条五键含 chain VO（5 必填字段+全字段校验），建议参数化工厂 `_make_trace_view(stages, payload_kind)` 三态分派【正常/信封/缺失】——6-4 先例只构造空 view，本 Story 构造面显著更重，预估 60-80 行工厂）
-- [ ] Subtask 2.2: 🟢 绿 — 实现端口 + 聚合服务
-- [ ] Subtask 2.3: 🔄 重构 — 优化聚合代码
+- [x] Subtask 2.1: 🔴 红 — 编写聚合/降级失败测试（AsyncMock(spec=Port) 五依赖 + `_make_*` 工厂——6-4 `_make_material` 形态；**TraceView 构造面提示**：records 每条五键含 chain VO（5 必填字段+全字段校验），建议参数化工厂 `_make_trace_view(stages, payload_kind)` 三态分派【正常/信封/缺失】——6-4 先例只构造空 view，本 Story 构造面显著更重，预估 60-80 行工厂）【落地：_make_trace_view 三态工厂 + ENVELOP 哨兵 + _full_stages_payload 覆盖映射——六组测试类 30 用例】
+- [x] Subtask 2.2: 🟢 绿 — 实现端口 + 聚合服务【report_generation.py 端口（契约 docstring Task 0.3 落档）+ report_repository.py R1 端口 + report_generation_service.py 双源聚合（三态判定/原因解析次序/缺行骨架/附录 A 三源映射/附录 B 两类全收/五段编排）】
+- [x] Subtask 2.3: 🔄 重构 — 优化聚合代码【聚合抽 _aggregate_document 模块级纯函数 + _Aggregation 局部累积（AC-7 无状态约束）；ruff+mypy 零错误】
 
 #### TDD 循环 B：持久化编排 + 事件发布
 
@@ -573,14 +573,14 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现五段编排尾部（L0 write→L2 save→事件发布→实体返回；发布失败双防线检出【`if not result.is_success` 先判 + `except Exception` 兜底】→warning 宽容；L0/L2 失败 491 包装【layer="l0"/"l2"】） |
 | 🔄 重构 | 无共同事务语境注释（save/publish 独立会话）+ 计时窗口（generation_ms） |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写编排/事件失败测试（含变异实证：改坏事件 report_type 组装→红→还原→绿）
-- [ ] Subtask 2.5: 🟢 绿 — 实现编排尾部
-- [ ] Subtask 2.6: 🟢 端口契约测试 `tests/contracts/test_port_contract_report_generation.py`（五断言族——服务面注册在 Task 3 组合根落地后 resolve 断言转绿）
+- [x] Subtask 2.4: 🔴 红 — 编写编排/事件失败测试（含变异实证：改坏事件 report_type 组装→红→还原→绿）【变异实证完成：report_type 组装改坏 → three_keys 断言红 → 还原 → 30 passed】
+- [x] Subtask 2.5: 🟢 绿 — 实现编排尾部【L0 双检出口径（OSError 主形态 + write() is False 端口契约面）/L2 491 包装/事件双防线宽容（is_success 先判+except 兜底——warning 消息含 report_id/event_type/error）】
+- [x] Subtask 2.6: 🟢 端口契约测试 `tests/contracts/test_port_contract_report_generation.py`（五断言族——服务面注册在 Task 3 组合根落地后 resolve 断言转绿）【编写完成待 Task 3 注册后转绿】
 
 **完成标准/Definition of Done:**
-- [ ] 聚合服务 + 端口实现完成
-- [ ] TDD 循环全部通过
-- [ ] 覆盖率 application ≥85%
+- [x] 聚合服务 + 端口实现完成
+- [x] TDD 循环全部通过（含变异实证）【30 用例全绿 + 事件变异实证】
+- [ ] 覆盖率 application ≥85%【Task 7 全量覆盖率门禁复核】
 
 ---
 
@@ -598,9 +598,9 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `models/report.py`（ReportModel）+ `deploy/postgresql/alembic/versions/017_strategic_reports.py`（只增）+ `src/infrastructure/storage/postgresql/repository/report_repository.py`（PostgreSQLReportRepository，session_factory 可选尾参构造——**application 层禁 import infrastructure 由端口注入隔离**） |
 | 🔄 重构 | `alembic upgrade head` 幂等验证 + migration downgrade 链验证 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写仓储失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 ORM/migration/repository
-- [ ] Subtask 3.3: 🔄 重构 — migration 幂等验证
+- [x] Subtask 3.1: 🔴 红 — 编写仓储失败测试【mock-session 模式（isolation 模板）四测试类 12 用例】
+- [x] Subtask 3.2: 🟢 绿 — 实现 ORM/migration/repository【ReportModel（metadata_ 属性名避开保留字）+ 017 migration + PostgreSQLReportRepository（session_factory 第一天注入 + save/get 双模式 fallback + 直调 get_session catch RuntimeError 防呆）】
+- [x] Subtask 3.3: 🔄 重构 — migration 幂等验证【测试库 5433 实证：016→017 升级成功 + 二次 upgrade 幂等零输出 + 9 列 2 索引与冻结基线一致；实施修正：_persist 私有名避免覆写基类 _do_save 钩子（LSP）+ add/flush 纯 INSERT 编排（report_id 恒新 uuid4）】
 
 #### TDD 循环 B：用例 + 组合根三注册块
 
@@ -610,9 +610,9 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/application/use_cases/generate_markdown_report.py` + 组合根三注册块（report_repository SCOPED session_factory 注入 / report_generation_service SINGLETON 五依赖 resolve / report_generation_use_case SINGLETON——`=== Story 6-5a ===` 分节注释，checkpoint_service :2293-2308 形态模板——R4 传播修复：锚点表 R1 校正值同步） |
 | 🔄 重构 | 契约测试 resolve 断言转绿 + 既有组合根断言零破坏复核（增量注册不动既有 lambda——6-4 0.8⑥ 亲验先例） |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写用例失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 实现用例 + 三注册块
-- [ ] Subtask 3.6: 🔄 重构 — 契约断言全绿
+- [x] Subtask 3.4: 🔴 红 — 编写用例失败测试【3 用例（守卫 242 context 三键/守卫先于调用/透传返回）】
+- [x] Subtask 3.5: 🟢 绿 — 实现用例 + 三注册块【组合根 `=== Story 6-5a ===` 包裹式分节（6-3 先例）；report_repository SCOPED session_factory 注入 / report_generation_service SINGLETON 五依赖 / report_generation_use_case SINGLETON】
+- [x] Subtask 3.6: 🔄 重构 — 契约断言全绿【test_port_contract_report_generation.py 11 passed（组合根落地后 resolve isinstance 全转绿）；既有组合根断言零破坏——契约全量回归 Task 4.3 覆盖】
 
 #### TDD 循环 C：CLI report-generate 子命令
 
@@ -622,14 +622,14 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 实现 `src/entrypoints/agent_cli.py` `report-generate` 子命令（argparse 扁平——checkpoint-create :337-392 模板——R4 传播修复：锚点表 R1 校正值同步；resolve `"report_generation_use_case"`） |
 | 🔄 重构 | 打印格式统一（`_print_report_summary` 辅助） |
 
-- [ ] Subtask 3.7: 🔴 红 — 编写 CLI 失败测试
-- [ ] Subtask 3.8: 🟢 绿 — 实现子命令
-- [ ] Subtask 3.9: 🔄 重构 — CLI 代码优化
+- [x] Subtask 3.7: 🔴 红 — 编写 CLI 失败测试【Parser 两例 + Execution 四例（成功摘要含 memory_id 打印/490 stderr/242 守卫先于用例/意外异常 logger-only）】
+- [x] Subtask 3.8: 🟢 绿 — 实现子命令【argparse 扁平（--plan-id required）+ _run_report_generate 执行器 + _run_report_generate_cli 五步定式（chain-query 模板）+ _print_report_summary（report_id/报告类型/逻辑路径/memory_id/章节计数汇总/耗时）+ main if 链分发】
+- [x] Subtask 3.9: 🔄 重构 — CLI 代码优化【CLI 全量 102 passed；mypy 746 零错误】
 
 **完成标准/Definition of Done:**
-- [ ] migration/ORM/仓储/用例/组合根/CLI 全部实现
-- [ ] `alembic upgrade head` 幂等 + 四目录相关测试全绿
-- [ ] CLI 生产通道 session 可达性实证（非三重遮蔽态）
+- [x] migration/ORM/仓储/用例/组合根/CLI 全部实现
+- [x] `alembic upgrade head` 幂等 + 四目录相关测试全绿【单测相关面 3512+102+117 passed；全量回归 Task 4.3 两轮】
+- [x] CLI 生产通道 session 可达性实证（非三重遮蔽态）【三步排查实证：①组合根 lambda 带 session_factory=resolver.resolve("session_factory") ②session_factory 端口注册在位 ③agent_cli 全文零 set_session/session_context——CLI 可达性全靠组合根 lambda + 仓储双模式 fallback】
 
 ---
 
@@ -639,15 +639,15 @@ class ReportRepositoryProtocol(Protocol):
 
 > **性质说明：** 负向契约断言 + 全量回归（纯读侧Story 的回归面守卫）。
 
-- [ ] Subtask 4.1: 🔴🟢 编写 `tests/contracts/test_event_channel_mapping_report.py`（event_channels.yaml + DEFAULT_MAPPINGS 零 diff 守护——**登记集合冻结快照相等断言**：①ReportGenerated 既有登记存在性【yaml :273-276 与 DEFAULT_MAPPINGS :346-351 双侧——routing key `sisys.events.reliable.report_generated` + reliable 单通道】②事件登记键集合与冻结基线全等【yaml 事件名集合 == 基线集合，防本 Story 意外新增事件名】。**R1 裁定：6-4「缺席断言 token 零命中」范式在本 Story 不适用**——`report_generated` 是 Epic 1 既有登记 token（routing key 内在位），按零命中断言必当场误伤既有登记；本 Story 零新事件，负向守护面=键集合全等而非 token 缺席）
-- [ ] Subtask 4.2: 6-x 冻结面零触碰验证（blm_planning_prompts.py/blm_planning.py 契约区/chain 归档配方/ReportGenerated 事件类——git diff 逐文件零改动实证 + 负向断言）
-- [ ] Subtask 4.3: 全量回归（四目录显式：`pytest tests/unit tests/integration tests/contracts tests/acceptance`——裸 `tests/` 会挂起，全量回归四目录命令纪律；两轮稳定）
-- [ ] Subtask 4.4: 红线三查（`grep -rn "raise ValueError" src/` + `grep -rn "HTTPException" src/ | grep -v handlers` + `grep -rn "# noqa\|# type: ignore\|# pylint" src/ tests/` 零输出）+ 提交信息禁 AI 署名
+- [x] Subtask 4.1: 🔴🟢 编写 `tests/contracts/test_event_channel_mapping_report.py`（event_channels.yaml + DEFAULT_MAPPINGS 零 diff 守护——**登记集合冻结快照相等断言**：①ReportGenerated 既有登记存在性【yaml :273-276 与 DEFAULT_MAPPINGS :346-351 双侧——routing key `sisys.events.reliable.report_generated` + reliable 单通道】②事件登记键集合与冻结基线全等【yaml 事件名集合 == 基线集合，防本 Story 意外新增事件名】。**R1 裁定：6-4「缺席断言 token 零命中」范式在本 Story 不适用**——`report_generated` 是 Epic 1 既有登记 token（routing key 内在位），按零命中断言必当场误伤既有登记；本 Story 零新事件，负向守护面=键集合全等而非 token 缺席）【6 用例：双侧登记存在性/单通道无 redis/运行时查表/键数 56 冻结/双侧键集互等】
+- [x] Subtask 4.2: 6-x 冻结面零触碰验证（blm_planning_prompts.py/blm_planning.py 契约区/chain 归档配方/ReportGenerated 事件类——git diff 逐文件零改动实证 + 负向断言）【git diff --stat HEAD 五文件零输出实证（prompts/blm_planning 端口/workflow_events/event_channels.yaml/channel_router）】
+- [x] Subtask 4.3: 全量回归（四目录显式：`pytest tests/unit tests/integration tests/contracts tests/acceptance`——裸 `tests/` 会挂起，全量回归四目录命令纪律；两轮稳定）【两轮实证：R1=14574 passed + 14 failed（13 本 Story 验收骨架预期红 + 1 sqlalchemy 架构测试误报——docstring 提及 SQLAlchemyError 字样触发字符串匹配，改措辞修复）；R2=14575 passed + 13 failed（仅验收骨架预期红）——两轮稳定】
+- [x] Subtask 4.4: 红线三查（`grep -rn "raise ValueError" src/` + `grep -rn "HTTPException" src/ | grep -v handlers` + `grep -rn "# noqa\|# type: ignore\|# pylint" src/ tests/` 零输出）+ 提交信息禁 AI 署名【①raise ValueError 零输出 ✓；②HTTPException 10 处 + ③抑制注释 23 处经归属甄别均为既有存量（91-1 立项面/既有测试文件）——本 Story 全部新建/修改文件零命中 ✓】
 
 **完成标准/Definition of Done:**
-- [ ] 契约测试全绿 + 零 diff 实证
-- [ ] 四目录全量回归两轮稳定
-- [ ] 三条 grep 零输出
+- [x] 契约测试全绿 + 零 diff 实证【事件契约 6 passed + 端口契约 11 passed + 既有契约 1479 基线】
+- [x] 四目录全量回归两轮稳定
+- [x] 三条 grep 零输出【本 Story 面零输出——存量残留属 91-1 既有立项】
 
 ---
 
@@ -657,17 +657,17 @@ class ReportRepositoryProtocol(Protocol):
 
 > **真实服务四件（Redis/PG/Qdrant/MinIO）+ Fake LLM/Embedding 双豁免**——服务内含 L2 落库链：**真实提交 + 按 plan_id/report_id 定向 DELETE 清理**（savepoint 不适用——6-4 钦定口径）； teardown 链 + 跑前跑后净增 0。
 
-- [ ] Subtask 5.1: 编写 `tests/integration/test_integration_markdown_report.py` 装配（`_ReportChain` 装配类——6-4 `_CheckpointChain` 形态模板：真实 resolve + Fake LLM **八键族**身份分派【6-2 `_make_fake_llm` 复用——六类型化 + GapAnalysis + InsightSynthesis 共八键族全派派（跑 8 步全链需要），验收版按 `__name__` 字符串分派/integration 版按 `is` 身份——复用取 integration 形态】+ Fake Embedding 1024 维 + `_probe_services` async 直 await 探测【禁 run_until_complete】+ **L0 写路径隔离**【tmp_path 自建 `FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))` 覆写注入 _restorers 还原——6-3 端口覆写先例；**禁直接真实 resolve 的 l0_storage**（写运行机器 `~/.sisys/memory/reports/` 污染共享目录；且组合根 SCOPED lambda 缓存于 resolver 实例，resolve 过后 setenv 不生效——覆写注入是唯一可靠隔离】+ teardown：报告三元【L0 文件/L2 行/事件 outbox 行】+ 归档三面【`_cleanup_archive_residues` 移植：PG 档案行/Qdrant 点/MinIO WORM】+ Redis 快照键族）
-- [ ] Subtask 5.2: 场景①全链生成（Fake 8 步 → generate → 报告三元断言 + 章节结构断言）+ 场景②格式化断言（表格/列表/标题逐项）+ 场景③降级语义（**构造手段钦定：逐 stage 归档七次跳过目标步——AC-4 冻结版；禁止跑后删行** → [数据缺失] 标注 + degraded_section_count==1）+ 场景③b 缺三步不变量（六子缺三步 → degraded==3 ≤ section==11 无 242 报告成功）+ 场景④490 全缺（**从未归档的独立 plan_id** 天然 total==0 → 异常码断言）
-- [ ] Subtask 5.3: 🔴 红→🟢 绿循环（先跑确认失败形态再补装配缺口——装配型测试红绿以「场景断言值级失败→全绿」为准）
-- [ ] Subtask 5.4: 场景⑤性能采样（**单一数据源 plan_id × 20 次生成**——OD-10 幂等锚合法采样，8 步归档链只构造一次；断言每轮新 report_id + L2 行数 +20 + report_id 集合无重复；聚合→发布窗口计时；P95 数学口径断言 <30s【n=20 次大值噪声敏感注记】；口径 docstring OD-8）+ 并发 3（asyncio.gather 三 plan_id 三元互不串扰；**gather 形态锚（R3）：gather 必须在 `async def` 辅助函数体内 await 后经 `_run_async` 驱动——6-4 `test_acceptance_json_chain_of_thought.py:2066-2068` 先例锚；禁止步骤顶层裸 `asyncio.gather(...)` 传入 `run_until_complete`（gather 即时 ensure_future 绑定 policy loop，与模块级 event_loop fixture 跨 loop → RuntimeError）**）
-- [ ] Subtask 5.5: 净增 0 断言（跑前跑后 Redis/PG/Qdrant/MinIO/L0 五面计数差为 0）
-- [ ] Subtask 5.6: 覆盖率集成 ≥75% 复核
+- [x] Subtask 5.1: 编写 `tests/integration/test_integration_markdown_report.py` 装配（`_ReportChain` 装配类——6-4 `_CheckpointChain` 形态模板：真实 resolve + Fake LLM **八键族**身份分派【集成数据面为逐 stage 归档构造（不经 LLM run）——Fake 面仅 Embedding 豁免；归档素材 _make_material 三型分派移植】+ Fake Embedding 1024 维 + `_probe_services` async 直 await 探测【禁 run_until_complete】+ **L0 写路径隔离**【tmp_path 自建 FileMemoryAdapter 服务实例层注入——R1-17 三理由；实施修正：注册表 register_port 同名异 spec 抛 ConflictError 不支持覆写，6-3 验收先例真身即服务实例注入】+ teardown：报告侧【outbox report 行 + L2 行定向 DELETE】+ 归档三面【6-4 `_cleanup_by_plan_id` 移植：PG 档案行/Qdrant 点/MinIO WORM】）【实施追加：`_fresh_resolver_per_test` autouse fixture——SCOPED/SINGLETON 缓存实例 asyncpg 池绑首用 loop，pytest-asyncio 每函数新 loop 跨测试复用必炸 different loop（6-1 场景③ clear_singleton 先例防线 + clear_scoped 补全）】
+- [x] Subtask 5.2: 场景①全链生成（八步归档 → generate → 报告三元断言 + 章节结构断言【display_name 源独立构造期望——MARKET_INSIGHT_STEP_CONFIG.values() 迭代构造 2.1~2.6】）+ 场景②格式化断言（ATX 层级遍历/PESTEL 表头定位法 6 行/五力 5 行/列表项数/中文原样）+ 场景③降级语义（**逐 stage 归档七次跳过目标步——AC-4 冻结版钦定构造** → [数据缺失] callout + degraded==1 + 附录 B 行）+ 场景③b 缺三步不变量（六子缺三步 → degraded==3 ≤ section==11 无 242 报告成功）+ 场景④490 全缺（**从未归档的独立 plan_id** 天然 total==0 → code/message/context 断言 + 零落库断言）
+- [x] Subtask 5.3: 🔴 红→🟢 绿循环（首跑 4 failed【装配缺口：跨 loop 缓存实例 + fallback 未触达】→ `_fresh_resolver_per_test` 防线修复 → 单进程 5 passed + xdist 并行两轮稳定——装配型红绿以「场景断言值级失败→全绿」为准 ✓）
+- [x] Subtask 5.4: 场景⑤性能采样（**单一数据源 plan_id × 20 次生成**——OD-10 幂等锚合法采样，归档链只构造一次；每轮新 report_id【集合无重复断言】+ L2 行数累计 20 + 每轮即时读回【秒级覆写豁免口径】；execute 包裹计时（聚合→发布窗口）；P95 `sorted[ceil(0.95*20)-1]` <30s 断言通过【实测亚秒级】；OD-8 口径差声明落模块 docstring）+ 并发 3（asyncio.gather 三 plan_id——裸 async 测试函数内直 await，无 BDD 跨 loop 陷阱；三元互不串扰断言【每 plan 恰 1 行 + report_id 互异】）
+- [x] Subtask 5.5: 净增 0 断言（跑前基线计数 → 清理后对照【报告行净增 0 + outbox 报告行残留 0】——场景①/⑤双承载）
+- [x] Subtask 5.6: 覆盖率集成 ≥75% 复核【整体 92%（三目录 cov run）≥75% ✓】
 
 **完成标准/Definition of Done:**
-- [ ] 五场景全绿（真实服务环境）
-- [ ] 净增 0 + 两轮稳定
-- [ ] P95/并发断言通过
+- [x] 五场景全绿（真实服务环境）【单进程 5 passed + xdist 并行两轮 5 passed 稳定】
+- [x] 净增 0 + 两轮稳定
+- [x] P95/并发断言通过
 
 ---
 
@@ -679,16 +679,16 @@ class ReportRepositoryProtocol(Protocol):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 6.1: 🔴 编写 `tests/unit/architecture/test_markdown_report.py`（epics L2260 钦定名——AST/import 扫描：渲染器/VO/实体零第三方 import【domain 零依赖】/聚合服务零 infrastructure import【application-no-infrastructure】/落位守护【新文件在冻结路径清单内】/CLI 不直依赖实现类）
-- [ ] Subtask 6.2: 实现四验证器（依赖方向/禁 import 黑名单/文件落位/端口经 resolver 解耦——test_checkpoint.py:1-60 形态模板）
-- [ ] Subtask 6.3: 循环依赖检测（ruff `I` 规则/isort——不引入 pylint）
-- [ ] Subtask 6.4: 运行完整测试套件并生成报告（四目录全量）
+- [x] Subtask 6.1: 🔴 编写 `tests/unit/architecture/test_markdown_report.py`（epics L2260 钦定名——AST/import 扫描：渲染器/VO/实体零第三方 import【domain 零依赖】/聚合服务零 infrastructure import【application-no-infrastructure】/落位守护【新文件在冻结路径清单内】/CLI 不直依赖实现类）
+- [x] Subtask 6.2: 实现四验证器（依赖方向/禁 import 黑名单/文件落位/端口经 resolver 解耦——test_checkpoint.py:1-60 形态模板）【四验证器 9 用例：A 零依赖双向校验【黑名单+白名单+src.domain 越层】/B 应用层隔离+本地 Protocol 禁令/C 落位存在+散落防护【__pycache__ 过滤修正】/D CLI resolve 端口名+服务依赖面全端口】
+- [x] Subtask 6.3: 循环依赖检测（ruff `I` 规则/isort——不引入 pylint）【ruff I 规则承载——全仓 import 排序检查零错误】
+- [x] Subtask 6.4: 运行完整测试套件并生成报告（四目录全量）【Task 7.3：14602 passed×2 轮稳定——架构测试 9 用例全绿在内】
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构/约束测试通过
-- [ ] 测试输出清晰的合规报告
-- [ ] 任何违规都会导致测试失败
-- [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
+- [x] 所有架构/约束测试通过【9 passed】
+- [x] 测试输出清晰的合规报告
+- [x] 任何违规都会导致测试失败
+- [x] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
 ---
 
@@ -706,17 +706,17 @@ class ReportRepositoryProtocol(Protocol):
 | 🟢 绿 | 完善 `tests/acceptance/test_acceptance_markdown_report.py` 的 BDD 步骤实现（收尾场景步骤：src 与四测试目录交付件存在性逐项断言） |
 | 🔄 重构 | 收敛场景命名、统一断言表达、pytestmark 完整性专项复核（6-3 丢失修复教训） |
 
-- [ ] Subtask 7.1: 收尾场景断言面补齐（src 交付件【实体/VO/渲染器/异常/端口/服务/用例/仓储/ORM/migration/CLI】+ 四测试目录交付件逐项存在性）
-- [ ] Subtask 7.2: 全部 13 场景转绿 + pytestmark 复核（acceptance/database/redis/qdrant/minio/xdist_group 六项齐备）+ Run with docstring
-- [ ] Subtask 7.3: 运行 `pytest`（四目录显式）、`ruff check`、`mypy` 收尾校验
-- [ ] Subtask 7.4: 三红线 grep + 提交信息审查（禁 AI 署名）+ deferred-work 留项终置（REST 导出面触发条件注记）
-- [ ] Subtask 7.5: sprint-status.yaml 状态流转（review→done 由 code-review 环节）
+- [x] Subtask 7.1: 收尾场景断言面补齐（src 交付件【实体/VO/渲染器/异常/端口/服务/用例/仓储/ORM/migration/CLI】+ 四测试目录交付件逐项存在性）【Task 0 骨架→完整实现：6-4 装配链移植（Fake LLM 八 Schema __name__ 分派/guard 链/CEO 实例化/图引擎/真实检索 R 门控）+ 双装配形态（完整 run/归档轻装配）+ 26 个 then 断言面全实现——display_name 源独立构造期望/表头定位法/两级 outbox 路径/jsonb 键族机理核实（子类三键嵌套 + 核心三键顶层）】
+- [x] Subtask 7.2: 全部 13 场景转绿 + pytestmark 复核（acceptance/database/redis/qdrant/minio/xdist_group 六项齐备）+ Run with docstring【13 passed 单进程+xdist 双模式；实施攻坚记录：①`_clear_resolver_caches` 前后清防线（SINGLETON/SCOPED 缓存跨 loop/跨文件污染——xdist 组内被 6-x 先跑缓存污染+反向污染他人）；②环境故障排查（测试 Qdrant 容器假死→重启→RocksDB 残锁→清卷重建；测试库 migration 中间态→upgrade head 恢复）——均为环境损伤非代码回归，环境恢复后既有验收 51 passed 实证】
+- [x] Subtask 7.3: 运行 `pytest`（四目录显式）、`ruff check`、`mypy` 收尾校验【**14602 passed / 2 skipped / 0 failed × 两轮完全稳定**（外部 LLM 门控 2 skip 动态跳过）；ruff All checks passed；mypy 746 零错误；覆盖率：整体 92%≥80% ✓ / domain+application 91%（≥90%/85%）✓ / 本 Story 新增文件 96-100%（renderer 98%/service 96%/实体 VO 异常 100%）✓】
+- [x] Subtask 7.4: 三红线 grep + 提交信息审查（禁 AI 署名）+ deferred-work 留项终置（REST 导出面触发条件注记）【红线三查本 Story 全部交付文件零输出（仓内存量残留属 91-1 既有立项面——HTTPException docstring 提及×1/test_tool_domain_entities 既有 noqa×1）；deferred-work 四处处置已 Task 0.7 落档 + 6.5a-DF1 REST 导出留项在位】
+- [x] Subtask 7.5: sprint-status.yaml 状态流转（review→done 由 code-review 环节）【in-progress→review 已落档 2026-11-04；review→done 归 code-review 环节】
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `review`/`done`
+- [x] `src` 完成清单已逐项验证确认【S13 交付件存在性 11 项断言通过】
+- [x] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认【S13 四目录 12 项断言通过】
+- [x] 开发结束验收测试通过【13 场景全绿×双模式 + 14602×2 全量稳定】
+- [x] Story 可进入 `review`/`done`
 
 ---
 
@@ -899,45 +899,56 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - [x] 项目结构对齐统一规范（双源聚合 / L0+L2 持久化 / 事件零新增 / 异常开段 490）
 - [x] 五 Agent 并行调研（数据面/报告现状/存储端口与组合根/验收集成样板/UX 与架构文档）+ 主会话亲验（planning 异常形态/query_chain_trace 结构/payload 三态/L0 write/migration 目录/ORM 模型/事件双登记/284 基类/EventPublisher 注入九项关键事实）
 - [x] Round 1 文档审查修订（2026-11-03：四视角调研 Agent【数据面/存储组合根/事件异常/测试样板】+ 三视角审查 Agent【一致性完备性/可行性可达性/科学性机理】——34 项处置 P0×2+P1×10+P2×10+P3×12；OD-4/5/6/8/10 五项修订 + 追溯矩阵重排 + 修复台账 R1-1~R1-26 落档；传播面 grep 核查零残留）
+- [x] **dev-story 实施完成（2026-11-04——Task 0~7 全 52 Subtask 闭环）**：
+  - 五 Agent 并行调研锚点复核（36+ 锚点吻合 + 两处校正：EXCEPTION_HTTP_MAP 真实在 exception_handlers.py:152；`(layer,...)` 家族形态真身 ArchiveStorageError 284 非 484）
+  - 领域层（实体 24/渲染器 17 含分隔行变异实证/异常 20 用例【CR1-F28 勘误：原记 21 实测 20】+ 四处登记 + design.md 双表回填含 483/484 顺带修正）
+  - 应用层（聚合服务 30 用例含事件变异实证 + 三态判定/原因解析次序/缺行骨架/锚叠加不计全套口径）
+  - 基础设施（017 migration 测试库幂等实证 + ReportModel + 仓储 12 用例双模式 fallback + CLI 五步定式 102 passed + 三步排查实证）
+  - 契约（端口五断言族 11 + 事件键集合冻结全等 6 + 冻结面零 diff + 红线三查本 Story 面零输出）
+  - 集成五场景（含③b）单进程+xdist 双模式两轮稳定 + 集成净增 0
+  - 验收 13 场景全绿双模式 + 全量回归 **14602 passed × 2 轮完全稳定**
+  - 覆盖率：整体 92%（≥80%）/domain+application 91%/新增文件 96-100%
+  - **实施攻坚沉淀**（非代码回归的环境/基建发现）：①resolver SINGLETON/SCOPED 缓存跨 loop/跨文件污染——验收与集成双面清缓存防线（`_clear_resolver_caches`/`_fresh_resolver_per_test`——6-1 场景③先例扩展）；②测试 Qdrant 容器强杀致假死+RocksDB 残锁——清卷重建恢复（既有 51 验收全绿实证非代码回归）；③测试库 migration 中间态（全量挂起被 pkill）——upgrade head 恢复；④验收 L0 覆写落地形态修正：注册表 register_port 同名异 spec 抛 ConflictError——服务实例层注入是 6-3 验收先例真身
+  - 全程零 noqa/type:ignore/AI 署名（过程中 4 次误写即时清除——红线纪律自查闭环）
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/6-5a-markdown-report-basic.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/entities/strategic_report.py` - 报告实体 + ReportType 枚举
-- `src/domain/value_objects/markdown_report.py` - 报告文档 VO 三件
-- `src/domain/services/markdown_report_renderer.py` - Markdown 渲染纯函数
-- `src/domain/exceptions/report_exceptions.py` - 490/491 异常双类
-- `src/domain/ports/report_repository.py` - 报告仓储端口
-- `src/application/ports/report_generation.py` - 报告生成服务端口
-- `src/application/services/report_generation_service.py` - 双源聚合+五段编排服务
-- `src/application/use_cases/generate_markdown_report.py` - 生成用例
-- `src/infrastructure/storage/postgresql/models/report.py` - ReportModel ORM
-- `src/infrastructure/storage/postgresql/repository/report_repository.py` - L2 仓储
-- `deploy/postgresql/alembic/versions/017_strategic_reports.py` - migration（只增）
-- `tests/unit/domain/test_strategic_report.py` - 实体/VO 单测
-- `tests/unit/domain/services/test_markdown_report_renderer.py` - 渲染器单测
-- `tests/unit/domain/exceptions/test_report_exceptions.py` - 异常单测
-- `tests/unit/application/test_report_generation_service.py` - 聚合服务单测
-- `tests/unit/application/use_cases/test_generate_markdown_report_use_case.py` - 用例单测
-- `tests/unit/infrastructure/storage/postgresql/test_report_repository.py` - 仓储单测
-- `tests/unit/architecture/test_markdown_report.py` - 架构验证（epics 钦定名）
-- `tests/integration/test_integration_markdown_report.py` - 集成五场景
-- `tests/contracts/test_port_contract_report_generation.py` - 端口契约
-- `tests/contracts/test_event_channel_mapping_report.py` - 事件零新增守护
-- `tests/acceptance/test_acceptance_markdown_report.feature` - Gherkin 13 场景
-- `tests/acceptance/test_acceptance_markdown_report.py` - BDD 步骤实现
+- `src/domain/entities/strategic_report.py` - 报告实体 + ReportType 枚举（Task 1 ✅）
+- `src/domain/value_objects/markdown_report.py` - 报告文档 VO 三件（Task 1 ✅）
+- `src/domain/services/markdown_report_renderer.py` - Markdown 渲染纯函数（Task 1 ✅）
+- `src/domain/exceptions/report_exceptions.py` - 490/491 异常双类（Task 1 ✅）
+- `src/domain/ports/report_repository.py` - 报告仓储端口（Task 2 ✅）
+- `src/application/ports/report_generation.py` - 报告生成服务端口（Task 2 ✅）
+- `src/application/services/report_generation_service.py` - 双源聚合+五段编排服务（Task 2 ✅）
+- `src/application/use_cases/generate_markdown_report.py` - 生成用例（Task 3 ✅）
+- `src/infrastructure/storage/postgresql/models/report.py` - ReportModel ORM（Task 3 ✅）
+- `src/infrastructure/storage/postgresql/repository/report_repository.py` - L2 仓储（Task 3 ✅）
+- `deploy/postgresql/alembic/versions/017_strategic_reports.py` - migration 只增（Task 3 ✅）
+- `tests/unit/domain/test_strategic_report.py` - 实体/VO 单测 24 用例（Task 1 ✅）
+- `tests/unit/domain/services/test_markdown_report_renderer.py` - 渲染器单测 17 用例（Task 1 ✅）
+- `tests/unit/domain/exceptions/test_report_exceptions.py` - 异常单测 20 用例（Task 1 ✅——CR1-F28 勘误：原记 21 实测 20）
+- `tests/unit/application/test_report_generation_service.py` - 聚合服务单测 30 用例（Task 2 ✅）
+- `tests/unit/application/use_cases/test_generate_markdown_report_use_case.py` - 用例单测 3 用例（Task 3 ✅）
+- `tests/unit/infrastructure/storage/postgresql/test_report_repository.py` - 仓储单测 12 用例（Task 3 ✅）
+- `tests/unit/architecture/test_markdown_report.py` - 架构验证四验证器 9 用例（Task 6 ✅）
+- `tests/integration/test_integration_markdown_report.py` - 集成五场景（Task 5 ✅）
+- `tests/contracts/test_port_contract_report_generation.py` - 端口契约五断言族 11 用例（Task 2/3 ✅）
+- `tests/contracts/test_event_channel_mapping_report.py` - 事件零新增守护 6 用例（Task 4 ✅）
+- `tests/acceptance/test_acceptance_markdown_report.feature` - Gherkin 13 场景（Task 0/7 ✅）
+- `tests/acceptance/test_acceptance_markdown_report.py` - BDD 步骤实现 13 场景全绑定（Task 0/7 ✅）
 
 **修改的文件/To Be Modified (Dev Story 实施):**
-- `src/domain/exceptions/_code_ranges.py` - 开 report 段 + 两类注册
-- `src/domain/exceptions/__init__.py` - 导出 + EXCEPTION_HTTP_MAP
-- `src/entrypoints/agent_cli.py` - report-generate 子命令
-- `src/composition_root.py` - 三注册块（=== Story 6-5a === 分节）
-- `tests/unit/interfaces/cli/test_agent_cli.py` - report-generate 用例扩展
-- `docs/architecture/sisys-uni-exception-design.md` - 编码分配表 report 段行 + 顺带回填 483/484 既有漂移（R1 裁定）
-- `_bmad-output/implementation-artifacts/deferred-work.md` - 台账处置注记
+- `src/domain/exceptions/_code_ranges.py` - 开 report 段 + 两类注册（Task 1 ✅）
+- `src/domain/exceptions/__init__.py` - 导出 + __all__（Task 1 ✅——EXCEPTION_HTTP_MAP 在 exception_handlers.py 见下）
+- `src/interfaces/api/exception_handlers.py` - EXCEPTION_HTTP_MAP 两行 + import（Task 1 ✅）
+- `src/entrypoints/agent_cli.py` - report-generate 子命令（Task 3 ✅）
+- `src/composition_root.py` - 三注册块 === Story 6-5a === 分节（Task 3 ✅）
+- `tests/unit/interfaces/api/test_exception_handlers.py` - 键集合快照同步登记双类（Task 1 ✅）
+- `tests/unit/interfaces/cli/test_agent_cli.py` - report-generate 用例扩展 6 用例（Task 3 ✅）
+- `docs/architecture/sisys-uni-exception-design.md` - 编码分配表 report 段行 + 483/484 顺带回填（Task 1 ✅）
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 台账四处处置注记（Task 0.7 ✅）
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 状态流转（Task 7）
 
 ---
@@ -1054,20 +1065,59 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 待定
-**审查模式:** 待定（full——Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-11-04（Round 1）
+**审查模式:** full（五视角并行调研 Agent【领域层正确性/应用层正确性/基础设施组装/测试质量断言/一致性契约】+ 主会话亲验交叉验证——P1 级发现全部经主会话独立实证）
 
-#### 需决策 Decision Needed
+**Round 1**（2026-11-04；五 Agent 并行 + 主会话 12 文件亲验矩阵 + P1×3 逐项独立实证；去重后 29 项：**P1×3 + P2×10 + P3×16**；本轮处置 19 项【P1×3+P2×10+联动 P3×6】，10 项 P3 留后续轮次）：
 
-- [ ] （待实施后审查）
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|----------|------|
+| CR1-F1 | 附录 A `_timeline_step_display` 判别 `step == "synthesis"` 与写侧 timeline 实际记录值 `"market_insight_synthesis"`（`blm_planning_service.py:504` record_step 实证 + `STAGE_VALUE_DOMAIN` frozenset 成员实证）错配——三分支全不命中走 miss 裸值，**真实 8 步 run 的每份报告附录 A 末行「步骤」列显示裸串**；单测 `:561` 喂臆造值 `"synthesis"` 把错误假设钉绿；story 附录 A 表定稿「synthesis」系对端口 docstring 简称的误读 | P1 | 判别改 `step == "market_insight_synthesis"`；单测臆造值改真实值；story 表定稿勘误（本文件已完成） | ✅ R1 |
+| CR1-F2 | `get_latest_by_plan` 排序方向全仓零杀伤：单测 `test_latest_ordering_by_created_at_desc` 是 `inspect.getsource` + `"created_at" in source or "order_by" in source` 恒真断言（`created_at` 在 docstring 命中；真正 `.order_by` 在 `_do_get_latest`）；集成测试全文件零调用 `get_latest_by_plan`；验收 S2 只断言行数与 report_id 互异不验证取最新——`.asc()` 突变全套件 14602 用例仍绿 | P1 | 单测改断言 `_do_get_latest` 编译产物 `_order_by_clauses` 含 created_at DESC；验收 S2 补 `get_latest_by_plan` 值级断言（两行在位取第二份 report_id）；集成场景① 补 get_latest 读回比对 | ✅ R1 |
+| CR1-F3 | AC-2「六 Schema 全字段渲染无遗漏」大面积断言缺口：六子公共前缀 **summary/findings 正向渲染零断言**（`_FAKE_STEP_SUMMARY_PREFIX` 常量定义后全仓零消费——被遗弃的断言锚）；scenario_plans/demand_priority_matrix/value_proposition_map/internal_capabilities/vrio_assessment/resource_constraints/priority_ranking/capability_match_matrix/closure_strategies/competitor_radar 数据行**全部零断言**（grep 实证 assert 消费计数 0）——删掉 `_step_field_blocks` 十余个冻结字段渲染全套件仍绿（Epic 4 恒真断言族当代复发） | P1 | 验收 S4 补全字段值级断言（summary 前缀×6 循环 + 零断言字段逐项抽样补齐）；单测补 `_step_field_blocks` 输出块型序列断言 | ✅ R1 |
+| CR1-F4 | GFM 表格单元格含 `\|`/换行破坏列对齐：VO 列数守卫只查 tuple 元素个数，单元格文本内管道符原样进入管道语法——payload 值（LLM 自由文本）含「政策 \| 稳定」→ 3 数据列 vs 2 表头；含 `\n` 表格拆断。暴露面覆盖全部四张表（PESTEL/五力/时间线/附录 B 原因列） | P2 | `_render_table` 单元格 GFM 结构性转义（`\|` → `\\|`、换行归一空格）+ 渲染语法冻结条款补限定（结构性字符转义≠unicode 转义禁令范围——story 已更新）+ 单测转义用例 | ✅ R1 |
+| CR1-F5 | callout 文本含换行丢失 `> ` 前缀：`f"> {block.text}"` 仅首行有前缀，`degrade_reason="原因A\n\| 伪造表格行"` 第二行裸奔被解析为表格行——标注形态冻结破坏 + 块结构注入面 | P2 | callout 渲染逐行补 `> ` 前缀（合法多行 blockquote）+ 单测多行用例 | ✅ R1 |
+| CR1-F6 | StrategicReport 冻结表约束未落地：`plan_id` 非空（默认 `""` 无守卫——脏实体落 L2 毒化查询面）/ `file_path` 纯空白（`" "` 通过）/ 三计数负值（`section_count=-5` 通过——字段表 ≥0 约束） | P2 | `__post_init__` 五查补全（plan_id 非空 + file_path strip 非空 + 三计数 ≥0）+ 242 断言用例（story 校验清单已更新） | ✅ R1 |
+| CR1-F7 | `_SECTION_COUNT=11` 硬编码与「配置增步自动跟随」原则自相矛盾：`degraded_count` 按 CONFIG 循环递增而 section_count 钉死字面量——CONFIG 增第七步且缺行时 degraded=12 > 11 触发 242 崩溃（恰是「缺行骨架渲染」要防的形态）；synthesis 编号 `2.7` 硬编码会与增步后第七子小节撞号 | P2 | `_SECTION_COUNT` 改派生 `4 + len(MARKET_INSIGHT_STEP_CONFIG) + 1`；synthesis 编号改 `2.{len(CONFIG)+1}` 派生 | ✅ R1 |
+| CR1-F8 | ReportModel 漏聚合进 `models/__init__.py`（唯一例外——既有 17 模型全聚合）：集成/验收 conftest 的 `Base.metadata.create_all` 兜底建表缺 `strategic_reports`（实证 `'strategic_reports' in Base.metadata.tables` → False）——alembic 失败/超时时兜底 schema 缺表误报「PostgreSQL 不可达」skip 或 save 抛 UndefinedTable | P2 | `models/__init__.py` 补 import + `__all__` 登记 | ✅ R1 |
+| CR1-F9 | CLI 成功打印 `报告类型: {report_type}` 输出枚举 repr「ReportType.MARKDOWN」而非「markdown」（f-string 渲染枚举成员）；单测 stub 设裸 str `"markdown"` 掩蔽真实属性形态（6-1/6-3/6-4「属性形态断裂族」在替身层复发） | P2 | 打印侧取 `.value`（getattr 二级取值保零 import）；stub 改真实 ReportType.MARKDOWN + 补「报告类型: markdown」值级断言 | ✅ R1 |
+| CR1-F10 | CLI memory_id 打印断言被 file_path 子串遮蔽：断言 `"plan-1_20261103120000" in out`，逻辑路径行 `reports/plan-1_20261103120000.md` 自含该子串——删掉 memory_id 打印行断言仍绿（R2-10 钦定打印面零守护） | P2 | 改按行断言 `f"  memory_id: plan-1_20261103120000" in out.splitlines()` | ✅ R1 |
+| CR1-F11 | `test_entity_to_model_fields` 恒绿断言：只断言 fixture 实体的枚举值（`report.report_type.value == "markdown"`——test_strategic_report 已测），与 `_to_model`/ORM 映射零相关；`_to_model` 映射改错（如 metadata 恒空/列写串位）该单测绿 | P2 | 重写为捕获 `mock_session.add` 的模型实例逐字段断言（metadata_/report_type/计数双列/created_at） | ✅ R1 |
+| CR1-F12 | 三态判定①「payload 非 dict 形态」分支零覆盖：`final_answer='["a","b"]'`（合法 JSON 数组）/`None`（TypeError 路径）→ missing 分支无用例——删掉 isinstance 守卫后含数组形态归档行的报告生成 AttributeError 500 而非降级标注，现有测试全绿无感知 | P2 | 单测参数化补 list/None 两用例（期望 degraded 计入 + [数据缺失] callout） | ✅ R1 |
+| CR1-F13 | `_load_snapshot` 容错分支（读异常→None→附录 A 省略）零单测：现有用例只覆盖返回 None 形态——删掉 try/except 后 Redis 抖动直接炸报告生成（辅源阻断主链违反 AC-4「不阻断」） | P2 | 补 `snapshot_repo.load.side_effect = RuntimeError` → 报告成功 + 无附录 A + timeline_available=false 用例 | ✅ R1 |
+| CR1-F14 | 空 dict payload `{}` 归信封态：`{}.keys() <= _ENVELOPE_KEYS` 恒真——常量注释自称「且非空即为信封」与行为矛盾；`final_answer='{}'` 判 [降级] 而语义应为 [数据缺失]（附录 B 类型值域错位） | P3 | 判定改 `payload and payload.keys() <= _ENVELOPE_KEYS`（空归①缺失态，与注释对齐）+ 钉一用例 | ✅ R1 |
+| CR1-F16 | generation_ms 口径双 docstring 矛盾：实体 docstring 称「聚合起点→事件发布返回——AC-7 口径」实际截断于 L2 落库前（frozen 实体先构造的结构必然）；service docstring 自认近似——同字段两套口径 | P3 | 实体 docstring 改述「聚合起点→L2 落库前（近似）」与服务对齐；story 实体表勘误注记（本文件已完成） | ✅ R1 |
+| CR1-F24 | `_save_passthrough` 死代码 helper（定义未用——疑为被丢弃的「save 返回值消费面」断言残骸，误导覆盖认知） | P3 | 删除 | ✅ R1 |
+| CR1-F27 | `_REPORT_EVENT_PAYLOAD_KEY_BASELINE` 冻结基线常量声明后未消费（then 步骤断言写死字面量）——baseline 形成假单源，后续 6-5b/6-11 加字段时常量与断言静默漂移 | P3 | 断言处改消费常量派生期望 | ✅ R1 |
+| CR1-F28 | 异常单测用例数台账 21 vs pytest 实际收集 20（两处口径失实——违反「禁概数」可复核纪律） | P3 | 台账 5 处改 20 + 勘误注记（本文件已完成） | ✅ R1 |
+| CR1-F29 | ruff I001 import 块排序（`test_report_generation_service.py:16`） | P3 | 实测确认：dev-story 攻坚期 typing import 变更已顺带修复（本轮 ruff 全绿零操作；评审期首次运行报 F821 系缓存陈旧，无缓存复跑仅 I001 且已被后续 import 调整消化） | ✅ R1 |
+| CR1-F15 | MarkdownReportDocument 零构造期校验：meta_rows 混入裸 str 行时 `' | '.join(str)` 退化为字符级拼接（`("k","v"),"abc"` → 三列静默错位——ReportBlock 已修的「str 行 len 巧合」同族隐患守卫不对称）；title/plan_id 空串放行 | P3 | 补 `__post_init__`（meta_rows 每行 tuple len==2 + title/plan_id 非空） | ⏳ R2 |
+| CR1-F17 | `_to_entity` 裸 `ReportType(model.report_type)`：脏行（'docx'）抛原生 ValueError 逃逸异常体系——archive 家族 try/except+warning+默认值守卫形态未沿用；017 未加 CHECK 值域 | P3 | 沿用 archive 守卫形态（except ValueError → warning + 回退）或 018 补 CHECK | ⏳ R2 |
+| CR1-F18 | `_to_model` 裸 `uuid.UUID(report.plan_id)` 可抛原生 ValueError；F6 修复后入口收窄但脏实体直调端口（6-8 REST 面绕过用例）仍可触发 | P3 | 与 F17 同点处置（守卫前置） | ⏳ R2 |
+| CR1-F19 | `order_by(created_at.desc())` 无并列 tie-breaker：同一 plan 两行 created_at 完全相同（数据回填/时钟粒度）时「最新」不确定 | P3 | `.order_by(created_at.desc(), report_id.desc())` | ⏳ R2 |
+| CR1-F20 | 单测 `_View` 手搓替身 + `ENVELOP` 死哨兵：服务消费面用结构同构替身而非真实 `ChainOfThoughtTraceView`（DTO 契约漂移单测恒绿）；ENVELOP 定义后零使用 | P3 | `_make_trace_view` 直接构造真实 DTO（四参 frozen dataclass 零成本）；删 ENVELOP | ⏳ R2 |
+| CR1-F21 | CLI 成功路径未断言 plan_id 向用例透传值（stub.calls 记录未消费——执行器传错/硬编码测试仍绿）；契约测试 use_case 缺 spec/resolve 断言（宣称五断言族实覆盖两项）+ report_repository 缺 tags | P3 | 成功用例补 `stub.calls` 值级断言（✅ R1 已修——独立构造期望形态）；契约测试补齐留 R2 | 🔶 R1 部分 |
+| CR1-F22 | 「ATX 严格递进不跳级」断言弱于步骤名：只断首行==1 且 ∈{1,2,3}，H1→H3 跳级不红（间接由 S3 全序列等价承载） | P3 | 补相邻层级差 ≤ +1 循环断言 | ⏳ R2 |
+| CR1-F23 | 验收层 teardown 七步链每步 `except Exception: pass` 全静默 + 13 场景零净增断言（净增 0 仅集成承载）——清理失败不可见 | P3 | finalizer 末尾 COUNT==0 断言或清理失败 logger.error | ⏳ R3 |
+| CR1-F25 | S11 分档表写「逐 stage 八步归档」实际走 `_assemble_full_flow` 完整 run + 计时窗口含真实 commit/read_text 宽于 OD-8 口径（偏严不假绿，文档漂移） | P3 | 修分档表措辞与计时包裹面 | ⏳ R3 |
+| CR1-F26 | 架构测试 `test_service_consumes_ports_only` 与 B1 逐字重复（docstring 宣称五依赖 Port 类型检查实未检查） | P3 | 合并或改查构造签名注解 | ⏳ R3 |
+| CR1-F30 | 渲染器无 ATX 递进校验（任意 level 序列照渲染——当前组装层顺序正确属结构信任边界） | P3 | 可选：渲染器/VO 增「sections 内禁 level=1」约定（H1 单源=document.title） | ⏳ R4 |
+| CR1-F31 | paragraph/bullet 文本内嵌换行同族注入残留面（评审员 1 F4 评审发现）：`financial_gap` 含 `\n### 伪造标题` 可注入块结构——本轮冻结条款只限定表格/callout 两块型，paragraph/bullet 出口 `_str_field`/`_str_items` 未归一 | P3 | R2 评估：威胁模型同源（LLM 自由文本）——`_str_field`/`_str_items` 出口换行归一或 VO 构造期守卫 | ⏳ R2 |
 
-#### 已修复 Patch
+**Round 1 主会话亲验通过项**（五 Agent 与主会话双重复核一致，不计 findings）：五段编排顺序与 L0 失败短路/三态判定主路径/原因解析次序/事件双防线+aggregate 自动派生（`ReportGenerated.__post_init__`）/双模式 fallback 与 session_factory 第一天到位/组合根三注册八字段/migration 017 链形态与九列镜像/异常四处登记+HTTP 映射+键集合快照/渲染器 slug+GFM+目录不自收录/BDD 三件套+13 场景对位/冻结面零 diff（AC-6 全清单）/红线三查零命中。
 
-- [ ] （待实施后审查）
+**Round 1 实施验证记录**（2026-11-04）：
+- **评审放行**：双评审员（正确性风险/完整性联动面）均「合格」并给出明确放行条件——F14 表达式反写阻断项按评审形态修正（isinstance 后前置 `if not payload: return "missing", None`）；F7 定义序陷阱（`_GAP_SUBSECTIONS` 上移）+ 双站点枚举 + F2 编译 SQL 断言形态 + F12 SimpleNamespace 直击 TypeError + F27 顶层三键独立命名 + F1 冻结面边界裁定（blm_planning.py:39/:811「stage 形态」措辞语义正确不改——误读责任在消费侧）全部吸收后实施
+- **变异实证**：F2 新断言 `.asc()` 注入 → 红 → 还原 → 绿（旧 getsource 断言同变异下不红——杀伤力差异实证）
+- **测试结果**：本 Story 单测+契约 246 passed；集成 5 passed；验收 13 passed（含全部新增断言：F1 附录 A synthesis 行值级 + F2 get_latest 行为级 + F3 全字段 + F27 基线派生）；ruff 零错误 + mypy 746 零错误 + lint-imports 5 kept
+- **全量回归**：四目录 14613 passed（第三轮）；首轮 20 failed / 次轮 19 failed 根因排查 = **Qdrant 容器 FD 耗尽**（docker 默认 ulimit 1024 + Qdrant segment FD 滞留累积——进程实测 974/1024；表象 RocksDB「IO error: While open directory」）——环境基础设施问题与 6-5a 零关联，处置 = 两容器 `--ulimit nofile=65535` 重建后 Qdrant 验收 14 passed×2 稳定；残余 1 个 hybrid_search flaky（Epic 2/3 面，单独复跑 PASSED）
+- **回归面自查**：修复后 12 文件 diff 全部可追溯到 CR1 台账；F4 转义对既有断言零破坏（fixture 值无管道符——评审员 grep 实证）；F6 五查对既有 9 处实体构造零误伤；F7 派生值恒等（11/2.7 字符串全等）
 
 #### 已推迟 Defer
 
-- [ ] （待实施后审查）
+- [ ] CR1-F15/F17/F18/F19/F20/F21/F22 → Round 2 处置（7 项 P3——防御面/断言收紧族）
+- [ ] CR1-F23/F25/F26 → Round 3 处置（3 项 P3——验收文档/结构族）
+- [ ] CR1-F30 → Round 4 处置（1 项 P3——渲染结构信任边界）
 
 ---
 
@@ -1080,12 +1130,14 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-11-03
-**最后更新/Last Updated:** 2026-11-03
+**最后更新/Last Updated:** 2026-11-04
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（五 Agent 并行调研 + 主会话九项亲验；OD-1~OD-10 十项架构裁定落档——宿主形态偏离声明/双源聚合/持久化三件/异常开段 490/图类表格承载为五大关键裁定）
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 三视角审查并行，34 项处置——P0×2：file_path 改 L0 逻辑路径裁定（write 不返回路径三路全断）/发布失败 is_success 双防线（实现层吞异常）；P1×10：491 宽容语义改判（无共同事务上抛无效）/archived=False 机理修正/渲染三态判定冻结/原因解析次序/计数单位 H3 口径/491-Gherkin 矛盾/事件守护范式重设计/性能采样单 plan_id×20/2.7 标题逐字源/元信息表；OD-4/5/6/8/10 五项修订 + 26 修复簇详见 Docs Review Fixes 表）
 - v1.2.0: Round 2 回归核查+组合交互面修订（R1 八裁定单独 8/8 成立实证；13 项处置=P1×1+P2×6+P3×6 的 12 命名修复 + 1 项 R1-13 勘误内联——P1：degraded_section_count 计数语义空洞（信封态计入/锚叠加不计/附录 B 两类全收 R2 口径）；P2：上限算术重算/PublishResult event_id 必填/AC-4 层级映射/验收层 L0 隔离传播/level 值域收窄 1-3 等；P3：同构措辞增强/outbox 断言等价机理/CLI memory_id 打印等——R2-1~R2-12 详见修复台账；分项口径 R4 对齐节头）
 - v1.3.0: Round 3 单深度推演修订（13 场景三轴推演+6 时间线+不变量数学；7 项处置——P1×1：缺行小节 H3 骨架渲染冻结（R2-2 算术证明的隐含前提显式化——省略分叉下极端形态炸 242）+ 跳步类别钦定六子步；P2×2：AC-6×1 断言面处方（字面基线全等形态）/「实体标注」载体修正（metadata.timeline_available 直查）；P3×4：矩阵场景号校正/gather 形态锚（跨 loop 陷阱）/附录 A 第三映射源/目录收录面冻结；11 条证伪留痕防重推——R3-1~R3-7 详见修复台账）
 - v1.4.0: Round 4 纯验证 + Round 5 独立终审收敛（R4：36 锚点 34 匹配+结构四线全过，5 项 P3 传播缝隙/勘误修复——R1-26「L17-18→L16-17」校正反向回调等；R5：五节终审全过——十项关键修复文档-代码双向取证 10/10 成立、周期闭合零游离提交、红线零违规；特权发现 R5-1 清偿：STAGE_VALUE_DOMAIN 注记双重失实改述（blm_phases.py:69 frozenset 在位）+ OD-6 ⑤锚校正；五轮总账 60 项处置、P0-P3 残留全零、投入递减 34→13→7→5→终审收敛）
+- v1.5.0: **dev-story 实施完成**（2026-11-04——Task 0~7 全 52 Subtask 闭环：Task 0 红阶段实证【12×运行期 ImportError+收集零错误】→ Task 1 领域层【24+17【分隔行变异实证】+20 用例/四处登记/design.md 双表回填含 483/484 顺带修正】→ Task 2 应用层【30 用例【事件变异实证】/三态判定全套口径/端口契约 docstring】→ Task 3 基础设施【017 幂等实证/仓储双模式 fallback/CLI 五步定式/三步排查实证/组合根三注册块】→ Task 4 契约守护【事件键集合冻结全等 6 用例/冻结面零 diff/红线三查】→ Task 5 集成五场景【双模式两轮稳定/净增 0/P95 实测亚秒级】→ Task 6 架构四验证器 9 用例 → Task 7 验收 13 场景全绿双模式 + 全量 **14602 passed×2 轮完全稳定** + 覆盖率 92%/91%/新增 96-100% + mypy 746 零错误；状态流转 ready-for-dev→in-progress→**review**）
+- v1.6.0: **代码审查 Round 1**（2026-11-04：五视角并行调研 Agent【领域/应用/基础设施组装/测试质量/一致性契约】+ 主会话 12 文件亲验矩阵 + P1×3 逐项独立实证；29 项 findings=P1×3+P2×10+P3×16，本轮处置 19 项【P1：附录 A synthesis 值形态错配【写侧实证 market_insight_synthesis】/get_latest 排序零杀伤恒真断言族/AC-2 十余冻结字段断言缺口；P2：GFM 结构字符转义+callout 多行前缀/实体五查补全/section_count 派生化/models 聚合/CLI 枚举 repr+断言遮蔽×2/映射恒绿断言/非 dict 分支+快照容错覆盖；P3 联动：空 dict 信封/口径 docstring/死代码死常量/台账勘误/I001】；10 项 P3 留后续轮次——CR1-F1~F30 详见 Review Findings 表；冻结表述四处勘误：附录 A 三源映射 synthesis 真实值形态/渲染语法冻结补 GFM 结构性转义限定/实体表 generation_ms 实际窗口注记+五查校验清单/异常用例数 21→20）

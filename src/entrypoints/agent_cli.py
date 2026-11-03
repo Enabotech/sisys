@@ -334,6 +334,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="深度解引用 L4 WORM blob（默认 False——读 L2 决策依据足够）",
     )
 
+    # Story 6-5a: report-generate 扁平子命令（Markdown 报告生成——双源聚合+
+    # 领域渲染+L0/L2 持久化+ReportGenerated 首激活；同 plan_id 重复生成产生新
+    # 报告不拦截——OD-10 幂等锚=report_id）
+    report_generate = subparsers.add_parser(
+        "report-generate",
+        help="按 plan_id 生成 Markdown 战略规划报告（BLM 前两阶段交付物）",
+    )
+    report_generate.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串——与 BLM plan_id 同源）",
+    )
+
     # Story 6-3: checkpoint-create 扁平子命令（Checkpoint 完整形态快照显式创建——
     # OD-5：MVP 同步链下"阶段完成即暂停等审批"物理不可达，由显式调用触发；
     # created_via 不暴露参数（硬编码传 "cli"——R6-4）；retrieved_docs 不可经
@@ -820,6 +835,22 @@ async def _run_chain_trace(plan_id: str, include_blob: bool) -> object:
         await _close_connection_pools()
 
 
+async def _run_report_generate(plan_id: str) -> object:
+    """执行报告生成（resolve 用例——与 _run_chain_trace 同款资源收尾）。
+
+    Args:
+        plan_id: 规划任务标识。
+
+    Returns:
+        StrategicReport 报告实体。
+    """
+    use_case = resolve("report_generation_use_case")
+    try:
+        return await use_case.execute(plan_id=plan_id)
+    finally:
+        await _close_connection_pools()
+
+
 def _print_chain_trace(view: object) -> None:
     """打印决策追溯结果（每条 to_display 五段形态——DC-2 展示用标签）。
 
@@ -879,6 +910,73 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
         # DB 宕机时 find 的原生 OperationalError 透传，对齐同文件两先例形态：
         # 仅 logger.error（exc_info 带堆栈）+ return 1，无 stderr print）。
         logger.error("决策追溯查询异常: %s", error, exc_info=True)
+        return 1
+
+
+def _print_report_summary(result: object) -> None:
+    """打印报告生成摘要（report_id/file_path 逻辑路径/memory_id/章节计数）。
+
+    memory_id 打印（R2-10）：人类用户经 memory_id + L0StoragePort.read 或
+    base 目录提示定位物理文件——逻辑路径单独打印不构成定位信息。
+
+    Args:
+        result: StrategicReport 实体（getattr 属性面消费——零 import 依赖）。
+    """
+    file_path = str(getattr(result, "file_path", ""))
+    memory_id = file_path.rsplit("/", 1)[-1].removesuffix(".md") if file_path else ""
+    print("报告生成完成：")
+    print(f"  报告标识: {getattr(result, 'report_id', '')}")
+    # CR1-F9：report_type 是 ReportType 枚举成员——f-string 直渲染为
+    # 「ReportType.MARKDOWN」repr；二级 .value 取值（枚举与裸 str 双形态
+    # 均输出 "markdown"），保 CLI 零 import 依赖
+    report_type_value = getattr(getattr(result, "report_type", None), "value", getattr(result, "report_type", ""))
+    print(f"  报告类型: {report_type_value}")
+    print(f"  逻辑路径: {file_path}")
+    print(f"  memory_id: {memory_id}")
+    print(f"  正文章节数: {getattr(result, 'section_count', 0)}（降级 {getattr(result, 'degraded_section_count', 0)}）")
+    print(f"  生成耗时: {getattr(result, 'generation_ms', 0)} ms")
+
+
+def _run_report_generate_cli(plan_id: str) -> int:
+    """report-generate 子命令执行（五步定式——chain-query 模板）。
+
+    exit 0 判据 = 报告生成返回（L0/L2 已落盘+事件已发布——宽容语义）；
+    plan_id 非 UUID → 守卫 exit 1；490/491 DomainError → [code] stderr
+    exit 1（双层异常定式）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+
+    Returns:
+        退出码（0=报告生成完成，1=业务异常/参数守卫失败）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "report-generate", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("报告生成失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_report_generate(plan_id))
+        _print_report_summary(result)
+        logger.info(
+            "报告生成完成: plan_id=%s report_id=%s",
+            plan_id,
+            getattr(result, "report_id", ""),
+        )
+        return 0
+    except DomainError as error:
+        logger.error("报告生成失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("报告生成异常: %s", error, exc_info=True)
         return 1
 
 
@@ -1264,6 +1362,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "chain-query":
         return _run_chain_query_cli(args.plan_id, args.include_blob)
+    if args.command == "report-generate":
+        return _run_report_generate_cli(args.plan_id)
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":

@@ -99,6 +99,8 @@ from src.domain.exceptions import (
     PlanningStateError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
+    ReportGenerationError,
+    ReportStorageError,
     RerankError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
@@ -372,6 +374,8 @@ class TestExceptionHttpMap:
             PlanningStateError,  # 482 — Story 6.1 状态机非法推进（409——已激活：重跑守卫 R1-5）
             CheckpointCreationError,  # 483 — Story 6.3 Checkpoint 五步编排强制环节失败（500）
             CheckpointIntegrityError,  # 484 — Story 6.3 完整性守卫/校验失败（409）
+            ReportGenerationError,  # 490 — Story 6.5a 报告数据源全缺（404）
+            ReportStorageError,  # 491 — Story 6.5a 报告持久化失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

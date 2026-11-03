@@ -3343,6 +3343,62 @@ def bootstrap() -> None:
         tags=("blm", "planning", "status", "usecase"),
     )
 
+    # === Story 6-5a — Markdown 报告生成（双源聚合+领域渲染+L0/L2 持久化+ReportGenerated 首激活）===
+    # report_repository：SCOPED 仓储带 session_factory 注入（6-4 CR1-F1 修复后
+    # 形态——第一天带 factory 不走裸构造后补；archive_repository :2181-2194 同款）
+    from src.domain.ports.report_repository import ReportRepositoryProtocol
+    from src.infrastructure.storage.postgresql.repository.report_repository import PostgreSQLReportRepository
+
+    register_port(
+        name="report_repository",
+        version="v1.0.0",
+        interface=ReportRepositoryProtocol,
+        impl=lambda resolver: PostgreSQLReportRepository(session_factory=resolver.resolve("session_factory")),
+        module="src.infrastructure.storage.postgresql.repository.report_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("report", "gateway", "application"),
+    )
+    # report_generation_service：SINGLETON 编排服务注入五依赖（R2 组合律——
+    # chain_trace[经 chain_of_thought_archive_service] + snapshot + l0 +
+    # report_repository + event_publisher；checkpoint_service/
+    # chain_of_thought_archive_service 双先例同款 SINGLETON 捕获 SCOPED 依赖
+    # 既有形态——服务无状态约束 AC-7 并发安全）
+    from src.application.ports.report_generation import ReportGenerationServicePort
+    from src.application.services.report_generation_service import ReportGenerationService
+
+    register_port(
+        name="report_generation_service",
+        version="v1.0.0",
+        interface=ReportGenerationServicePort,
+        impl=lambda resolver: ReportGenerationService(
+            chain_archive_service=resolver.resolve("chain_of_thought_archive_service"),
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+            l0_storage=resolver.resolve("l0_storage"),
+            report_repository=resolver.resolve("report_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.report_generation_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("report", "markdown", "application"),
+    )
+    # report_generation_use_case：CLI report-generate 入口用例（SINGLETON）
+    from src.application.use_cases.generate_markdown_report import GenerateMarkdownReportUseCase
+
+    register_port(
+        name="report_generation_use_case",
+        version="v1.0.0",
+        interface=GenerateMarkdownReportUseCase,
+        impl=lambda resolver: GenerateMarkdownReportUseCase(
+            report_service=resolver.resolve("report_generation_service"),
+        ),
+        module="src.application.use_cases.generate_markdown_report",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("report", "use_case", "application"),
+    )
+
     # === 事件处理器注册（register_handlers）===
     # 所有事件处理器端口注册完成后，统一调用注册方法——同步 handler
     # （register_handlers 方法，event_listener 端口注入 InMemoryEventListener）

@@ -188,6 +188,20 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   缺失 persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测)
     # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；485-489 预留 planning 域（486-489 留 6-6 恢复执行面）
     "planning": (480, 489),
+    # 报告子域（490-499）—— Story 6-5a 新开 1 批 2 个
+    # （planning 段 480-489 之后九代开段先例第九段：data_source 410/debate 420/
+    #  tool_version 430/agent 440/evaluation 450/sap 460/financial 470/planning 480
+    #  同款「前段满/双重成文预留不可占/语义独立 → 开独立段」——报告交付物域与
+    #  规划流程域语义分立（报告是规划产物的事后聚合交付 ≠ 规划流程本身）；
+    #  planning 段 485 预留、486-489 成文「留 6-6 恢复执行面」不可占）:
+    # EXCEPTION_490 ReportGenerationError (Story 6-5a, 报告数据源全缺——chain
+    #   total==0[plan 从未跑过与归档全失败两形态同判]；404 语义；最新快照在位
+    #   亦同判[时间线摘要非报告素材])
+    # EXCEPTION_491 ReportStorageError (Story 6-5a, 报告持久化失败——L0 写
+    #   layer="l0"/L2 落库 layer="l2" 二元值域；事件发布失败不走本码[AC-5
+    #   宽容语义 warning 不回滚]；492-499 预留 report 域)
+    # 490-491 语义归属 business（报告失败是调用方可处理结果）；492-499 预留 report 域
+    "report": (490, 499),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
 }
@@ -368,6 +382,10 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "PlanningStateError": "planning",
     "CheckpointCreationError": "planning",
     "CheckpointIntegrityError": "planning",
+    # report_exceptions.py (Story 6-5a 新增 2 个异常——Markdown 报告生成
+    #   数据源全缺/持久化失败双码)
+    "ReportGenerationError": "report",
+    "ReportStorageError": "report",
 }
 
 
