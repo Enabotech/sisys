@@ -371,8 +371,8 @@
 | AC-4 | 组装失败降级 | Task 1 | 445 捕获+chain 缺席 | 同上 |
 | AC-5 | 追溯查询面 | Task 1/3 | query_chain_trace+用例+CLI | test_blm_chain_trace_use_case.py + 验收 S6/S7 |
 | AC-5 | blob 深度解引用可选 | Task 1/3 | include_blob 参数 | 同上 + 集成② |
-| AC-6 | 事件/异常零新增 | Task 4 | 四文件零 diff 验证 | 契约守护 |
-| AC-6 | 6-1/6-2/6-3 回归面零适配 | Task 4 | 既有测试全量复跑 | 回归实证记录 |
+| AC-6 | 事件/异常零新增 | Task 4 | 四文件零 diff 验证 | 契约守护 + 验收 S9（R5 回指补） |
+| AC-6 | 6-1/6-2/6-3 回归面零适配 | Task 4 | 既有测试全量复跑 | 回归实证记录 + 验收 S8/S13 |
 | AC-6 | 负向断言面零修改 | Task 4/6 | 四文件零 CheckpointReached 复跑 | test_event_channel_mapping_blm_planning.py |
 | AC-7 | 组装 P95<50ms | Task 5 | 20 轮采样窗口（纯函数直调——R1-F13） | 集成④（xdist_group）+ 验收 S11 |
 | AC-7 | 成功率+并发 10 | Task 5 | 8/8 读回+gather 10 | 集成①③ + 验收 S1/S12（R1-P3 订正：成功率读回是场景①面非⑤） |
@@ -850,7 +850,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | R1-F7 | 并发 10 双缺口：gather 共享单 AsyncSession 并发使用不被 SQLAlchemy 支持（session 来自 ContextVar）；plan_id 口径两处矛盾（「独立 plan_id」vs「count==10 按 plan_id 过滤」） | P1 | 每协程 `session_context()` 独立 scope（session_context.py 模块头 R3）；plan_id 消歧=10 素材共享一个场景专属 plan_id（AC-7/隔离表/Task 5.3 三处同步）；集成隔离口径订正为真实提交+按 plan_id 清理（6-3 实证同构，savepoint 不适用服务内归档链路） |
 | R1-F8 | 13 场景计数对不上：枚举仅 12 个 ID（S11 空洞+AC-5×2 仅 S6 一个编号）——0.7「全红」与 Task 7「13/13」按字面不可满足 | P1 | 场景编号连续重排：AC-5 拆 S6 正向+S7 负向，S8 零回归/S9 事件/S10 to_display（归 AC-1）/S11 P95/S12 并发/S13 收尾；0.5/0.6/边缘注记/矩阵五处同步 |
 | R1-F9 | AC-5 round-trip 必炸 242：PG JSONB 读回 tools_used 为 list，VO tuple 类型守卫（chain_of_thought.py:71-75）必拒——归一责任无人钦定 | P1 | query_chain_trace 重构前 `tools_used=tuple(chain["tools_used"])` 归一；AC-1 round-trip 断言 list 归一口径；冻结表/AC-5/Task 1B 三处钦定 |
-| R1-F10 | StepChainMaterial 字段清单未钦定（「字段清单 AC-2/AC-5 已钦定」引用失实——AC 只钦定另两 dataclass） | P2 | 数据模型节直接落 12 字段表（含三型差异说明） |
+| R1-F10 | StepChainMaterial 字段清单未钦定（「字段清单 AC-2/AC-5 已钦定」引用失实——AC 只钦定另两 dataclass） | P2 | 数据模型节直接落 字段表（含三型差异说明） |
 | R1-F11 | 组合根「零删改」与 version 升 v1.1.0 自相矛盾（version 行必是修改） | P2 | 四处统一「纯新增+恰 1 行版本号变更」精确口径 |
 | R1-F12 | 投影「末条思维链」缺空回退语义（chain_records 空时末条不存在——无条件替换丢 synthesis 现值信息） | P2 | 钦定空回退 `(first_conclusion or "")[:200]`；AC-2 验证标准补空回退断言 |
 | R1-F13 | P95 采样对象（纯组装函数）未在规范位定义——直调 async 复合函数必含 I/O 超预算 | P2 | 钦定模块级纯函数 `compose_step_chain(material) -> ChainOfThought`（Task 1 绿+端口节+Task 5.4 采样素材型=六子步骤型） |
@@ -895,6 +895,10 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 > R3 证伪留痕（已推演排除，防下轮重推）：①SINGLETON×SCOPED 死 session（服务实为 SCOPED+PG 仓储零参构造调用时读 ContextVar+验收手工构造绕开组合根）②投影在 _assemble_result 后读 Result（实为先于——submit_graph :126-131 发布）③SpBlmState 加键破坏 6-1 图身份锚（逐键成员断言非全集）④lambda 第 9 参破坏 getsource 断言（membership 断言）⑤445 注入 archive_plan 零调用断言时序矛盾（组装先于归档）⑥尾字段破坏等值断言（尾参 None 投影恒 ()）⑦R2-F3 唯一 242 通道论断有漏（四文本恒非空白复核成立）⑧gather 共享 ContextVar 互窜（Task 级拷贝隔离）⑨S5 Qdrant 断言依赖相似命中（filter 面过滤检索）⑩epics 钦定名冲突（无同名+OD-7 已声明）⑪快照写在挂接前时序错位（每节点后 state 恰含该步）⑫行号锚点漂移（20+ 抽查全命中）⑬synthesis 无降级标记可判（R2-F2 三处承载通吃）。
 
+**Round 5（2026-11-03，独立终审五节——周期闭合/双向取证/独立快扫/收敛判定/状态完整性，v1.3.0→v1.3.1）：**
+
+> **收敛声明**：Story 6-4 v1.3.0 独立终审收敛——三轮文档审查（Round 1 四视角调研+双评审 P0×1+P1×8、Round 2 回归核查双 Agent P1×2+P2×3、Round 3 单深度推演 P1×1+P2×4 + 13 条证伪留痕）共 37 项修复台账登记完整，终审抽验 12/12（覆盖三轮、含 P0/P1 全档）经「台账声明 vs 正文现实 vs 代码现实」三方对照全部一致，R1-改判（6-1 边界表 L37 误报）经原文实地核实登记正当。25+ 代码锚点实地命中（协议六方法/三元组 :600-601/早退 :410-412/TOOL_CATALOG 零 slug/EVIDENCE_PACKAGE 全 src 零使用等），三张冻结表交叉一致、文件清单与项目结构三方对齐。零 P0/P1 残留，P3×6（changelog 残留字符/计数 off-by-one/条目顺序/:655-680 定谳/字段表描述/矩阵回指）随本轮收敛提交清偿。判定达到 ready-for-dev 质量门，Status 与 sprint-status.yaml 一致，可交付 dev-story 实施。
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -926,11 +930,12 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-03
-**最后更新/Last Updated:** 2026-11-03
+**最后更新/Last Updated:** 2026-11-03（五轮审查收敛）
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研+主会话亲验：5-3 ChainOfThought VO 复用定位/3-10 EVIDENCE_PACKAGE 零使用实证/6-1 边界表 L37 钦定 BLM 面/6-3 归档与清理先例；四冻结规范：确定性组装映射（OD-2）/归档载荷映射（OD-4）/端口契约/异常复用清单（OD-6 零新增）；AC-1~AC-7 + Task 0~7 + 13 验收场景规划；Status → ready-for-dev）
-- v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×9+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第六投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
-- v1.3.0: 文档审查 Round 3 单深度推演（13 场景三轴/8 步时间线/失败矩阵+13 条证伪留痕；P1×1+P2×4+P3×5）：R3-F1 StepChainMaterial 补 evidence_refs 字段（assumptions 源字段）；R3-F2 部分降级分层裁定（归单测层——验收 no-mock 无通道）；R3-F3 outbox 行清理四步链（6-3 teardown 第②步移植）；R3-F4 挂接段 UUID 守卫（裸 ValueError 逃逸防御）；R3-F5 L2 半行语义钦定；R3-F6~F10 实值/公式/装配/清单/护栏批
+- v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×8+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第七投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
 - v1.2.0: 文档审查 Round 2 回归核查（双 Agent：传播完备性+增量面组合；P1×2+P2×3+P3×5）：R2-F1 第七方法计数订正（R1 自引入 9 处）；R2-F2 部分降级 payload 钦定（降级信封仅产物缺席形态——R1-F3 降级轴漏修）；R2-F3 445 构造配方（tool_slug=" " 唯一通道）；R2-F4 include_blob None 行为+blob_content 落位字段；R2-F5 读侧 tuple 归一；R2-F6~F10 行号/口径/结构批（详见修复表）
+- v1.3.0: 文档审查 Round 3 单深度推演（13 场景三轴/8 步时间线/失败矩阵+13 条证伪留痕；P1×1+P2×4+P3×5）：R3-F1 StepChainMaterial 补 evidence_refs 字段（assumptions 源字段）；R3-F2 部分降级分层裁定（归单测层——验收 no-mock 无通道）；R3-F3 outbox 行清理四步链（6-3 teardown 第②步移植）；R3-F4 挂接段 UUID 守卫（裸 ValueError 逃逸防御）；R3-F5 L2 半行语义钦定；R3-F6~F10 实值/公式/装配/清单/护栏批
+- v1.3.1: Round 5 独立终审收敛（P3×6 随收敛清偿：changelog 残留字符/计数 off-by-one/条目调序/:655-680 定谳/字段表描述/矩阵回指）+ 收敛声明入档——零 P0/P1 残留，v1.3.1 维持 ready-for-dev
