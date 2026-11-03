@@ -1561,7 +1561,7 @@ class TestChainQueryParser:
 
 
 class TestChainQueryExecution:
-    """chain-query 执行（正常输出/空清单/非法 plan_id 242）。"""
+    """chain-query 执行（正常输出/空清单/非法 plan_id 242/意外异常兜底）。"""
 
     def test_success_output_contains_display_and_archive_count(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -1615,6 +1615,23 @@ class TestChainQueryExecution:
         assert exit_code == 0
         out = capsys.readouterr().out
         assert "共 0 条思维链档案" in out  # total=0 精确可见（CR1-F9——裸 "0" 子串判别力弱）
+
+    def test_unexpected_exception_exit_1_logged(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """意外异常兜底（CR2-F1）：RuntimeError 透传 → exit 1 + logger.error 带
+        堆栈（对齐 blm-plan/checkpoint-create 双层五步定式——异常逃逸则 main
+        直接 raise 本测试以 error 失败，exit 1 即「非 traceback 逃逸」证明）。"""
+        stub = _StubChainTraceUseCase()
+        stub.error = RuntimeError("检索链路意外故障（注入）")
+        _patch_chain_query_entry(monkeypatch, stub)
+
+        with caplog.at_level(logging.ERROR, logger="src.entrypoints.agent_cli"):
+            exit_code = agent_cli.main(["chain-query", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 1
+        assert "决策追溯查询异常" in caplog.text
+        assert caplog.records[-1].exc_info is not None  # exc_info 带堆栈形态钉死
 
     def test_invalid_plan_id_exit_1_stderr_242(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

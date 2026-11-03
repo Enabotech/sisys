@@ -873,6 +873,12 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
         logger.error("决策追溯查询失败: %s", error)
         print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
+    except Exception as error:
+        # CR2-F1：读路径兜底（fallback 打开后失败信封不再恒为 DomainError 族——
+        # DB 宕机时 find 的原生 OperationalError 透传，对齐同文件两先例形态：
+        # 仅 logger.error（exc_info 带堆栈）+ return 1，无 stderr print）。
+        logger.error("决策追溯查询异常: %s", error, exc_info=True)
+        return 1
 
 
 def _run_checkpoint_create_cli(

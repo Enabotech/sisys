@@ -354,3 +354,9 @@
 > Story 6-4（JSON 思维链输出——BLM 面组装+EVIDENCE_PACKAGE 归档+追溯）Task 0 处置注记落档（OD-1 边界声明承载）。
 
 - 【6.4-DF1·P3】5-3 任务级思维链无归档通道 — 描述：SingleAgentWorkflow 六阶段 package_evidence 终局合成→AgentWorkflowResult.chain 的生命周期止于 state→CLI 打印→AgentDecided 200 字截断投影→span 属性（全仓 grep "chain.*archive|persist.*chain" 零命中实证）；6-4 落地的是 BLM 面思维链归档（6-1 边界表 L37 钦定「Story 6-4（BLM 面输出规范化）」），任务级思维链归档不在本 Story 范围 — 触发条件：5.7 Phoenix 追踪消费立项（届时 span 关联面与归档面一并定夺）或独立任务级归档 Story — 归宿：5.7 Phoenix 追踪消费专项 / 后续 Story — 承接方：5.7 立项时评估
+
+## Deferred from: code review of 6-4-json-chain-of-thought-output Round 2 (2026-11-03)
+
+> 审查台账见 Story 6-4「代码审查发现 Review Findings」节 Round 2 表（CR2-F3——R2-B 增量面组合审查产出）。
+
+- 【6.4-DF2·P3】CR1-F1 fallback 分支的集成/验收层覆盖缺口 + 组合根接线无守卫 — 描述：PostgreSQLArchiveRepository save/find 双模式 fallback（CR1-F1）的 CLI 端到端仅单测 mock 四例承载（TestDualModeSession）——集成测试全走 session_context 请求路径、验收手动 set_session，fallback 分支在真实服务层零覆盖；组合根 `resolve("session_factory")` 接线（archive_repository 注册 lambda）无自动化断言（注册名漂移不红）；配置分叉：CLI bootstrap 指向 .env dev 库而测试装配走测试库（5433）——测试永远看不到 CLI 真实落库目标。R2-B 审查已以真实探针补证代码正确性（组合根真实装配无 ContextVar 下归档全链往返成功），盲区是测试形态非代码缺陷 — 触发条件：7-2 REST 化立项或下一 CLI 归档消费 Story（届时补无 session 上下文的集成场景 + 组合根接线守卫断言；audit R1-DF1 核销时补真实路径验证的家族先例为参照） — 归宿：7-2 REST 化专项 / 后续 CLI 归档消费 Story — 承接方：届时立项评估

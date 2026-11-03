@@ -374,7 +374,7 @@
 | AC-6 | 事件/异常零新增 | Task 4 | 四文件零 diff 验证 | 契约守护 + 验收 S9（R5 回指补） |
 | AC-6 | 6-1/6-2/6-3 回归面零适配 | Task 4 | 既有测试全量复跑 | 回归实证记录 + 验收 S8/S13 |
 | AC-6 | 负向断言面零修改 | Task 4/6 | 四文件零 CheckpointReached 复跑 | test_event_channel_mapping_blm_planning.py |
-| AC-7 | 组装 P95<50ms | Task 5 | 20 轮采样窗口（纯函数直调——R1-F13） | 集成④（xdist_group）+ 验收 S11 |
+| AC-7 | 组装 P95<50ms | Task 5 | ≥20 轮采样窗口（实现 25——CR1-F7；纯函数直调 R1-F13） | 集成④（xdist_group）+ 验收 S11 |
 | AC-7 | 成功率+并发 10 | Task 5 | 8/8 读回+gather 10 | 集成①③ + 验收 S1/S12（R1-P3 订正：成功率读回是场景①面非⑤） |
 
 ---
@@ -962,9 +962,21 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 | CR1-R1 | CR1-F2 诊断与修法修正：`:1592` ignore 经 `mypy --warn-unused-ignores` 双评审员独立实证为 **Unused 死注释**（stub 是独立类不继承真实视图、records 参数本就是裸 `list` 兼容——「与端口 VO 失配」诊断不成立）；`:1344` 「assert is not None」窄化**不充分**——删 ignore 后暴露第二个错误 `attr-defined`（`await_args_list` 不在 Protocol 方法面） | `:1592` 直接删除 ignore 注释；`:1344` 改 `chain_service = service._chain_archive_service; assert isinstance(chain_service, AsyncMock)`（运行时真身校验+类型收窄双效——评审员 2 mypy 副本实证干净） |
 | CR1-R2 | CR1-F3 断言同步漏一处：架构测试 Any 锁死断言实为**两处**——`:238`（Result 字段）+ **`:205`**（`"def project_chain_records(self, plan_id: str) -> list[Any]" in port_text` 方法签名锁死），只改 :238 则 :205 必假红 | :205 与 :238 两处断言同步为精确类型串；端口 docstring「禁向 infrastructure 反向依赖」错误辩护理由随精确化改写（真实理由=同层 ports 互导合法+类型契约面强化） |
 | CR1-R3 | CR1-F4 缺席断言误伤面实测：裸 `chain` 子串撞 `ToolChainExecuted`/`tool_chain_executed`（event_channels.yaml:90-92 + channel_router.py:139-142）→ 恒假红；C 验证器三用例只给了 :159 一项替换（:165/:173 归宿未定义）；@then 绑定联动未声明；485-489 断言与 6-6 预留冲突未注记 | 缺席断言锚定 6-4 专属 token（`ChainOfThought`/`chain_of_thought`/`ChainArchived`/`BlmChain`/`思维链`——中文 token 两文件 grep 零命中安全）；C 验证器三用例归宿：:159→`inspect.signature` 七参数名清单断言（phoenix_tracer R3-14 先例）、:165→`ArchiveType` 枚举值域含 EVIDENCE_PACKAGE 恒定断言、:171→`ChainOfThought` VO 五字段 dataclass 字段名清单断言；**@then 绑定串与 feature 文本不动、仅换断言体**（避免双文件文本联动新面）；485-489 断言处注记「6-6 恢复执行面落地时让位」；四处 docstring「git diff」措辞随断言体替换同步（架构 :12/:62/:160 + 验收 :2148） |
-| CR1-R4 | CR1-F5 联动计数与声明位修正：feature「双豁免」Given 文本实测 **11 处非 13 处**（11 场景各一份 Given 行，Background 仅 Redis 门控）；py 侧 6 处声明位（方案只列 3） | 联动清单=feature 11 处 Given 文本 + py :1406 @given 绑定串（锁步）+ :60 测试隔离节 + 分档表 + **:5 文件头 docstring + :560 共享基建注释 + :1054 装配函数 docstring**（六处补全） |
+| CR1-R4 | CR1-F5 联动计数与声明位修正：feature「双豁免」Given 文本实测 **11 处非 13 处**（11 场景各一份 Given 行，Background 仅 Redis 门控）；py 侧 6 处声明位（方案只列 3） | 联动清单=feature 11 处 Given 文本 + py :1406 @given 绑定串（锁步）+ :60 测试隔离节 + 分档表 + **:5 文件头 docstring + :560 共享基建注释 + :1054 装配函数 docstring**（六处补全；CR2-F2③ 注记：分档表位系文件头邻近承载——表体三属性轴无替身列，三替身声明由 :5 文件头直接可见） |
 | CR1-R5 | CR1-F6 日志形态勘误：同文件先例 `_write_snapshot_and_publish`（:827/:843/:855）实为 **`logger.exception`**（ERROR 级带堆栈）非 warning——「宽捕+warning」与所引先例自相矛盾；checkpoint_service :249-257 先例定位勘误（其形态是「宽捕后包装重抛」非「降级续行」——真正同构先例只有快照容错） | 宽捕日志用 `logger.exception`（未知异常严重性 WARNING 不足以暴露）；单测落位 `TestChainArchiveHookup`（:1091），替身工厂 `_make_chain_archive_mock`（:1054）加 `raise_error` 参数（与既有 `return_none` 参数对称）；断言面=方法正常返回 + project_chain_records 空 + 不抛 |
 | CR1-R6 | CR1-F1 落码补强三条（评审员 1 补强+评审员 2 NP-6）+ 全链推演确认（Step5 事件发布走 outbox fallback :619-626 已注入 ✓——CLI 归档全链通；L2 行与 outbox 行分属独立会话是 CLI/后台 fallback 固有权衡非新缝；回写 save 是 merge UPSERT 语义不先查行 ✓ 无缝） | ①单测三例落位 `tests/unit/infrastructure/storage/test_archive_repository.py`（既有 :28 零参构造 fixture 同文件）；②范围注记「repo 其余 6 方法（find_for_update/mark_stale/list_by_plan/list_by_archive_type/count+继承 get_by_id/delete）维持 206 显式失败——调用图已核无 CLI 消费方」；③save 落码形态「子类覆写经 `super().save()` 复用基类 merge 逻辑（tool_execution :64-93 同款）」+ docstring 明示「不移植 isolation 的 StorageError 包装链（ArchiveRepositoryPort 无 Raises 声明）」+「无工厂 RuntimeError 为手工构造形态显式失败（R1-DF3 同款）」；④消费方回归面点名 archive 测试族 8 文件（3-10 资产域变更纪律——unit/integration×3/acceptance×2/benchmark/contracts） |
+
+#### Round 2（2026-11-03，回归核查双 Agent（R2-A 传播完备性 + R2-B 增量面组合）+ 主会话亲验）
+
+> R2-A 结论：Round 1 九项修复传播面经 git 提交级逐项取证**全部落地**（CR1-F1 三易漏 docstring 声明齐备/`_do_find` 查询体逐字节保持/CR1-F2/F3 零残留/CR1-F4 六用例位转持久断言孤儿清净/CR1-F6 对齐 logger.exception 先例；F8 逐行等值断言与 test_save_executes_merge 适配加强**强于台账声称**；台账计数 180/26/15 经 collect-only 精确复刻）。
+> R2-B 结论：9 项修复组合语义自洽——F1×F6 组合的 CLI 写通道三层异常收敛闭环（仓储 fallback→session_context 重抛→archive_plan 三处宽捕→台账降级）经**真实探针实证**（组合根真实装配无 ContextVar 下归档全链往返成功：archived=True/save×2 跨独立会话/L4 落对象/outbox 落行/find 回读）；47↔47 BDD 绑定双向对账零缺零余；F3 类型链 mypy+运行时双清。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| CR2-F1 | **chain-query CLI 缺 `except Exception` 兜底**（agent_cli.py:866-875 仅 `except DomainError`）——CR1-F1 组合破口：fallback 打开前失败信封恒为 206 InvalidStateError（DomainError 族干净 exit 1），打开后 DB 宕机时 find 的原生 OperationalError 一路上抛裸 traceback 逃逸（读写不对称：写路径有 archive_plan 宽捕+F6 双保险，读路径无）；与同文件 `_run_checkpoint_create_cli`（:929-935）/`_run_blm_plan_cli`（:742-748）双层五步定式先例断裂 | **P2** | 补 `except Exception` 兜底（对齐同文件两先例：logger.error+stderr 统一形态+exit 1）+ CLI 单测一例（stub 抛 RuntimeError → exit 1 非 traceback） |
+| CR2-F2 | 台账口径批：① Patch 清单「单测 59」无出处（R2-A 实测最接近自然组合 58——59 实为 Round 1 架构测试改写**前**首跑数字 22+6+9+22，混合时点口径未注明）；② AC→Task 矩阵 :377「20 轮采样窗口」旧口径残留（CR1-F7 只改了 Subtask 5.4 与 AC-7 正文漏矩阵行）；③ CR1-R4「六处声明位」中分档表位为文件头邻近承载（表体无替身轴——字面计数微差） | **P3** | ①Patch 清单验证行改写为明确口径（注明文件组合与时点）；②矩阵 :377 同步「≥20 轮（实现 25）」；③CR1-R4 行注记「分档表位由文件头邻近承载」 |
+| CR2-F3 | CR1-F1 fallback 分支集成/验收零覆盖（集成全 session_context 请求路径、验收手动 set_session——CLI fallback 端到端仅单测 mock 三例承载）+ 组合根 `resolve("session_factory")` 接线无自动化守卫（注册名漂移不红）；配置分叉事实：CLI bootstrap 指向 .env dev 库、测试装配走测试库（5433）——测试永远看不到 CLI 真实落库目标。R2-B 已以真实探针补证代码正确性（盲区是测试形态非代码缺陷）；与 audit R1-DF1 核销时补真实路径验证的家族先例不对称 | **P3** | deferred-work 登记 6.4-DF2（核销触发：7-2 REST 化立项或下一 CLI 归档消费 Story——届时补无 session 上下文的集成场景+接线守卫断言；audit 核销先例为参照） |
+| CR2-改判 | S13 feature 文本「四守护文件零改动」与实现（token 缺席+预留码缺席）语义收窄——CR1-F4 已知权衡、docstring 在位（R2-B 附注）；R2-B 另证 F1 对既有归档域请求路径零变化（代码级+55 个真实服务测试实证 34+21 passed） | — | 留痕不动作 |
 
 #### 已修复 Patch
 
@@ -977,11 +989,18 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - [x] **CR1-F7（P3）**：故事 Subtask 5.4 口径「≥20 轮（实现 25）」
 - [x] **CR1-F8（P3）**：单测 blob 解引用补 retrieve 逐行调用计数断言
 - [x] **CR1-F9（P3）**：文案/弱断言批（三型代表 docstring 如实化/six_delivery_files 改名/A 验证器 docstring 如实化/CLI 空清单「共 0 条」精确断言/S11 分档 Background 门控注记）
-- [x] **验证**：单测 180+59+26 passed、契约 15 passed、验收 13 场景收集 ✓、mypy 736 文件零错误、ruff 全过
+- [x] **验证**（CR2-F2 口径勘误——原「59」系 Round 1 架构测试改写前的首跑混合时点数字，废弃）：单测 180（agent_cli+blm_planning_service+chain_service 三文件）+ 96（agent_cli——Round 2 后含 CR2-F1 新例）+ 26（archive 仓储）passed、契约 15（strategic_archive 族）+ 48（blm_planning 族+run 用例）passed、验收 13 场景收集 ✓、mypy 736 文件零错误、ruff 全过
 
 #### 已推迟 Defer
 
 - [ ] （Round 1 暂无新增 Defer——CR1-改判 8 项均为排除性留痕非留项；6-6 落地时架构 E/验收 S13 的 485-489 断言让位更新已在断言处注记）
+- [x] **Round 2 → 6.4-DF2（P3）**：CR1-F1 fallback 分支集成/验收覆盖缺口 + 组合根 session_factory 接线无守卫（deferred-work「code review of 6-4 Round 2」小节登记——核销触发：7-2 REST 化或下一 CLI 归档消费 Story）
+
+#### Round 2 已修复 Patch
+
+- [x] **CR2-F1（P2）**：`_run_chain_query_cli` 补 `except Exception` 兜底（对齐同文件 blm-plan/checkpoint-create 双层五步定式：logger.error exc_info=True + return 1、无 stderr print——快评员先例形态勘误吸收）+ 单测一例（stub.error 既有通道注入 RuntimeError → exit 1 + caplog 消息 + exc_info 钉死——CLI 96 passed）
+- [x] **CR2-F2（P3）**：矩阵 :377 采样轮数同步 + Patch 清单验证行口径勘误（「59」废弃注明时点缘由）+ CR1-R4 分档表邻近承载注记
+- [x] **CR2-F3（P3）**：6.4-DF2 登记 deferred-work + 故事 Defer 小节同步
 
 ---
 
@@ -1005,3 +1024,5 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - v1.3.0: 文档审查 Round 3 单深度推演（13 场景三轴/8 步时间线/失败矩阵+13 条证伪留痕；P1×1+P2×4+P3×5）：R3-F1 StepChainMaterial 补 evidence_refs 字段（assumptions 源字段）；R3-F2 部分降级分层裁定（归单测层——验收 no-mock 无通道）；R3-F3 outbox 行清理四步链（6-3 teardown 第②步移植）；R3-F4 挂接段 UUID 守卫（裸 ValueError 逃逸防御）；R3-F5 L2 半行语义钦定；R3-F6~F10 实值/公式/装配/清单/护栏批
 - v1.3.1: Round 5 独立终审收敛（P3×6 随收敛清偿：changelog 残留字符/计数 off-by-one/条目调序/:655-680 定谳/字段表描述/矩阵回指）+ 收敛声明入档——零 P0/P1 残留，v1.3.1 维持 ready-for-dev
 - v2.0.0: dev-story 实施完成（2026-11-03）——Task 0~7 全部执行：四冻结规范+13 验收场景全红→全绿；端口/服务/用例/挂接/组合根/CLI 全交付（src 3 新建+8 修改；组合根 diff 纯新增 35 行+恰 1 行版本变更）；测试 8 文件新建/3 文件扩展（单测 41+图链路 3+CLI 8+契约 9+架构 22+集成 5+验收 13）；四目录全量回归 14438 passed×2 轮零适配；mypy/ruff 全过；覆盖率 95%/100%；零新事件零新异常（四守护文件零 diff+domain 零改动终验）；环境事实沉淀一处（tests/environments MINIO ROOT 命名双轨缝隙根因修复——计划外追加修改，Task 5）；Status → review
+- v2.1.0: 代码审查 Round 1（四视角调研+双评审员+复评达标，P0×1+P1×1+P2×4+P3×3+改判 8 项；提交 78da3c91）——**CR1-F1(P0) archive_repository save/find 双模式 session fallback**（CLI 归档/追溯结构性不可用修复——audit R1-DF1 家族第五成员）；CR1-F2 两处 type: ignore 根因清偿；CR1-F3 端口类型精确化；CR1-F4 git diff 断言族 5 处转持久断言；CR1-F5 三替身豁免声明；CR1-F6 挂接段宽捕兜底；CR1-F7~F9 P3 批
+- v2.1.1: 代码审查 Round 2（回归核查双 Agent：传播完备性全落地+组合面自洽真实探针实证；CR2-F1(P2) chain-query CLI Exception 兜底+CR2-F2 口径批+CR2-F3 6.4-DF2 登记）
