@@ -55,7 +55,7 @@
 **验证标准/Validation Criteria:**
 - [ ] 8 条思维链**四文本字段非空白**（input_summary/reflection/constraints_check/final_answer）+ **tools_used 形态合法**（空元组合法——synthesis 步恒空；非空时元素级非空白）（R2-F7 口径订正——「五字段非空」与空元组合法矛盾；Fake LLM 确定性产出下 100% 完整率——epic「完整率≥98%」MVP 口径）
 - [ ] **组装映射判别力**：tools_used 断言=独立构造的期望轨迹（该步实际执行的工具 slug 单元组或空元组——**非 Fake LLM 回声**，组装面素材来自执行轨迹与既有产物，Fake 回声值泄漏即红——5-3 `test_chain_assembly_overwrite` :680-695 判别力先例）；final_answer 经 `json.loads` round-trip 解回等于该步 structured_output（六子步骤）/ asdict 六键等值（gap——list 归一口径：root_causes 解回为 list，与 asdict tuple 比较前显式 `tuple()` 归一——R1-F9 钦定）/ 两键等值（synthesis，同款 list 归一）
-- [ ] 降级步（Fake LLM 注入失败形态——6-1 降级注入先例）思维链仍产出：final_answer 为降级信封 JSON 且 degrade_reason 在位、constraints_check 含降级标注；**部分降级形态**（R2-F2——Fake 检索降级+LLM 成功注入，6-1 既有注入先例）payload=structured_output 原样（非信封）+降级事实三处承载（reflection 后缀/constraints_check 标记/decision_basis.degraded）
+- [ ] 降级步（Fake LLM 注入失败形态——**验收 S3**（fail_schemas **限六子 Schema 子集**（R3-F10——全覆盖 8 Schema 触发全降级 481 :177-182 场景不可达））+单测双层）思维链仍产出：final_answer 为降级信封 JSON 且 degrade_reason 在位、constraints_check 含降级标注；**部分降级形态**（R2-F2）**归单测层 Task 1A 专属**（素材构造 degraded=True+payload 在位——R3-F2 分层裁定：检索降级唯一注入先例在单测 mock 层（test_blm_planning_service.py:252-254 AsyncMock spec=HybridSearchPort），验收层 no-mock 红线下无构造通道（真实 Qdrant 空结果=正常空证据不降级 :641-654））payload=structured_output 原样（非信封）+降级事实三处承载（reflection 后缀/constraints_check 标记/decision_basis.degraded）
 - [ ] 组装素材缺陷时（构造性红测——单测层）：445 触发且 missing_fields 携缺失字段名——**构造配方钦定**（R2-F3）：冻结公式四文本字段恒非空白/final_answer 恒非空，**唯一可达 242 通道是 tools_used 元素级守卫**（`StepChainMaterial(tool_slug=" ")` 纯空白串——truthy 进元组后被 VO `not item.strip()` 拒绝，chain_of_thought.py:76-81）；空 payload 不可达（`json.dumps({})`="{}" 非空白）；payload 含不可 JSON 序列化对象抛 TypeError 非 242——生产素材源受控（model_dump/asdict/信封三态）注记不设防
 - [ ] `to_display()` 展示形态正确（五段顺序 + 三个 XML 标签闭合对 + JSON 尾段——5-3 既有 VO 方法零改动复用，验收仅断言组装产物经展示面输出）
 
@@ -79,7 +79,7 @@
 **When** 归档步骤执行（挂接点内经 `ChainOfThoughtArchiveService` 调用 `StrategicArchiveService.archive_plan`——零改动复用）
 **Then** 落一条 `StrategicArchive`：`archive_type=ArchiveType.EVIDENCE_PACKAGE`（**枚举首激活**——3-10 定义后零使用，本 Story 唯一构造位）、`plan_id` 同 BLM run、`plan_type="SP"`（6-3 R6-1 同款钦定——思维链是 SP 编制过程的推理快照）、归档载荷映射（**Task 0.3 冻结——唯一真源**）：
 - `decision_basis = {"kind": "blm_chain_of_thought", "stage": stage_id, "chain": {五字段 dict}, "degraded": bool}`（**kind+stage 语境锚**——R8-F3「decision_basis 是 dict 自由字段，携带语境锚使读侧可精确过滤」同构先例）
-- `assumptions = {"tools_used": [...], "evidence_refs": [...]}`（过程素材溯源）
+- `assumptions = {"tools_used": [...], "evidence_refs": [...]}`（过程素材溯源——evidence_refs 源自 material.evidence_refs（R3-F1 补字段）：六子=result.evidence_refs / gap=检索三元组第三位 / synthesis=()）
 - `evidence_blob = json.dumps({"stage": stage_id, "chain": {五字段 dict}}, ensure_ascii=False, sort_keys=True).encode("utf-8")`（**L4 WORM 存结构化 JSON——DC-2「存储用结构化、展示用标签」钦定**；to_display() 是展示面不落 blob）
 **And** 存储落位：L2 PostgreSQL `strategic_archives` 行（强制）+ L3 Qdrant `strategic_archive` collection 点（可降级）+ L4 MinIO `archive-evidence` bucket WORM 对象（强制，retention_days=2555）+ L5 图谱（可降级）——`archive_plan` 既有编排零改动（:122-294 五步序）；归档内 `ArchiveCreated` 事件随 outbox 发布（既有——**零新事件**，OD-6）；**L4 落对象双前提注记**（R1-F16）：写入条件 `evidence_blob and self._object_storage is not None`（:191）——组合根 `resolve_optional("l4_object")`（:2217）未注册时 blob 静默跳过（blob_ref=None 无 284 无告警）；测试环境经 6-3 装配形态（真实 MinIO + bucket 自愈）覆盖，生产部署 L4 注册是 WORM 落位前提
 
@@ -93,7 +93,8 @@
 
 **Given** 某步思维链组装成功、归档调用执行
 **When** 归档强制环节失败（L2/L4 存储失败或归档内 ArchiveCreated 发布失败——`ArchiveStorageError` 284 透传面）
-**Then** **降级不阻断 BLM 流程**：捕获 284 → 该步 `ChainRecord(archived=False, archive_id="")` → warning 日志（含 stage/plan_id/失败原因）→ 流程继续（后续步骤正常执行；该步领域产物/快照/事件不受影响——思维链是可观测面，因观测面失败丢弃已产出的领域结果是错误的权衡，OD-5）
+**Then** **降级不阻断 BLM 流程**：捕获 284 → 该步 `ChainRecord(archived=False, archive_id="")` → warning 日志（含 stage/plan_id/失败原因）→ 流程继续（后续步骤正常执行；该步领域产物/快照/事件不受影响——思维链是可观测面，因观测面失败丢弃已产出的领域结果是错误的权衡，OD-5）；**L2 半行语义注记**（R3-F5）：archive_plan 内 L2 save 先于 L4/回写/发布（:122-127 在前三者之前）——284 于后三者时 L2 行已在 session，session_context 末尾 commit 使 archived=False 台账与 L2 EVIDENCE_PACKAGE 行并存；**钦定半行提交为可接受形态**（L2 行在即证据在，archived 台账反映调用终态，读侧追溯以 L2 为准——行在即读得到，与台账 False 并存不矛盾）
+**And** **挂接段 UUID 守卫钦定**（R3-F4）：`context.plan_id` 是 str（:218-225），归档是首个 UUID 硬消费方——挂接段 `uuid.UUID(plan_id)` 转换失败（畸形 plan_id——CLI `--plan-id` 无 UUID 守卫透传）时该步 chain 缺席+warning 日志降级续行（OD-5 同语义；裸 ValueError 逃逸违红线——6-3 checkpoint_service :249-252 宽捕注记同款防御）；6-1 既有链路对非 UUID plan_id 全程 str 兼容，本守卫使其不因 6-4 挂接而中断
 **And** **零静默吞错**：失败可见可数——chain_records 中 archived=False 条目即失败台账；CLI blm-plan 汇总行输出归档计数（**三段式口径**（R2-F8）：「思维链归档 成功 N/失败 M/预期 8」——分母 8 使组装缺席 K=8-N-M 可推算，Task 3 断言同步）
 **And** 组装失败（445）同降级语义（该步 chain 缺席于 chain_records——`chain_records` 条目数在 445 降级下 <8，计数断言可见；**不抛出中断 run**——同 OD-5 权衡）；**边界注记**（R1-F15）：`synthesize_insights` 早退分支（:410-412 `effective_context is None`——无步骤先行调用）不写快照不发事件亦**不触发挂接段**，该路径 synthesis chain 缺席合法（<8 台账口径覆盖）；AC-2 空回退分支（R1-F12）承接投影面
 
@@ -177,11 +178,12 @@
 
 | 字段 | 类型 | 三型差异说明 |
 |---|---|---|
-| `stage` | `str` | STAGE_VALUE_DOMAIN 八值之一 |
+| `stage` | `str` | STAGE_VALUE_DOMAIN 八值之一——**构造公式钦定**（R3-F7）：六子=`f"market_insight_{step.value}"`（:384 同源——方法内裸变量 `step.value` 是 "trend" 短值不在八值集，必须前缀拼装）；gap="performance_gap"；synthesis="market_insight_synthesis" |
 | `display_name` / `role_prefix` | `str` | 六子/gap=语义配置取值；synthesis=调用方（服务挂接段）传模块常量 |
 | `task` | `str` | 三型同源（context.task） |
 | `evidence_count` | `int` | gap/六子=len(evidence_texts)；synthesis 恒 0 |
-| `tool_slug` | `str` | `_execute_candidate_tools` 第三返回值（可空串——空即空元组）；synthesis 恒 "" |
+| `tool_slug` | `str` | `_execute_candidate_tools` 第三返回值（可空串——空即空元组）；synthesis 恒 ""；**实值注记**（R3-F6）：TOOL_CATALOG 23 工具全零 `slug=`（strategic_tool_catalog.py 实测）——`tool.slug or tool.name` :600 回落分支恒触发，**实值恒为工具中文显示名**，判别力期望按 name 构造 |
+| `evidence_refs` | `tuple[str, ...]` | **R3-F1 补**：六子=`result.evidence_refs`（blm_phases.py:240）；gap=检索三元组第三位（:252）；synthesis=()（无检索）——AC-3 assumptions.evidence_refs 的源字段 |
 | `summary` | `str` | 六子=result.summary；gap=summary（=financial_gap）；synthesis=""（无该字段，reflection 用 conclusions 计数替代） |
 | `findings_count` | `int` | 六子=len(findings)；gap=len(root_causes)；synthesis=len(conclusions)（**统一命名承载三型计数——组装服务按 stage 型选用素材**） |
 | `degraded_inputs_count` | `int` | synthesis 型专用（其余 0） |
@@ -326,6 +328,7 @@
 | 约束类型 | 规则 | 违反后果 |
 |---------|------|---------|
 | **PG 档案行清理** | **集成=真实归档提交+按 plan_id 删除清理**（R1-F7 口径订正：挂接点内归档经 archive_plan 真实提交，savepoint 回滚模式不适用于服务内归档链路；6-3 集成实证形态 :190-268 真实四服务+清理链同构——仅 commit 失败时 session 级 rollback 兜底 :292-296）；验收=真实提交后按 plan_id 删除 EVIDENCE_PACKAGE 行（6-3 `_cleanup_archive_residues` :346-430 先例——登记-清理闭环，R1-F1 教训） | 档案行泄漏累积 |
+| **outbox 行清理**（R3-F3） | ArchiveCreated 8 行/run——`event_type='ArchiveCreated'` + `payload->'payload'->>'plan_id'` 双通道精确 DELETE（6-3 teardown 第②步 :287-291 先例）；集成② S9 断言场景后对称清理 | outbox 行泄漏累积 |
 | **Qdrant 点清理** | 点 ID 为 MD5 哈希 int——断言/清理按 `payload.archive_id` 匹配（6-3 环境事实沉淀） | 点泄漏 |
 | **MinIO WORM 清理** | WORM 对象经 `remove_objects(bypass_governance_mode=True)` 清理；bucket 必须 object-lock 形态（无锁 bucket 上 GOVERNANCE 设置使 L4 阻断——探测自愈 bypass 清版本重建，6-3 环境事实） | 对象泄漏/L4 阻断 |
 | **Redis 零新键** | 本 Story 快照面零改动（OD-8）——无新 Redis 键族；验收沿用 6-1/6-2 blm-planning- 键清理链 | 无新增面 |
@@ -356,7 +359,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 每步五段组装+8 条/run | Task 1 | 组装映射五分支+降级信封 | test_chain_of_thought_archive_service.py |
+| AC-1 | 每步五段组装+8 条/run | Task 1 | 组装映射五分支+降级信封 | test_chain_of_thought_archive_service.py + 验收 S3（R3-F2 补行） |
 | AC-1 | 组装映射判别力 | Task 1 | 期望轨迹独立构造+round-trip | 同上 + 验收 S2 |
 | AC-1 | to_display 展示形态 | Task 1 | 五段展示 VO 方法复用断言 | 同上 + 验收 S10（R1-F8 归位） |
 | AC-1 | 挂接点触发 | Task 2 | 三方法末尾挂接 | test_blm_planning_service.py（扩展） |
@@ -393,9 +396,9 @@
 - [ ] Subtask 0.3: 归档载荷映射冻结（decision_basis kind+stage 锚 / assumptions 过程素材 / evidence_blob 结构化 JSON——AC-3 唯一真源；embedding_text 构造亲验——`strategic_archive_service.py:148` 上游确认）
 - [ ] Subtask 0.4: 端口契约定稿（ChainOfThoughtArchiveServicePort 两方法 + StepChainMaterial/ChainRecord/ChainOfThoughtTraceView 三 dataclass 字段表）
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_json_chain_of_thought.feature`（**13 场景编号连续钉死**（R1-F8 重排——AC-5 拆正向/负向两场景消除 S11 空洞与 S6 二义，to_display 场景归 AC-1）：S1 全链 8 条（AC-1，含 AC-7 成功率断言并入）/S2 组装映射判别力（AC-1）/S3 降级步形态（AC-1）/S4 Result 携带+投影真实化（AC-2）/S5 归档真实落位（AC-3）/S6 追溯查询正向（AC-5）/S7 追溯负向两形态（AC-5——**单 Scenario 含两段 Given-When-Then**（R2-F9）：无档案合法 plan_id 空清单段+非法 plan_id 242 段串联，@scenario 绑单场景名，拆两 Scenario 则计数 14≠13 失配）/S8 零回归守护（AC-6）/S9 事件零新增+ArchiveCreated 落行（AC-6）/S10 to_display 展示形态（AC-1 验证标准 5——原 S12 归位）/S11 P95 组装窗口（AC-7）/S12 并发 10（AC-7——原 S10+S11 并入）/S13 收尾清单）
-- [ ] Subtask 0.6: 编写 BDD 步骤实现（**含延迟 import 的完整步骤体**——非占位骨架，0.7 全红失败形态依赖完整实现；R1-P3 措辞订正）`tests/acceptance/test_acceptance_json_chain_of_thought.py`（docstring 五段+场景三属性分档表/pytestmark 全套+xdist_group blm-planning-perf/13 场景全绑定 @scenario/模块级 event_loop+context dict+_run_async 三件套/teardown 链含 PG 档案行+Qdrant 点+MinIO WORM 对象三清理步（6-3 `_cleanup_archive_residues` :346-430 形态移植）/Fake LLM 双 Schema 族分派工厂（复用 6-2 `_make_fake_llm` 按 response_schema 身份分派形态——test_acceptance_market_insight.py:365 先例；6-4 组装零新增 LLM 调用故 Fake 面不扩）/Fake Embedding 豁免工厂/延迟 import 纪律）
+- [ ] Subtask 0.6: 编写 BDD 步骤实现（**含延迟 import 的完整步骤体**——非占位骨架，0.7 全红失败形态依赖完整实现；R1-P3 措辞订正）`tests/acceptance/test_acceptance_json_chain_of_thought.py`（docstring 五段+场景三属性分档表/pytestmark 全套+xdist_group blm-planning-perf/13 场景全绑定 @scenario/模块级 event_loop+context dict+_run_async 三件套/teardown 链含**四清理步**（R3-F3：PG 档案行+Qdrant 点+MinIO WORM 对象+**outbox 行**（`event_type='ArchiveCreated'` + `payload->'payload'->>'plan_id'` 双通道 DELETE——6-3 六步链第②步 :287-291 移植，S9 断言落行后必须对称清理，8 行/run×全链场景）/（6-3 `_cleanup_archive_residues` :346-430 形态移植））/**验收装配归档服务 publisher 形态钦定**（R3-F8：默认 None+发布场景（S9）重建真实 publisher——6-3 先例 :636 同款，避免全场景 8 行/run outbox 残留放大清理面）/Fake LLM 双 Schema 族分派工厂（复用 6-2 `_make_fake_llm` 按 response_schema 身份分派形态——test_acceptance_market_insight.py:365 先例；6-4 组装零新增 LLM 调用故 Fake 面不扩）/Fake Embedding 豁免工厂/延迟 import 纪律）
 - [ ] Subtask 0.7: 运行验收测试，确认 13 场景全红零 skip（四真实服务门控全过；失败形态钦定：ModuleNotFoundError×N（端口/服务缺失）+AttributeError（chain_records 缺失）+AssertionError（收尾清单）——收集期零错误）
-- [ ] Subtask 0.8: 既有资产复核（八项亲验——**①② 已于文档审查 R1 实测定谳**（R1-F2/F3，正文冻结表已按实测形态书写，本 Subtask 复跑确认而非重新定谳）：① `_execute_candidate_tools`（blm_planning_service.py:559-608）返回三元组 `(输出摘要, 降级原因, tool_slug)`——**单数 slug 至多 1 项无版本后缀**（:600-601 首个成功即返回）；② **双单数形态断裂**：`InsightStepResult.tool_used` 是单数 str（blm_phases.py:239）**且执行轨迹第三返回值同为单数 str**——ChainOfThought.tools_used 是 tuple[str,...]，包装 `(tool_slug,)`（6-1 属性形态断裂族教训直接应用：素材采集从执行轨迹取而非信封字段，且**不得假设清单形态**）；③ `archive_plan` embedding_text 构造（:144-148 上游）；④ `PerformanceGapArtifacts` asdict **六键**/`InsightSynthesis` asdict **两键**（frozen dataclass 标准库形态亲验——R1-F4 口径）；⑤ AgentDecided SpBlmGraph 投影分支（langgraph_engine.py:258-279）chain_summary 现值形态；⑥ 组合根 blm_planning_service lambda（:1580-1598）注入实参断言面（test_port_contract_blm_planning.py:89-98 inspect.getsource——增量注入不破坏既有断言亲验）；⑦ 三方法挂接点素材可见性（六子步骤：result 信封+裸变量全可见；**performance_gap：无 findings/structured_output——素材=artifacts 六属性+summary+evidence_texts（:249-297 作用域）；synthesis：conclusions/degraded_inputs，无工具无检索（:391-449）——R1-F3 三型分列依据**）；⑧ SpBlmState TypedDict（schemas.py:84-110）加键零破坏亲验（total=False——**写侧经 sp_blm_graph 节点适配器（R1-F1 三件套③），加键本身不产生写入**）
+- [ ] Subtask 0.8: 既有资产复核（八项亲验——**①② 已于文档审查 R1 实测定谳**（R1-F2/F3，正文冻结表已按实测形态书写，本 Subtask 复跑确认而非重新定谳）：① `_execute_candidate_tools`（blm_planning_service.py:559-608）返回三元组 `(输出摘要, 降级原因, tool_slug)`——**单数 slug 至多 1 项无版本后缀**（:600-601 首个成功即返回）；② **双单数形态断裂**：`InsightStepResult.tool_used` 是单数 str（blm_phases.py:239）**且执行轨迹第三返回值同为单数 str**——ChainOfThought.tools_used 是 tuple[str,...]，包装 `(tool_slug,)`（6-1 属性形态断裂族教训直接应用：素材采集从执行轨迹取而非信封字段，且**不得假设清单形态**）；③ `archive_plan` embedding_text 构造（:144-148 上游）；④ `PerformanceGapArtifacts` asdict **六键**/`InsightSynthesis` asdict **两键**（frozen dataclass 标准库形态亲验——R1-F4 口径）；⑤ AgentDecided SpBlmGraph 投影分支（langgraph_engine.py:258-279）chain_summary 现值形态；⑥ 组合根 blm_planning_service lambda（:1580-1598）注入实参断言面（test_port_contract_blm_planning.py:89-98 inspect.getsource——增量注入不破坏既有断言亲验）；⑦ 三方法挂接点素材可见性（六子步骤：result 信封+裸变量全可见；**performance_gap：无 findings/structured_output——素材=artifacts 六属性+summary+evidence_texts+`_tool_slug`/`_evidence_refs`（下划线命名作用域可见可采集——R3-F9 补）（:249-297 作用域）；synthesis：conclusions/degraded_inputs，无工具无检索（:391-449）——R1-F3 三型分列依据**）；⑧ SpBlmState TypedDict（schemas.py:84-110）加键零破坏亲验（total=False——**写侧经 sp_blm_graph 节点适配器（R1-F1 三件套③），加键本身不产生写入**）
 - [ ] Subtask 0.9: 链路接线断言清单五项定义（见 Task 0 完成标志⑤）+ deferred-work 处置注记落档（L192 R1-DF3 零触发注记——6-4 确定性组装不经 ChainOfThoughtSchema；新登记：5-3 任务级思维链归档归 5.7 Phoenix/后续 Story）
 
 **完成标准/Definition of Done:**
@@ -550,7 +553,7 @@
 - [ ] Subtask 5.3: 场景③ 并发 10（asyncio.gather 10 独立素材归档——**每协程 session_context() 独立 scope**（R1-F7——gather 共享单 AsyncSession 并发使用不被 SQLAlchemy 支持）；**10 素材共享一个场景专属 plan_id**（count==10 按该 plan_id+archive_type 过滤——R1-F7 消歧）；全 archived=True）
 - [ ] Subtask 5.4: 场景④ 性能采样（组装窗口 20 轮 P95<50ms——素材固定**直调纯函数 `compose_step_chain`**（R1-F13——零 I/O 零 LLM；**采样素材型=六子步骤型**钦定）；采样 task 文本固定；口径差声明落 docstring）
 - [ ] Subtask 5.5: 场景⑤ 6-1/6-2/6-3 回归面（集成层既有用例复跑）
-- [ ] Subtask 5.6: 清理闭环（PG 档案行按 plan_id 删除+Qdrant payload.archive_id 匹配清点+MinIO bypass_governance 清对象——teardown 链三步独立 try/except；三键族跑前跑后净增 0 断言——6-3 R1-F1 教训直接继承）
+- [ ] Subtask 5.6: 清理闭环（PG 档案行按 plan_id 删除+Qdrant payload.archive_id 匹配清点+MinIO bypass_governance 清对象+**outbox 行**（ArchiveCreated 按 event_type+plan_id 双通道 DELETE——R3-F3）——teardown 链四步独立 try/except；四键族跑前跑后净增 0 断言——6-3 R1-F1 教训直接继承）
 
 **完成标准/Definition of Done:**
 - [ ] 五场景全绿
@@ -875,6 +878,23 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 > R2-A 另证实：R1 十项修复传播完备性**全部落地**（含台账外超额传播位）；R2-B 证实「零适配」声称经全仓断言面实测成立（6-1 图身份锚为逐键成员断言非键全集；键全集断言仅在快照 state_data 面——OD-8 保护）+ R1-F7 并发会话模型验证最干净。
 
+**Round 3（2026-11-03，单深度推演（13 场景三轴/8 步时间线/失败矩阵）+ 13 条证伪留痕，v1.2.0→v1.3.0）：**
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R3-F1 | StepChainMaterial 缺 `evidence_refs` 字段：AC-3 assumptions.evidence_refs 引用无源字段（material 是唯一传参通道）——R1-F10 字段表「假冻结」同类病 | P1 | 字段表补一行（六子=result.evidence_refs/gap=检索三元组第三位/synthesis=()）；AC-3 assumptions 行标注素材源 |
+| R3-F2 | 部分降级验收层不可构造（检索降级唯一注入先例在单测 mock 层 test_blm_planning_service.py:252-254；验收 no-mock 红线无通道——真实 Qdrant 空结果=正常空证据不降级 :641-654）+「6-1 既有注入先例」引用失实 | P2 | AC-1 VC3 分层裁定：全降级=验收 S3+单测；部分降级=单测层 Task 1A 专属；矩阵补 AC-1→S3 行 |
+| R3-F3 | outbox 行清理缺位：S9/集成②断言 ArchiveCreated 落行（8 行/run）但 6-3 teardown 六步链移植时丢弃第②步——残留累积+「净增 0」口径失真 | P2 | 0.6 四清理步/Task 5.6 四步链+四键族/隔离表补 outbox 行（event_type+plan_id 双通道 DELETE） |
+| R3-F4 | 挂接段 plan_id str→UUID 转换守卫未钦定：归档是首个 UUID 硬消费方（6-1 全程 str 兼容），畸形值下裸 ValueError 逃逸→图失败中断 run（违 OD-5+违红线） | P2 | AC-4 钦定挂接段守卫：转换失败该步 chain 缺席+warning 降级续行（6-3 :249-252 宽捕注记同款） |
+| R3-F5 | 284 捕获后 L2 半行提交语义未钦定（L2 save 先于失败位——archived=False 台账与 L2 行并存，三层测试均不可达的生产空洞） | P2 | AC-4 注记钦定：半行提交为可接受形态（L2 行在即证据在，读侧以 L2 为准） |
+| R3-F6 | tools_used 实值恒为中文显示名：TOOL_CATALOG 23 工具全零 slug=（实测零命中）——判别力期望按 kebab-case 假设必假红 | P3 | 字段表 tool_slug 行补实值注记（期望按 name 构造） |
+| R3-F7 | 六子步骤 stage 锚构造公式未显式钦定（裸变量 step.value="trend" 不在八值集——必须前缀拼装） | P3 | 字段表 stage 行补公式 `f"market_insight_{step.value}"`（:384 同源） |
+| R3-F8 | 验收装配归档服务 event_publisher 形态未钦定（6-3 先例默认 None；S9 需真实 publisher——若全程真实则全场景 outbox 残留放大） | P3 | 0.6 钦定：默认 None+S9 场景重建真实 publisher（6-3 :636 同款） |
+| R3-F9 | 0.8⑦ gap 素材清单漏 tool_slug（冻结表每步采集——清单与冻结表不一致） | P3 | 0.8⑦ 补 `_tool_slug`/`_evidence_refs`（下划线命名作用域可见） |
+| R3-F10 | S3 全红注入护栏未声明（fail_schemas 全覆盖 8 Schema→全降级 481 :177-182 场景不可达） | P3 | AC-1 VC3 补「限六子 Schema 子集」注记 |
+
+> R3 证伪留痕（已推演排除，防下轮重推）：①SINGLETON×SCOPED 死 session（服务实为 SCOPED+PG 仓储零参构造调用时读 ContextVar+验收手工构造绕开组合根）②投影在 _assemble_result 后读 Result（实为先于——submit_graph :126-131 发布）③SpBlmState 加键破坏 6-1 图身份锚（逐键成员断言非全集）④lambda 第 9 参破坏 getsource 断言（membership 断言）⑤445 注入 archive_plan 零调用断言时序矛盾（组装先于归档）⑥尾字段破坏等值断言（尾参 None 投影恒 ()）⑦R2-F3 唯一 242 通道论断有漏（四文本恒非空白复核成立）⑧gather 共享 ContextVar 互窜（Task 级拷贝隔离）⑨S5 Qdrant 断言依赖相似命中（filter 面过滤检索）⑩epics 钦定名冲突（无同名+OD-7 已声明）⑪快照写在挂接前时序错位（每节点后 state 恰含该步）⑫行号锚点漂移（20+ 抽查全命中）⑬synthesis 无降级标记可判（R2-F2 三处承载通吃）。
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -906,10 +926,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-11-03
 **最后更新/Last Updated:** 2026-11-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研+主会话亲验：5-3 ChainOfThought VO 复用定位/3-10 EVIDENCE_PACKAGE 零使用实证/6-1 边界表 L37 钦定 BLM 面/6-3 归档与清理先例；四冻结规范：确定性组装映射（OD-2）/归档载荷映射（OD-4）/端口契约/异常复用清单（OD-6 零新增）；AC-1~AC-7 + Task 0~7 + 13 验收场景规划；Status → ready-for-dev）
 - v1.1.0: 文档审查 Round 1（四视角调研+双评审+主会话亲验，P0×1+P1×8+P2×9+P3 批）：**R1-F1 回传通道三件套**（chain_records 经 _PlanRunState 累积+协议第六投影方法+sp_blm_graph 节点适配器直写——原「累积进返回 dict」物理不可行）；R1-F2 tools_used 单数口径；R1-F3 素材映射三型分列；R1-F5 端口返回 ChainRecord \| None；R1-F6 include_blob 第二注入；R1-F7 并发会话模型+plan_id 消歧+集成清理口径；R1-F8 场景编号连续重排；R1-F9 tuple 归一；R1-F10~F17 与 R1-P3 行号订正批（详见文档审查修复表）
+- v1.3.0: 文档审查 Round 3 单深度推演（13 场景三轴/8 步时间线/失败矩阵+13 条证伪留痕；P1×1+P2×4+P3×5）：R3-F1 StepChainMaterial 补 evidence_refs 字段（assumptions 源字段）；R3-F2 部分降级分层裁定（归单测层——验收 no-mock 无通道）；R3-F3 outbox 行清理四步链（6-3 teardown 第②步移植）；R3-F4 挂接段 UUID 守卫（裸 ValueError 逃逸防御）；R3-F5 L2 半行语义钦定；R3-F6~F10 实值/公式/装配/清单/护栏批
 - v1.2.0: 文档审查 Round 2 回归核查（双 Agent：传播完备性+增量面组合；P1×2+P2×3+P3×5）：R2-F1 第七方法计数订正（R1 自引入 9 处）；R2-F2 部分降级 payload 钦定（降级信封仅产物缺席形态——R1-F3 降级轴漏修）；R2-F3 445 构造配方（tool_slug=" " 唯一通道）；R2-F4 include_blob None 行为+blob_content 落位字段；R2-F5 读侧 tuple 归一；R2-F6~F10 行号/口径/结构批（详见修复表）
