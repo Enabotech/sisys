@@ -190,6 +190,9 @@ class RunBlmPlanningUseCase:
             synthesis=final_state["synthesis"],
             degraded_steps=degraded_steps,
             execution_ms=execution_ms,
+            # 6-4：读侧 tuple 归一（R2-F5——state 承载 list（投影返回），
+            # dict.get→Any 静默绕过 mypy，显式 tuple() 归一防 list/注解漂移）
+            chain_records=tuple(final_state.get("chain_records") or ()),
         )
 
 

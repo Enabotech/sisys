@@ -45,6 +45,7 @@ def build_sp_blm_graph(service: BlmPlanningServicePort) -> Any:
             "gap_artifacts": result,
             "degraded_steps": service.project_degraded_steps(plan_id),
             "timeline": service.project_timeline(plan_id),
+            "chain_records": service.project_chain_records(plan_id),
         }
 
     def _make_insight_node(step: MarketInsightStep) -> Any:
@@ -62,6 +63,7 @@ def build_sp_blm_graph(service: BlmPlanningServicePort) -> Any:
                 "insight_step_results": [*state.get("insight_step_results", []), result],
                 "degraded_steps": service.project_degraded_steps(state["plan_id"]),
                 "timeline": service.project_timeline(state["plan_id"]),
+                "chain_records": service.project_chain_records(state["plan_id"]),
             }
 
         return _insight_node
@@ -78,6 +80,7 @@ def build_sp_blm_graph(service: BlmPlanningServicePort) -> Any:
             "synthesis": synthesis,
             "degraded_steps": service.project_degraded_steps(state["plan_id"]),
             "timeline": service.project_timeline(state["plan_id"]),
+            "chain_records": service.project_chain_records(state["plan_id"]),
         }
 
     graph = StateGraph(SpBlmState)

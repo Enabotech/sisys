@@ -264,10 +264,17 @@ class LangGraphEngine:
             synthesis = result.get("synthesis")
             conclusions = getattr(synthesis, "conclusions", ()) if synthesis is not None else ()
             first_conclusion = conclusions[0] if conclusions else ""
+            # 6-4 投影真实化：chain_summary 取末条思维链 final_answer 截断
+            # （SingleAgentWorkflow :254 同款取值语义）；空回退钦定 R1-F12——
+            # chain_records 空时回退 first_conclusion 现值（synthesis 结论信息
+            # 不因观测面缺席而丢失）
+            chain_records = result.get("chain_records") or ()
+            last_chain = chain_records[-1] if chain_records else None
+            chain_summary_source = getattr(getattr(last_chain, "chain", None), "final_answer", "") or ""
             decision_result = {
                 "workflow_status": "completed" if not result.get("degraded_steps") else "degraded",
                 "task_summary": (getattr(gap, "financial_gap", "") or "")[:200],
-                "chain_summary": (first_conclusion or "")[:200],
+                "chain_summary": (chain_summary_source or first_conclusion or "")[:200],
                 "evidence_ref": str(result.get("plan_id", "")),
                 "retry_count": 0,
             }

@@ -97,6 +97,8 @@ class SpBlmState(TypedDict, total=False):
         synthesis: InsightSynthesis（综合洞察）
         degraded_steps: 降级步骤清单（服务投影直写全量）
         timeline: 步骤时间线（服务投影直写全量——6.3 快照消费面）
+        chain_records: 思维链归档记录（服务投影直写全量——6-4 回传三件套③；
+            不进快照 state_data——持久化归宿是战略档案库，OD-8）
     """
 
     agent_id: str
@@ -108,3 +110,4 @@ class SpBlmState(TypedDict, total=False):
     synthesis: Any
     degraded_steps: list[str]
     timeline: list[dict[str, Any]]
+    chain_records: list[Any]

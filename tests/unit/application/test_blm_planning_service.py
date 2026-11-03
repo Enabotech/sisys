@@ -214,6 +214,7 @@ def _make_service(
     guard_error: Exception | None = None,
     registry_error: Exception | None = None,
     search_error: Exception | None = None,
+    chain_archive: Any | None = None,
 ) -> tuple[BlmPlanningService, dict[str, Any]]:
     """构造被测服务 + mock 依赖字典。
 
@@ -222,6 +223,8 @@ def _make_service(
         guard_error: 隔离预检注入异常（449 触发面）。
         registry_error: 工具注册注入异常（380 触发面）。
         search_error: 检索注入异常（检索失败降级面）。
+        chain_archive: 思维链归档服务替身（6-4 挂接注入——None 即尾参缺席
+            等价性形态，既有用例零适配先例）。
     """
     llm = fake_llm or _make_fake_llm()
 
@@ -274,6 +277,7 @@ def _make_service(
         search_collection=COLLECTION,
         event_publisher=publisher,
         snapshot_repository=snapshot_repo,
+        chain_archive_service=chain_archive,
     )
     return service, {
         "llm": llm,
@@ -283,6 +287,7 @@ def _make_service(
         "hybrid": hybrid,
         "snapshot_repo": snapshot_repo,
         "publisher": publisher,
+        "chain_archive": chain_archive,
     }
 
 
@@ -1039,3 +1044,322 @@ class TestSpBlmGraphTopology:
         assert final_state is not None
         degraded = tuple(final_state["degraded_steps"])
         assert len(degraded) == 8, f"全降级 degraded_steps={degraded}"
+
+
+# ===================================================================
+# Story 6-4：思维链挂接用例族（三方法挂接/回传三件套/尾参可选等价性守护）
+# ===================================================================
+
+
+def _make_chain_archive_mock(*, return_none: bool = False, raise_error: BaseException | None = None) -> Any:
+    """思维链归档服务替身工厂（AsyncMock(spec=端口协议)——单元测试 Mock 红线）。
+
+    Args:
+        return_none: compose_and_archive_step_chain 恒返回 None（445 组装
+            失败降级面——chain 缺席台账注入）。
+        raise_error: compose_and_archive_step_chain 抛出注入异常（CR1-F6
+            挂接段宽捕兜底面——非 284/445 意外形态降级续行注入）。
+    """
+    from src.application.ports.chain_of_thought_archive import (
+        ChainOfThoughtArchiveServicePort,
+        ChainRecord,
+    )
+    from src.application.services.chain_of_thought_archive_service import compose_step_chain
+
+    mock = AsyncMock(spec=ChainOfThoughtArchiveServicePort)
+    if raise_error is not None:
+        mock.compose_and_archive_step_chain = AsyncMock(side_effect=raise_error)
+    elif return_none:
+        mock.compose_and_archive_step_chain = AsyncMock(return_value=None)
+    else:
+        mock.compose_and_archive_step_chain = AsyncMock(
+            side_effect=lambda plan_id, stage, material: ChainRecord(
+                stage=stage,
+                chain=compose_step_chain(material),
+                archived=True,
+                archive_id=f"archive-{stage}",
+            )
+        )
+    mock.query_chain_trace = AsyncMock(return_value=None)
+    return mock
+
+
+def _make_chain_context() -> BlmPlanningContext:
+    """UUID 形态 plan_id 上下文（挂接测试专用——归档是首个 UUID 硬消费方 R3-F4，
+    既有 PLAN_ID='plan-test-1' 非 UUID 会被守卫正确拒绝）。"""
+    profile = MagicMock()
+    profile.agent_id = AGENT_ID
+    return BlmPlanningContext(plan_id=str(uuid.uuid4()), agent_id=AGENT_ID, profile_result=profile, task=TASK)
+
+
+class TestChainArchiveHookup:
+    """6-4 挂接用例族（尾参可选注入 + 三方法挂接段 + 素材采集判别）。"""
+
+    def test_tail_param_none_keeps_service_construction(self) -> None:
+        """尾参 None 等价性守护（构造成功——既有 6-1/6-2 用例零适配的基座）。"""
+        service, mocks = _make_service()
+        assert service is not None
+        assert mocks["chain_archive"] is None
+
+    async def test_gap_method_hooks_chain_archive(self) -> None:
+        """gap 方法挂接：末尾触发组装归档（stage 锚+素材采集判别——R1-F3 gap 型）。"""
+        chain_mock = _make_chain_archive_mock()
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        await service.run_performance_gap_analysis(context)
+        chain_mock.compose_and_archive_step_chain.assert_awaited_once()
+        args = chain_mock.compose_and_archive_step_chain.await_args.args
+        plan_uuid, stage, material = args
+        assert plan_uuid == uuid.UUID(context.plan_id)
+        assert stage == "performance_gap"
+        assert material.stage == "performance_gap"
+        assert material.display_name == "业绩差距分析"
+        assert material.tool_slug == "swot-tows"  # 执行轨迹第三位单数 slug（mock registry slug 在位）
+        assert material.evidence_count == 1  # hybrid mock 单条命中
+        assert material.findings_count == 2  # root_causes 计数（单测 Fake gap 两根因）
+        assert material.structured_ok is True
+        assert set(material.payload) == {
+            "financial_gap",
+            "operational_gap",
+            "root_causes",
+            "portfolio_health",
+            "degraded",
+            "degrade_reason",
+        }
+
+    async def test_insight_step_hooks_chain_archive(self) -> None:
+        """六子方法挂接：stage 前缀拼装公式 + 素材采集判别（R3-F7/R1-F3）。"""
+        chain_mock = _make_chain_archive_mock()
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        await service.run_insight_step(MarketInsightStep.TREND, context, {"performance_gap": None, "insight_steps": ()})
+        chain_mock.compose_and_archive_step_chain.assert_awaited_once()
+        _, stage, material = chain_mock.compose_and_archive_step_chain.await_args.args
+        assert stage == "market_insight_trend"
+        assert material.display_name == "看趋势"
+        assert material.role_prefix == "以 CEO 宏观趋势判断与 CTO 技术趋势分析的双重视角"
+        assert material.tool_slug == "swot-tows"
+        assert material.findings_count == 2  # Fake trend findings 2 条
+        assert "summary" in material.payload and "findings" in material.payload
+
+    async def test_synthesis_hooks_chain_archive(self) -> None:
+        """synthesis 方法挂接：模块常量语义 + 无工具无检索素材形态。"""
+        chain_mock = _make_chain_archive_mock()
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        results = await _run_six_steps(service, context)
+        await service.synthesize_insights({"insight_steps": tuple(results), "performance_gap": None}, context)
+        chain_mock.compose_and_archive_step_chain.assert_awaited()
+        _, stage, material = chain_mock.compose_and_archive_step_chain.await_args.args
+        assert stage == "market_insight_synthesis"
+        assert material.display_name == "市场洞察综合"
+        assert material.role_prefix == "CMO"
+        assert material.tool_slug == ""  # synthesis 无工具
+        assert material.evidence_count == 0  # synthesis 无检索
+        assert set(material.payload) == {"conclusions", "degraded_inputs"}
+
+    async def test_full_eight_steps_accumulate_chain_records(self) -> None:
+        """全链 8 步累积（run_state.chain_records——回传三件套①）。"""
+        chain_mock = _make_chain_archive_mock()
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        await service.run_performance_gap_analysis(context)
+        results = await _run_six_steps(service, context)
+        await service.synthesize_insights({"insight_steps": tuple(results), "performance_gap": None}, context)
+        assert chain_mock.compose_and_archive_step_chain.await_count == 8
+        projected = service.project_chain_records(context.plan_id)
+        assert len(projected) == 8
+        assert [record.stage for record in projected] == [
+            "performance_gap",
+            "market_insight_trend",
+            "market_insight_market_customer",
+            "market_insight_competition",
+            "market_insight_self",
+            "market_insight_opportunity",
+            "market_insight_opportunity_gap",
+            "market_insight_synthesis",
+        ]
+
+    async def test_none_chain_archive_zero_hookup_calls(self) -> None:
+        """尾参 None 时零挂接（与现状逐字节等价——快照/事件行为不变）。"""
+        service, mocks = _make_service()  # chain_archive=None
+        context = _make_context()
+        await service.run_performance_gap_analysis(context)
+        await _run_six_steps(service, context)
+        assert mocks["snapshot_repo"].save.await_count == 13  # gap latest×1 + 六子（per-step+latest）×6
+        assert service.project_chain_records(PLAN_ID) == []
+
+    async def test_compose_none_skips_append(self) -> None:
+        """compose 返回 None（445 降级）时跳过追加（chain 缺席台账——R1-F5）。"""
+        chain_mock = _make_chain_archive_mock(return_none=True)
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        await service.run_performance_gap_analysis(context)
+        chain_mock.compose_and_archive_step_chain.assert_awaited_once()
+        assert service.project_chain_records(context.plan_id) == []  # None 不追加
+
+    async def test_compose_unexpected_error_degrades_and_continues(self) -> None:
+        """compose 抛非 284/445 意外异常时宽捕降级续行（CR1-F6——OD-5 完整捕获面）。
+
+        RuntimeError 注入钉死宽捕形态：日后有人收窄为 except DomainError 必红
+        （RuntimeError 非 DomainError 系——判别力锚）。
+        """
+        chain_mock = _make_chain_archive_mock(raise_error=RuntimeError("归档链路意外故障（注入）"))
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        artifacts = await service.run_performance_gap_analysis(context)  # 不抛异常即过
+        assert artifacts is not None  # 领域产物不因观测面失败丢弃
+        chain_mock.compose_and_archive_step_chain.assert_awaited_once()
+        assert service.project_chain_records(context.plan_id) == []  # 意外形态 chain 缺席台账
+
+    async def test_hookup_keeps_snapshot_and_event_calls_unchanged(self) -> None:
+        """挂接不改变快照写与事件发布调用次数（可观测面非流程面——OD-5）。"""
+        context_none = _make_context()
+        service_none, mocks_none = _make_service()
+        await service_none.run_performance_gap_analysis(context_none)
+        snapshot_calls_none = mocks_none["snapshot_repo"].save.await_count
+        event_calls_none = mocks_none["publisher"].publish.await_count
+
+        context_hooked = _make_context()
+        chain_mock = _make_chain_archive_mock()
+        service_hooked, mocks_hooked = _make_service(chain_archive=chain_mock)
+        await service_hooked.run_performance_gap_analysis(context_hooked)
+        assert mocks_hooked["snapshot_repo"].save.await_count == snapshot_calls_none
+        assert mocks_hooked["publisher"].publish.await_count == event_calls_none
+
+    async def test_malformed_plan_id_degrades_without_exception(self) -> None:
+        """畸形 plan_id UUID 守卫（R3-F4——转换失败该步 chain 缺席+降级续行）。"""
+        chain_mock = _make_chain_archive_mock()
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = BlmPlanningContext(plan_id="not-a-uuid", agent_id=AGENT_ID, profile_result=MagicMock(), task=TASK)
+        artifacts = await service.run_performance_gap_analysis(context)  # 不抛异常即过
+        assert artifacts is not None
+        chain_mock.compose_and_archive_step_chain.assert_not_awaited()  # 守卫先于归档调用
+        assert service.project_chain_records("not-a-uuid") == []
+
+    async def test_archive_failure_ledger_appended(self) -> None:
+        """归档失败 284 台账（archived=False 的 ChainRecord 仍追加——失败可见可数）。"""
+
+        chain_mock = _make_chain_archive_mock()
+        chain_mock.compose_and_archive_step_chain = AsyncMock(
+            side_effect=lambda plan_id, stage, material: _record_with(stage, archived=False, archive_id="")
+        )
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        context = _make_chain_context()
+        await service.run_performance_gap_analysis(context)
+        projected = service.project_chain_records(context.plan_id)
+        assert len(projected) == 1
+        assert projected[0].archived is False
+        assert projected[0].archive_id == ""
+
+
+def _record_with(stage: str, *, archived: bool, archive_id: str) -> Any:
+    """构造 ChainRecord（归档失败台账形态——链构造辅助）。"""
+    from src.application.ports.chain_of_thought_archive import ChainRecord
+    from src.domain.value_objects.chain_of_thought import ChainOfThought
+
+    return ChainRecord(
+        stage=stage,
+        chain=ChainOfThought(
+            input_summary=f"input-{stage}",
+            reflection=f"reflection-{stage}",
+            tools_used=(),
+            constraints_check="constraints",
+            final_answer='{"stage": "%s"}' % stage,
+        ),
+        archived=archived,
+        archive_id=archive_id,
+    )
+
+
+class TestChainGraphWiring:
+    """6-4 回传三件套③（图适配器直写）+ AgentDecided 投影真实化（循环 B）。"""
+
+    async def test_graph_final_state_carries_eight_chains(self) -> None:
+        """图终态 chain_records 恰 8 条（三类节点适配器直写行活着——R1-F1③）。"""
+        chain_mock = _make_chain_archive_mock()
+        plan_id = str(uuid.uuid4())
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        engine = _make_engine(service)
+        profile = MagicMock()
+        profile.agent_id = AGENT_ID
+        run_id = await engine.submit_graph(
+            "SpBlmGraph",
+            {
+                "agent_id": str(AGENT_ID),
+                "plan_id": plan_id,
+                "task": TASK,
+                "context": BlmPlanningContext(plan_id=plan_id, agent_id=AGENT_ID, profile_result=profile, task=TASK),
+            },
+        )
+        final_state = await engine.get_graph_result(run_id)
+        assert final_state is not None
+        chain_records = final_state.get("chain_records")
+        assert chain_records is not None, "终态 state 缺 chain_records 键（适配器直写行缺失——R1-F1③）"
+        assert len(chain_records) == 8, f"图终态 chain_records={len(chain_records)} 条 期望=8"
+        assert isinstance(chain_records, list)  # state 承载 list（投影返回——R2-F5 读侧归一归用例）
+
+    async def test_agent_decided_chain_summary_realized_from_last_chain(self) -> None:
+        """投影 chain_summary == 末条思维链 final_answer[:200]（值级断言——AC-2）。"""
+        from src.application.services.chain_of_thought_archive_service import compose_step_chain
+
+        chain_mock = _make_chain_archive_mock()
+        plan_id = str(uuid.uuid4())
+        service, _mocks = _make_service(chain_archive=chain_mock)
+        engine = _make_engine(service)
+        profile = MagicMock()
+        profile.agent_id = AGENT_ID
+        run_id = await engine.submit_graph(
+            "SpBlmGraph",
+            {
+                "agent_id": str(AGENT_ID),
+                "plan_id": plan_id,
+                "task": TASK,
+                "context": BlmPlanningContext(plan_id=plan_id, agent_id=AGENT_ID, profile_result=profile, task=TASK),
+            },
+        )
+        final_state = await engine.get_graph_result(run_id)
+        assert final_state is not None
+        last_chain = final_state["chain_records"][-1]
+        expected_summary = compose_step_chain(_synthesis_material_of(service, plan_id)).final_answer[:200]
+        recorder = engine._event_publisher
+        agent_decided = [c.args[0] for c in recorder.publish.await_args_list if type(c.args[0]).__name__ == "AgentDecided"]
+        assert agent_decided, "SpBlmGraph 路径未发布 AgentDecided"
+        payload = agent_decided[0].decision_result
+        assert payload["chain_summary"] == expected_summary, (
+            f"chain_summary 实测={payload['chain_summary']!r} 期望=末条 final_answer[:200]={expected_summary!r}"
+        )
+        assert last_chain.chain.final_answer[:200] == expected_summary  # 同源锚（末条即 synthesis）
+
+    async def test_agent_decided_empty_fallback_keeps_first_conclusion(self) -> None:
+        """空回退分支（R1-F12——chain_records 空时回退 first_conclusion 现值）。"""
+        service, _mocks = _make_service()  # chain 尾参 None → chain_records 空
+        engine = _make_engine(service)
+        run_id = await engine.submit_graph(
+            "SpBlmGraph",
+            {"agent_id": str(AGENT_ID), "plan_id": PLAN_ID, "task": TASK, "context": _make_context()},
+        )
+        final_state = await engine.get_graph_result(run_id)
+        assert final_state is not None
+        assert final_state.get("chain_records", []) == []
+        synthesis = final_state["synthesis"]
+        first_conclusion = synthesis.conclusions[0] if synthesis.conclusions else ""
+        recorder = engine._event_publisher
+        agent_decided = [c.args[0] for c in recorder.publish.await_args_list if type(c.args[0]).__name__ == "AgentDecided"]
+        assert agent_decided
+        payload = agent_decided[0].decision_result
+        assert payload["chain_summary"] == (first_conclusion or "")[:200], (
+            "空回退分支漂移（chain_records 空时应回退 first_conclusion 现值——R1-F12）"
+        )
+
+
+def _synthesis_material_of(service: BlmPlanningService, plan_id: str) -> Any:
+    """从服务 run_state 提取 synthesis 步组装素材（mock compose 调用面重建——
+    投影断言期望构造辅助）。"""
+
+    chain_service = service._chain_archive_service
+    assert isinstance(chain_service, AsyncMock)  # 运行时真身校验 + Optional 类型收窄双效（CR1-R1）
+    calls = list(chain_service.compose_and_archive_step_chain.await_args_list)
+    synthesis_calls = [c for c in calls if c.args[1] == "market_insight_synthesis"]
+    assert synthesis_calls, "synthesis 步 compose 调用缺失"
+    return synthesis_calls[0].args[2]

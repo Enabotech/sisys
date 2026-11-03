@@ -1579,8 +1579,10 @@ def bootstrap() -> None:
 
     register_port(
         name="blm_planning_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=BlmPlanningServicePort,
+        # Story 6-4：尾部增 chain_archive_service 注入（思维链挂接；version
+        # v1.0.0→v1.1.0——agent_engine :1555-1574 同款单行版本变更先例）
         impl=lambda resolver: BlmPlanningService(
             llm_client=resolver.resolve("llm_client"),
             tool_execution_service=resolver.resolve("tool_execution_service"),
@@ -1590,6 +1592,7 @@ def bootstrap() -> None:
             search_collection=os.getenv("BLM_SEARCH_COLLECTION", "documents"),
             event_publisher=resolver.resolve("event_publisher"),
             snapshot_repository=resolver.resolve("snapshot_repository"),
+            chain_archive_service=resolver.resolve("chain_of_thought_archive_service"),
         ),
         module="src.application.services.blm_planning_service",
         lifetime=Lifetime.SINGLETON,
@@ -2176,11 +2179,14 @@ def bootstrap() -> None:
     )
 
     # 注册档案仓储（PostgreSQLArchiveRepository 实现 ArchiveRepositoryPort）
+    # Story 6-4 代码审查 CR1-F1：lambda 注入 session_factory（CLI/后台路径
+    # fallback 独立会话——isolation DC-5 / audit R1-DF1 / outbox 家族同款第五成员；
+    # version v1.0.0→v1.1.0 单行版本变更）
     register_port(
         name="archive_repository",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=ArchiveRepositoryPort,
-        impl=lambda resolver: PostgreSQLArchiveRepository(),
+        impl=lambda resolver: PostgreSQLArchiveRepository(session_factory=resolver.resolve("session_factory")),
         module="src.infrastructure.storage.postgresql.repository.archive_repository",
         lifetime=Lifetime.SCOPED,
         owner="foundation-team",
@@ -2323,6 +2329,37 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("checkpoint", "use_case", "application"),
+    )
+    # Story 6-4：思维链归档服务（SINGLETON 编排服务注入 SCOPED 依赖——
+    # checkpoint_service/blm_planning_service 双先例同款既有模式）
+    from src.application.ports.chain_of_thought_archive import ChainOfThoughtArchiveServicePort
+    from src.application.services.chain_of_thought_archive_service import ChainOfThoughtArchiveService
+    from src.application.use_cases.get_blm_chain_trace import GetBlmChainTraceUseCase
+
+    register_port(
+        name="chain_of_thought_archive_service",
+        version="v1.0.0",
+        interface=ChainOfThoughtArchiveServicePort,
+        impl=lambda resolver: ChainOfThoughtArchiveService(
+            archive_service=resolver.resolve("strategic_archive_service"),
+            object_storage=resolver.resolve_optional("l4_object"),  # R1-F6 双注入：include_blob 解引用通道
+        ),
+        module="src.application.services.chain_of_thought_archive_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("chain-of-thought", "blm", "archive", "application"),
+    )
+    register_port(
+        name="blm_chain_trace_use_case",
+        version="v1.0.0",
+        interface=GetBlmChainTraceUseCase,
+        impl=lambda resolver: GetBlmChainTraceUseCase(
+            chain_archive_service=resolver.resolve("chain_of_thought_archive_service"),
+        ),
+        module="src.application.use_cases.get_blm_chain_trace",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("chain-of-thought", "use_case", "application"),
     )
 
     # === Strategic Toolbox Ports (Story 4.1) ===

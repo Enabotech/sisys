@@ -456,3 +456,29 @@ class TestGetBlmPlanningStatusUseCase:
         use_case = GetBlmPlanningStatusUseCase(snapshot_repository=repo)
         await use_case.execute(plan_id="plan-1")
         repo.load.assert_awaited_once_with(f"{BLM_PLANNING_SESSION_PREFIX}plan-1")
+
+
+class TestChainRecordsAssembly:
+    """6-4 Result 携带 chain_records（默认尾字段零破坏 + 读侧 tuple 归一 R2-F5）。"""
+
+    def test_assemble_result_normalizes_list_to_tuple(self) -> None:
+        """state 承载 list（投影返回）→ Result 字段 tuple 归一。"""
+        use_case, _mocks = _make_use_case(final_state={**_make_final_state(), "chain_records": ["record-a", "record-b"]})
+        result = use_case._assemble_result(
+            {**_make_final_state(), "chain_records": ["record-a", "record-b"]},
+            agent_id=AGENT_ID,
+            plan_id="plan-1",
+            started=0.0,
+        )
+        assert isinstance(result.chain_records, tuple), f"chain_records 未归一 tuple: {type(result.chain_records)}"
+        assert result.chain_records == ("record-a", "record-b")
+
+    def test_assemble_result_default_empty_tuple_when_key_absent(self) -> None:
+        """终态缺键 → 默认空 tuple（零破坏——既有 state 无 chain_records 形态）。"""
+        result = _make_use_case()[0]._assemble_result(
+            _make_final_state(),
+            agent_id=AGENT_ID,
+            plan_id="plan-1",
+            started=0.0,
+        )
+        assert result.chain_records == ()

@@ -49,6 +49,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
 
+from src.application.ports.chain_of_thought_archive import ChainRecord
 from src.domain.value_objects.blm_phases import (
     InsightStepResult,
     InsightSynthesis,
@@ -103,6 +104,9 @@ class BlmPlanningResult:
         synthesis: 综合洞察
         degraded_steps: 降级步骤清单（AC-6③）
         execution_ms: 执行耗时（毫秒）
+        chain_records: 思维链归档记录（6-4——默认尾字段 () 零破坏，
+            6-3 R3-2 先例；读侧 tuple 归一——R2-F5；元素 ChainRecord——
+            AC-2 钦定精确类型，同层 ports 互导合法）
     """
 
     plan_id: str
@@ -112,6 +116,7 @@ class BlmPlanningResult:
     synthesis: InsightSynthesis = field(default_factory=lambda: InsightSynthesis(conclusions=()))
     degraded_steps: tuple[str, ...] = ()
     execution_ms: int = 0
+    chain_records: tuple[ChainRecord, ...] = ()
 
 
 @runtime_checkable
@@ -196,6 +201,16 @@ class BlmPlanningServicePort(Protocol):
 
     def project_degraded_steps(self, plan_id: str) -> list[str]:
         """投影降级步骤清单（图 state 的 degraded_steps 键）。"""
+        ...
+
+    def project_chain_records(self, plan_id: str) -> list[ChainRecord]:
+        """投影思维链归档记录（图 state 的 chain_records 键——6-4 回传三件套②）。
+
+        增量方法追加非语义变更（既有六方法零改动）；元素为 ChainRecord
+        dataclass（同层 ports 互导合法——chain_of_thought_archive.py 定义，
+        无循环依赖；图 state 侧 SpBlmState 承载 list[Any] 是 schemas.py
+        既有惯例与本端口类型纪律分立）。
+        """
         ...
 
 

@@ -2,6 +2,28 @@
 
 实现 ArchiveRepositoryPort 端口，使用 PostgreSQL 持久化战略档案元数据。
 继承 PostgreSQLAdapter 泛型基类，支持软删除和 ArchiveQuery 查询。
+
+双模式 session（6-4 代码审查 CR1-F1——照抄 isolation DC-5 / audit R1-DF1 修复
+形态，家族第五个补齐 fallback 的成员）：
+- 请求路径： ``get_session()`` 命中 ContextVar（HTTP 请求事务内）→ 行为与
+  既有逐字节等价（merge+flush，持久性随外层请求事务）；
+- fallback 路径： ``get_session()`` 抛 ``RuntimeError``（CLI/后台上下文）→
+  经注入 ``session_factory`` 走 ``session_context()`` 独立会话 commit——
+  CLI ``blm-plan`` 思维链归档（save×2：Step1 落行 + 引用回写 merge UPSERT）
+  与 ``chain-query`` 追溯检索（find）的可达性前提。
+
+⚠️ 防呆： fallback 分派直调 ``session_context.get_session()`` 并 catch
+``RuntimeError``（isolation 模板 L12-14 同款）——经 ``PostgreSQLAdapter._session``
+property 则会把 RuntimeError 包成 InvalidStateError（``from None``），except
+永不命中。
+
+范围注记（调用图已核）：仅 save/find 两方法补 fallback（6-4 两 CLI 场景的
+唯一触达面）；其余 ``self._session`` 直用方法（find_for_update/mark_stale/
+list_by_plan/list_by_archive_type/count 及继承 get_by_id/delete）的消费方均
+无 CLI 入口，维持 206 显式失败。相对 isolation 模板不移植
+SQLAlchemyError → StorageError 包装链——ArchiveRepositoryPort 无 Raises
+声明（端口契约面），且 archive_plan Step1/Step5 均 ``except Exception`` 宽捕
+包 284，原生异常透传对消费面行为等价。
 """
 
 from __future__ import annotations
@@ -12,11 +34,13 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.entities.strategic_archive import ArchiveType, StrategicArchive
 from src.domain.ports.archive_repository import ArchiveQuery
 from src.infrastructure.storage.postgresql.models.archive import ArchiveModel
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.session_context import get_session, session_context
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +51,22 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
     继承 PostgreSQLAdapter[StrategicArchive, ArchiveModel]，
     通过 _to_entity/_to_model 隔离领域层与 ORM 层。
     支持软删除（deleted_at 列）和 ArchiveQuery 多条件组合查询。
+    双模式 session（请求 ContextVar 优先 + factory fallback——类 docstring 见模块头）。
     """
 
     pk_column: str = "archive_id"
     soft_delete_column: str = "deleted_at"
 
-    def __init__(self) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
+        """初始化档案仓储.
+
+        Args:
+            session_factory: fallback 独立会话工厂（CLI/后台路径——None 时无
+                ContextVar session 则 RuntimeError 上抛，配置缺失显式失败——
+                R1-DF3 有意设计同款；组合根恒注入使生产 CLI 不落此形态）。
+        """
         super().__init__(ArchiveModel)
+        self._session_factory = session_factory
 
     # ------------------------------------------------------------------
     # 实体/模型转换
@@ -155,8 +188,50 @@ class PostgreSQLArchiveRepository(PostgreSQLAdapter[StrategicArchive, ArchiveMod
             stmt = stmt.where(ArchiveModel.archive_id.in_(query.archive_ids))
         return stmt
 
+    async def save(self, entity: StrategicArchive) -> StrategicArchive:
+        """保存实体（双模式 session——请求路径优先，CLI/后台走独立会话 commit）.
+
+        子类覆写仅做 fallback 分派（tool_execution_repository :64-93 同款）——
+        merge 语义复用基类 PostgreSQLAdapter.save（主键 UPSERT，引用回写二次
+        save 亦经此路径，不先按 archive_id 查行）。
+
+        Args:
+            entity: 领域实体
+
+        Returns:
+            持久化后的领域实体（含数据库生成的 id、时间戳等）
+        """
+        try:
+            get_session()
+        except RuntimeError:
+            # CLI/后台路径（无请求 session）——经注入工厂走独立会话 commit
+            if self._session_factory is None:
+                raise
+            async with session_context(self._session_factory):
+                return await super().save(entity)
+        return await super().save(entity)
+
     async def find(self, query: ArchiveQuery) -> list[StrategicArchive]:
-        """按条件查询档案
+        """按条件查询档案（双模式 session——请求路径优先，CLI/后台走独立会话）.
+
+        Args:
+            query: 查询条件（ArchiveQuery 值对象）
+
+        Returns:
+            符合条件的档案列表
+        """
+        try:
+            get_session()
+        except RuntimeError:
+            # CLI 检索路径（chain-query）——find 也必须走 fallback 才可达
+            if self._session_factory is None:
+                raise
+            async with session_context(self._session_factory):
+                return await self._do_find(query)
+        return await self._do_find(query)
+
+    async def _do_find(self, query: ArchiveQuery) -> list[StrategicArchive]:
+        """在当前上下文 session 上执行档案查询（find 的查询体——双模式共用）.
 
         Args:
             query: 查询条件（ArchiveQuery 值对象）

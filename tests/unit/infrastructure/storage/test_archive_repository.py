@@ -104,12 +104,98 @@ class TestSave:
 
     @pytest.mark.asyncio
     async def test_save_executes_merge(self, repository: PostgreSQLArchiveRepository) -> None:
-        """save 调用 _do_save"""
+        """save 调用 _do_save（请求路径——CR1-F1 双模式后需在 session 上下文内）"""
+        from src.infrastructure.storage.postgresql.session_context import with_session
+
         archive = _make_archive()
-        with patch.object(repository, "_do_save", new_callable=AsyncMock) as mock_save:
-            mock_save.return_value = None
-            result = await repository.save(archive)
-            assert result is not None
+        mock_session = _make_dual_mode_session_mock()
+        async with with_session(mock_session):
+            with patch.object(repository, "_do_save", new_callable=AsyncMock) as mock_save:
+                mock_save.return_value = None
+                result = await repository.save(archive)
+                assert result is not None
+                mock_save.assert_awaited_once()
+
+
+def _make_dual_mode_session_mock() -> AsyncMock:
+    """构造可承载 merge/flush/refresh 链的 session 替身（merge 恒等返回）。"""
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.merge = AsyncMock(side_effect=lambda model: model)
+    mock_session.execute = AsyncMock(return_value=MagicMock())
+    return mock_session
+
+
+class TestDualModeSession:
+    """双模式 session 测试（6-4 代码审查 CR1-F1——isolation DC-5 / audit R1-DF1 家族形态）
+
+    save/find 的 fallback 分派：请求路径（ContextVar 命中）行为不变；
+    CLI/后台路径（无 ContextVar）经注入工厂走 session_context 独立会话 commit。
+    """
+
+    @pytest.mark.asyncio
+    async def test_save_fallback_via_independent_session(self) -> None:
+        """无请求 session 时 save 经注入工厂走独立会话（factory 被调用 + commit 落库）"""
+        from src.infrastructure.storage.postgresql.session_context import clear_session
+
+        clear_session()
+        mock_session = _make_dual_mode_session_mock()
+        factory = MagicMock(return_value=mock_session)
+        repository = PostgreSQLArchiveRepository(session_factory=factory)
+
+        archive = _make_archive()
+        result = await repository.save(archive)
+
+        factory.assert_called_once()
+        mock_session.merge.assert_awaited()
+        mock_session.flush.assert_awaited()
+        mock_session.commit.assert_awaited()
+        assert result.archive_id == archive.archive_id
+
+    @pytest.mark.asyncio
+    async def test_find_fallback_via_independent_session(self) -> None:
+        """无请求 session 时 find 经注入工厂走独立会话（chain-query CLI 可达性前提）"""
+        from src.infrastructure.storage.postgresql.session_context import clear_session
+
+        clear_session()
+        mock_session = _make_dual_mode_session_mock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        factory = MagicMock(return_value=mock_session)
+        repository = PostgreSQLArchiveRepository(session_factory=factory)
+
+        result = await repository.find(ArchiveQuery(archive_type=ArchiveType.EVIDENCE_PACKAGE))
+
+        factory.assert_called_once()
+        mock_session.commit.assert_awaited()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_save_without_factory_raises_runtime_error(self) -> None:
+        """无请求 session 且未注入工厂——RuntimeError 显式上抛（配置缺失显式失败）"""
+        from src.infrastructure.storage.postgresql.session_context import clear_session
+
+        clear_session()
+        repository = PostgreSQLArchiveRepository()
+
+        with pytest.raises(RuntimeError):
+            await repository.save(_make_archive())
+
+    @pytest.mark.asyncio
+    async def test_save_request_path_does_not_invoke_factory(self) -> None:
+        """请求路径（ContextVar session 在位）——工厂零触发（行为不变守护）"""
+        from src.infrastructure.storage.postgresql.session_context import with_session
+
+        mock_session = _make_dual_mode_session_mock()
+        factory = MagicMock()
+        repository = PostgreSQLArchiveRepository(session_factory=factory)
+
+        async with with_session(mock_session):
+            result = await repository.save(_make_archive())
+
+        factory.assert_not_called()
+        mock_session.commit.assert_not_awaited()
+        assert result.archive_id is not None
 
 
 class TestFind:

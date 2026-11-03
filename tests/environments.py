@@ -695,6 +695,13 @@ def _sync_config_to_environ(config: TestEnvConfig) -> None:
         os.environ.setdefault("MINIO_ENDPOINT", config.minio.endpoint)
     os.environ.setdefault("MINIO_ACCESS_KEY", config.minio.access_key)
     os.environ.setdefault("MINIO_SECRET_KEY", config.minio.secret_key)
+    # ROOT 命名双轨同步（Story 6-4 环境事实）：MinIOConfig.from_env() 读
+    # MINIO_ROOT_USER/MINIO_ROOT_PASSWORD（:88-89）而非 ACCESS_KEY 名——缺此
+    # 同步时组合根 l4_object 在 pytest 进程内为空凭证，MinIO 对象操作恒
+    # AccessDenied（6-3/6-4 集成的 L4 断言面同受影响；是否暴露取决于运行
+    # shell 是否恰好 export 过 ROOT 名——时变不稳定根源）
+    os.environ.setdefault("MINIO_ROOT_USER", config.minio.access_key)
+    os.environ.setdefault("MINIO_ROOT_PASSWORD", config.minio.secret_key)
     os.environ.setdefault("MINIO_BUCKET", config.minio.bucket)
 
     # 应用配置

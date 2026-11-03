@@ -42,6 +42,13 @@ from src.application.ports.blm_planning import (
     BlmPlanningContext,
     BlmPlanningServicePort,
 )
+from src.application.ports.chain_of_thought_archive import (
+    SYNTHESIS_DISPLAY_NAME,
+    SYNTHESIS_ROLE_PREFIX,
+    ChainOfThoughtArchiveServicePort,
+    ChainRecord,
+    StepChainMaterial,
+)
 from src.application.services.agent_workflow_context import MVP_TENANT_ID
 from src.application.services.blm_planning_prompts import (
     BLM_PER_CALL_TIMEOUT_SEC,
@@ -105,6 +112,7 @@ class _PlanRunState:
         self.completed_steps: int = 0
         self.degraded_steps: list[str] = []
         self.timeline: list[BlmTimelineEntry] = []
+        self.chain_records: list[ChainRecord] = []  # 6-4 思维链累积位（不进快照——OD-8）
 
     def record_step(self, step: str, started_at: datetime, summary: str, *, degraded: bool) -> None:
         """记录步骤完成（timeline 追加 + 计数推进 + current_step/phase 更新）。"""
@@ -143,6 +151,7 @@ class BlmPlanningService(BlmPlanningServicePort):
         event_publisher: Any,
         snapshot_repository: Any,
         base_config: LLMConfig | None = None,
+        chain_archive_service: ChainOfThoughtArchiveServicePort | None = None,
     ) -> None:
         """构造 BLM 规划服务。
 
@@ -156,6 +165,9 @@ class BlmPlanningService(BlmPlanningServicePort):
             event_publisher: 事件发布器（BlmStageCompleted）。
             snapshot_repository: 快照存储端口（步骤边界 latest 写入）。
             base_config: LLM 基底配置（温度/超时覆写基底——缺省 LLMConfig()）。
+            chain_archive_service: 思维链归档服务（6-4 挂接——可选尾参，
+                None 时零挂接与现状逐字节等价；本类 base_config+LangGraphEngine
+                双尾参先例同形态）。
         """
         self._llm = llm_client
         self._tool_execution_service = tool_execution_service
@@ -166,6 +178,7 @@ class BlmPlanningService(BlmPlanningServicePort):
         self._event_publisher = event_publisher
         self._snapshot_repository = snapshot_repository
         self._base_config = base_config or LLMConfig()
+        self._chain_archive_service = chain_archive_service
         self._runs: dict[str, _PlanRunState] = {}
         self._last_context_cache: BlmPlanningContext | None = None
 
@@ -295,6 +308,26 @@ class BlmPlanningService(BlmPlanningServicePort):
 
         run_state.record_step("performance_gap", started_at, summary, degraded=degraded)
         await self._write_snapshot_and_publish(context, stage="performance_gap", summary_excerpt=summary)
+        # 6-4 挂接段：步骤产物就绪 → 组装素材（gap 型——artifacts 六属性+轨迹素材）→ 归档
+        await self._compose_and_archive_chain(
+            context,
+            "performance_gap",
+            StepChainMaterial(
+                stage="performance_gap",
+                display_name=PERFORMANCE_GAP_CONFIG.display_name,
+                role_prefix=PERFORMANCE_GAP_CONFIG.role_prefix,
+                task=context.task,
+                evidence_count=len(evidence_texts),
+                tool_slug=_tool_slug,
+                evidence_refs=_evidence_refs,
+                summary=summary,
+                findings_count=len(artifacts.root_causes),
+                degraded=degraded,
+                degrade_reason=degrade_reason,
+                payload=dataclasses.asdict(artifacts),
+                structured_ok=bool(artifacts.financial_gap),
+            ),
+        )
         return artifacts
 
     # ------------------------------------------------------------------
@@ -382,6 +415,32 @@ class BlmPlanningService(BlmPlanningServicePort):
         # per-step Checkpoint 快照骨架（AC-2——先于 latest 写入；失败容错不阻断）
         await self._write_step_checkpoint(context, step, result)
         await self._write_snapshot_and_publish(context, stage=f"market_insight_{step.value}", summary_excerpt=summary_excerpt)
+        # 6-4 挂接段：两快照之后、return 之前（六子型素材——信封+轨迹双源采集）。
+        # R2-F2：payload=structured_output 产物原样（部分降级不丢弃真实产物）；
+        # 仅产物缺席（LLM 失败支 structured_output None）用降级信封。
+        await self._compose_and_archive_chain(
+            context,
+            f"market_insight_{step.value}",
+            StepChainMaterial(
+                stage=f"market_insight_{step.value}",
+                display_name=config.display_name,
+                role_prefix=config.role_prefix,
+                task=context.task,
+                evidence_count=len(evidence_texts),
+                tool_slug=tool_slug,
+                evidence_refs=evidence_refs,
+                summary=result.summary,
+                findings_count=len(result.findings),
+                degraded=result.degraded,
+                degrade_reason=result.degrade_reason,
+                payload=(
+                    result.structured_output
+                    if result.structured_output is not None
+                    else {"degraded": True, "degrade_reason": result.degrade_reason}
+                ),
+                structured_ok=result.structured_output is not None,
+            ),
+        )
         return result
 
     # ------------------------------------------------------------------
@@ -446,6 +505,29 @@ class BlmPlanningService(BlmPlanningServicePort):
         await self._write_snapshot_and_publish(
             effective_context, stage="market_insight_synthesis", summary_excerpt=summary_excerpt
         )
+        # 6-4 挂接段：synthesis 型素材（模块常量语义——语义配置表无 synthesis 行；
+        # 无工具无检索——tool_slug 恒空/证据恒 0；degraded=not conclusions 与
+        # record_step 口径同源）
+        await self._compose_and_archive_chain(
+            effective_context,
+            "market_insight_synthesis",
+            StepChainMaterial(
+                stage="market_insight_synthesis",
+                display_name=SYNTHESIS_DISPLAY_NAME,
+                role_prefix=SYNTHESIS_ROLE_PREFIX,
+                task=effective_context.task,
+                evidence_count=0,
+                tool_slug="",
+                evidence_refs=(),
+                summary="",
+                findings_count=len(synthesis.conclusions),
+                degraded_inputs_count=len(synthesis.degraded_inputs),
+                degraded=not synthesis.conclusions,
+                degrade_reason="" if synthesis.conclusions else "综合结论为空（LLM 降级或空结论）",
+                payload=dataclasses.asdict(synthesis),
+                structured_ok=bool(synthesis.conclusions),
+            ),
+        )
         return synthesis
 
     # ------------------------------------------------------------------
@@ -463,6 +545,63 @@ class BlmPlanningService(BlmPlanningServicePort):
         """投影降级步骤清单（图 state 的 degraded_steps 键）。"""
         run_state = self._runs.get(plan_id)
         return list(run_state.degraded_steps) if run_state else []
+
+    def project_chain_records(self, plan_id: str) -> list[ChainRecord]:
+        """投影思维链归档记录（图 state 的 chain_records 键——6-4 回传三件套②）。
+
+        degraded_steps/timeline 同构第三投影：节点适配器直写全量勿二次合并
+        （R1-F1）；未挂接（尾参 None）或未执行步骤时恒空清单。
+        """
+        run_state = self._runs.get(plan_id)
+        return list(run_state.chain_records) if run_state else []
+
+    async def _compose_and_archive_chain(
+        self,
+        context: BlmPlanningContext,
+        stage: str,
+        material: StepChainMaterial,
+    ) -> None:
+        """思维链挂接段（6-4——三方法末尾共用：UUID 守卫 → 组装归档 → 累积）。
+
+        降级语义（OD-5 可观测面非流程面）：
+        - 尾参 None（未注入）→ 直接返回（零挂接——与现状逐字节等价守护）；
+        - plan_id 畸形（非 UUID——CLI --plan-id 无守卫透传形态）→ 该步 chain
+          缺席 + warning 降级续行（R3-F4 守卫，裸 ValueError 逃逸违红线）；
+        - compose 返回 None（445 组装失败）→ 跳过追加（chain 缺席台账——R1-F5）；
+        - 返回 ChainRecord（含 archived=False 284 台账）→ 追加 run_state（R1-F1①
+          累积进 per-run 状态非方法返回值——三方法返回 VO 零改动）。
+        """
+        if self._chain_archive_service is None:
+            return
+        try:
+            plan_uuid = uuid.UUID(context.plan_id)
+        except (ValueError, TypeError, AttributeError):
+            logger.warning(
+                "思维链挂接段 plan_id 非 UUID 形态（该步 chain 缺席+降级续行）[stage=%s plan_id=%r]",
+                stage,
+                context.plan_id,
+            )
+            return
+        record = None
+        try:
+            record = await self._chain_archive_service.compose_and_archive_step_chain(plan_uuid, stage, material)
+        except Exception:
+            # 观测面兜底（CR1-F6——OD-5 完整捕获面）：compose 内层已精确捕获
+            # 242（→445→None 缺席台账）与 284（→archived=False 台账），此处
+            # 兜底的是未来演化/底层未包装的意外异常形态——宽捕降级续行不杀
+            # run（八步领域产物不因观测面失败丢弃）；日志形态对齐同文件
+            # _write_snapshot_and_publish 容错先例（logger.exception 带堆栈）。
+            logger.exception(
+                "思维链挂接段意外异常（该步 chain 缺席+降级续行）[stage=%s plan_id=%s]",
+                stage,
+                context.plan_id,
+            )
+            return
+        if record is None:
+            return
+        run_state = self._runs.get(context.plan_id)
+        if run_state is not None:
+            run_state.chain_records.append(record)
 
     # ------------------------------------------------------------------
     # 内部：LLM 结构化调用（444 纪律 + 两级重试）

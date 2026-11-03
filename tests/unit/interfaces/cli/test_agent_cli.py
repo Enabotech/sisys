@@ -1503,3 +1503,192 @@ class TestCheckpointCreateExecution:
         )
 
         assert exit_code == 0  # 用例成功即 exit 0（服务层发布降级已被吸收）
+
+
+# ===================================================================
+# Story 6-4：chain-query 子命令（决策追溯查询 CLI 入口）
+# ===================================================================
+
+
+class _StubChainTraceView:
+    """追溯视图替身（total/records 属性访问面——_StubResult 先例形态）。"""
+
+    def __init__(self, *, records: list | None = None, total: int = 0) -> None:
+        self.records = records or []
+        self.total = total
+
+
+class _StubChainTraceUseCase:
+    """追溯查询用例替身（calls 记录 + 可编程异常）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.view = _StubChainTraceView()
+
+    async def execute(self, **kwargs) -> _StubChainTraceView:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return self.view
+
+
+def _patch_chain_query_entry(monkeypatch: pytest.MonkeyPatch, use_case: _StubChainTraceUseCase) -> None:
+    """chain-query 入口注入（bootstrap/resolve 三件套替身——checkpoint-create 先例）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: use_case)
+
+
+class TestChainQueryParser:
+    """chain-query 子命令解析（--plan-id 必填 + --include-blob 旗标）。"""
+
+    def test_chain_query_requires_plan_id(self) -> None:
+        """必填参数缺失 usage error exit 2。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["chain-query"])
+        assert exc_info.value.code == 2
+
+    def test_chain_query_full_arguments(self) -> None:
+        """全参数解析（--include-blob 默认 False 开启 True）。"""
+        args = agent_cli.build_parser().parse_args(["chain-query", "--plan-id", str(uuid.uuid4()), "--include-blob"])
+        assert args.command == "chain-query"
+        assert args.include_blob is True
+
+    def test_chain_query_include_blob_defaults_false(self) -> None:
+        """--include-blob 缺省 False（默认读 L2 决策依据足够）。"""
+        args = agent_cli.build_parser().parse_args(["chain-query", "--plan-id", str(uuid.uuid4())])
+        assert args.include_blob is False
+
+
+class TestChainQueryExecution:
+    """chain-query 执行（正常输出/空清单/非法 plan_id 242）。"""
+
+    def test_success_output_contains_display_and_archive_count(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功路径：exit 0 + 每条 to_display 五段形态 + 归档计数行。"""
+        from src.application.ports.chain_of_thought_archive import StepChainMaterial
+        from src.application.services.chain_of_thought_archive_service import compose_step_chain
+
+        material = StepChainMaterial(
+            stage="market_insight_trend",
+            display_name="看趋势",
+            role_prefix="以 CEO 宏观趋势判断与 CTO 技术趋势分析的双重视角",
+            task="制定新能源汽车行业五年战略规划",
+            evidence_count=5,
+            tool_slug="PESTEL 分析",
+            summary="市场洞察产物",
+            findings_count=2,
+            payload={"summary": "市场洞察产物"},
+        )
+        record = {
+            "stage": "market_insight_trend",
+            "chain": compose_step_chain(material),
+            "archive_id": "arch-1",
+            "degraded": False,
+            "blob_content": None,
+        }
+        stub = _StubChainTraceUseCase()
+        stub.view = _StubChainTraceView(records=[record], total=1)
+        _patch_chain_query_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["chain-query", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "<Reflection>" in out and "</Reflection>" in out, "输出缺五段展示形态（DC-2 展示用标签）"
+        assert "<Tools_Used>" in out and "<Constraints_Check>" in out
+        assert "market_insight_trend" in out
+        assert stub.calls, "用例未被调用"
+        assert stub.calls[0]["include_blob"] is False  # 默认 False 透传
+
+    def test_empty_trace_exit_0_with_empty_marker(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """空清单：exit 0 + total=0（查询面幂等读——非异常路径）。"""
+        stub = _StubChainTraceUseCase()
+        stub.view = _StubChainTraceView(records=[], total=0)
+        _patch_chain_query_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["chain-query", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "共 0 条思维链档案" in out  # total=0 精确可见（CR1-F9——裸 "0" 子串判别力弱）
+
+    def test_invalid_plan_id_exit_1_stderr_242(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """非法 plan_id：exit 1 + stderr [EXCEPTION_242]（守卫构造真实异常）。"""
+        stub = _StubChainTraceUseCase()
+        from src.domain.exceptions import EntityValidationError
+
+        stub.error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"use_case": "GetBlmChainTraceUseCase", "field": "plan_id"},
+        )
+        _patch_chain_query_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["chain-query", "--plan-id", "not-a-uuid"])
+
+        assert exit_code == 1
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+
+
+class TestBlmPlanChainSummaryLine:
+    """blm-plan 汇总行三段式（R2-F8——成功 N/失败 M/预期 8）。"""
+
+    def test_progress_prints_three_segment_chain_line(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """_print_blm_progress 尾部思维链计数行（三段式口径）。"""
+        from src.application.ports.blm_planning import BlmPlanningResult
+        from src.application.ports.chain_of_thought_archive import ChainRecord
+        from src.domain.value_objects.blm_phases import InsightSynthesis, PerformanceGapArtifacts
+
+        def _record(stage: str, archived: bool) -> ChainRecord:
+            from src.domain.value_objects.chain_of_thought import ChainOfThought
+
+            return ChainRecord(
+                stage=stage,
+                chain=ChainOfThought(
+                    input_summary=f"input-{stage}",
+                    reflection="reflection",
+                    tools_used=(),
+                    constraints_check="constraints",
+                    final_answer='{"stage": "x"}',
+                ),
+                archived=archived,
+                archive_id="a" if archived else "",
+            )
+
+        result = BlmPlanningResult(
+            plan_id="plan-1",
+            agent_id=uuid.uuid4(),
+            gap_artifacts=PerformanceGapArtifacts(financial_gap="f", operational_gap="o", root_causes=(), portfolio_health="p"),
+            insight_steps=(),
+            synthesis=InsightSynthesis(conclusions=("c1",)),
+            degraded_steps=(),
+            execution_ms=10,
+            chain_records=(
+                _record("performance_gap", True),
+                _record("market_insight_trend", False),
+            ),
+        )
+        agent_cli._print_blm_progress(result)
+        out = capsys.readouterr().out
+        assert "思维链归档" in out, "缺思维链归档汇总行（零静默吞错——AC-4 可见性）"
+        assert "成功 1/失败 1/预期 8" in out, f"三段式口径漂移（实测输出={out!r}）"
+
+    def test_progress_without_chain_records_omits_line(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """chain_records 空（尾参未注入）不打印汇总行（旧形态零破坏）。"""
+        from src.application.ports.blm_planning import BlmPlanningResult
+        from src.domain.value_objects.blm_phases import PerformanceGapArtifacts
+
+        result = BlmPlanningResult(
+            plan_id="plan-1",
+            agent_id=uuid.uuid4(),
+            gap_artifacts=PerformanceGapArtifacts(financial_gap="f", operational_gap="o", root_causes=(), portfolio_health="p"),
+        )
+        agent_cli._print_blm_progress(result)
+        out = capsys.readouterr().out
+        assert "思维链归档" not in out, "chain_records 空时不应打印汇总行"

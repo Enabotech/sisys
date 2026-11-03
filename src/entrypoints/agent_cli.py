@@ -313,6 +313,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="规划任务标识（缺省新铸——同 id 重跑将被拒绝 482，重试请用新 id）",
     )
 
+    # Story 6-4: chain-query 扁平子命令（决策追溯查询——AC-5 CLI 消费入口；
+    # --include-blob 缺省 False：默认读 L2 决策依据足够，深度审计显式开启）
+    chain_query = subparsers.add_parser(
+        "chain-query",
+        help="决策追溯查询（按 plan_id 读回 EVIDENCE_PACKAGE 思维链档案——五段展示形态）",
+    )
+    chain_query.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串——与 BLM plan_id 同源）",
+    )
+    chain_query.add_argument(
+        "--include-blob",
+        action="store_true",
+        default=False,
+        help="深度解引用 L4 WORM blob（默认 False——读 L2 决策依据足够）",
+    )
+
     # Story 6-3: checkpoint-create 扁平子命令（Checkpoint 完整形态快照显式创建——
     # OD-5：MVP 同步链下"阶段完成即暂停等审批"物理不可达，由显式调用触发；
     # created_via 不暴露参数（硬编码传 "cli"——R6-4）；retrieved_docs 不可经
@@ -677,6 +697,13 @@ def _print_blm_progress(result: object) -> None:
     degraded_steps = getattr(result, "degraded_steps", ())
     if degraded_steps:
         print(f"降级步骤（{len(degraded_steps)}）: {', '.join(degraded_steps)}")
+    # 6-4 思维链归档汇总行（三段式口径 R2-F8——「成功 N/失败 M/预期 8」，
+    # 分母 8 使组装缺席 K=8-N-M 可推算；零静默吞错——archived 台账可见）
+    chain_records = getattr(result, "chain_records", ()) or ()
+    if chain_records:
+        success_count = sum(1 for record in chain_records if getattr(record, "archived", False))
+        failed_count = len(chain_records) - success_count
+        print(f"思维链归档: 成功 {success_count}/失败 {failed_count}/预期 8")
     print(f"耗时: {getattr(result, 'execution_ms')}ms")
 
 
@@ -773,6 +800,79 @@ def _print_checkpoint_result(result: object) -> None:
     print(f"  stage_id: {getattr(result, 'stage_id', '')}")
     print(f"  state_version: {getattr(result, 'state_version', 0)}")
     print(f"  TTL: {getattr(result, 'ttl_seconds', 0)} 秒（30 天）")
+
+
+async def _run_chain_trace(plan_id: str, include_blob: bool) -> object:
+    """执行决策追溯查询（resolve 用例——与 _run_checkpoint_create 同款资源收尾）。
+
+    Args:
+        plan_id: 规划任务标识。
+        include_blob: 是否深度解引用 L4 WORM blob。
+
+    Returns:
+        ChainOfThoughtTraceView 追溯视图。
+    """
+    use_case = resolve("blm_chain_trace_use_case")
+    try:
+        return await use_case.execute(plan_id=plan_id, include_blob=include_blob)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_chain_trace(view: object) -> None:
+    """打印决策追溯结果（每条 to_display 五段形态——DC-2 展示用标签）。
+
+    Args:
+        view: ChainOfThoughtTraceView（getattr 属性访问——stub 替身兼容）。
+    """
+    records = getattr(view, "records", []) or []
+    print(f"决策追溯查询: 共 {getattr(view, 'total', 0)} 条思维链档案（归档成功 {getattr(view, 'archived_count', 0)}）")
+    for record in records:
+        stage = record.get("stage", "")
+        archive_id = record.get("archive_id", "")
+        degraded_marker = "（降级）" if record.get("degraded") else ""
+        print(f"--- {stage}{degraded_marker} [archive_id={archive_id}] ---")
+        print(record.get("chain").to_display())
+        blob_content = record.get("blob_content")
+        if blob_content is not None:
+            print(f"（WORM blob 深度解引用: stage={blob_content.get('stage', '')}）")
+
+
+def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
+    """chain-query 子命令执行（五步定式——checkpoint-create 先例）。
+
+    exit 0 判据 = 查询面返回（空清单亦是合法答案——查询面幂等读语义，
+    与恢复面 480 语义分立）；plan_id 非 UUID → 守卫 exit 1（构造真实
+    EntityValidationError——R1-F18 统一形态）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        include_blob: --include-blob 旗标（默认 False）。
+
+    Returns:
+        退出码（0=查询返回（含空清单），1=业务异常/参数守卫失败）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "chain-query", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("决策追溯查询失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_chain_trace(plan_id, include_blob))
+        _print_chain_trace(result)
+        logger.info("决策追溯查询完成: plan_id=%s total=%s", plan_id, getattr(result, "total", 0))
+        return 0
+    except DomainError as error:
+        logger.error("决策追溯查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
 
 
 def _run_checkpoint_create_cli(
@@ -1155,6 +1255,8 @@ def main(argv: list[str] | None = None) -> int:
             args.summary,
             args.completed,
         )
+    if args.command == "chain-query":
+        return _run_chain_query_cli(args.plan_id, args.include_blob)
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":
