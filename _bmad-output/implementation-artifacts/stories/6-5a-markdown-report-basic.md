@@ -86,10 +86,10 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 **And** 源步骤 `degraded=True`（chain 归档行 degraded 锚）时章节携带 `> ⚠️ [降级] {display_name}：{原因}` 标注——**原因解析次序冻结**：`payload.get("degrade_reason")` → 缺席时固定兜底文案「降级（原因未随归档行结构化持久化）」（六子部分降级 R2-F2/synthesis 降级两形态 payload 无 reason 键——6-4 归档配方历史局限；**禁止解析 chain VO reflection 文本**）
 **And** **渲染三态判定以 payload 形态为准**（非 degraded 锚——信封态行在/锚 True/无业务字段三信号并存）：①payload 解析失败或非 dict 形态不可识别 → [数据缺失]；②六子 payload 键集 ⊆ {degraded, degrade_reason}（降级信封态）→ [降级] callout（带 payload.degrade_reason）+ 跳过字段渲染；③其余 → 正常渲染 + 行 degraded 锚 True 时叠加 [降级] callout（原因按解析次序）。gap 型 payload 恒为 asdict 六键不适用②
 **And** 数据源全缺（chain total==0）→ 抛 `ReportGenerationError`（EXCEPTION_490——404 语义；plan 从未跑过与跑过归档全失败两形态在持久真源同形同判，message 陈述可观测事实「该 plan_id 无思维链归档记录，无法生成报告」；最新快照在位亦同判：时间线摘要非报告素材）
-**And** latest 快照缺失/TTL 过期（86400）→ 附录 A 省略 + 实体标注，不阻断（可观测面）
+**And** latest 快照缺失/TTL 过期（86400）→ 附录 A 省略 + L2 `metadata.timeline_available=false` 可观测，不阻断（R3 载体修正：「实体标注」原措辞无载体——实体七字段冻结表无标注位且 `get_latest_by_plan` 读回不携带 metadata；可观测面=落库时直查 PG JSONB——快照缺失场景断言面同步钦定此形态）
 
 **验证标准/Validation Criteria:**（R2 逐条标层——验收 13 场景 AC-4×3=部分缺失/全缺/快照缺失三场景，其余归集成/单测）
-- [ ] 部分缺失场景【验收场景+集成场景③】（**构造手段钦定：逐 stage 归档七次跳过目标步——6-3 `_archive_eight_steps` 先例变体；禁止跑完 8 步后删行构造**，仓内 `DELETE FROM strategic_archives` 仅 teardown 清理先例零场景构造先例）→ 章节标注 + degraded_section_count 正确 + 报告成功
+- [ ] 部分缺失场景【验收场景+集成场景③】（**构造手段钦定：逐 stage 归档七次跳过目标步——6-3 `_archive_eight_steps` 先例变体；禁止跑完 8 步后删行构造**，仓内 `DELETE FROM strategic_archives` 仅 teardown 清理先例零场景构造先例；**跳步类别钦定（R3——期望唯一性）：验收与集成③目标步=六子步**（期望 degraded_section_count==1 与集成③对齐）；gap 缺行变体（期望 4 + 四小节 H3 骨架在位——缺行小节骨架渲染冻结）与 synthesis 缺行变体（期望 1）**归单测层参数化**，不进验收 13 场景）→ 章节标注 + degraded_section_count==1 + 报告成功
 - [ ] 缺三步场景【集成 5.2 ③b——不占 13 场景名额】（六子缺三步 → degraded_section_count==3 ≤ section_count==11 不变量成立，无 242——锁死计数口径）
 - [ ] 全缺场景【验收场景+集成场景④】（**从未归档的独立 plan_id**——天然 total==0 无需清空）→ 异常 490（code/message/context 断言）
 - [ ] 快照缺失场景【验收场景】→ 无附录 A + 报告成功
@@ -118,7 +118,7 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 
 **验证标准/Validation Criteria:**
 - [ ] 四目录全量回归两轮稳定（`pytest tests/unit tests/integration tests/contracts tests/acceptance`）
-- [ ] 负向断言：源码级零 `CheckpointReached` 新引用等（6-4 AC-6 先例形态，按本 Story 实际零新增面设计）
+- [ ] AC-6×1 验收场景断言面处方（R3 钉死——对齐 6-4 S8/S9「契约键集字面基线全等」形态，防现场发明/恒真断言）：真实 8 步 run + 报告生成后断言①chain 读侧 records 五键结构（stage/chain/archive_id/degraded/blob_content）与冻结面全等【字面键集基线在测试内——防漂移即守护】②ReportGenerated outbox 行 payload 键族与事件类冻结字段面全等（report_id/report_type/file_path/aggregate_id/aggregate_type/event_type）；**不重复** Task 4.1 事件登记键集合面（契约测试已载）与 Task 6 架构扫描面（SDD 验证已载）——验收层只做「读侧消费面契约」两断言
 - [ ] `poetry run ruff check` + `poetry run mypy src/` 零错误
 
 ### AC-7: 性能与持久化成功率
@@ -223,12 +223,15 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 | opportunity_gap | `gap_quantification`/`capability_match_matrix`/`closure_strategies` → 三组 bullet_list | 机会差距量化报告要点/能力-机会匹配矩阵/差距弥合策略 |
 
 **标注形态冻结**（callout 块型两形态——6-1「降级事实+原因完整传导」报告面延续；**三态判定与原因解析次序以 AC-4 冻结版为准**——payload 形态优先于 degraded 锚，信封态键集判定勿并入「解析失败」）：
+- **缺行小节骨架渲染冻结（R3 补——load-bearing 前提）**：归档行缺失的小节**仍渲染 H3 骨架**（`### {编号} {display_name}` 标题 + [数据缺失] callout 为该小节唯一块）——section_count 恒 11 与数据缺否无关（省略小节的分叉实现会使极端形态 section_count=6 < degraded_section_count=11 炸 242，击穿「报告照常生成」——R2-2 不变量算术的隐含前提在此显式化；gap 缺行时 1.1~1.4 四小节共享步骤级 display_name 锚定骨架）
 - 源步降级：`> ⚠️ [降级] {display_name}：{原因}`（章节标题后首块；原因 = `payload.get("degrade_reason")` 缺席时固定兜底「降级（原因未随归档行结构化持久化）」——synthesis payload 恒无 reason 键/六子部分降级（R2-F2）payload=structured_output 原样亦无——两形态走兜底；**禁止解析 chain VO reflection 文本后缀**；信封态与锚叠加态均落本形态 callout + 附录 B [降级] 行——**是否计入 degraded_section_count 见实体表 R2 口径**：信封态计（内容缺失）/锚叠加不计）
 - 归档行缺失：`> ⚠️ [数据缺失] {display_name}：该步骤归档记录不可用`（章节标题后唯一块 + 附录 B [数据缺失] 行 + degraded_section_count 计入）
 
 **渲染语法冻结**：ATX 标题（`#`/`##`/`###`，禁 Setext）；GFM 管道表格（表头 + `| --- |` 分隔行 + 数据行，列数严格一致）；无序列表 `- ` 前缀；callout `> ` 前缀；中文与特殊字符原样输出（渲染层禁转义——`ensure_ascii=False` 语义）。
 
-**附录 A 表两处定稿**：「步骤」列取 **display_name 映射**（timeline 条目是裸 step 值如 "trend"——渲染时经 `MARKET_INSIGHT_STEP_CONFIG`/gap 配置映射显示名，与正文章节标题同源）；`summary_excerpt` 键**显式省略**（时间线表五列不含摘要——附录是执行过程记录非内容面）。
+**附录 A 表定稿（R3 补全映射源清单）**：「步骤」列取 **display_name 映射**——timeline 条目是三种 step 值形态（`src/application/ports/blm_planning.py:38-40`：六子裸值 trend 等/`performance_gap`/`synthesis`），映射源**三源**：`performance_gap`→`PERFORMANCE_GAP_CONFIG.display_name`、六子裸值→`MARKET_INSIGHT_STEP_CONFIG`、`synthesis`→`SYNTHESIS_DISPLAY_NAME`（R3 补第三源——两源版下 synthesis 条目无源可映射，期望不唯一）；映射 miss（未知 step 值）**直显裸值**（防未来配置增步炸渲染）；`summary_excerpt` 键**显式省略**（时间线表五列不含摘要——附录是执行过程记录非内容面）。
+
+**目录（TOC）收录面冻结（R3 补）**：收录 **H2 章级 + 附录**（第 1/2 章 + 附录 A/B——条目数随附录 A 有无非恒定，断言按实际收录数构造期望）；H3 小节不进目录（报告篇幅短，两级目录足够——渲染器单测断言目录条目数与收录规则联动）。
 
 #### 统一端口定义注册与管理 (Port Contract)
 
@@ -449,8 +452,9 @@ class ReportRepositoryProtocol(Protocol):
 | AC-1 | 全链真实服务验证 | Task 5 | 5.1-5.2 场景① | `test_integration_markdown_report.py` |
 | AC-1/2/3/5/6/7 | 验收场景（13 场景主体） | Task 0/7 | 0.4-0.6 Gherkin + 7.1-7.2 步骤 | `test_acceptance_markdown_report.feature/.py` |
 | AC-2 | 章节结构冻结（章节/小节/display_name） | Task 1 | 1.1-1.3 实体/VO + 1.4-1.6 渲染器 | `test_strategic_report.py` / `test_markdown_report_renderer.py` |
-| AC-2 | 全链章节断言 | Task 5 | 5.2 场景② | `test_integration_markdown_report.py` |
+| AC-2 | 全链章节断言 | Task 5 | 5.2 场景①（含章节结构断言——R3 校正：原标②系场景号错位） | `test_integration_markdown_report.py` |
 | AC-3 | 标题/列表/表格格式化 | Task 1 | 1.4-1.5 渲染器块型 | `test_markdown_report_renderer.py` |
+| AC-3 | 集成格式化断言 | Task 5 | 5.2 场景② | `test_integration_markdown_report.py` |
 | AC-4 | 部分缺失降级/全缺 490/快照过期容错 | Task 2 | 2.1-2.3 降级语义 | `test_report_generation_service.py` |
 | AC-4 | 缺失/缺三步/全缺集成验证 | Task 5 | 5.2 场景③③b④ | `test_integration_markdown_report.py` |
 | AC-4 | 异常 490 BDD 场景 | Task 0/7 | 0.4 Gherkin + 7.2 步骤 | `test_acceptance_markdown_report.py` |
@@ -656,7 +660,7 @@ class ReportRepositoryProtocol(Protocol):
 - [ ] Subtask 5.1: 编写 `tests/integration/test_integration_markdown_report.py` 装配（`_ReportChain` 装配类——6-4 `_CheckpointChain` 形态模板：真实 resolve + Fake LLM **八键族**身份分派【6-2 `_make_fake_llm` 复用——六类型化 + GapAnalysis + InsightSynthesis 共八键族全派派（跑 8 步全链需要），验收版按 `__name__` 字符串分派/integration 版按 `is` 身份——复用取 integration 形态】+ Fake Embedding 1024 维 + `_probe_services` async 直 await 探测【禁 run_until_complete】+ **L0 写路径隔离**【tmp_path 自建 `FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))` 覆写注入 _restorers 还原——6-3 端口覆写先例；**禁直接真实 resolve 的 l0_storage**（写运行机器 `~/.sisys/memory/reports/` 污染共享目录；且组合根 SCOPED lambda 缓存于 resolver 实例，resolve 过后 setenv 不生效——覆写注入是唯一可靠隔离】+ teardown：报告三元【L0 文件/L2 行/事件 outbox 行】+ 归档三面【`_cleanup_archive_residues` 移植：PG 档案行/Qdrant 点/MinIO WORM】+ Redis 快照键族）
 - [ ] Subtask 5.2: 场景①全链生成（Fake 8 步 → generate → 报告三元断言 + 章节结构断言）+ 场景②格式化断言（表格/列表/标题逐项）+ 场景③降级语义（**构造手段钦定：逐 stage 归档七次跳过目标步——AC-4 冻结版；禁止跑后删行** → [数据缺失] 标注 + degraded_section_count==1）+ 场景③b 缺三步不变量（六子缺三步 → degraded==3 ≤ section==11 无 242 报告成功）+ 场景④490 全缺（**从未归档的独立 plan_id** 天然 total==0 → 异常码断言）
 - [ ] Subtask 5.3: 🔴 红→🟢 绿循环（先跑确认失败形态再补装配缺口——装配型测试红绿以「场景断言值级失败→全绿」为准）
-- [ ] Subtask 5.4: 场景⑤性能采样（**单一数据源 plan_id × 20 次生成**——OD-10 幂等锚合法采样，8 步归档链只构造一次；断言每轮新 report_id + L2 行数 +20 + report_id 集合无重复；聚合→发布窗口计时；P95 数学口径断言 <30s【n=20 次大值噪声敏感注记】；口径 docstring OD-8）+ 并发 3（asyncio.gather 三 plan_id 三元互不串扰）
+- [ ] Subtask 5.4: 场景⑤性能采样（**单一数据源 plan_id × 20 次生成**——OD-10 幂等锚合法采样，8 步归档链只构造一次；断言每轮新 report_id + L2 行数 +20 + report_id 集合无重复；聚合→发布窗口计时；P95 数学口径断言 <30s【n=20 次大值噪声敏感注记】；口径 docstring OD-8）+ 并发 3（asyncio.gather 三 plan_id 三元互不串扰；**gather 形态锚（R3）：gather 必须在 `async def` 辅助函数体内 await 后经 `_run_async` 驱动——6-4 `test_acceptance_json_chain_of_thought.py:2066-2068` 先例锚；禁止步骤顶层裸 `asyncio.gather(...)` 传入 `run_until_complete`（gather 即时 ensure_future 绑定 policy loop，与模块级 event_loop fixture 跨 loop → RuntimeError）**）
 - [ ] Subtask 5.5: 净增 0 断言（跑前跑后 Redis/PG/Qdrant/MinIO/L0 五面计数差为 0）
 - [ ] Subtask 5.6: 覆盖率集成 ≥75% 复核
 
@@ -1016,6 +1020,22 @@ Round 1 未修留项：无 P0/P1 残留（34 项全部处置：26 修复簇 + 8 
 
 Round 2 未修留项：无 P0/P1 残留（13 项全部处置：12 修复 + R1-13 勘误内联）。
 
+**Round 3**（单深度推演 Agent——13 Gherkin 场景逐个三轴推演【前置可达/期望唯一可写/环境可观测】+ 6 条长时间线 + 不变量数学核验；P1×1 + P2×2 + P3×4 + 证伪留痕 11 条）：
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R3-1 | 缺行小节 H3 骨架渲染形态未冻结——R2-2「极端=11≤11 天然成立」的算术证明隐含「缺行小节仍渲染骨架（section_count 恒 11）」但正文未字面化；「省略小节」分叉实现下极端形态 section_count=6 < degraded=11 炸 242 击穿「照常生成」；且验收部分缺失场景跳步类别未钦定（gap/六子/synthesis 三类期望值不同——期望只能自证反推） | P1 | 标注形态冻结补「缺行小节仍渲染 H3 骨架 + section_count 恒 11 与数据缺否无关（load-bearing 前提显式化）」；AC-4 验收/集成③目标步钦定六子步（期望 ==1）；gap/synthesis 缺行变体归单测层参数化 |
+| R3-2 | AC-6×1 验收场景断言面全文无处方（13 场景钉死它但 Given/When/Then 不可推定——验证标准是 CI 动作与「留待设计」委托，不构成场景内断言面；最劣路径=现场发明恒真断言） | P2 | AC-6 验证标准钉死断言面处方（对齐 6-4 S8/S9 字面基线全等形态）：chain 读侧五键结构全等 + ReportGenerated payload 键族全等；显式不重复 4.1/Task 6 面 |
+| R3-3 | AC-4「附录 A 省略 + 实体标注」载体不存在——实体七字段无标注位、get_latest_by_plan 读回不携带 metadata（悬空契约：诱导实体扩字段或断言不可达） | P2 | 改「L2 `metadata.timeline_available=false` 可观测（直查 PG JSONB）」+ 快照缺失场景断言面同步钦定 |
+| R3-4 | 追溯矩阵 AC-2 集成锚场景号错位（章节断言在 5.2 场景①非②）+ AC-3 缺集成行 | P3 | 矩阵 AC-2 行改场景① + 补 AC-3 Task 5 行 |
+| R3-5 | AC-7 并发 3 的 gather 步骤形态未锚先例——BDD 步骤顶层裸 gather 经 run_until_complete 跨 loop 绑定炸 RuntimeError（与验收 Redis 跨循环问题同族陷阱） | P3 | Task 5.4 补 gather 形态锚（async 辅助函数体内 await + _run_async——6-4 :2066-2068 先例；禁顶层裸 gather） |
+| R3-6 | 附录 A「步骤」列映射源清单缺 synthesis 条目（timeline 第三种 step 值无源——期望不唯一：裸值直显 vs 显示名两实现都对） | P3 | 补第三源 SYNTHESIS_DISPLAY_NAME + 映射 miss 直显裸值钦定 |
+| R3-7 | 目录收录粒度未冻结（仅 H2 vs H2+H3 两种实现都满足现文本——目录条目断言期望不唯一） | P3 | 冻结收录面 = H2 章级 + 附录（H3 不进目录；条目数随附录 A 有无非恒定注记） |
+
+Round 3 证伪留痕（推演过并排除的疑点——防后续轮重推）：①AC-1 sleep≥1.05s 跨秒数学恒成立（T1+1.05>S+1）②同秒覆写 teardown delete 契约返 False 不抛（l0_storage.py:46-53）③SINGLETON 缓存冻结 L0 覆写——6-3 先例 clear_singleton() 还原链关闭（checkpoint_snapshot.py:1275-1281）④并发 3 会话隔离——session_factory 每操作独立会话 + 6-4 gather 10 并发先例实证⑤发布失败轮不破坏「N 次事件落行」（采样纯正常路径，失败注入钦定单测层）⑥缺步 plan_id 重复生成计数恒稳定⑦信封+快照缺失组合期望唯一（R2 口径三分支互斥）⑧P95 n=20 数学正确（次大值=已注记设计选择）⑨13/52/23/③b 四组计数全自洽⑩③态单字段缺席真实链不可达（instructor 全 schema 或信封二值 + Fake 八键族恒全字段）⑪覆盖率分层无数学矛盾。
+
+Round 3 未修留项：无 P0/P1 残留（7 项全部修复）。
+
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
 **审查日期:** 待定
@@ -1044,10 +1064,11 @@ Round 2 未修留项：无 P0/P1 残留（13 项全部处置：12 修复 + R1-13
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-11-03
 **最后更新/Last Updated:** 2026-11-03
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（五 Agent 并行调研 + 主会话九项亲验；OD-1~OD-10 十项架构裁定落档——宿主形态偏离声明/双源聚合/持久化三件/异常开段 490/图类表格承载为五大关键裁定）
 - v1.1.0: Round 1 文档审查修订（四视角调研 + 三视角审查并行，34 项处置——P0×2：file_path 改 L0 逻辑路径裁定（write 不返回路径三路全断）/发布失败 is_success 双防线（实现层吞异常）；P1×10：491 宽容语义改判（无共同事务上抛无效）/archived=False 机理修正/渲染三态判定冻结/原因解析次序/计数单位 H3 口径/491-Gherkin 矛盾/事件守护范式重设计/性能采样单 plan_id×20/2.7 标题逐字源/元信息表；OD-4/5/6/8/10 五项修订 + 26 修复簇详见 Docs Review Fixes 表）
 - v1.2.0: Round 2 回归核查+组合交互面修订（R1 八裁定单独 8/8 成立实证；13 项处置——P1×1：degraded_section_count 计数语义空洞（信封态计入/锚叠加不计/附录 B 两类全收 R2 口径）；P2×5：上限算术重算/PublishResult event_id 必填/AC-4 层级映射/验收层 L0 隔离传播/level 值域收窄 1-3；P3×6：同构措辞增强/outbox 断言等价机理/CLI memory_id 打印等——R2-1~R2-12 详见修复台账）
+- v1.3.0: Round 3 单深度推演修订（13 场景三轴推演+6 时间线+不变量数学；7 项处置——P1×1：缺行小节 H3 骨架渲染冻结（R2-2 算术证明的隐含前提显式化——省略分叉下极端形态炸 242）+ 跳步类别钦定六子步；P2×2：AC-6×1 断言面处方（字面基线全等形态）/「实体标注」载体修正（metadata.timeline_available 直查）；P3×4：矩阵场景号校正/gather 形态锚（跨 loop 陷阱）/附录 A 第三映射源/目录收录面冻结；11 条证伪留痕防重推——R3-1~R3-7 详见修复台账）
