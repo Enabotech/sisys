@@ -66,7 +66,8 @@ _GFM_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 
 #: 不可覆盖装饰前缀（U+26A0+U+FE0F——Adobe-GB1 无该字形，光栅化呈豆腐块；
 #: 聚合产物 callout 以此为装饰前缀，语义由 ``[降级]``/``[数据缺失]`` 文字
-#: 标记承载，剥除零语义损失）
+#: 标记承载，剥除零语义损失；documents 行 filename 以此开头时同被剥——
+#: 与 ``**`` 同款的概率趋零保真度取舍）
 _UNRENDERABLE_PREFIX = "⚠️ "
 
 
@@ -351,6 +352,11 @@ class ReportLabPdfRenderer(PdfRendererPort):
             for col_index, cell in enumerate(row):
                 text = _pdf_text(str(cell))
                 if citation_links and col_index == 0:
+                    # 序号列值域断言（fail-loud 前移）：锚点名直插 XML 属性位
+                    # （name/href），值域封闭=服务层 str(entry.index) 数字——
+                    # 非 digit 形态在 paraparser 是宽容静默（引号形态则 save 期
+                    # ValueError→492），断言使偏离在渲染入口即红
+                    assert text.isdigit(), f"引文锚点序号列必须为数字: {text!r}"
                     anchor = f"citation-{text}"
                     cells.append(
                         Paragraph(

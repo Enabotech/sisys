@@ -1074,13 +1074,15 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 - CR1-F11 验收 S2「零事件落位」断言缺——feature 三面承诺 vs 断言两面。修复：`_count_outbox_rows`（plan 维度，与清理面同源通道）+ outbox==0 断言
 - CR1-F12 集成净增 0 引文预置面无对照断言——docstring 四面声明 vs 断言三面。修复：`_count_citation_documents`/`_count_citation_points` helper + 两组 presets 清理后两面零断言 + 采样轮 outbox==20 基线对照 + 并发 plan outbox==1（S11 taxonomy 修正并入）
 
-**P3 修复（9 项）：** CR1-F14 chain_archive_service Any→Port 类型（6-5a 同位先例）；CR1-F15 _APPENDIX_C_TITLE 双源上提 ports 单源（`__all__` 登记，两侧 import 引用常量名；**列数守卫经评审裁定删除**——静默回退违「修根因不抑制」，reportlab ValueError→492 天然 fail-loud）；CR1-F16 桶常量等值钉（EVIDENCE_BUCKET_TYPE == L4_BUCKET_TYPE 契约断言——值级镜像漂移必红）；CR1-F17 测试判别力四条（幂等 spy 委托真实 registerFont+计数/count==1、tags 收紧 `{"report","pdf"} <= set()`、getsource 收紧 resolve 调用锚定注释免疫、dash 用例 docstring 口径）；CR1-F18 point_missing 吸收形态文档化（缺 document_id/非法 UUID 同判——检索点信息缺失伞形）；CR1-F19 collection 表述校准（写侧字面量对齐非 env 传导——svc/ports/Story :220 三处）；CR1-F20 `__all__` 私有名移除；CR1-F22 :893 台账补 typing import cast 行。
+**P3 修复（8 项 + F13 并入 F8/F9 净化出口）：** CR1-F14 chain_archive_service Any→Port 类型（6-5a 同位先例）；CR1-F15 _APPENDIX_C_TITLE 双源上提 ports 单源（`__all__` 登记，两侧 import 引用常量名；**列数守卫经评审裁定删除**——静默回退违「修根因不抑制」，reportlab ValueError→492 天然 fail-loud）；CR1-F16 桶常量等值钉（EVIDENCE_BUCKET_TYPE == L4_BUCKET_TYPE 契约断言——值级镜像漂移必红）；CR1-F17 测试判别力四条（幂等 spy 委托真实 registerFont+计数/count==1、tags 收紧 `{"report","pdf"} <= set()`、getsource 收紧 resolve 调用锚定注释免疫、dash 用例 docstring 口径）；CR1-F18 point_missing 吸收形态文档化（缺 document_id/非法 UUID 同判——检索点信息缺失伞形）；CR1-F19 collection 表述校准（写侧字面量对齐非 env 传导——ports/Story :220 两处落地 + svc 侧 R2 补齐）；CR1-F20 `__all__` 私有名移除；CR1-F22 :893 台账补 typing import cast 行。
 
 **drop 1 项（评审裁定）：** CR1-F21 B 验证器 ast.Attribute 分支——理论威胁（服务文件无 `import typing` 形态）+ 只改 PDF 副本造成守护家族不对称（test_markdown_report.py:146 同款 Name-only）。
 
 **改判维持 4 项：** outline 跳级（不可达+命中即 492 fail-loud 可辩护）/callout 空行差异（callout 恒单行实证）/会话包装显式失败桩（方法集合不可穷举——docstring 指引替代）/document_missing 时 document_id 丢弃（VO 契约允许空串+status 可判别+chunk_id 可回查）。
 
-**统计：P1×4 + P2×7 全落码，P3 落码 9 + drop 1 + 台账 1；变异红证 ×3；新增断言 12 条；单测 49（27+22）/契约 14/集成 6/验收 13 全绿——四目录全量两轮稳定归 Round 4 纯验证轮承载。**
+**统计：发现 24 = P1×4 + P2×7 + P3×13【10 编号项 F13~F22 + 3 项 P3 级改判（outline 跳级/callout 空行/document_id 丢弃）】；处置 = 落码 19【F1~F20 减 F21，F13 并入 F8/F9】+ drop 1（F21）+ Story 台账补记 1（F22）+ 改判维持 4【3 项 P3 发现 + 1 项 F10 内裁定延伸（会话包装桩）】；变异红证 ×3；新增断言 12 条；单测 49（27+22）/契约 14/集成 6/验收 13 全绿——四目录全量两轮稳定归 Round 4 纯验证轮承载。**
+
+**Round 2（2026-11-04，回归核查 + 交叉面传播双 Agent 并行 + 主会话复核）：** R1 修复 19/20 完整落位 + 三锚变异红证复验存活；发现 P2×2 + P3×6 全部 R1 传播面/自伤面——R2-1【P2】F19 svc :133-134 半落地（「三处」承诺漏 svc 构造参数 docstring，与 ports/组合根双矛盾——补落地）；R2-2【P2】F12③ 验收 S11 outbox==20 落位漂移至集成（方案明文移入落码但仅集成侧兑现——feature/.py 锁步补断言）；R2-3 F2 注释重复两份（变异还原编辑自伤——删）；R2-4 ⚠️ filename 保真度注记不对称（与 `**` 注记合并）；R2-5 集成并发三 plan 清理后 outbox==0 缺断言（净增 0 承诺面并发分支补齐）；R2-6 引文锚点序号列 isdigit 守卫（XML 属性位 fail-loud 前移——paraparser 对 `<`/`&` 宽容静默形态以断言在渲染入口即红）；R2-7 方法级 docstring「连接级异常」措辞残留（:284/:287/测试 :439 统一「解析链依赖异常」）；R2-8 统计行计数闭合重构（本段统计行）；R2-9 6-5a 契约测试 or/裸子串旧形态家族不对称——deferred-work 登记（6.5b-DF5）。
 
 ---
 
@@ -1093,10 +1095,11 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 
 ---
 
-**故事版本/Story Version:** v1.7.0
+**故事版本/Story Version:** v1.7.1
 **创建日期/Created:** 2026-11-04
 **最后更新/Last Updated:** 2026-11-04
 **更新说明/Description:**
+- v1.7.1: 代码审查 Round 2 回归核查+交叉面修订（双 Agent 并行：R1 修复 19/20 落位确认+三锚变异红证复验存活；P2×2+P3×6 全传播面/自伤面——F19 svc 侧补落地/验收 S11 outbox 补断言【feature/.py 锁步】/注释重复清理/⚠️ 注记对称/并发 outbox 断言/isdigit 守卫/措辞统一/统计行闭合/6.5b-DF5 登记）
 - v1.7.0: 代码审查 Round 1 修订（四 Agent 并行调研 + C3 双评审员 + 复评收敛；P1×4+P2×7+P3×13 发现，落码 F1~F20 + F21 drop + F22 台账 + 改判 4 维持；变异红证×3 + 新增断言 12 条；六项核心修复——document_missing 占位文案/find 容错边界扩展/bullet U+2022 豆腐块改 ASCII/页码列守护锚/chunks 脏形态守卫/L2 save 失败归 491；渲染器净化层（⚠️/**）+ generation_ms 回归钦定顺序 + 净增 0 断言四面补齐；6.5b-DF4 登记；详见 Review Findings）
 - v1.6.0: dev-story 实施完成（Task 0~7 / 39 Subtask 全勾——四 Agent 并行调研 + 主会话亲验；13 验收场景全绿 + 集成五场景两轮稳定 + 四目录全量 14756 passed × 2 零失败 + 覆盖率 93.10% + mypy 752 零错误 + 变异实证×4 + 红线三查零输出；实施攻坚六项：引文锚点 link 自指承载/Qdrant 点 id MD5 归一走生产通道/document_repository 组合根会话包装/收集段 archived_at 排序/两守护测试正当演进/Qdrant FD 环境铁证清卷闭环+6.5b-DF3 登记；Status → review）
 - v1.5.0: 文档审查 Round 5 独立终审收敛定稿（general-purpose 新鲜上下文终审：锚点 5+7 全命中零漂移/残留旧口径 16 词零残留/结构编号层级全收敛；终修 8 项 P2×2+P3×6——R2/R4 统计行计数纪律订正/增量冻结表与 OD-11 管道转义/括号闭合/变异锚名对齐/「12 系」无溯源表述改写；五轮收敛 P0-P1 双零残留清零，定稿）

@@ -1634,14 +1634,16 @@ def assert_event_payload_key_family(context: dict[str, Any]) -> None:
     assert payload["aggregate_type"] == "Report"
 
 
-@then("每轮新 report_id 且 L2 行数与 L4 对象数累计 20")
+@then("每轮新 report_id 且 L2 行数、L4 对象数与 outbox 行数累计 20")
 def assert_twenty_unique_reports(context: dict[str, Any]) -> None:
-    """report_id 集合无重复 + L2 行 20 + L4 对象 20（键锚 report_id 天然互异——OD-8 更强锚）。"""
+    """report_id 集合无重复 + L2 行 20 + L4 对象 20 + outbox 行 20（三元落位——CR1-F12③ R2 补）。"""
     assert len(set(context["perf_report_ids"])) == _PERF_SAMPLE_ROUNDS
     rows = _run_async(context["_loop"], _count_report_rows(context, context["plan_id"]))
     assert rows == _PERF_SAMPLE_ROUNDS
     objects = _run_async(context["_loop"], _count_pdf_objects(context, context["plan_id"]))
     assert objects == _PERF_SAMPLE_ROUNDS
+    outbox = _run_async(context["_loop"], _count_outbox_rows(context, context["plan_id"]))
+    assert outbox == _PERF_SAMPLE_ROUNDS
 
 
 @then("生成窗口 P95 小于 60 秒且三元每轮可读回")

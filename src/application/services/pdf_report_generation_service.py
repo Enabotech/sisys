@@ -130,8 +130,9 @@ class PdfReportGenerationService:
             document_repository: documents 仓储（引文解析②find）。
             archive_service: 战略档案服务（query_archive——assumptions 读径；
                 注入具体类：application 同层引用合法）。
-            collection: 引文检索 collection（默认 "documents"——组合根
-                BLM_SEARCH_COLLECTION env 同源）。
+            collection: 引文检索 collection（默认 "documents"——与 chunk
+                索引写侧 collection 字面量对齐，非 BLM_SEARCH_COLLECTION
+                env 传导（env 覆写只影响检索服务侧））。
             tenant_id: 引文链租户（默认 str(MVP_TENANT_ID)——DocumentQuery
                 必填且 PG find 硬过滤，数据链无租户可用注入是唯一来源）。
         """
@@ -281,10 +282,10 @@ class PdfReportGenerationService:
             stage: 首现步骤名（步骤归属信息——OD-6）。
 
         Returns:
-            引文条目；连接级异常时 None（整体降级空清单——上层中断迭代）。
+            引文条目；解析链依赖异常时 None（整体降级空清单——上层中断迭代）。
 
         Raises:
-            ConnectionError 传播形态：不传播——本方法内捕获整体降级信号。
+            无外抛——解析链依赖异常在本方法内捕获转为整体降级信号。
         """
         try:
             point = await self._l3_vector.get_point(self._collection, chunk_id)
@@ -327,8 +328,6 @@ class PdfReportGenerationService:
                 page=0,
                 status="point_missing",
             )
-        # find 与 get_point 同形态容错（解析链任一依赖异常 → 整体降级空附录 C
-        # ——增强面故障不炸主链，R2D-1 整体容错边界）
         # find 与 get_point 同形态容错（解析链任一依赖异常 → 整体降级空附录 C
         # ——增强面故障不炸主链，R2D-1 整体容错边界）
         try:

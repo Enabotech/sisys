@@ -436,7 +436,7 @@ class TestCitationAggregation:
         assert metadata["citation_count"] == 0
 
     async def test_get_point_connection_error_degrades_to_empty(self) -> None:
-        """get_point 连接级异常 → 整体降级空（与 query_archive 异常同 try 边界）。"""
+        """get_point 解析链依赖异常 → 整体降级空（与 query_archive 异常同 try 边界）。"""
         service, mocks = _make_service(archive_rows=[_make_archive_row("performance_gap", ["chunk-z"])])
         mocks["l3"].get_point.side_effect = ConnectionError("Qdrant 不可达")
         report = await _generate(service)

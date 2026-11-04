@@ -1100,6 +1100,7 @@ async def test_performance_sampling_and_concurrency() -> None:
         for concurrent_plan in concurrent_plans:
             assert await _count_report_rows(concurrent_plan) == 0
             assert await _count_pdf_objects(concurrent_plan) == 0
+            assert await _count_outbox_report_rows(concurrent_plan) == 0
         # 引文预置两面净增 0（documents 行 + Qdrant 点——CR1-F12 第四面对照）
         for cleaned_presets in (presets, concurrent_presets):
             assert await _count_citation_documents(cleaned_presets) == 0
