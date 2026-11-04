@@ -12,6 +12,7 @@ Run with:
 """
 
 import asyncio
+import logging
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
@@ -154,7 +155,7 @@ class TestGetLatestByPlan:
         assert isinstance(repo, ReportRepositoryProtocol)
 
     def test_latest_ordering_by_created_at_desc(self) -> None:
-        """查询编译产物含 created_at 降序 + LIMIT（CR1-F2 重写——原 getsource 断言被 docstring 命中恒真）。"""
+        """查询编译产物含 created_at 降序 + report_id tie-breaker + LIMIT（CR1-F2/CR2-F3）。"""
         from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
         repo = PostgreSQLReportRepository()
@@ -167,6 +168,8 @@ class TestGetLatestByPlan:
             compiled = str(statement.compile()).lower()
             # 行为面断言：突变 .asc()/删 order_by 即红（docstring 命中不再可能）
             assert "order by strategic_reports.created_at desc" in compiled
+            # CR2-F3：并列 tie-breaker 守护（删 report_id 次序键即红——防修复成无守护形状）
+            assert "strategic_reports.report_id desc" in compiled
             assert "limit" in compiled
         finally:
             reset_session(token)
@@ -215,3 +218,37 @@ class TestOrmEntityMapping:
     def test_model_metadata_jsonb_roundtrip_ready(self) -> None:
         """metadata JSONB 列在位（timeline_available 可观测面载体）。"""
         assert "metadata" in ReportModel.__table__.columns.keys()
+
+    def test_dirty_report_type_falls_back_with_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """脏行 report_type 不在枚举值域 → 回退 MARKDOWN + warning（CR2-F7——裸 ValueError 逃逸修复）。
+
+        None=「无记录」语义完整保持（脏行仍返回非 None）；未来值域演进/手工
+        修数场景读侧可观测（caplog warning 含 report_id 与原值）。
+        """
+        from src.infrastructure.storage.postgresql.repository import report_repository as repo_module
+        from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
+        dirty_model = ReportModel(
+            report_id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            report_type="docx",  # 不在 ReportType 值域
+            file_path="reports/dirty_20261104120000.md",
+            section_count=11,
+            degraded_section_count=0,
+            generation_ms=100,
+        )
+        repo = PostgreSQLReportRepository()
+        mock_session = _make_mock_session()
+        mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=dirty_model)))
+        token = set_session(mock_session)
+        try:
+            with caplog.at_level(logging.WARNING, logger=repo_module.__name__):
+                result = run_async(repo.get_latest_by_plan(dirty_model.plan_id))
+        finally:
+            reset_session(token)
+        assert result is not None  # 脏行不跳行（None=无记录语义保持）
+        assert result.report_type is ReportType.MARKDOWN  # 回退
+        assert result.report_id == dirty_model.report_id
+        warning_text = caplog.text
+        assert "report_type" in warning_text and "docx" in warning_text  # 原值可观测
+        assert str(dirty_model.report_id) in warning_text  # 行定位键

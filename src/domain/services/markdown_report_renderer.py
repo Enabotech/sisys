@@ -56,11 +56,47 @@ def _github_slug(title: str) -> str:
     return cleaned.replace(" ", "-")
 
 
+#: 段首 ATX 标题形态（窄转义判别——0-3 前导空格 + 1-6 个 # + 空白/行尾；
+#: `#` 后非空格的合法文本如 ``#1 排名`` 不命中零误伤——CR2-F1 评审窄形态）
+_ATX_HEADING_PATTERN = re.compile(r" {0,3}#{1,6}(?:\s|$)")
+
+
+def _flatten_inline(text: str) -> str:
+    """行内文本换行归一（CR2-F1——``\\r\\n``/``\\r``/``\\n`` → 空格）。
+
+    paragraph/bullet 出口归一：多行文本拆行会注入任意块结构（标题/表格/
+    列表）。与表格单元格归一同链（``_escape_cell`` 组合消费）。
+
+    Args:
+        text: 原始行内文本。
+
+    Returns:
+        单行文本。
+    """
+    return text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+
+
+def _escape_leading_hash(text: str) -> str:
+    """段首 ATX 标题形态的行首 ``#`` 转义（CR2-F1 窄形态——仅首个 ``#``）。
+
+    在首个 ``#`` 前插入 ``\\`` 破坏标题解析（``\\###`` 渲染回 ``###`` 原文）；
+    保留 0-3 前导空格原位。
+
+    Args:
+        text: 已判定命中标题形态的单行文本。
+
+    Returns:
+        转义后文本。
+    """
+    index = len(text) - len(text.lstrip(" "))
+    return text[:index] + "\\" + text[index:]
+
+
 def _escape_cell(text: str) -> str:
     """GFM 表格单元格结构性字符归一（CR1-F4——语法内在要求非 unicode 转义）。
 
-    ``|`` 转义为 ``\\|``（GFM 字面管道标准形态）；换行符（含 ``\\r\\n``/``\\r``）
-    归一空格（单元格内本就无法存在换行——防注入拆断表格）。中文原样。
+    ``|`` 转义为 ``\\|``（GFM 字面管道标准形态）；换行归一空格（单元格内
+    本就无法存在换行——防注入拆断表格）。中文原样。
 
     Args:
         text: 单元格原始文本。
@@ -68,7 +104,7 @@ def _escape_cell(text: str) -> str:
     Returns:
         归一后单元格文本。
     """
-    return text.replace("|", "\\|").replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    return _flatten_inline(text.replace("|", "\\|"))
 
 
 def _render_table(headers: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> list[str]:
@@ -100,9 +136,17 @@ def _render_block(block: ReportBlock) -> list[str]:
         块文本行列表（空 items 边界返回空列表——无空列表项）。
     """
     if block.kind == "paragraph":
-        return [block.text] if block.text else []
+        if not block.text:
+            return []
+        flattened = _flatten_inline(block.text)
+        # 段首标题注入防护（CR2-F1 窄形态）：命中 ATX 标题形态时仅转义首个 #
+        # ——合法文本（# 后非空格如「#1 排名」）不命中零误伤；bullet 渲染形态
+        # `- {item}` 中 # 非行首本无向量，不在此处理
+        if _ATX_HEADING_PATTERN.match(flattened):
+            flattened = _escape_leading_hash(flattened)
+        return [flattened]
     if block.kind == "bullet_list":
-        return [f"- {item}" for item in block.items]
+        return [f"- {_flatten_inline(item)}" for item in block.items]
     if block.kind == "table":
         return _render_table(block.headers, block.rows)
     # callout（降级/数据缺失标注——`> ` 前缀；多行文本逐行补前缀防后续行

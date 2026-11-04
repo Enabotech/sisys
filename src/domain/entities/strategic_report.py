@@ -83,6 +83,16 @@ class StrategicReport:
                 message="plan_id 不可为空（与 chain 归档 plan_id 同源的 UUID 字符串）",
                 context={"entity": "StrategicReport", "field": "plan_id"},
             )
+        try:
+            uuid.UUID(self.plan_id)
+        except ValueError as error:
+            # CR2-F8：UUID 格式查——实体是 plan_id 语义唯一权威（脏 plan_id 还会
+            # 流向 L0 文件名等消费面，仓储单点防御治标）；ValueError → 242 包装
+            # （异常体系红线——裸 ValueError 逃逸即违例）
+            raise EntityValidationError(
+                message="plan_id 必须为 UUID 字符串（与用例层守卫措辞对齐）",
+                context={"entity": "StrategicReport", "field": "plan_id", "plan_id": self.plan_id},
+            ) from error
         if not self.file_path.strip():
             raise EntityValidationError(
                 message="file_path 不可为空（L0 逻辑路径单源派生锚）",

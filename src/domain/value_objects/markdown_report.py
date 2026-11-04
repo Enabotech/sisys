@@ -123,3 +123,31 @@ class MarkdownReportDocument:
     meta_rows: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     sections: tuple[ReportSection, ...] = field(default_factory=tuple)
     toc_enabled: bool = True
+
+    def __post_init__(self) -> None:
+        """构造期文档根守卫（CR2-F2——VO 家族守卫对称补全，违例抛 242）。
+
+        Raises:
+            EntityValidationError: title/plan_id 为空或纯空白；meta_rows 混入
+                非 tuple 行或列数非 2（裸 str 行经渲染器字符级迭代静默错位
+                ——ReportBlock「str 行 len 巧合」同族防呆）；sections 含
+                level=1 章节（H1 单源 = document.title——渲染器 :146 自写 H1，
+                sections 内 level=1 会产出第二 H1 破坏结构契约，CR1-F30(a)）。
+        """
+        if not self.title.strip() or not self.plan_id.strip():
+            raise EntityValidationError(
+                message="文档根 title/plan_id 不可为空（封面标题与标识锚定）",
+                context={"entity_type": "MarkdownReportDocument", "field": "title/plan_id"},
+            )
+        for row in self.meta_rows:
+            if not isinstance(row, tuple) or len(row) != 2:
+                raise EntityValidationError(
+                    message="meta_rows 每行必须为二元 tuple（| 项目 | 值 | 两列表——裸 str 行字符级迭代静默错位）",
+                    context={"entity_type": "MarkdownReportDocument", "field": "meta_rows", "row_type": type(row).__name__},
+                )
+        for section in self.sections:
+            if section.level == 1:
+                raise EntityValidationError(
+                    message="sections 内禁止 level=1 章节（H1 单源 = document.title——CR1-F30(a)）",
+                    context={"entity_type": "MarkdownReportDocument", "field": "sections", "section_title": section.title},
+                )

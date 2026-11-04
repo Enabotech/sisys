@@ -340,17 +340,29 @@ def _resolve_degrade_reason(payload: dict[str, Any] | None) -> str:
 def _appendix_a_rows(snapshot: Any) -> list[tuple[str, ...]]:
     """构造附录 A 时间线表数据行（display_name 三源映射 + miss 直显裸值）。
 
+    辅源形态守卫双层闭合（CR2-F10——AC-4「辅源不阻断」信封延伸）：容器级
+    （state_data 非 dict / timeline 非 list → 空行 = 附录 A 省略）+ 元素级
+    （条目非 dict 跳过其余行照常——Redis 反序列化可返回任意 JSON 类型，
+    形态损坏走 AttributeError 逃逸非 DomainError 即违信封）。
+
     Args:
-        snapshot: latest 快照（None 或无 timeline 键 → 空列表）。
+        snapshot: latest 快照（None 或形态损坏 → 空列表）。
 
     Returns:
         五列数据行列表（summary_excerpt 显式省略）。
     """
     if snapshot is None:
         return []
-    timeline = (getattr(snapshot, "state_data", None) or {}).get("timeline") or []
+    state_data = getattr(snapshot, "state_data", None)
+    if not isinstance(state_data, dict):
+        return []
+    timeline = state_data.get("timeline")
+    if not isinstance(timeline, list):
+        return []
     rows: list[tuple[str, ...]] = []
     for entry in timeline:
+        if not isinstance(entry, dict):
+            continue
         rows.append(
             (
                 _timeline_step_display(str(entry.get("step", ""))),
@@ -433,6 +445,11 @@ def _aggregate_document(
     records_by_stage: dict[str, dict[str, Any]] = {str(record["stage"]): record for record in records}
     appendix_b: list[tuple[str, str, str]] = []
     degraded_count = 0
+    # 内容缺失类 stage 清单（CR2-F11——与 degraded_section_count 同口径的
+    # 三处增量位并行累积，禁从 appendix_b 派生【附录 B 两类全收含锚叠加且
+    # 类型列无法区分信封与锚叠加】；missing_stages ⊆ degraded_stages 包含
+    # 关系——前者只反映行缺席，本清单另含信封态与解析失败形态）
+    degraded_stages: list[str] = []
     sections: list[ReportSection] = []
 
     # --- 第 1 章：业绩差距分析（gap 四小节；缺行 → 四小节骨架共享步骤锚定）---
@@ -477,6 +494,7 @@ def _aggregate_document(
                 )
             )
         degraded_count += len(_GAP_SUBSECTIONS)
+        degraded_stages.append("performance_gap")
 
     # --- 第 2 章：市场洞察（六子 2.1~2.6 + synthesis 2.7）---
     sections.append(ReportSection(title="2 市场洞察", level=2))
@@ -498,6 +516,7 @@ def _aggregate_document(
             )
             appendix_b.append((mark, display, reason))
             degraded_count += 1
+            degraded_stages.append(stage)
             continue
         assert payload is not None
         blocks: list[ReportBlock] = []
@@ -540,6 +559,7 @@ def _aggregate_document(
         )
         appendix_b.append((mark, SYNTHESIS_DISPLAY_NAME, reason))
         degraded_count += 1
+        degraded_stages.append("market_insight_synthesis")
 
     # --- 附录 A：执行时间线（latest 快照在位时）---
     timeline_rows = _appendix_a_rows(snapshot)
@@ -581,6 +601,9 @@ def _aggregate_document(
     metadata: dict[str, Any] = {
         "timeline_available": bool(timeline_rows),
         "missing_stages": missing_stages,
+        # CR2-F11：内容缺失类 stage 全收（缺行/信封态/解析失败——锚叠加不收，
+        # 与 degraded_section_count 同口径；missing_stages ⊆ degraded_stages）
+        "degraded_stages": degraded_stages,
     }
     return _Aggregation(document, degraded_count, metadata)
 

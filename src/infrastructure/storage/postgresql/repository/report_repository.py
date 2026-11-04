@@ -9,6 +9,7 @@ fallback 防呆（archive_repository 模块 docstring 同款纪律）：fallback
 InvalidStateError（``from None``），except 永不命中。
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +21,8 @@ from src.domain.entities.strategic_report import ReportType, StrategicReport
 from src.infrastructure.storage.postgresql.models.report import ReportModel
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.session_context import get_session, session_context
+
+logger = logging.getLogger(__name__)
 
 
 class PostgreSQLReportRepository(PostgreSQLAdapter[StrategicReport, ReportModel]):
@@ -43,18 +46,31 @@ class PostgreSQLReportRepository(PostgreSQLAdapter[StrategicReport, ReportModel]
         self._session_factory = session_factory
 
     def _to_entity(self, model: ReportModel) -> StrategicReport:
-        """ORM 模型 → 领域实体（report_type str → enum）。
+        """ORM 模型 → 领域实体（report_type str → enum——脏行回退守卫）。
 
         Args:
             model: ORM 行。
 
         Returns:
-            StrategicReport 实体。
+            StrategicReport 实体（report_type 不在枚举值域时回退 MARKDOWN
+            + warning——CR2-F7：裸 ValueError 逃逸异常体系；None=「无记录」
+            语义完整保持不跳行；表唯一写方恒写 enum.value，脏行仅来自
+            手工修数/未来值域演进。file_path 空串等其他脏形态经实体
+            __post_init__ 242 fail-loud——读侧宽容仅覆盖枚举值域一轴）。
         """
+        try:
+            report_type = ReportType(model.report_type)
+        except ValueError:
+            logger.warning(
+                "报告行 report_type 不在枚举值域（回退 MARKDOWN）: report_id=%s report_type=%r",
+                model.report_id,
+                model.report_type,
+            )
+            report_type = ReportType.MARKDOWN
         return StrategicReport(
             report_id=model.report_id,
             plan_id=str(model.plan_id),
-            report_type=ReportType(model.report_type),
+            report_type=report_type,
             file_path=model.file_path,
             section_count=model.section_count,
             degraded_section_count=model.degraded_section_count,
@@ -153,7 +169,12 @@ class PostgreSQLReportRepository(PostgreSQLAdapter[StrategicReport, ReportModel]
         Returns:
             最新报告实体或 None。
         """
-        statement = select(ReportModel).where(ReportModel.plan_id == plan_id).order_by(ReportModel.created_at.desc()).limit(1)
+        statement = (
+            select(ReportModel)
+            .where(ReportModel.plan_id == plan_id)
+            .order_by(ReportModel.created_at.desc(), ReportModel.report_id.desc())
+            .limit(1)
+        )
         result = await self._session.execute(statement)
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model is not None else None

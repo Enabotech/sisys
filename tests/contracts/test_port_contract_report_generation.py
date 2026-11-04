@@ -58,12 +58,31 @@ class TestReportGenerationContracts:
         assert spec.owner
 
     def test_report_repository_spec_metadata(self) -> None:
-        """②仓储 spec 元数据：interface=R1 端口 + SCOPED + tags。"""
+        """②仓储 spec 元数据：interface=R1 端口 + SCOPED + tags（CR2-F4 补 tags 断言）。"""
         spec = _global_registry.get("report_repository")
         assert spec is not None
         assert spec.interface is ReportRepositoryProtocol
         assert spec.lifetime == Lifetime.SCOPED
+        assert "report" in spec.tags and "gateway" in spec.tags  # 组合根 :3360 三 tags
         assert spec.owner
+
+    def test_use_case_spec_metadata(self) -> None:
+        """②用例 spec 元数据（CR2-F4 补——具体类 interface 先例：agent_instantiation 形态）。"""
+        from src.application.use_cases.generate_markdown_report import GenerateMarkdownReportUseCase
+
+        spec = _global_registry.get("report_generation_use_case")
+        assert spec is not None
+        assert spec.interface is GenerateMarkdownReportUseCase  # 具体类（无独立 Protocol）
+        assert spec.lifetime == Lifetime.SINGLETON
+        assert "use_case" in spec.tags
+        assert spec.owner
+
+    def test_resolve_use_case_isinstance(self) -> None:
+        """⑤resolve isinstance：用例实例（CR2-F4 补——具体类直判）。"""
+        from src.application.use_cases.generate_markdown_report import GenerateMarkdownReportUseCase
+
+        instance = get_resolver().resolve("report_generation_use_case")
+        assert isinstance(instance, GenerateMarkdownReportUseCase)
 
     @pytest.mark.parametrize("port_name", PORT_NAMES)
     def test_port_spec_version_prefix(self, port_name: str) -> None:

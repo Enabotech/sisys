@@ -1,7 +1,7 @@
 """ReportGenerationService 单元测试（Story 6-5a Task 2——双源聚合+降级+渲染编排+事件）。
 
 Mock 形态：AsyncMock(spec=Port) 五依赖 + _make_trace_view 参数化工厂三态分派
-（正常 dict / 降级信封 ENVELOP / 缺行 None——6-4 _make_material 形态移植）。
+（正常 dict / 降级信封两键 dict / 缺行 None——6-4 _make_material 形态移植）。
 
 覆盖面：
 - 循环 A：聚合分派（八 stage → 章节）/ payload JSON 解析三态 / 降级三态判定
@@ -17,12 +17,11 @@ import json
 import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.ports.chain_of_thought_archive import ChainOfThoughtArchiveServicePort
+from src.application.ports.chain_of_thought_archive import ChainOfThoughtArchiveServicePort, ChainOfThoughtTraceView
 from src.application.ports.report_generation import REPORT_FILE_MEMORY_TYPE
 from src.application.services.report_generation_service import ReportGenerationService, _step_field_blocks
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
@@ -35,15 +34,12 @@ from src.domain.ports.report_repository import ReportRepositoryProtocol
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 from src.domain.value_objects.chain_of_thought import ChainOfThought
 
-#: 信封态哨兵（降级信封 {"degraded": True, "degrade_reason": ...}——三态判定②）
-ENVELOP = "envelope"
-
 
 def _make_chain_vo(payload: dict | None) -> ChainOfThought:
     """构造 chain VO（final_answer = json.dumps(payload)——payload 三态载体）。
 
     Args:
-        payload: 结构化产物 dict（信封态传 ENVELOP 哨兵对应的两键 dict）。
+        payload: 结构化产物 dict（信封态传 `_make_envelope_payload` 的两键 dict）。
 
     Returns:
         ChainOfThought VO 实例。
@@ -168,15 +164,19 @@ def _make_trace_view(
     stages_payload: dict[str, dict | None],
     *,
     degraded_stages: frozenset[str] = frozenset(),
-) -> Any:
+) -> ChainOfThoughtTraceView:
     """构造聚合主源 TraceView（三态分派工厂——6-4 _make_material 形态移植）。
+
+    CR2-F6：直接构造真实 ChainOfThoughtTraceView（四参 frozen dataclass，
+    与原手搓替身属性逐一同名——替换零行为差；DTO 契约漂移从此单测即红，
+    6-1/6-3/6-4「属性形态断裂族」在替身层堵口）。
 
     Args:
         stages_payload: stage → payload 三态映射（dict=正常/None=缺行）。
         degraded_stages: 行级 degraded 锚为 True 的 stage 集（锚叠加态）。
 
     Returns:
-        ChainOfThoughtTraceView 替身对象（属性面同构）。
+        真实 ChainOfThoughtTraceView DTO 实例。
     """
     records = []
     for stage, payload in stages_payload.items():
@@ -191,17 +191,12 @@ def _make_trace_view(
                 "blob_content": None,
             }
         )
-
-    class _View:
-        """TraceView 替身（属性面同构——构造器赋实例属性）。"""
-
-        def __init__(self, record_list: list[dict]) -> None:
-            self.plan_id = "trace-plan"
-            self.records = record_list
-            self.total = len(record_list)
-            self.archived_count = len(record_list)
-
-    return _View(records)
+    return ChainOfThoughtTraceView(
+        plan_id="trace-plan",
+        records=records,
+        total=len(records),
+        archived_count=len(records),
+    )
 
 
 def _make_snapshot(timeline: list[dict] | None) -> CheckpointSnapshot:
@@ -255,7 +250,7 @@ def _full_stages_payload(
 
     Args:
         gap_degraded: gap 步降级锚叠加形态。
-        step_override: 覆盖映射（None 值=构造缺行；ENVELOP 特殊值由调用方直接传 dict）。
+        step_override: 覆盖映射（None 值=构造缺行；信封态直接传 `_make_envelope_payload` dict）。
 
     Returns:
         stage → payload 映射。
@@ -483,6 +478,9 @@ class TestDegradationThreeStates:
         text = mocks["l0"].write.call_args.args[2]
         assert "### 2.1 看趋势" in text
         assert "> ⚠️ [数据缺失] 看趋势：该步骤归档记录不可用" in text
+        # CR2-F11：degraded_stages 收缺行 stage（与 degraded_section_count 同口径）
+        saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
+        assert saved_metadata.get("degraded_stages") == ["market_insight_trend"]
 
     @pytest.mark.asyncio
     async def test_missing_gap_renders_four_subsection_skeletons(self) -> None:
@@ -536,6 +534,10 @@ class TestDegradationThreeStates:
         text = mocks["l0"].write.call_args.args[2]
         assert "> ⚠️ [降级] 看自己：" in text
         assert "| [降级] | 看自己 |" in text  # 附录 B 两类全收
+        # CR2-F11 负向断言：锚叠加 stage 不进 degraded_stages（禁从 appendix_b 派生的守护锚
+        # ——附录 B 该场景有 [降级] 行而清单必须为空，两口径分叉即红）
+        saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
+        assert saved_metadata.get("degraded_stages") == []
 
     @pytest.mark.asyncio
     async def test_gap_degraded_anchor_uses_payload_reason(self) -> None:
@@ -572,6 +574,10 @@ class TestDegradationThreeStates:
         service, mocks = _make_service(trace_view=view)
         report = await service.generate_markdown_report(PLAN_ID)
         assert report.degraded_section_count == 4  # performance_gap 行不可解析 → 四小节缺失
+        # CR2-F11：解析失败形态（行在位）也进 degraded_stages——missing_stages 为空可对照
+        saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
+        assert saved_metadata.get("degraded_stages") == ["performance_gap"]
+        assert saved_metadata.get("missing_stages") == []  # 行在位（两清单语义区分锚）
 
     @pytest.mark.asyncio
     async def test_list_payload_treated_as_missing(self) -> None:
@@ -694,6 +700,52 @@ class TestSnapshotTimelineAppendixA:
         assert "## 附录 A 执行时间线" not in text
         saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
         assert saved_metadata.get("timeline_available") is False
+
+    @pytest.mark.asyncio
+    async def test_snapshot_malformed_state_data_degrades_to_omitted_appendix_a(self) -> None:
+        """快照 state_data 非 dict 形态损坏 → 附录 A 省略 + 报告成功（CR2-F10 容器级守卫）。
+
+        Redis 反序列化可返回任意 JSON 类型——形态损坏走 AttributeError 逃逸
+        非 DomainError 即违「辅源不阻断」信封（SimpleNamespace 注入——真实
+        实体 state_data 注解为 dict 不宜带脏形态构造）。
+        """
+        from typing import cast
+
+        malformed = SimpleNamespace(state_data="形态损坏的字符串")  # truthy 非 dict
+        service, mocks = _make_service(
+            trace_view=_make_trace_view(_full_stages_payload()),
+            snapshot=cast("CheckpointSnapshot", malformed),
+        )
+        report = await service.generate_markdown_report(PLAN_ID)
+        assert report.section_count == 11
+        text = mocks["l0"].write.call_args.args[2]
+        assert "## 附录 A 执行时间线" not in text
+
+    @pytest.mark.asyncio
+    async def test_snapshot_timeline_mixed_entries_skip_malformed(self) -> None:
+        """timeline 混合 list（元素级损坏）→ 跳过畸形条目其余行照常（CR2-F10 元素级守卫）。
+
+        `["ok"（非 dict）, 42（非 dict）, 合法条目]` 形态：容器守卫放行后
+        若无元素级守卫，`entry.get` AttributeError 逃逸——混合形态即红。
+        """
+        from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
+
+        snapshot = CheckpointSnapshot(
+            session_id="blm-planning-plan-1",
+            stage_id="blm_planning",
+            state_data={
+                "plan_id": "plan-1",
+                "timeline": ["畸形字符串条目", 42, _make_timeline_entry("performance_gap")],
+            },
+            timestamp=datetime(2026, 11, 3, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        service, mocks = _make_service(trace_view=_make_trace_view(_full_stages_payload()), snapshot=snapshot)
+        report = await service.generate_markdown_report(PLAN_ID)
+        assert report.section_count == 11  # 报告照常生成
+        text = mocks["l0"].write.call_args.args[2]
+        assert "## 附录 A 执行时间线" in text  # 合法条目照常渲染
+        assert "| 业绩差距分析 |" in text  # 合法行保留
+        assert "畸形字符串条目" not in text.split("附录 A")[1]  # 畸形条目跳过
 
     @pytest.mark.asyncio
     async def test_timeline_unknown_step_shows_raw_value(self) -> None:

@@ -44,7 +44,7 @@ BLM 前两阶段（6-1~6-4）已交付完整的流程/快照/思维链/归档数
 **When** 调用报告生成（CLI `report-generate --plan-id` 或用例 `GenerateMarkdownReportUseCase.execute(plan_id)`）
 **Then** 执行五段编排：①chain 归档主源聚合（query_chain_trace）→ ②latest 快照辅源（可选容错）→ ③领域渲染纯函数生成 Markdown 文本 → ④L0 写 `.md` 文件 + L2 `strategic_reports` 元数据行 → ⑤发布 `ReportGenerated` 事件
 **And** 返回 `StrategicReport` 实体（report_id/plan_id/report_type="markdown"/file_path/section_count/degraded_section_count/generation_ms）
-**And** 同 plan_id 重复生成产生新报告（幂等锚=report_id，非 plan_id——重跑语义与 blm-plan `--plan-id` 透传幂等锚对齐，不拦截；**时间戳锚秒级精度注记**：`YYYYMMDDHHMMSS` 秒内连跑 memory_id 相同 → L0 文件覆写为一份，重复生成断言锚 = report_id 新增 + L2 行 +1，L0 文件件数唯一性断言需跨秒（场景间隔 sleep ≥1.05s）或不断言件数）
+**And** 同 plan_id 重复生成产生新报告（幂等锚=report_id，非 plan_id——重跑语义与 blm-plan `--plan-id` 透传幂等锚对齐，不拦截；**时间戳锚秒级精度注记**：`YYYYMMDDHHMMSS` 秒内连跑 memory_id 相同 → L0 文件覆写为一份，重复生成断言锚 = report_id 新增 + L2 行 +1，L0 文件件数唯一性断言需跨秒（场景间隔 sleep ≥1.05s）或不断言件数；**并发形态边界注记（CR2-F13）**：「覆写为一份」隐含顺序写假设——同 plan **并发**同秒触发时两写者交错 truncate/write 可产生撕裂文件（非原子写），该形态超出本 Story 范围已登记 deferred-work 6.5a-DF2，6-8 REST 读侧上线前处置）
 
 **验证标准/Validation Criteria:**
 - [ ] 全链真实服务验收：Fake LLM/Embedding 双豁免跑 8 步 → report-generate → 断言五段全部落位
@@ -1115,9 +1115,36 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 
 #### 已推迟 Defer
 
-- [ ] CR1-F15/F17/F18/F19/F20/F21/F22 → Round 2 处置（7 项 P3——防御面/断言收紧族）
-- [ ] CR1-F23/F25/F26 → Round 3 处置（3 项 P3——验收文档/结构族）
-- [ ] CR1-F30 → Round 4 处置（1 项 P3——渲染结构信任边界）
+- [ ] ~~CR1-F15/F17/F18/F19/F20/F21/F22 → Round 2 处置~~（**R2 已处置**——见 Round 2 台账）
+- [ ] CR1-F23/F25/F26 → Round 3 处置（3 项 P3——验收文档/结构族；深查方案已备：F23=logger.error 七步+内层五段禁 COUNT 断言/F25=只修分档表与 docstring 措辞/F26=删除重复断言）
+- [ ] ~~CR1-F30 → Round 4 处置~~（**R2 拆半处置**：(a) 禁 level=1 收编 F15 `__post_init__` 已修；(b) 相邻递进校验裁定不做——VO 序列校验属过度约束，F22 断言面+组装层单源已承载）
+
+**Round 2**（2026-11-04；三视角并行 Agent【Round 1 修复回归验证/遗留 P3 深查/新维度扫描】；回归验证 19 项修复全部正确落地零回收——验收 13+集成 5 真实服务复验全绿；新发现 5 项 P3 + 遗留 8 项处置方案落定，本轮处置 12 项）：
+
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|----------|------|
+| CR2-F1（=CR1-F31+新N2） | paragraph/bullet 文本内嵌换行注入残留：`financial_gap` 含 `\n### 伪造标题` 可注入块结构——F4/F5 冻结条款只限定表格/callout，paragraph/bullet 出口未归一（渲染规则单源纪律下渲染器出口归一） | P3 | 渲染器提取 `_flatten_inline` helper（换行归一空格，与 `_escape_cell` 同链组合消重）；paragraph/bullet 两分支归一；**段首标题转义窄形态（评审修正：弃 startswith 宽形态）**——`re.match(r" {0,3}#{1,6}(\s|$)", text)` 命中时仅首个 `#` 前插 `\`（宽形态会误伤 `#1 排名` 等合法非标题文本——GFM 中 `#` 后非空格本就不构成标题；窄形态零误伤且含 0-3 前导空格向量全覆盖）；**只落 paragraph 分支**（bullet 渲染形态 `- {item}` 中 `#` 非行首本无向量；不并入 `_flatten_inline` 防泄漏进表格单元格）；单测×3（paragraph 换行归一/bullet 换行归一/合法 `#1 排名` 不被转义）+ story 冻结条款补 paragraph/bullet 归一限定 | ✅ R2 |
+| CR2-F2（=CR1-F15+F30a） | MarkdownReportDocument 零构造期校验（meta_rows 裸 str 行字符级 join 静默错位——ReportBlock 已修的「str 行」同族守卫不对称；title/plan_id 空串放行）；F30(a) sections 内 level=1 无守卫（第二 H1 向量——H1 单源=document.title） | P3 | `__post_init__` 四查：title/plan_id strip 非空 + meta_rows 每行 tuple 且 len==2 + sections 禁 level=1（违例 242）；单测参数化失败用例（grep 实证零误伤——全仓 3 文件构造面恒合法） | ✅ R2 |
+| CR2-F3（=CR1-F19） | `order_by(created_at.desc())` 无并列 tie-breaker（数据回填/时钟粒度并列时「最新」不确定） | P3 | `.order_by(created_at.desc(), report_id.desc())` + 单测断言补强（`report_id desc` 编译产物子串——防本修复成无守护形状） | ✅ R2 |
+| CR2-F4（=CR1-F21 剩余） | 契约测试三缺口：use_case 缺②spec/⑤resolve 断言（宣称五断言族实覆盖两项）+ report_repository 缺 tags 断言 | P3 | 补 `test_use_case_spec_metadata`（interface is 具体类/SINGLETON/tags/owner——agent_instantiation 先例 :117/:157 形态）+ `test_resolve_use_case_isinstance` + repository spec 补 tags | ✅ R2 |
+| CR2-F5（=CR1-F22） | 「ATX 严格递进不跳级」断言名实不符：只断首行==1 且 ∈{1,2,3}，H1→H3 跳级不红 | P3 | 验收/集成两处补相邻层级差 ≤ +1 循环断言 | ✅ R2 |
+| CR2-F6（=CR1-F20） | 单测 `_View` 手搓替身（DTO 契约漂移单测恒绿）+ ENVELOP 死哨兵（定义后零值消费） | P3 | `_make_trace_view` 直接构造真实 `ChainOfThoughtTraceView`（四参 frozen dataclass 属性名逐一同名——替换零行为差）；删 ENVELOP + 三处 docstring 改述 | ✅ R2 |
+| CR2-F7（=CR1-F17） | `_to_entity` 裸 `ReportType()`：脏行（'docx'）抛原生 ValueError 逃逸异常体系——archive 家族 try/except+warning+回退守卫形态未沿用 | P3 | warning + 回退 `ReportType.MARKDOWN`（None=「无记录」语义完整保持；跳行方案否决——与 None 语义冲突；CHECK 方案否决——防写不护读）；补脏行回退用例 | ✅ R2 |
+| CR2-F8（=CR1-F18） | `_to_model` 裸 `uuid.UUID(report.plan_id)` 可抛原生 ValueError；实体契约「UUID 字符串」半落地（F6 只落非空） | P3 | 实体 `__post_init__` 补 UUID 格式查（非空查之后——空串先给更准错误消息；**ValueError → 242 包装**——context field=plan_id，异常体系红线）；测试字面量机械替换 **9 处实数**（8×`plan_id="p"` + 1×`plan_id="plan-full"`，全在 test_strategic_report.py——评审校正原「~12」概数）+ `"not-a-uuid"` 拒绝用例 | ✅ R2 |
+| CR2-F9（新N1） | F6 五查测试面变异存活：`section_count=-5, degraded_section_count=-5` 双负值被首子句短路——`degraded_section_count < 0` 单独触发零覆盖（删中间子句变异体存活） | P3 | 补两杀伤用例（评审补强）：`(5, -1)` 杀「删 degraded<0 子句」变异 + `(-1, 0)` 杀「删 section<0 子句」变异——两子句独立杀伤全覆盖 | ✅ R2 |
+| CR2-F10（新N4） | 辅源容错信封止于 load 异常：快照 `state_data` 形态损坏（非 dict/timeline 非 list——Redis 反序列化可返回任意 JSON 类型）→ `_appendix_a_rows` 内 AttributeError 逃逸非 DomainError，绕过 AC-4「辅源不阻断」 | P3 | `_appendix_a_rows` 守卫**双层闭合**（评审补强：容器级+元素级）：入口 state_data 非 dict / timeline 非 list → 空行（附录 A 省略）；**循环内 `isinstance(entry, dict)` 元素级守卫**（混合 list `["ok", 42]` 形态——跳过畸形条目其余行照常）+ 单测含混合形态用例 | ✅ R2 |
+| CR2-F11（新N5） | L2 metadata 无法枚举「内容缺失」小节：missing_stages 只反映行缺席，三态①（解析失败）与②（信封态）形态的 stage 不在清单——运维经 L2 直查误判「无缺失」 | P3 | metadata 增补 `degraded_stages` 键（**与 degraded_section_count 同口径——评审修正：禁从 appendix_b 派生**【附录 B 两类全收含锚叠加，类型列无法区分信封与锚叠加，从其派生会混入锚叠加 stage 与实体计数口径分裂】；三处增量位并行累积 stage 键：gap else 收 performance_gap/六子非 normal 收 stage/synthesis else 收 market_insight_synthesis——同分支同口径 + AC-7 局部累积纪律）+ 单测正向三形态 + **锚叠加负向断言**（锚 True + payload 完整 → stage 不在列表）+ `missing_stages ⊆ degraded_stages` 包含关系注记 | ✅ R2 |
+| CR2-F12（新N2） | `_escape_cell` 双重转义边缘：payload 含字面 `\|` → 输出 `\\|` → GFM 解析为转义反斜杠+未转义管道 → 拆列 | P3 | **defer + 台账注记**：源文本字面 `\|` 组合（反斜杠+管道）在 LLM 中文自由文本产出中概率极低；正确修复需区分「预转义」与「字面」语义（Markdown 转义经典边界），复杂度与收益不成比例 | ⏳ 留档 |
+| CR2-F13（新N3） | 同 plan 同秒并发生成：L0 非原子写（`open("w")` 直接 truncate-write 无 temp+rename）可产生撕裂文件——两协程交错写混合内容，绕过「覆写为一份」顺序写假设 | P3 | **deferred-work 登记**（6-8 REST 读侧上线前处置）：memory_id 精度提升受端口契约 docstring 与 OD-10 锚定制约、原子写改造波及全 L0 共享适配器——不在 6-5a 扩面；story AC-1 秒级注记扩写覆盖并发形态 | ✅ R2 注记+登记 |
+
+**Round 2 defer 裁定依据**（深查 Agent 方案 + 主会话采纳）：F17 的 CHECK 分支不做（防写不护读/家族无先例/表唯一写方恒写 enum.value）；F23 维持 R3（logger.error 方案备妥——COUNT==0 断言会放大基础设施抖动为验收红，与动态跳过哲学冲突）；F25 维持 R3 方向 a（偏严不假绿，只修文档）；F26 维持 R3 方向 a 删除（与 B1 逐字重复+docstring 宣称失实）；F30(b) 不做（VO 序列校验过度约束）。
+
+**Round 2 实施验证记录**（2026-11-04）：
+- **评审放行**：评审员判定「需改进」——3 项阻断（F1 段首 # 宽形态误伤合法 `#1 排名` 文本改 `^ {0,3}#{1,6}(\s|$)` 窄形态且只落 paragraph 分支 / F10 守卫补 timeline **元素级** isinstance（容器级只护一半）/ F11「与附录 B 口径对齐」自相矛盾改「与 degraded_section_count 同口径三处增量位累积、禁从 appendix_b 派生」）+ 3 项条件放行（F7 warning 字段钦定 report_id+原值 + logging 前提 / F8 台账「~12 处」概数改实数 9 处 + ValueError→242 包装钦定 / F9 补 section 单独负值杀伤用例）全部吸收后实施
+- **变异实证×3**：F10 删元素守卫 → 混合形态用例红 → 还原绿；F1 窄正则改宽 startswith → `#1 排名` 误伤断言红 → 还原绿；F11 正常分支误收 stage → 锚叠加负向断言红 → 还原绿（评审建议的三个修正面防「修法走样」实证全过）
+- **测试结果**：本 Story 面 263 单测+契约 + 集成 5 + 验收 13 全绿；ruff 零错误 + mypy 746 零错误
+- **四目录全量回归**：14630 passed（唯一失败 `test_scenario_4_real_llm_smoke` 为外部 LLM API 冒烟 flaky——单独复跑 PASSED，与 6-5a 零关联）
+- **红线自查**：过程中 1 次误写 `# type: ignore`（测试参数类型注解）即时发现移除——抑制注释零残留；F6 替换产生 Any 孤儿 import 即时清理
 
 ---
 

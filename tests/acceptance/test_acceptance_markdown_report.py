@@ -1662,11 +1662,13 @@ def assert_synthesis_lists(context: dict[str, Any]) -> None:
 
 @then("ATX 标题层级严格递进不跳级")
 def assert_atx_heading_levels(context: dict[str, Any]) -> None:
-    """逐行 # 计数 ∈ {1,2,3}（首行 H1——无 # 前缀混淆行）。"""
+    """逐行 # 计数 ∈ {1,2,3} + 相邻层级差 ≤ +1（首行 H1——CR2-F5 递进补强）。"""
     lines = context["report_text"].splitlines()
     heading_levels = [len(line) - len(line.lstrip("#")) for line in lines if line.startswith("#")]
     assert heading_levels[0] == 1
     assert all(1 <= level <= 3 for level in heading_levels)
+    # CR2-F5：严格递进不跳级（H1→H3 跳级即红——原断言仅查值域查不出跳级）
+    assert all(right - left <= 1 for left, right in zip(heading_levels, heading_levels[1:]))
 
 
 @then("GFM 管道表格表头分隔行数据行对齐（PESTEL 六行五力五行）")

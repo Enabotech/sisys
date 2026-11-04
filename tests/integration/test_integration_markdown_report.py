@@ -643,10 +643,11 @@ async def test_scenario_two_formatting_elements(tmp_path: Path) -> None:
         memory_id = PurePosixPath(report.file_path).stem
         text = _read_report_text(tmp_path, memory_id)
         lines = text.splitlines()
-        # ATX 标题层级严格递进（逐行 # 计数 ∈ {1,2,3} 且首行 H1）
+        # ATX 标题层级严格递进（逐行 # 计数 ∈ {1,2,3} 且首行 H1 + 相邻差 ≤ +1——CR2-F5）
         heading_levels = [len(line) - len(line.lstrip("#")) for line in lines if line.startswith("#")]
         assert heading_levels[0] == 1
         assert all(1 <= level <= 3 for level in heading_levels)
+        assert all(right - left <= 1 for left, right in zip(heading_levels, heading_levels[1:]))
         # PESTEL 表 6 行数据（表头定位法——防分隔行串扰）
         pestel_header = lines.index("| 维度 | 评估 |")
         assert lines[pestel_header + 1] == "| --- | --- |"

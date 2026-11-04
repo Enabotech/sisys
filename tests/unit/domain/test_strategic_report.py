@@ -23,6 +23,9 @@ from src.domain.value_objects.markdown_report import (
     ReportSection,
 )
 
+#: 守卫用例合法 plan_id（RFC 4122 示例 UUID——CR2-F8：实体已加 UUID 格式查）
+_VALID_PLAN_ID = "123e4567-e89b-12d3-a456-426614174000"
+
 
 class TestReportTypeEnum:
     """ReportType 枚举值域（6-5b PDF 预留值——本 Story 仅产 MARKDOWN）。"""
@@ -66,7 +69,7 @@ class TestStrategicReportValidConstruction:
         created_at = datetime(2026, 11, 3, 12, 0, 0, tzinfo=timezone.utc)
         report = StrategicReport(
             report_id=report_id,
-            plan_id="plan-full",
+            plan_id=_VALID_PLAN_ID,
             report_type=ReportType.MARKDOWN,
             file_path="reports/plan-full_20261103120000.md",
             section_count=11,
@@ -82,7 +85,7 @@ class TestStrategicReportValidConstruction:
         """frozen dataclass——字段赋值抛 FrozenInstanceError（setattr 动态形态——静态面合法）。"""
         from dataclasses import FrozenInstanceError
 
-        report = StrategicReport(plan_id="p", file_path="reports/p_1.md", section_count=0, degraded_section_count=0)
+        report = StrategicReport(plan_id=_VALID_PLAN_ID, file_path="reports/p_1.md", section_count=0, degraded_section_count=0)
         with pytest.raises(FrozenInstanceError):
             setattr(report, "plan_id", "other")
 
@@ -96,7 +99,7 @@ class TestStrategicReportInvariants:
 
         with pytest.raises(EntityValidationError) as exc_info:
             StrategicReport(
-                plan_id="p",
+                plan_id=_VALID_PLAN_ID,
                 report_type=cast("ReportType", "markdown"),
                 file_path="reports/p_1.md",
                 section_count=0,
@@ -108,13 +111,13 @@ class TestStrategicReportInvariants:
     def test_file_path_empty_rejected(self) -> None:
         """file_path 非空守卫（L0 逻辑路径单源派生锚）。"""
         with pytest.raises(EntityValidationError) as exc_info:
-            StrategicReport(plan_id="p", file_path="", section_count=0, degraded_section_count=0)
+            StrategicReport(plan_id=_VALID_PLAN_ID, file_path="", section_count=0, degraded_section_count=0)
         assert exc_info.value.code == "EXCEPTION_242"
 
     def test_file_path_whitespace_only_rejected(self) -> None:
         """file_path 纯空白拒（CR1-F6——strip 非空，防空白路径静默落库）。"""
         with pytest.raises(EntityValidationError) as exc_info:
-            StrategicReport(plan_id="p", file_path="   ", section_count=0, degraded_section_count=0)
+            StrategicReport(plan_id=_VALID_PLAN_ID, file_path="   ", section_count=0, degraded_section_count=0)
         assert exc_info.value.code == "EXCEPTION_242"
 
     def test_plan_id_empty_rejected(self) -> None:
@@ -127,22 +130,45 @@ class TestStrategicReportInvariants:
     def test_negative_section_count_rejected(self) -> None:
         """section_count 负值拒（CR1-F6——字段表 ≥0 约束；负值对 -5 ≤ -5 会绕过大小不变量）。"""
         with pytest.raises(EntityValidationError) as exc_info:
-            StrategicReport(plan_id="p", file_path="reports/p_1.md", section_count=-5, degraded_section_count=-5)
+            StrategicReport(plan_id=_VALID_PLAN_ID, file_path="reports/p_1.md", section_count=-5, degraded_section_count=-5)
         assert exc_info.value.code == "EXCEPTION_242"
 
     def test_negative_generation_ms_rejected(self) -> None:
         """generation_ms 负值拒（CR1-F6——耗时字段 ≥0 约束）。"""
         with pytest.raises(EntityValidationError) as exc_info:
             StrategicReport(
-                plan_id="p", file_path="reports/p_1.md", section_count=1, degraded_section_count=0, generation_ms=-100
+                plan_id=_VALID_PLAN_ID,
+                file_path="reports/p_1.md",
+                section_count=1,
+                degraded_section_count=0,
+                generation_ms=-100,
             )
         assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_negative_degraded_section_count_alone_rejected(self) -> None:
+        """degraded_section_count 单独负值拒（CR2-F9——杀「删 degraded<0 子句」变异：双负值用例被首子句短路）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            StrategicReport(plan_id=_VALID_PLAN_ID, file_path="reports/p_1.md", section_count=5, degraded_section_count=-1)
+        assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_negative_section_count_alone_rejected(self) -> None:
+        """section_count 单独负值拒（CR2-F9——杀「删 section<0 子句」变异：双负值用例被次子句兜住）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            StrategicReport(plan_id=_VALID_PLAN_ID, file_path="reports/p_1.md", section_count=-1, degraded_section_count=0)
+        assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_plan_id_non_uuid_format_rejected(self) -> None:
+        """plan_id 非 UUID 格式拒（CR2-F8——实体是 plan_id 语义唯一权威；ValueError → 242 包装）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            StrategicReport(plan_id="not-a-uuid", file_path="reports/p_1.md", section_count=0, degraded_section_count=0)
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert exc_info.value.context["field"] == "plan_id"
 
     def test_degraded_exceeds_section_rejected(self) -> None:
         """计数不变量：degraded_section_count > section_count 抛 242（缺三步场景锁死）。"""
         with pytest.raises(EntityValidationError) as exc_info:
             StrategicReport(
-                plan_id="p",
+                plan_id=_VALID_PLAN_ID,
                 file_path="reports/p_1.md",
                 section_count=11,
                 degraded_section_count=12,
@@ -152,7 +178,7 @@ class TestStrategicReportInvariants:
     def test_degraded_equal_section_allowed(self) -> None:
         """边界：degraded == section 合法（极端形态 11 == 11——R2-2 算术上限）。"""
         report = StrategicReport(
-            plan_id="p",
+            plan_id=_VALID_PLAN_ID,
             file_path="reports/p_1.md",
             section_count=11,
             degraded_section_count=11,
@@ -271,3 +297,50 @@ class TestMarkdownReportDocumentVo:
         assert document.meta_rows[0] == ("报告类型", "markdown")
         assert document.sections == (section,)
         assert document.toc_enabled is False
+
+    def test_empty_title_rejected(self) -> None:
+        """title 空拒（CR2-F2——文档根守卫；渲染出 `# ` 空 H1 无意义）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            MarkdownReportDocument(plan_id="plan-1", title="  ")
+        assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_empty_plan_id_rejected(self) -> None:
+        """plan_id 空拒（CR2-F2——标识锚定）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            MarkdownReportDocument(plan_id="", title="战略规划报告")
+        assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_meta_rows_bare_str_row_rejected(self) -> None:
+        """meta_rows 裸 str 行拒（CR2-F2——`' | '.join(str)` 字符级迭代三列静默错位，ReportBlock「str 行」同族防呆）。"""
+        from typing import cast
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            MarkdownReportDocument(
+                plan_id="plan-1",
+                title="战略规划报告",
+                meta_rows=cast("tuple[tuple[str, str], ...]", (("计划标识", "plan-1"), "裸字符串行")),
+            )
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert exc_info.value.context["row_type"] == "str"
+
+    def test_meta_rows_wrong_arity_rejected(self) -> None:
+        """meta_rows 三元行拒（CR2-F2——两列表列数冻结）。"""
+        from typing import cast
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            MarkdownReportDocument(
+                plan_id="plan-1",
+                title="战略规划报告",
+                meta_rows=cast("tuple[tuple[str, str], ...]", (("a", "b", "c"),)),
+            )
+        assert exc_info.value.code == "EXCEPTION_242"
+
+    def test_sections_level_one_rejected(self) -> None:
+        """sections 含 level=1 章节拒（CR2-F2 收编 CR1-F30(a)——H1 单源 = document.title）。"""
+        with pytest.raises(EntityValidationError) as exc_info:
+            MarkdownReportDocument(
+                plan_id="plan-1",
+                title="战略规划报告",
+                sections=(ReportSection(title="伪造 H1", level=1),),
+            )
+        assert exc_info.value.code == "EXCEPTION_242"

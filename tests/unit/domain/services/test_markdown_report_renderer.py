@@ -297,6 +297,77 @@ class TestBlockRendering:
         # 脱离前缀的裸行不得存在（注入面闭合）
         assert "第二行不得裸奔" not in [line for line in lines if not line.startswith("> ")]
 
+    def test_paragraph_multiline_text_flattened_no_heading_injection(self) -> None:
+        """paragraph 多行文本 → 换行归一空格 + 段首标题窄形态转义（CR2-F1）。
+
+        `财务差距\n### 伪造标题` 若原样输出会注入 H3；归一后单行 + 首个 #
+        前插 \\ 破坏标题解析。
+        """
+        document = _make_document(
+            (
+                ReportSection(
+                    title="1.1 财务差距",
+                    level=3,
+                    blocks=(ReportBlock(kind="paragraph", text="财务差距结论\n### 伪造标题内容"),),
+                ),
+            )
+        )
+        rendered = render_markdown_report(document)
+        lines = rendered.splitlines()
+        # 单行归一：换行变空格（归一后 ### 在行中非段首——标题解析向量已消除）
+        assert "财务差距结论 ### 伪造标题内容" in rendered
+        assert "### 伪造标题内容" not in lines  # 无独立注入标题行（精确行——章节标题 ### 1.1 不受扰）
+
+    def test_paragraph_leading_hash_heading_escaped(self) -> None:
+        """paragraph 段首 ATX 标题形态 → 首个 # 转义（CR2-F1 窄形态）。"""
+        document = _make_document(
+            (
+                ReportSection(
+                    title="小节",
+                    level=3,
+                    blocks=(ReportBlock(kind="paragraph", text="### 伪造标题"),),
+                ),
+            )
+        )
+        lines = render_markdown_report(document).splitlines()
+        assert "\\### 伪造标题" in lines
+        assert "### 伪造标题" not in lines  # 未转义标题行不得独立存在（精确行）
+
+    def test_paragraph_leading_hash_non_heading_text_untouched(self) -> None:
+        """合法 `#1 排名` 文本不被转义（CR2-F1 窄形态无误伤断言——宽形态实现下此断言红）。
+
+        GFM 中 `#` 后非空格不构成 ATX 标题，本就原样渲染——`#` 后带数字的
+        合法文本（话题标签/排名标记）零扰动。
+        """
+        document = _make_document(
+            (
+                ReportSection(
+                    title="小节",
+                    level=3,
+                    blocks=(ReportBlock(kind="paragraph", text="#1 排名：市场渗透率第一"),),
+                ),
+            )
+        )
+        lines = render_markdown_report(document).splitlines()
+        assert "#1 排名：市场渗透率第一" in lines  # 无 \ 前缀（原样）
+        assert "\\#1" not in render_markdown_report(document)
+
+    def test_bullet_item_multiline_flattened(self) -> None:
+        """bullet item 含换行 → 单行归一（CR2-F1——`- {item}` 后续行裸奔可注入块结构）。"""
+        document = _make_document(
+            (
+                ReportSection(
+                    title="小节",
+                    level=3,
+                    blocks=(ReportBlock(kind="bullet_list", items=("根因一：组织能力缺口\n| 伪造表格行",)),),
+                ),
+            )
+        )
+        rendered = render_markdown_report(document)
+        lines = rendered.splitlines()
+        assert "- 根因一：组织能力缺口 | 伪造表格行" in rendered  # 换行归一空格
+        assert not any(line.startswith("| 伪造") for line in lines)  # 无注入表格行
+
 
 class TestChineseAndSpecialCharacters:
     """中文与特殊字符原样输出（渲染层禁转义）。"""
