@@ -943,12 +943,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml ▲ 状态流转（Task
 - `src/domain/exceptions/_code_ranges.py` - 开 report 段 + 两类注册（Task 1 ✅）
 - `src/domain/exceptions/__init__.py` - 导出 + __all__（Task 1 ✅——EXCEPTION_HTTP_MAP 在 exception_handlers.py 见下）
 - `src/interfaces/api/exception_handlers.py` - EXCEPTION_HTTP_MAP 两行 + import（Task 1 ✅）
-- `src/entrypoints/agent_cli.py` - report-generate 子命令（Task 3 ✅）
+- `src/entrypoints/agent_cli.py` - report-generate 子命令（Task 3 ✅；CR1-F9 枚举 .value 打印）
 - `src/composition_root.py` - 三注册块 === Story 6-5a === 分节（Task 3 ✅）
+- `src/infrastructure/storage/postgresql/models/__init__.py` - ReportModel 聚合 import + __all__（CR1-F8 ✅——R4 终审回填）
 - `tests/unit/interfaces/api/test_exception_handlers.py` - 键集合快照同步登记双类（Task 1 ✅）
-- `tests/unit/interfaces/cli/test_agent_cli.py` - report-generate 用例扩展 6 用例（Task 3 ✅）
+- `tests/unit/interfaces/cli/test_agent_cli.py` - report-generate 用例扩展 6 用例（Task 3 ✅；CR1-F9/F10 断言补强）
 - `docs/architecture/sisys-uni-exception-design.md` - 编码分配表 report 段行 + 483/484 顺带回填（Task 1 ✅）
-- `_bmad-output/implementation-artifacts/deferred-work.md` - 台账四处处置注记（Task 0.7 ✅）
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 台账四处处置注记（Task 0.7 ✅；CR2-F13 增 6.5a-DF2 登记）
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 状态流转（Task 7）
 
 ---
@@ -1115,9 +1116,13 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 
 #### 已推迟 Defer
 
-- [ ] ~~CR1-F15/F17/F18/F19/F20/F21/F22 → Round 2 处置~~（**R2 已处置**——见 Round 2 台账）
-- [ ] CR1-F23/F25/F26 → Round 3 处置（3 项 P3——验收文档/结构族；深查方案已备：F23=logger.error 七步+内层五段禁 COUNT 断言/F25=只修分档表与 docstring 措辞/F26=删除重复断言）
-- [ ] ~~CR1-F30 → Round 4 处置~~（**R2 拆半处置**：(a) 禁 level=1 收编 F15 `__post_init__` 已修；(b) 相邻递进校验裁定不做——VO 序列校验属过度约束，F22 断言面+组装层单源已承载）
+- [x] ~~CR1-F15/F17/F18/F19/F20/F21/F22 → Round 2 处置~~（**R2 已处置**——见 Round 2 台账 CR2-F2/F7/F8/F3/F4/F5/F6）
+- [x] ~~CR1-F23/F25/F26 → Round 3 处置~~（**R3 已处置**——见 Round 3 台账 CR3-F1/F2/F3）
+- [x] ~~CR1-F30 → Round 4 处置~~（**R2 拆半处置**：(a) 禁 level=1 收编 CR2-F2 `__post_init__` 已修；(b) 相邻递进校验裁定不做——VO 序列校验属过度约束，CR2-F5 断言面+组装层单源已承载）
+- [ ] CR2-F12 双重转义边缘 → 留档（story 台账内——概率极低，6-5b PDF 渲染立项统一评估）
+- [ ] CR3-F6 ≥4 前导空格缩进代码块向量 → 留档（6-5b 立项统一评估——与 CR2-F12 同批）
+- [ ] R4 终审披露：验收 teardown 内层 helper 4 处静默吞异常残留（`_cleanup_l0_report_files` 逐条/`_cleanup_archive_residues` Qdrant+MinIO/`_cleanup_redis_keys` 整体包体）——系 6-3/6-4 验收文件同族共享模式（跨 Story 既有形态），F23 修复范围（七步链+PG 五段）外；建议 Epic 6 收尾时统一收口非 6-5a 单独扩面
+- [ ] R4 终审披露：`tests/unit/interfaces/api/test_exception_handlers.py:1255-1256` 两处历史 `# noqa: N817/N814`——blame 实证系文件创建期（5face7b9）遗留非本 Story 引入，如实上报不代为处置（跨 Story 技术债）
 
 **Round 2**（2026-11-04；三视角并行 Agent【Round 1 修复回归验证/遗留 P3 深查/新维度扫描】；回归验证 19 项修复全部正确落地零回收——验收 13+集成 5 真实服务复验全绿；新发现 5 项 P3 + 遗留 8 项处置方案落定，本轮处置 12 项）：
 
@@ -1158,6 +1163,8 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 | CR3-F6（R2 回归 N3） | CR2-F1 同族残留向量：paragraph ≥4 前导空格 → GFM 缩进代码块（块结构改写向量——窄正则 ` {0,3}` 按 ATX 规范设计本就不覆盖） | P3 | **留档不修**：形态为代码块化妆非内容注入（无损失）；与 CR2-F12 同批边缘形态，6-5b PDF 渲染立项时统一评估 | ⏳ 留档 |
 
 **Round 3 验证记录**：实体/服务/架构单测 81 passed + 验收 13 + 集成 5 全绿；ruff 零错误；N1 变异实证（删 synthesis append → 红 → 还原 → 绿）；R2 回归验证 Agent 对 Round 2 全部 12 项的代码+测试双面实证通过（指定五文件 123 passed + 红线 grep 零命中 + cast 形态先例一致）。
+
+**Round 4 独立终验（2026-11-04——纯验证轮，不采信台账自述）**：五节终审全过——①周期闭合：提交链 4c45a6f0→6799d48f→476f9925 零游离、工作区干净、三台账在位；②**十项关键修复双向取证 10/10 成立**（F1 判别/F2 排序/F3 转义三成员/F6 七查/F7 回退/F8 UUID 查/F10 双层守卫/F11 三增量位+负向/F5 递进/F23 可观测化——逐项代码实证）；③一致性：File List 补 models/__init__.py 缺口（本轮清偿）+ 6.5a-DF1/DF2 四要素齐备 + 冻结面三轮零触碰实证；④红线：新增面抑制注释/裸异常/AI 署名零命中（历史遗留 noqa 两处如实披露不代处置）；⑤**收敛判定成立**：P0-P2 残留为零，四项留档/defer 处置去向全部确认。独立实跑 93 单测 + ruff 全绿。新发现 4 项 P3：File List 缺口 + 台账划线销账（**本轮清偿**）；teardown 内层 helper 4 处静默残留（跨 Story 既有形态——Epic 6 收尾统一收口）+ CR2-F12/CR3-F6 无 DF 编号（留档形态可接受）。**四目录全量回归 14630 passed 零失败**（连前轮 real_llm_smoke flaky 亦通过）。
 
 ---
 
