@@ -926,7 +926,7 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
 
 
 def _print_report_summary(result: object, report_format: str = "markdown") -> None:
-    """打印报告生成摘要（format 感知——markdown 分支含 memory_id，PDF 分支含对象键+bucket+引文计数）。
+    """打印报告生成摘要（format 感知——markdown 分支含 memory_id，PDF 分支含对象键+bucket）。
 
     memory_id 打印（R2-10，仅 markdown 分支）：人类用户经 memory_id +
     L0StoragePort.read 或 base 目录提示定位物理文件；PDF 分支 file_path 是
