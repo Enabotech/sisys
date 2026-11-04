@@ -1866,7 +1866,6 @@ class _StubPdfReport:
         self.section_count = 11
         self.degraded_section_count = 0
         self.generation_ms = 240
-        self.citation_count = 7  # 打印面汇总（实体不携该字段——getattr 容错面）
 
 
 class _StubPdfReportUseCase:
@@ -1929,7 +1928,7 @@ class TestReportGenerateFormatExecution:
     """--format 分发执行（PDF 分支打印/异常定式/默认通道零变化）。"""
 
     def test_pdf_dispatch_and_prints_summary(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-        """--format pdf：分发 pdf 用例 + 打印对象键/bucket/报告类型 pdf/引文计数。"""
+        """--format pdf：分发 pdf 用例 + 打印对象键/bucket/报告类型 pdf。"""
         from src.application.ports.pdf_report import EVIDENCE_BUCKET_TYPE
 
         markdown_stub = _StubReportGenerateUseCase()
@@ -1944,7 +1943,9 @@ class TestReportGenerateFormatExecution:
         assert pdf_stub.result.file_path in out  # L4 对象键逻辑路径打印
         assert "  报告类型: pdf" in out.splitlines()
         assert EVIDENCE_BUCKET_TYPE in out  # bucket 打印（常量 import——实体不携 bucket）
-        assert "引文计数: 7" in out  # citation_count 汇总行
+        assert (
+            "引文计数" not in out
+        )  # R3-1：实体不携 citation_count（6-5a 冻结八字段）——打印面不呈现恒 0 死指标（L2 metadata 可查）
         assert "memory_id" not in out  # memory_id 反解仅 markdown 分支（.md 钉死不适用 PDF）
         assert pdf_stub.calls == [{"plan_id": passed_plan_id}]
         assert not markdown_stub.calls  # 不误分发 markdown 用例

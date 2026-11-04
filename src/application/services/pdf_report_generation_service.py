@@ -68,7 +68,10 @@ __all__ = ["PdfReportGenerationService"]
 logger = logging.getLogger(__name__)
 
 #: 引文收集显式 limit（八步现值 8 行虽低于 ArchiveQuery 默认 20，显式传参为
-#: 未来同型行扩展余量——对齐 6-4 ``_TRACE_QUERY_LIMIT=50`` 显式传参先例）
+#: 未来同型行扩展余量——对齐 6-4 ``_TRACE_QUERY_LIMIT=50`` 显式传参先例。
+#: 方向交互注记（R3-4）：仓储层 archived_at DESC 取最新 N 行——同 plan
+#: EVIDENCE_PACKAGE 行 >64 时最旧行静默丢弃（首现次序被腐蚀而非第 65 条
+#: 截断）；引文条数本身不受限（单行 evidence_refs 可含任意多条 chunk_id）
 _CITATION_QUERY_LIMIT: int = 64
 
 #: 附录 C 降态占位文案（两降级态冻结——AC-3 增量冻结表钦定；status 值域
@@ -170,8 +173,9 @@ class PdfReportGenerationService:
             raise ReportGenerationError(plan_id=str(plan_id))
         # ② latest 快照辅源（缺失/读失败同形态容错）
         snapshot = await self._load_snapshot(plan_id)
-        # ③ 引文聚合（整体容错——增强面故障不炸主链）
-        citations, stage_of = await self._aggregate_citations(plan_id)
+        # ③ 引文聚合（整体容错——增强面故障不炸主链；degraded 标记入 L2
+        # metadata 持久可观测——「解析失败空附录」与「真无引文」的审计分界）
+        citations, stage_of, citation_degraded = await self._aggregate_citations(plan_id)
         # ③④ 聚合复用 + 附录 C 组装进 IR + 渲染（同步纯 CPU）
         aggregation = aggregate_report_document(str(plan_id), trace.records, snapshot, started)
         document = self._append_citation_section(aggregation.document, citations)
@@ -193,9 +197,10 @@ class PdfReportGenerationService:
         except Exception as error:
             raise ReportEvidenceStorageError(plan_id=str(plan_id), cause=error) from error
         # 实体构造（generation_ms 终点紧贴 L2 落库——含渲染+L4 段，6-5a 同款
-        # 窗口口径；与聚合 metadata「执行耗时」行双窗口辨析：前者是实体字段、
-        # 后者是元信息表行，终点同源；与 P95 窗口【聚合起点→事件发布返回】
-        # 起点/终点均异的采样统计口径）
+        # 窗口口径；与聚合 metadata「执行耗时」行双窗口辨析：前者终点在聚合
+        # 函数内（不含引文/渲染/L4），后者终点在 L4 归档后；与 P95 窗口
+        # 【generate_pdf_report 调用→事件发布返回】起点同、终点异——采样
+        # 统计口径含事件发布段）
         generation_ms = int((time.perf_counter() - started) * 1000)
         report = StrategicReport(
             report_id=report_id,
@@ -213,6 +218,8 @@ class PdfReportGenerationService:
         metadata["citations"] = [
             {**self._citation_to_dict(entry), "stage": stage_of.get(entry.chunk_id, "")} for entry in citations
         ]
+        if citation_degraded:
+            metadata["citation_degraded"] = True
         try:
             await self._report_repository.save(report, metadata=metadata)
         except Exception as error:
@@ -225,15 +232,17 @@ class PdfReportGenerationService:
     # 引文聚合三段链（AC-3）
     # ------------------------------------------------------------------
 
-    async def _aggregate_citations(self, plan_id: uuid.UUID) -> tuple[list[CitationEntry], dict[str, str]]:
+    async def _aggregate_citations(self, plan_id: uuid.UUID) -> tuple[list[CitationEntry], dict[str, str], bool]:
         """引文聚合三段链（整体容错——降级空清单不炸主链）。
 
         Args:
             plan_id: 规划任务标识。
 
         Returns:
-            (引文条目清单, chunk_id→首现步骤名映射)；整体故障时空清单——
-            citation_count==0。
+            (引文条目清单, chunk_id→首现步骤名映射, 整体降级标记)——整体
+            故障时 (空清单, 空映射, True)：citation_count==0 且
+            ``citation_degraded`` 键入 L2 metadata（审计分界——区别于真
+            无引文的空态）。
         """
         try:
             archives = await self._archive_service.query_archive(
@@ -245,7 +254,7 @@ class PdfReportGenerationService:
             )
         except Exception as error:
             logger.warning("引文收集降级（归档库不可达——空附录 C 不阻断报告）: plan_id=%s error=%s", plan_id, error)
-            return [], {}
+            return [], {}, True
         # archived_at 升序（首现次序=归档写入序——与 6-4 query_chain_trace 同款
         # 排序；None 回落 epoch 下界保证稳定性）
         ordered_rows = sorted(archives, key=lambda archive: archive.archived_at or _EPOCH_FLOOR)
@@ -269,9 +278,9 @@ class PdfReportGenerationService:
         for position, chunk_id in enumerate(ordered, start=1):
             entry = await self._resolve_citation(position, chunk_id, stage_of[chunk_id])
             if entry is None:
-                return [], {}
+                return [], {}, True
             entries.append(entry)
-        return entries, stage_of
+        return entries, stage_of, False
 
     async def _resolve_citation(self, index: int, chunk_id: str, stage: str) -> CitationEntry | None:
         """解析单条引文（三态降级判定——整体容错边界内逐条降级）。

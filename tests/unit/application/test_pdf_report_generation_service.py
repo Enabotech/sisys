@@ -434,6 +434,7 @@ class TestCitationAggregation:
         assert report is not None
         metadata = _saved_metadata(mocks)
         assert metadata["citation_count"] == 0
+        assert metadata["citation_degraded"] is True  # R3-5：持久降级标记（审计分界）
 
     async def test_get_point_connection_error_degrades_to_empty(self) -> None:
         """get_point 解析链依赖异常 → 整体降级空（与 query_archive 异常同 try 边界）。"""
@@ -443,6 +444,7 @@ class TestCitationAggregation:
         assert report is not None
         metadata = _saved_metadata(mocks)
         assert metadata["citation_count"] == 0
+        assert metadata["citation_degraded"] is True  # R3-5：持久降级标记
 
     async def test_find_failure_degrades_to_empty(self) -> None:
         """find 抛解析链异常 → 整体降级空（与 get_point 同形态——CR1-F2 容错边界扩展）。"""
@@ -456,6 +458,7 @@ class TestCitationAggregation:
         assert report is not None
         metadata = _saved_metadata(mocks)
         assert metadata["citation_count"] == 0
+        assert metadata["citation_degraded"] is True  # R3-5：持久降级标记
         # 附录 C 空态说明（整体降级形态——非半截引文表）
         document_vo = mocks["renderer"].render.call_args.args[0]
         appendix = [s for s in document_vo.sections if s.title == "附录 C 引文索引"]

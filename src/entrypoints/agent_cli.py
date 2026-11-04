@@ -947,12 +947,12 @@ def _print_report_summary(result: object, report_format: str = "markdown") -> No
     print(f"  报告类型: {report_type_value}")
     print(f"  逻辑路径: {file_path}")
     if report_format == "pdf":
-        # PDF 分支：对象键 + bucket 定位（L4 WORM）；引文计数汇总（实体不携
-        # 该字段——getattr 容错面，缺失时打印 0）
+        # PDF 分支：对象键 + bucket 定位（L4 WORM）。引文计数经 L2 metadata
+        # 可查（citation_count/citations 键）——实体是 6-5a 冻结面八字段不携
+        # 该值，CLI 打印面不重复呈现（R3-1：删除恒 0 的 getattr 死指标行）
         from src.application.ports.pdf_report import EVIDENCE_BUCKET_TYPE
 
         print(f"  存储桶: {EVIDENCE_BUCKET_TYPE}")
-        print(f"  引文计数: {getattr(result, 'citation_count', 0)}")
     else:
         memory_id = file_path.rsplit("/", 1)[-1].removesuffix(".md") if file_path else ""
         print(f"  memory_id: {memory_id}")
