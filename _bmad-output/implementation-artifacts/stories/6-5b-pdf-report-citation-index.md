@@ -165,7 +165,7 @@
 
 #### 数据模型 (Data Models)
 
-**domain VO——引文条目**（`src/domain/value_objects/citation_entry.py` ★ 新建，frozen dataclass 零依赖——报告域文档模型扩展；**不复用 3-8 的 `Citation` VO**（citation.py:24-51——它是检索溯源域产物：含 text/start_offset/end_offset/page_number/bbox/confidence 检索语义字段，无 filename；报告引文条目需要 filename/解析状态——语义不同面，OD-6）：
+**domain VO——引文条目**（`src/domain/value_objects/citation_entry.py` ★ 新建，frozen dataclass 零依赖——报告域文档模型扩展；**不复用 3-8 的 `Citation` VO**（citation.py:24-51——它是检索溯源域产物：含 text/start_offset/end_offset/page_number/bbox/confidence 检索语义字段，无 filename；报告引文条目需要 filename/解析状态——语义不同面【OD-6】）：
 
 | 字段 | 类型 | 约束 |
 |---|---|---|
@@ -178,7 +178,7 @@
 
 - [ ] `__post_init__` 校验：index ≥1 / chunk_id 非空 / status 值域 / page ≥0（与字段表「≥1；不可得时 0」边界一致）/ document_id 非空时校验 UUID 格式（uuid.UUID 试解析兜底），违例抛 `EntityValidationError`（242 复用）
 
-**StrategicReport 实体**：零改动（6-5a 八字段全兼容 PDF 形态——report_type=PDF 预留值/file_path 存 L4 对象键逻辑路径非空合法/计数不变量 12 系口径自然成立）
+**StrategicReport 实体**：零改动（6-5a 八字段全兼容 PDF 形态——report_type=PDF 预留值/file_path 存 L4 对象键逻辑路径非空合法/计数不变量【degraded_section_count ≤ section_count 恒 11 口径】自然成立）
 
 **L2 `strategic_reports` 表**：零 migration（report_type 列 String(20) 自由值 "pdf"；metadata JSONB 自由扩展 citation_count/unresolvable_citation_count/citations 三键——**无表结构变更**，alembic 018 无需新增）
 
@@ -188,7 +188,7 @@
 
 | 位置 | 标题（level） | 素材源 | 块型序列 |
 |---|---|---|---|
-| 附录 C | `附录 C 引文索引`（H2） | 引文聚合产物 CitationEntry 列表 | table（`| # | 文档名 | 页码 | 切片标识 |` 四列；序号列 `1..M`、页码列 resolved+page>0→`p.{page}` / resolved+page==0→`-` / 降级态→`-`、切片标识列 chunk_id 前 8 位；evidence_refs 全空 → 单行说明 callout「本报告无检索证据引用」）；每条目锚点 ID `citation-{index}`（渲染层注册） |
+| 附录 C | `附录 C 引文索引`（H2） | 引文聚合产物 CitationEntry 列表 | table（`\| # \| 文档名 \| 页码 \| 切片标识 \|` 四列；序号列 `1..M`、页码列 resolved+page>0→`p.{page}` / resolved+page==0→`-` / 降级态→`-`、切片标识列 chunk_id 前 8 位；evidence_refs 全空 → 单行说明 callout「本报告无检索证据引用」）；每条目锚点 ID `citation-{index}`（渲染层注册） |
 
 - 附录 C 进目录（H2 章级收录——目录收录面 = 2 章恒收录 + 附录 B/C 恒在 + 附录 A 可选（快照在位则收录），**条目数非恒定**与 6-5a「条目数随附录 A 有无非恒定」注记同口径；断言面 = 目录条目集合与实际渲染章节一致（AC-4 验证标准「条目数 == 目录收录面」按此口径断言，聚合复用的自然结果））
 - section_count 口径增量：**恒 11 与 6-5a 同口径**（附录 C 是 H2 章级附录不计 H3 小节——与附录 A/B 同不计入；双格式断言式 `pdf.section_count == markdown.section_count` 恒等，两者同聚合同计数单位）
@@ -556,7 +556,7 @@ class PdfReportGenerationServicePort(Protocol):
 
 **完成标准/Definition of Done:**
 - [ ] 引文聚合 + 编排服务 + 端口实现完成
-- [ ] TDD 循环全部通过（含变异实证×3：report_type 组装 / 引文去重保序【R3B-1 补】/ 渲染锚点结构归 Task 2）
+- [ ] TDD 循环全部通过（含变异实证×3：report_type 组装 / 引文去重保序【R3B-1 补】/ outline 层级生成【归 Task 2 Subtask 2.1 实锚——全 Story 变异锚四处：T1 status 值域/T2 outline 层级/T3 report_type+引文去重】）
 - [ ] 覆盖率 application ≥85%（epics L2294 钦定）
 
 ---
@@ -681,7 +681,7 @@ class PdfReportGenerationServicePort(Protocol):
 | **OD-8** | **性能口径**：P95<60s（epics L2289——上限钦定；口径=聚合起点→事件发布返回不含 BLM run，6-5a OD-8 延续）；「导出<1 分钟」（L2279）由 60s<1min 钦定关系覆盖单指标承载；采样形态=单一数据源 plan_id × 20 次（6-5a OD-8 先例——引文预置一次构造；断言锚=新 report_id + L2 行 20 + **L4 对象 20**——键锚 report_id 无同秒覆写豁免问题，比 6-5a 更强）；成功率=N 生成 N 三元可读回（L4 retrieve+pypdf 页数>0/L2 行/事件）；**「引文点击响应<300ms」CLI-only 口径重读**：该指标语义本源是 PDF.js 阅读器点击→定位原文档坐标（prd L419 溯源跳转/epic_3 L445/UX L893——Web 交互面归 6-8）；CLI 形态下引文点击=PDF 文件内部链接注释跳转（阅读器本地执行零网络延迟）——落地为**结构化断言**（link 注释存在 + 目标锚点可解析——AC-4），非计时断言 | epics L2289-2291 + prd L419/L2397 口径谱系 + 6-5a OD-8 四连先例 + 「图像不失真」同款口径重读（零位图面前提 OD-9） |
 | **OD-9** | **图类产物继续表格承载**：6-5a OD-9「位图/SVG/mermaid defer 6-5b」的 6-5b 裁定 = **PDF 面继续表格/列表承载零位图**（六 Schema 字段仍是要点字段族——PDF 渲染以文本+表格兑现；「图像不失真」（epics L2278）口径重读 = 零位图前提下的渲染质量：中文清晰/表格完整/页面可渲染【pypdfium2 冒烟】——AC-8 承载）。位图渲染（品牌 logo/图表）归 6-11 白标模板立项（reportlab Image 能力届时启用） | 6-5a OD-9 断链预防 + epics 三要素字面无图像项 + YAGNI |
 | **OD-10** | **异常开新码 492/493 不扩 491 值域**：`PdfRenderingError` 492（渲染失败——reportlab 异常领域包装）/`ReportEvidenceStorageError` 493（L4 归档失败）。**不复用/不扩 491**：其 `_VALID_LAYERS=("l0","l2")` 二元值域是 6-5a 冻结面且有负向测试钉死（"l4" 现为非法值抛 242——扩值域即破坏该用例）；最小契约变更原则取新码（6-5a OD-6 开段哲学同款）。引文解析失败**零新码**（宽容降级非异常——OD-6）；490 全缺 PDF 链同判复用 | sisys-uni-exception-design.md L760（492-499 预留成文）+ 491 值域冻结实证 + 最小契约变更 |
-| **OD-11** | **CLI `--format` 参数形态**（非新子命令）：`report-generate --plan-id <id> --format {markdown,pdf}`（default=markdown 向后兼容——既有用户脚本零破坏）；interface-design.md L526 `sisys plan export --format <pdf|markdown|json>` format 参数形态钦定先例；单入口演进友好（6-11 白标模板参数同入口扩展）。CLI 内按 format 分发 resolve 两用例（report_generation_use_case / pdf_report_generation_use_case） | interface-design.md L526/L1466 format 参数先例 + 向后兼容 + argparse 扁平多参先例（checkpoint-create :352-401） |
+| **OD-11** | **CLI `--format` 参数形态**（非新子命令）：`report-generate --plan-id <id> --format {markdown,pdf}`（default=markdown 向后兼容——既有用户脚本零破坏）；interface-design.md L526 `sisys plan export --format <pdf\|markdown\|json>` format 参数形态钦定先例；单入口演进友好（6-11 白标模板参数同入口扩展）。CLI 内按 format 分发 resolve 两用例（report_generation_use_case / pdf_report_generation_use_case） | interface-design.md L526/L1466 format 参数先例 + 向后兼容 + argparse 扁平多参先例（checkpoint-create :352-401） |
 | **OD-12** | **pyproject 依赖组迁移**：reportlab 从 `[tool.poetry.group.test.dependencies]`（pyproject:126）移入主依赖组 `[tool.poetry.dependencies]`——src 面首次消费该库（现状 src/ 零 import，仅测试 fixture 用）；types-reportlab 已在 dev 组（:148）mypy 支持在位；poetry.lock 同版本跨组迁移（4.5.1 锁定不变——Task 0.2 实证 install 可用）。**architecture.md §12 技术栈回填义务**（L1670「选型参考及时更新」）：Task 7 落档 reportlab 条目 | pyproject 实证 + architecture.md 回填义务条款 + 6-5a「依赖已预留未用」先例闭环 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
@@ -956,7 +956,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 - R2D-6【P2】`_publish_event`「逐字复用」复制 vs 共享未裁定 → 裁定同款代码复制（6-5a 文件冻结不可提取，docstring 注形态溯源）
 - R2D-7~13【P3】collect-only 验证命令 / 1479+ 口径注明（collected 含参数化） / 三态样例构造来源 / linkRect 前向引用机制提示（单遍渲染） / 三私有函数签名 / CLI bucket 打印来源（EVIDENCE_BUCKET_TYPE 常量 import） / 冻结路径清单单源指回
 
-**统计：P1×3 + P2×6 + P3×9 = 25 项修复（含 2 项 Round 1 联动残留清偿）；AC-1 标题与 Then 六段切分统一（聚合→快照→引文→渲染→L4+L2→事件）；组合根构造参数默认值形态注记补齐**
+**统计：P1×3 + P2×7 + P3×11 = 21 项修复（两 Agent 重复发现已去重——R2-1 系回归核查与交叉引用共见；含 2 项 Round 1 联动残留清偿）；AC-1 标题与 Then 六段切分统一（聚合→快照→引文→渲染→L4+L2→事件）；组合根构造参数默认值形态注记补齐**
 
 **Round 3（2026-11-04，技术实证 + WORM/并发复核 + 方案合理性终审共 3 Agent 并行）：**
 
@@ -1003,7 +1003,27 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 - R4G-1【P2】学习经验「断言判别力」条目 R3 联动遗漏（仍写旧口径「extract_text 受限三层分工」）→ 改 R3 实证升级口径
 - R4G-2/3【P3】结构树 ├── 符号修正 + Task 2 表格断言表述对齐 R3 升级口径
 
-**统计：P2×4 + P3×12 = 16 项修复；收敛判据：P0 2→0→0→0、P1 7→3→2→0 双零达成、联动噪声 2→1 递减——满足进入 Round 5 终审条件（结构修复→细节钉死阶段转换完成）**
+**统计：P2×5 + P3×11 = 16 项修复；收敛判据：P0 2→0→0→0、P1 7→3→2→0 双零达成、联动噪声 2→1 递减——满足进入 Round 5 终审条件（结构修复→细节钉死阶段转换完成）**
+
+**Round 5（2026-11-04，独立终审——general-purpose 新鲜上下文 1 Agent，无前四轮确认偏误）：**
+
+**终审通过面（方案与结构全部经受住新鲜视角复核）：**
+- 代码锚点抽样 5+7 全命中零漂移（聚合/渲染分离 :176-177、archive-evidence :40、MVP_TENANT_ID :39、evidence_refs 写侧 :200-203、_VALID_LAYERS :67 + archive 签名/payload 6 键/桶常量/组合根三锚/query_archive 等附加七项）
+- 残留旧口径 16 词 grep 活文本零残留（命中均合法语境：审查记录引旧稿/蓝图名框架/outbox 四键/防照抄注记）
+- 结构树符号/39 Subtask 编号连续/8 张 TDD 表/章节层级全收敛；四轮编号唯一无重复
+- 数字口径：13 场景/恒 11 六处/citations 七键/九依赖/六段编排四处同构/PortSpec×3 全通过
+
+**终审修复 8 项（P2×2 + P3×6，全文字级）：**
+- R5-1【P2】R2 统计行三重失准（声称 P1×3+P2×6+P3×9=25，机械核对实为 P1×3+P2×7+P3×11=21 且原算术 18≠25 不闭合——两 Agent 重复发现未去重所致）→ 统计行/v1.2.0 说明/sprint-status 注记三处联动订正（「计数纪律」红线复发清偿）
+- R5-2【P2】增量冻结表附录 C 行内联表格四管道未转义——GFM 渲染下切为 9 列、块型序列整段（Task 0 权威输入）渲染丢失 → 管道转义 `\|`
+- R5-3【P3】R4 统计分项失准（实为 P2×5+P3×11 非 4+12，总数 16 恰对）→ 分项订正
+- R5-4【P3】OD-11 `--format <pdf|markdown|json>` 两管道未转义 5 列错位 → 转义
+- R5-5【P3】数据模型 VO 段外层括号未闭合（R2-6 修的是另一处，此处漏网）→ 内层换【】消歧
+- R5-6【P3】Task 3 DoD 变异第三锚名「渲染锚点结构」与 Task 2 实锚「outline 层级生成」漂移 → 对齐 + 全 Story 变异锚四处全景注记（T1×1/T2×1/T3×2）
+- R5-7【P3】R1「26 项」两处传播缺「22 编号+4 附注」限定 → 补限定
+- R5-8【P3】「计数不变量 12 系口径」无溯源（6-5a 与实体均无 12 系表述）→ 改可溯源表述（degraded≤section_count 恒 11）
+
+**定稿判定：五轮收敛完成，v1.5.0 定稿**——P0 2→0→0→0→0、P1 7→3→2→0→0、发现级别全程递减、联动噪声 2→1→0；方案裁定（同源双渲染/L4 键锚 report_id/引文三段链/492-493 开码/tenant_id 构造注入/archive-evidence 同桶）全部经代码实证与新鲜视角复核成立；残留清零。
 
 ---
 
@@ -1022,12 +1042,13 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-11-04
 **最后更新/Last Updated:** 2026-11-04
 **更新说明/Description:**
-- v1.4.0: 文档审查 Round 4 修订（3 Agent 并行：需求覆盖六输入源核查 + 测试矩阵七维度核查 + 门禁复核；P2×4+P3×12 共 16 项——6-5a 钦定思维链附录裁定义务承接【YAGNI 归 6-7】/AC-2 附录 B 联动断言补承载/引文预置 collection 形态裁定/渲染器三态改快照缺失敏感面/citations 七键断言/互不串扰值级形态/R3 联动残留清偿等；收敛判据 P0/P1 双零达成；详见 Docs Review Fixes）
+- v1.5.0: 文档审查 Round 5 独立终审收敛定稿（general-purpose 新鲜上下文终审：锚点 5+7 全命中零漂移/残留旧口径 16 词零残留/结构编号层级全收敛；终修 8 项 P2×2+P3×6——R2/R4 统计行计数纪律订正/增量冻结表与 OD-11 管道转义/括号闭合/变异锚名对齐/「12 系」无溯源表述改写；五轮收敛 P0-P1 双零残留清零，定稿）
+- v1.4.0: 文档审查 Round 4 修订（3 Agent 并行：需求覆盖六输入源核查 + 测试矩阵七维度核查 + 门禁复核；P2×5+P3×11 共 16 项——6-5a 钦定思维链附录裁定义务承接【YAGNI 归 6-7】/AC-2 附录 B 联动断言补承载/引文预置 collection 形态裁定/渲染器三态改快照缺失敏感面/citations 七键断言/互不串扰值级形态/R3 联动残留清偿等；收敛判据 P0/P1 双零达成；详见 Docs Review Fixes）
 - v1.3.0: 文档审查 Round 3 修订（3 Agent 并行：技术实证【/tmp 脚本实跑 8/8 通过】+ WORM/并发复核 + 方案合理性终审【10 维度对标 9 维持】；P1×2+P2×3+P3×6 共 11 项——AC-4 断言形态修正【/Dest 数组非命名目标】/AC-8 断言分层升级【extract_text 中文完美工作证伪旧注记】/WORMManager 类名修正/object lock 生效前提注记/引文链变异锚补强等；详见 Docs Review Fixes）
-- v1.2.0: 文档审查 Round 2 修订（3 Agent 并行：回归核查 + 交叉引用 + 深度推演；P1×3+P2×6+P3×9 共 25 项——R1 联动残留清偿【EVIDENCE_PACKAGES 残留/L2274】/引文聚合整体容错边界裁定【query_archive 异常降级空附录 C 不炸主链】/Task 5.2 冻结面与必改文件操作性矛盾修正/citations 补 stage 键/AC-1 六段切分统一/poetry 迁移操作序列/13 场景覆盖互检机制/_publish_event 复制裁定/linkRect 前向引用提示等；详见 Docs Review Fixes）
-- v1.1.0: 文档审查 Round 1 修订（6 Agent 并行：代码事实核查×4 + 一致性内审 + P0 方案设计；P0×2+P1×7+P2×8+P3×5 共 26 项修复——tenant_id 构造注入裁定【MVP_TENANT_ID 单源】/L4 桶名对齐代码单源 archive-evidence【蓝图注记 Task 7 回填】/字段数口径统一/行号漂移修正/limit=64 理由重述/快照步补齐等；详见 Docs Review Fixes）
+- v1.2.0: 文档审查 Round 2 修订（3 Agent 并行：回归核查 + 交叉引用 + 深度推演；P1×3+P2×7+P3×11 共 21 项（重复发现去重后）——R1 联动残留清偿【EVIDENCE_PACKAGES 残留/L2274】/引文聚合整体容错边界裁定【query_archive 异常降级空附录 C 不炸主链】/Task 5.2 冻结面与必改文件操作性矛盾修正/citations 补 stage 键/AC-1 六段切分统一/poetry 迁移操作序列/13 场景覆盖互检机制/_publish_event 复制裁定/linkRect 前向引用提示等；详见 Docs Review Fixes）
+- v1.1.0: 文档审查 Round 1 修订（6 Agent 并行：代码事实核查×4 + 一致性内审 + P0 方案设计；P0×2+P1×7+P2×8+P3×5 共 26 项（22 编号+4 附注）——tenant_id 构造注入裁定【MVP_TENANT_ID 单源】/L4 桶名对齐代码单源 archive-evidence【蓝图注记 Task 7 回填】/字段数口径统一/行号漂移修正/limit=64 理由重述/快照步补齐等；详见 Docs Review Fixes）
 - v1.0.0: 创建故事文件（四 Agent 并行调研【报告链路/引文数据面/测试样板/架构治理】+ 主会话八项亲验；OD-1~OD-12 十二项架构裁定落档——同源双渲染（聚合公开化复用）/L4 WORM 归档（键锚 report_id）/PDF 渲染器 application 端口+infrastructure 实现（reportlab 唯一宿主）/引文 evidence_refs 首消费三段链（bbox 缺口 defer）/异常开码 492-493（不扩 491 值域）/CLI --format 参数/依赖组迁移为关键裁定；6-5a defer 钩子五条+新留项两条逐条处置）
