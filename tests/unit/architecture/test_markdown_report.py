@@ -182,10 +182,8 @@ class TestPortResolverDecoupling:
         for implementation in ("PostgreSQLReportRepository", "ReportGenerationService("):
             assert implementation not in cli_source, f"CLI 直依赖实现类: {implementation}"
 
-    def test_service_consumes_ports_only(self) -> None:
-        """聚合服务依赖面全端口（五依赖 Protocol/Port 类型——零实现类 import）。"""
-        service_file = REPORT_APPLICATION_FILES[0]
-        imports = _extract_imports(service_file)
-        for target in imports:
-            if target.startswith("src.infrastructure"):
-                raise AssertionError(f"聚合服务依赖实现类: {target}")
+    # CR2-F26：原 test_service_consumes_ports_only 与 B1
+    # （test_report_application_no_infrastructure_imports）逐字重复（同一文件
+    # 同一 import 黑名单断言）且 docstring 宣称「五依赖 Port 类型检查」实未
+    # 检查——按 R2 深查裁定删除（改注解检查是另一种恒真形态；注入面实质
+    # 由契约测试 getsource 断言承载）

@@ -496,11 +496,14 @@ class TestDegradationThreeStates:
 
     @pytest.mark.asyncio
     async def test_missing_synthesis_counts_one(self) -> None:
-        """synthesis 缺行 → degraded==1（单测层参数化变体）。"""
+        """synthesis 缺行 → degraded==1 + degraded_stages 收 synthesis 位（单测层参数化变体）。"""
         stages = _full_stages_payload(step_override={"market_insight_synthesis": None})
-        service, _ = _make_service(trace_view=_make_trace_view(stages))
+        service, mocks = _make_service(trace_view=_make_trace_view(stages))
         report = await service.generate_markdown_report(PLAN_ID)
         assert report.degraded_section_count == 1
+        # R3-N1：synthesis 增量位钉死（删该 append 变异即红）
+        saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
+        assert saved_metadata.get("degraded_stages") == ["market_insight_synthesis"]
 
     @pytest.mark.asyncio
     async def test_envelope_payload_renders_degraded_callout_with_reason(self) -> None:
@@ -513,6 +516,9 @@ class TestDegradationThreeStates:
         assert "> ⚠️ [降级] 看趋势：LLM 调用失败（注入）" in text
         # 信封态跳过字段渲染（summary/findings 等不出现——trend 正常产物的摘要不渲染）
         assert "trend 步骤摘要" not in text
+        # R3-N1：信封态（行在位内容缺失）进 degraded_stages（三形态之②钉死）
+        saved_metadata = mocks["report_repo"].save.call_args.kwargs.get("metadata") or {}
+        assert saved_metadata.get("degraded_stages") == ["market_insight_trend"]
 
     @pytest.mark.asyncio
     async def test_envelope_without_reason_uses_fallback_text(self) -> None:

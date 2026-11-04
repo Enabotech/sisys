@@ -1146,6 +1146,19 @@ Round 4 验证结论：36 锚点 34 匹配（2 偏移即 R4-3/R4-4）；19 项�
 - **四目录全量回归**：14630 passed（唯一失败 `test_scenario_4_real_llm_smoke` 为外部 LLM API 冒烟 flaky——单独复跑 PASSED，与 6-5a 零关联）
 - **红线自查**：过程中 1 次误写 `# type: ignore`（测试参数类型注解）即时发现移除——抑制注释零残留；F6 替换产生 Any 孤儿 import 即时清理
 
+**Round 3**（2026-11-04；回归验证 Agent 判定 Round 2 的 12 项「实现面全部正确落地零回收」+ 新发现 2 项 P3 测试补强；R3 处置 5 项——CR1-F23/F25/F26（R2 评审核可方案执行）+ R3-N1/N2（回归验证建议顺手补强））：
+
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|----------|------|
+| CR3-F1（=CR1-F23） | 验收 teardown 七步链 + `_finalize_pg_session` 内层五段全静默 `except: pass`——清理失败不可见 | P3 | 全部改 `logger.error`（含 exc_info）；**禁 COUNT==0 断言**（R2 裁定：会放大基础设施抖动为验收红，与动态跳过哲学冲突——清理是残局防线非验收判据，仅日志化） | ✅ R3 |
+| CR3-F2（=CR1-F25） | S11 分档表「逐 stage 八步归档」与实际通道漂移（Given 与 S1 同文本走 `_assemble_full_flow` 完整 run）+ 轻装配 docstring 误列 S11 + 计时窗口含 commit/read_text 宽于 OD-8 | P3 | 分档表改「完整 run」+ 轻装配注释 S11 移除 + 口径声明区补 CR2-F25 勘误注记（偏严不假绿；计时面收窄改动面/收益比差 R2 裁定不收窄） | ✅ R3 |
+| CR3-F3（=CR1-F26） | 架构测试 `test_service_consumes_ports_only` 与 B1 逐字重复且 docstring 宣称「五依赖 Port 类型检查」实未检查 | P3 | 删除（改注解检查是另一种恒真形态——R2 裁定；注入面实质由契约测试 getsource 断言承载）+ 留注释锚 | ✅ R3 |
+| CR3-F4（R2 回归 N1） | F11 测试面缺口：synthesis 增量位与信封态无 degraded_stages 断言——删 `degraded_stages.append("market_insight_synthesis")` 变异体 123 测试仍绿（回归 Agent 实证） | P3 | `test_missing_synthesis_counts_one` 补 `== ["market_insight_synthesis"]` + 信封态用例补 `== ["market_insight_trend"]`（三形态之②钉死）；变异实证：删 append → 红 → 还原 → 绿 | ✅ R3 |
+| CR3-F5（R2 回归 N2） | F9 声明一半不成立：`section<0 且 degraded≥0` 蕴含 `degraded>section`，「删负值守卫子句」变异体经大小不变量背书仍抛 242（行为等价仅 context 可区分——回归 Agent 变异实证） | P3 | `test_negative_section_count_alone_rejected` 补 context field 断言（`"section_count/degraded_section_count/generation_ms"`——区分守卫来源，钉死负值守卫的错误契约面） | ✅ R3 |
+| CR3-F6（R2 回归 N3） | CR2-F1 同族残留向量：paragraph ≥4 前导空格 → GFM 缩进代码块（块结构改写向量——窄正则 ` {0,3}` 按 ATX 规范设计本就不覆盖） | P3 | **留档不修**：形态为代码块化妆非内容注入（无损失）；与 CR2-F12 同批边缘形态，6-5b PDF 渲染立项时统一评估 | ⏳ 留档 |
+
+**Round 3 验证记录**：实体/服务/架构单测 81 passed + 验收 13 + 集成 5 全绿；ruff 零错误；N1 变异实证（删 synthesis append → 红 → 还原 → 绿）；R2 回归验证 Agent 对 Round 2 全部 12 项的代码+测试双面实证通过（指定五文件 123 passed + 红线 grep 零命中 + cast 形态先例一致）。
+
 ---
 
 ### 下一步 Next Steps

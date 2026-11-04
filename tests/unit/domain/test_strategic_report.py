@@ -152,10 +152,17 @@ class TestStrategicReportInvariants:
         assert exc_info.value.code == "EXCEPTION_242"
 
     def test_negative_section_count_alone_rejected(self) -> None:
-        """section_count 单独负值拒（CR2-F9——杀「删 section<0 子句」变异：双负值用例被次子句兜住）。"""
+        """section_count 单独负值拒（CR2-F9——R3-N2 补强：断言 context field 区分守卫来源）。
+
+        注：section<0 且 degraded≥0 蕴含 degraded>section，「删负值守卫子句」
+        变异体经大小不变量背书仍抛 242（行为等价、仅 context 可区分）——
+        断言负值守卫的 context field 才能钉死守卫来源（错误契约面）。
+        """
         with pytest.raises(EntityValidationError) as exc_info:
             StrategicReport(plan_id=_VALID_PLAN_ID, file_path="reports/p_1.md", section_count=-1, degraded_section_count=0)
         assert exc_info.value.code == "EXCEPTION_242"
+        # 负值守卫来源（非大小不变量——context field 区分守卫出处）
+        assert exc_info.value.context["field"] == "section_count/degraded_section_count/generation_ms"
 
     def test_plan_id_non_uuid_format_rejected(self) -> None:
         """plan_id 非 UUID 格式拒（CR2-F8——实体是 plan_id 语义唯一权威；ValueError → 242 包装）。"""

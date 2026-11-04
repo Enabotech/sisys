@@ -14,7 +14,7 @@
 | S8 | latest 快照缺失时附录 A 省略 | AC-4 | 逐 stage 八步归档（无 run → 天然无快照） | 四真实服务 |
 | S9 | ReportGenerated 事件经 outbox 落行 | AC-5 | 同 S1 | 四真实服务 |
 | S10 | 读侧消费面契约键集全等 | AC-6 | 同 S1 | 四真实服务 |
-| S11 | 性能 P95 与成功率采样 | AC-7 | 逐 stage 八步归档 ×1 plan ×20 次生成（OD-10 幂等锚采样） | 四真实服务 |
+| S11 | 性能 P95 与成功率采样 | AC-7 | 完整 run 八步归档 ×1 plan ×20 次生成（OD-10 幂等锚采样；CR2-F25 勘误见下） | 四真实服务 |
 | S12 | 并发生成 3 个报告互不串扰 | AC-7 | 逐 stage 八步归档 ×3 plan（gather 形态锚） | 四真实服务 |
 | S13 | Story 交付件存在性收尾验收 | 收尾 | 静态文件断言 | 无 |
 
@@ -22,6 +22,10 @@
 - **OD-8 性能口径差**：生成窗口 P95 = 数据聚合起点→事件发布返回（不含 BLM run 前置——
   run 是数据面构造非被测窗口）；采样形态 = 单一数据源 plan_id × 20 次生成（重跑幂等锚
   语义下合法采样，归档链只构造一次）。
+- **CR2-F25 S11 勘误**：S11 Given 与 S1 同文本走 _assemble_full_flow 完整 run 通道
+  （分档表原记「逐 stage 八步归档」系漂移）；计时包裹 _generate_report 全程
+  （含 PG commit 与 L0 read_text），宽于 OD-8「execute 返回」口径——偏严不假绿
+  （计时面收窄需重构 _generate_report 多场景共享形态，改动面/收益比差，R2 裁定不收窄）。
 - **L0 写路径隔离**（R1-17/R2-5）：tmp_path 自建 FileMemoryAdapter 覆写注入 + _restorers
   还原——真实 resolve 通道会写运行机器 ~/.sisys/memory/reports/ 污染共享目录；且组合根
   SCOPED lambda 缓存于 resolver 实例，resolve 后 setenv 不生效，覆写注入是唯一可靠隔离。
@@ -38,6 +42,7 @@ Run with:
 """
 
 import asyncio
+import logging
 import uuid
 from collections.abc import Awaitable, Generator
 from pathlib import Path
@@ -45,6 +50,8 @@ from typing import Any, TypeVar
 
 import pytest
 from pytest_bdd import given, scenario, then, when
+
+logger = logging.getLogger(__name__)
 
 # marker 名以 pyproject 注册为准（database 非 postgresql——R2-F23）；xdist_group
 # 模块级挂法复用 6-1/6-2/6-3/6-4 组名（性能/采样场景跨 Story 同 worker 串行）
@@ -183,46 +190,49 @@ def context(
 def _teardown_chain(ctx: dict[str, Any]) -> None:
     """teardown 七步链（报告三元 + 归档三面 + 快照键族 + 覆写还原）。
 
-    各步独立 try/except（残局防线）；全部 _run_async 同循环（跨循环
+    各步独立 try/except（残局防线——前步失败不阻断后步）；清理失败
+    logger.error 可观测（CR2-F23——静默吞异常使清理失败不可见，与
+    「清理是残局防线非验收判据」不冲突：COUNT 断言会放大基础设施
+    抖动为验收红故不做，仅日志化）；全部 _run_async 同循环（跨循环
     "Event loop is closed" 存档教训）。
     """
     # ① 端口覆写还原（L0 tmp_path 覆写替身）+ SINGLETON 缓存驱逐
     for restore in ctx["_restorers"]:
         try:
             restore()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("teardown 端口还原失败（残局防线不阻断）: %s", exc, exc_info=exc)
     _run_async(ctx["_loop"], _finalize_pg_session(ctx))
     # ② outbox 事件行精确 DELETE（event_id 面 + plan_id/report_id 兜底多通道）
     try:
         _run_async(ctx["_loop"], _cleanup_outbox_rows(ctx))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown outbox 行清理失败: %s", exc, exc_info=exc)
     # ③ L2 strategic_reports 行精确 DELETE（report_id 面 + plan_id 兜底）
     try:
         _run_async(ctx["_loop"], _cleanup_report_rows(ctx))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown L2 报告行清理失败: %s", exc, exc_info=exc)
     # ④ L0 报告文件删除（memory_id 定向——tmp_path 隔离下理论零残留，双保险）
     try:
         _run_async(ctx["_loop"], _cleanup_l0_report_files(ctx))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown L0 报告文件清理失败: %s", exc, exc_info=exc)
     # ⑤⑥ 归档三面（PG 档案行 / Qdrant 点 / MinIO WORM——6-4 移植）
     try:
         _run_async(ctx["_loop"], _cleanup_archive_residues(ctx))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown 归档三面清理失败: %s", exc, exc_info=exc)
     # ⑦ Redis 快照键族删除 + 同循环关闭客户端
     try:
         _run_async(ctx["_loop"], _cleanup_redis_keys(ctx))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown Redis 快照键清理失败: %s", exc, exc_info=exc)
     if ctx["_redis_client"] is not None:
         try:
             _run_async(ctx["_loop"], ctx["_redis_client"].close())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("teardown Redis 客户端关闭失败: %s", exc, exc_info=exc)
 
 
 def _make_pg_manager(env: Any) -> Any:
@@ -249,35 +259,36 @@ def _make_pg_manager(env: Any) -> Any:
 
 
 async def _finalize_pg_session(ctx: dict[str, Any]) -> None:
-    """PG 会话终结（commit→失败 rollback→reset→close，各自独立容错）。"""
+    """PG 会话终结（commit→失败 rollback→reset→close，各自独立容错——失败 logger.error 可观测 CR2-F23）。"""
     session = ctx.get("_pg_session")
     if session is None:
         return
     try:
         await session.commit()
-    except Exception:
+    except Exception as exc:
+        logger.error("teardown PG commit 失败（转 rollback）: %s", exc, exc_info=exc)
         try:
             await session.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_exc:
+            logger.error("teardown PG rollback 失败: %s", rollback_exc, exc_info=rollback_exc)
     token = ctx.get("_pg_session_token")
     if token is not None:
         try:
             from src.infrastructure.storage.postgresql.session_context import reset_session
 
             reset_session(token)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("teardown PG ContextVar reset 失败: %s", exc, exc_info=exc)
     try:
         await session.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("teardown PG session 关闭失败: %s", exc, exc_info=exc)
     manager = ctx.get("_pg_manager")
     if manager is not None:
         try:
             await manager.get_async_engine().dispose()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("teardown PG engine dispose 失败: %s", exc, exc_info=exc)
 
 
 async def _cleanup_outbox_rows(ctx: dict[str, Any]) -> None:
@@ -1093,7 +1104,7 @@ def _assemble_full_flow(ctx: dict[str, Any]) -> None:
 
 
 def _assemble_archive_only(ctx: dict[str, Any]) -> None:
-    """轻装配（逐 stage 归档通道——S6/S8/S11/S12 数据面；无 LLM run）。"""
+    """轻装配（逐 stage 归档通道——S6/S8/S12 数据面；无 LLM run——CR2-F25：S11 走 full_flow 非本通道）。"""
     from src.application.services.chain_of_thought_archive_service import ChainOfThoughtArchiveService
     from src.application.services.report_generation_service import ReportGenerationService
     from src.application.services.strategic_archive_service import StrategicArchiveService
