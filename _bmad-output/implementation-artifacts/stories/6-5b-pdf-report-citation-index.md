@@ -37,7 +37,7 @@
 
 ## ✅ Acceptance Criteria 验收标准
 
-### AC-1: PDF 生成主链（聚合复用 → 引文聚合 → PDF 渲染 → L4 WORM 归档 → L2 元数据 → 事件）
+### AC-1: PDF 生成主链（聚合复用 → 快照辅源 → 引文聚合 → PDF 渲染 → L4 WORM 归档 + L2 元数据 → 事件）
 
 **Given** BLM 前两阶段已完成（八步 chain 归档行在位，plan_id 已知；与 6-5a 同数据源——**不要求 Markdown 报告行已存在**，「Markdown 报告已生成」Given 的口径重读 = 归档数据面就绪即 PDF 可生成，OD-3）
 **When** 调用 PDF 报告生成（CLI `report-generate --plan-id <id> --format pdf` 或用例 `GeneratePdfReportUseCase.execute(plan_id)`）
@@ -47,7 +47,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 全链真实服务验收：归档八步（可复用 6-5a 归档轻装配）→ report-generate --format pdf → 断言六段全部落位
-- [ ] L4 对象可读回：`retrieve(EVIDENCE_PACKAGES, object_key)` 流式收 bytes 首块非空 + pypdf 解析 `len(reader.pages) >= 1`（读回口径——OD-8）
+- [ ] L4 对象可读回：`retrieve(EVIDENCE_BUCKET_TYPE, object_key)` 流式收 bytes 首块非空 + pypdf 解析 `len(reader.pages) >= 1`（读回口径——OD-8）
 - [ ] L2 元数据行可读回（`get_latest_by_plan` 返回最新行，report_type=="pdf" 与实体一致；metadata JSONB 含 citation_count/unresolvable_citation_count 等扩展键）
 - [ ] ReportGenerated 事件经 outbox 真实落行（两级 JSONB 路径 `payload->'payload'->>'report_id'`；report_type 值级断言 =="pdf"）
 
@@ -69,9 +69,9 @@
 **Given** 八步归档行的 `assumptions.evidence_refs` 含 chunk_id 清单（6-4 写侧在位：`chain_of_thought_archive_service.py:200-203`）
 **When** PDF 报告生成
 **Then** 引文聚合三段：①**收集**——`query_archive(ArchiveQuery(plan_id=plan_id, archive_type=ArchiveType.EVIDENCE_PACKAGE, limit=64))` 逐行取 `assumptions.get("evidence_refs", [])`（list[str] chunk_id），跨步骤**去重保序**（首现次序即索引号）；②**解析**——每 chunk_id 经 `L3VectorPort.get_point(collection, chunk_id)` 取 payload（document_id/chunk_header/content）→ `DocumentRepositoryPort.find(DocumentQuery(tenant_id=服务注入租户, document_id=uuid.UUID(payload["document_id"])))` 取 `filename` + `metadata["chunks"]` 按 chunk_id 匹配取 `page_start`（tenant_id 经服务构造参数注入、默认 `str(MVP_TENANT_ID)`——agent_workflow_context.py:39，5-3 单租户先例，多租户归后续 Story；DocumentQuery.tenant_id 必填且 PG find 硬过滤——document_repository.py:99-103；payload 的 document_id 是 str 而 DocumentQuery.document_id 是 UUID，必须显式转换）；③**组装**——附录 C section（H2 `附录 C 引文索引`）以 table 块型渲染（`| # | 文档名 | 页码 | 切片标识 |` 四列——切片标识列 = chunk_id 前 8 位截断显示，完整值入 L2 metadata）
-**And** 引文条目形态冻结：正常条目 `[n] {filename} p.{page_start} {chunk_id_8}`；**解析降级三态**——`get_point` 无点（chunk 已删/collection 不含）→ 条目 `[n] [溯源不可用：检索点缺失]`；document 行缺失 → `[n] [溯源不可用：文档记录缺失]`；chunks 元数据无该 chunk_id → 页码列显示 `-`（文档名仍可得）。**降级不阻断报告生成**（引文是增强面非阻断面——计数入 L2 metadata `unresolvable_citation_count`，与 6-5a「部分数据报告 + 显式标注 > 全或无」哲学一致）
+**And** 引文条目形态冻结：正常条目 `[n] {filename} p.{page_start} {chunk_id_8}`；**解析降级三态**——`get_point` 无点（chunk 已删/collection 不含）→ 条目 `[n] [溯源不可用：检索点缺失]`；document 行缺失 → `[n] [溯源不可用：文档记录缺失]`；chunks 元数据无该 chunk_id → 页码列显示 `-`（文档名仍可得）。**降级不阻断报告生成**（引文是增强面非阻断面——计数入 L2 metadata `unresolvable_citation_count`，与 6-5a「部分数据报告 + 显式标注 > 全或无」哲学一致；**整体容错边界**：引文聚合整体 try 容错——`query_archive` 抛异常（归档库不可达）或 `get_point` 抛连接级异常（非 None 返回）时降级为空附录 C 单行说明 + log warning、报告照常生成【增强面故障不炸主链——与事件发布宽容哲学同构，citation_count==0】）
 **And** evidence_refs 全空（八步零引用）→ 附录 C 渲染「本报告无检索证据引用」单行说明（**附录 C 恒存在**与 6-5a「缺行骨架渲染」同哲学——但 section_count 仍恒 11 不受附录 C 内容形态影响：附录 C 是 H2 附录本就不计 H3 小节口径）
-**And** 每条引文在 L2 metadata 留完整溯源三元组（`citations: [{index, document_id, chunk_id, filename, page, status}]`——6-8 Web 阅读器/6-7 溯源树的查询面）
+**And** 每条引文在 L2 metadata 留完整溯源三元组（`citations: [{index, document_id, chunk_id, filename, page, status, stage}]` 七键——stage=首现步骤名【去重后一个 chunk_id 锚首现步骤，步骤归属信息经 metadata 保留——OD-6】；6-8 Web 阅读器/6-7 溯源树的查询面）
 
 **验证标准/Validation Criteria:**
 - [ ] 真实链引文场景：预置 Qdrant 点（payload 含 document_id/chunk_header）+ PG documents 行（tenant_id=服务实例注入的测试租户值【预置与查询同租户闭环——find 硬过滤下租户不匹配必现 document_missing 假降级】+ filename + metadata.chunks 含 chunk_id/page_start）→ 归档行 evidence_refs 喂该 chunk_id → 附录 C 值级断言（`[1] {filename} p.{page}` 逐字段）
@@ -84,7 +84,7 @@
 
 **Given** PDF 报告生成
 **When** 以 pypdf 读回 PDF 结构
-**Then** 三层导航结构在位：①**书签 outline**（H1 文档题 + H2 章级含附录 A/B/C——reportlab `bookmarkPage` + `addOutlineEntry`，层级与冻结章节结构一致）；②**目录内链**（目录条目为 link 注释指向对应章起始页锚点——reportlab `linkRect` + `linkDest`）；③**引文锚点**（附录 C 每条目注册命名锚点——为 6-8 Web 阅读器「正文引用点→引文详情」交互预留结构位；正文不插句级引用标记——evidence_refs 是**步骤级**粒度非句级，数据粒度不支持句级标记，OD-6）
+**Then** 三层导航结构在位：①**书签 outline**（H1 文档题 + H2 章级含附录 A/B/C——附录 A 可选【快照在位时收录，与目录收录面同口径】；outline 含 H1 文档题而目录自 H2 章级起收录——两结构收录面差异注记；reportlab `bookmarkPage` + `addOutlineEntry`，层级与冻结章节结构一致）；②**目录内链**（目录条目为 link 注释指向对应章起始页锚点——reportlab `linkRect` + `linkDest`）；③**引文锚点**（附录 C 每条目注册命名锚点——为 6-8 Web 阅读器「正文引用点→引文详情」交互预留结构位；正文不插句级引用标记——evidence_refs 是**步骤级**粒度非句级，数据粒度不支持句级标记，OD-6）
 **And** 全部 link 注释目标锚点存在（无悬空链接——pypdf 遍历 page `/Annots` 断言每 link 的目标命名目标可解析）
 **And** 「引文点击响应<300ms」的 CLI-only 口径落地 = **结构化断言非计时断言**：链接注释正确生成 + 目标锚点存在（阅读器本地跳转零网络延迟——OD-8 口径重读，epics L2291 字面指标的本 Story 承载面）
 
@@ -160,7 +160,7 @@
 #### 领域事件 Schema (Domain Events)
 
 - [ ] **零新增事件**——`ReportGenerated` 复用（6-5a 首激活后第二次生产；report_type="pdf" 经自由 str 字段流经零类改动）；双登记既有零 diff
-- [ ] 发布点唯一落位 = `PdfReportGenerationService` 编排尾部（L2 落库之后；宽容语义双防线逐字复用 6-5a `_publish_event` 形态）
+- [ ] 发布点唯一落位 = `PdfReportGenerationService` 编排尾部（L2 落库之后；宽容语义双防线**同款代码复制**为 6-5b 服务私有方法——6-5a 文件冻结不可提取共享，重复是冻结面的代价；docstring 注明形态溯源 report_generation_service.py:243-276）
 
 #### 数据模型 (Data Models)
 
@@ -175,7 +175,7 @@
 | `page` | `int` | ≥1；页码不可得时 0（渲染层 0→`-`） |
 | `status` | `str` | 值域三元组冻结 `("resolved", "point_missing", "document_missing")`（page 缺失是 resolved 的子形态非独立态——文档在页码元数据缺，status 仍 resolved + page=0） |
 
-- [ ] `__post_init__` 校验：index ≥1 / chunk_id 非空 / status 值域，违例抛 `EntityValidationError`（242 复用）
+- [ ] `__post_init__` 校验：index ≥1 / chunk_id 非空 / status 值域 / page ≥0（与字段表「≥1；不可得时 0」边界一致）/ document_id 非空时校验 UUID 格式（uuid.UUID 试解析兜底），违例抛 `EntityValidationError`（242 复用）
 
 **StrategicReport 实体**：零改动（6-5a 八字段全兼容 PDF 形态——report_type=PDF 预留值/file_path 存 L4 对象键逻辑路径非空合法/计数不变量 12 系口径自然成立）
 
@@ -189,7 +189,7 @@
 |---|---|---|---|
 | 附录 C | `附录 C 引文索引`（H2） | 引文聚合产物 CitationEntry 列表 | table（`| # | 文档名 | 页码 | 切片标识 |` 四列；序号列 `1..M`、页码列 resolved+page>0→`p.{page}` / resolved+page==0→`-` / 降级态→`-`、切片标识列 chunk_id 前 8 位；evidence_refs 全空 → 单行说明 callout「本报告无检索证据引用」）；每条目锚点 ID `citation-{index}`（渲染层注册） |
 
-- 附录 C 进目录（H2 章级收录——目录收录面 = 2 章恒收录 + 附录 B/C 恒在 + 附录 A 可选（快照在位则收录），**条目数非恒定**与 6-5a「条目数随附录 A 有无非恒定」注记同口径；断言面 = 目录条目集合与实际渲染章节一致（AC-4 验证标准「条目数 == 目录收录面」按此口径断言，聚合复用的自然结果）
+- 附录 C 进目录（H2 章级收录——目录收录面 = 2 章恒收录 + 附录 B/C 恒在 + 附录 A 可选（快照在位则收录），**条目数非恒定**与 6-5a「条目数随附录 A 有无非恒定」注记同口径；断言面 = 目录条目集合与实际渲染章节一致（AC-4 验证标准「条目数 == 目录收录面」按此口径断言，聚合复用的自然结果））
 - section_count 口径增量：**恒 11 与 6-5a 同口径**（附录 C 是 H2 章级附录不计 H3 小节——与附录 A/B 同不计入；双格式断言式 `pdf.section_count == markdown.section_count` 恒等，两者同聚合同计数单位）
 - degraded_section_count 口径：**引文降级不计入**（三态①②是数据缺失类但那是引文条目级非 H3 小节级——计数单位冻结 H3 小节，引文降级归 L2 metadata `unresolvable_citation_count` 可观测——与 6-5a「锚叠加不计」同款「可观测面归 metadata」哲学）
 
@@ -444,14 +444,14 @@ class PdfReportGenerationServicePort(Protocol):
 > **目的：** 在进入代码实现前，明确增量冻结表、引文三段链、端口契约、异常契约、验收标准与六边形架构边界。
 
 - [ ] Subtask 0.1: 复核确认「增量冻结表」（附录 C 块型/锚点 ID/目录收录/section_count==11 恒等口径/degraded 不计入口径五项）；异常 492/493 开码——`grep -r "EXCEPTION_49[2-9]" src/domain/exceptions/` 零碰撞实证；复核引文读径锚点（`chain_of_thought_archive_service.py:200-203` assumptions 写侧 + `:239` EVIDENCE_PACKAGE 查询面 + `strategic_archive_service.py:315-323` query_archive 签名 + `l3_vector.py:85` get_point + `document_repository.py` find/DocumentQuery【tenant_id :33-34 必填 + PG 硬过滤 :99-103 + document_id UUID 类型——租户注入与 str→UUID 转换注记 OD-6】 + `agent_workflow_context.py:39` MVP_TENANT_ID + `semantic_chunk.py:158-170` chunk_id/page_start 字段）；复核 6-5a 聚合公开化波及面（`grep -rn "_aggregate_document" src/ tests/` 唯一命中 report_generation_service.py 自身——tests 零直接引用实证复跑）
-- [ ] Subtask 0.2: 验证 reportlab CJK 字体注册可用性（`UnicodeCIDFont("STSong-Light")` 注册 + 中文段落渲染最小脚本实证）+ pypdf 读回行为实证（outline 可读性/`/Annots` link 遍历/`extract_text` 对 CID 字体的实际行为——AC-8 断言分层钉死的实证依据）+ pypdfium2 渲染冒烟可用性；**pyproject reportlab 依赖组迁移**（test 组 → 主依赖组 `[tool.poetry.dependencies]`——poetry.lock 同版本跨组迁移，`poetry install` 实证 src 环境 import 可用）
+- [ ] Subtask 0.2: 验证 reportlab CJK 字体注册可用性（`UnicodeCIDFont("STSong-Light")` 注册 + 中文段落渲染最小脚本实证）+ pypdf 读回行为实证（outline 可读性/`/Annots` link 遍历/`extract_text` 对 CID 字体的实际行为——AC-8 断言分层钉死的实证依据）+ pypdfium2 渲染冒烟可用性；**pyproject reportlab 依赖组迁移**（test 组 → 主依赖组——操作序列：手工编辑 pyproject.toml【test 组删 reportlab 行 :126 / 主组加 `reportlab = "^4.5.1"`】→ `poetry lock --no-update`【锁定 4.5.1 不重解析，避免 add/remove 命令版本漂移】→ `poetry install` 实证 src 环境 import 可用）
 - [ ] Subtask 0.3: 定义端口契约（pdf_report.py 模块 docstring 契约区：对象键模板/EVIDENCE_BUCKET_TYPE 单源/引文三段链契约/降级三态判定/CitationEntry 值域）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_pdf_report.feature`（13 场景钉死——AC-1×2/AC-2×1/AC-3×3/AC-4×2/AC-5×1/AC-6×1/AC-7×2/收尾×1）
+- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_pdf_report.feature`（13 场景钉死——AC-1×2/AC-2×1/AC-3×3/AC-4×2/AC-5×1/AC-6×1/AC-7×2/收尾×1；场景清单须逐一标注覆盖 AC 编号，13↔8 AC 双向覆盖互检【每 AC 至少一场景归属或注记归属理由——AC-8 经单测+集成场景⑤承载】后钉死，防自拟场景覆盖面漂移）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_pdf_report.py`（6-5a 验收文件装配链整体移植：三件套骨架 + 延迟 import + teardown 七步链 + L4/引文预置清理扩展 + Fake LLM 八键族 + 归档轻装配复用；PDF 服务装配 `_make_pdf_report_service`——tmp_path L0 注入形态不适用（PDF 不落 L0），L4 走真实 resolve + 测试 bucket；collection/tenant_id 经服务构造参数注入（测试租户与引文预置 PG 行同值闭环——OD-6））
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——运行期 ImportError 形态，13 场景收集期零错误）
-- [ ] Subtask 0.7: 链路接线断言清单落档（组合根三注册/事件发布点/outbox 断言键/L4 WORM 测试面先探——复用 6-4 验收探测+建桶+WORM 自愈形态 test_acceptance_json_chain_of_thought.py:995-1035，archive-evidence 桶已在位、探测以自愈为主）+ deferred-work.md 台账处置（L129 data_pipeline 再锚定注记 + L170 事件消费顺延注记 + L192 ChainOfThoughtSchema 零触发注记（6-5b 直读 assumptions JSON 与 6-5a 同理——留项维持）+ 6.5a-DF1 维持注记 + 6.5a-DF2 风险面转移注记（L4 键锚 report_id 消解 PDF 链撕裂面——留项范围收窄至 Markdown 面）+ **新留项登记**：bbox ingestion 写入缺口（3-8 遗留——chunk_indexing_handler.py 未写 bbox/page_start 入 Qdrant payload，触发=6-7 溯源树立项或 6-8 Web 高亮立项）+ REST 导出面触发条件复核注记）
+- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——先 `pytest tests/acceptance/test_acceptance_pdf_report.py --collect-only -q` 确认 13 场景收集期零 error，再实跑确认失败形态为**运行期 ImportError**【延迟 import 纪律】）
+- [ ] Subtask 0.7: 链路接线断言清单落档（组合根三注册/事件发布点/outbox 断言键/L4 WORM 测试面先探——复用 6-4 验收探测+建桶+WORM 自愈形态 test_acceptance_json_chain_of_thought.py:995-1035，archive-evidence 桶已在位、探测以自愈为主）+ deferred-work.md 台账处置（L129 data_pipeline 再锚定注记 + L170 事件消费顺延注记 + L192 ChainOfThoughtSchema 零触发注记（6-5b 直读 assumptions JSON 与 6-5a 同理——留项维持）+ 6.5a-DF1 维持注记 + 6.5a-DF2 风险面转移注记（L4 键锚 report_id 消解 PDF 链撕裂面——留项范围收窄至 Markdown 面）+ **新留项登记**：bbox ingestion 写入缺口（3-8 遗留——chunk_indexing_handler.py 未写 bbox/page_start 入 Qdrant payload，触发=6-7 溯源树立项或 6-8 Web 高亮立项）+ REST 导出面触发条件复核并入 #4 DF1 注记（CLI-only 延续下触发条件不变——不另立条目））
 - [ ] Subtask 0.8: 关键代码锚点复核（并行会话提交会使行号漂移——上表锚点逐条 grep 复验）
-- [ ] Subtask 0.9: 既有契约测试回归基线（`pytest tests/contracts/ -q` 全绿记录——6-5a 基线 1479+ 面不回退）
+- [ ] Subtask 0.9: 既有契约测试回归基线（`pytest tests/contracts/ -q` 全绿记录——6-5a 基线 1479+ 为 collected 用例数【含参数化展开】口径，以本 Task 实测记录为准、不作为硬编码断言；contracts 目录 117 文件/1342 test 函数）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（增量冻结表 + 引文三段链 + 端口契约 + 异常 492/493）
@@ -503,8 +503,8 @@ class PdfReportGenerationServicePort(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/reporting/test_reportlab_pdf_renderer.py`（构造 6-5a VO 三态样例文档 → render → bytes 非空 + pypdf 断言：页数≥1/outline 层级（display_name 源构造期望）/metadata Title==REPORT_TITLE_TEMPLATE；**中文渲染**：未注册字体渲染中文抛异常是天然红——注册 STSong-Light 后成功；表格列数（ASCII 面文本抽样）；目录 link 注释（/Annots Subtype==/Link 目标非空）；引文锚点 citation-{index} 可解析） |
-| 🟢 绿 | 实现 `src/infrastructure/reporting/reportlab_pdf_renderer.py`（`ReportLabPdfRenderer(PdfRendererPort)`：STSong-Light 注册【模块级一次】+ 块型分派渲染【paragraph/bullet_list/table/callout 四块型】+ 章节遍历 + bookmarkPage/addOutlineEntry + linkRect/linkDest 目录内链 + 附录 C 条目锚点 + Table 列宽策略 + metadata Title） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/reporting/test_reportlab_pdf_renderer.py`（构造 6-5a VO 三态样例文档【经 6-5a payload 工厂族 + aggregate_report_document 聚合生成，或直接构造 VO——dev 自选，三态覆盖面固定：正常/缺行/降级】→ render → bytes 非空 + pypdf 断言：页数≥1/outline 层级（display_name 源构造期望）/metadata Title==REPORT_TITLE_TEMPLATE；**中文渲染**：未注册字体渲染中文抛异常是天然红——注册 STSong-Light 后成功；表格列数（ASCII 面文本抽样）；目录 link 注释（/Annots Subtype==/Link 目标非空）；引文锚点 citation-{index} 可解析） |
+| 🟢 绿 | 实现 `src/infrastructure/reporting/reportlab_pdf_renderer.py`（`ReportLabPdfRenderer(PdfRendererPort)`：STSong-Light 注册【模块级一次】+ 块型分派渲染【paragraph/bullet_list/table/callout 四块型】+ 章节遍历 + bookmarkPage/addOutlineEntry + linkRect/linkDest 目录内链【linkRect 可前向引用 bookmarkPage 命名目标——save 时统一解析、目标缺失抛错即天然悬空链接守护；顺序渲染单遍即可无需两遍渲染】+ 附录 C 条目锚点 + Table 列宽策略 + metadata Title） |
 | 🔄 重构 | 块渲染私有函数族拆分（与 markdown_report_renderer 结构对称）/类型注解/ruff+mypy |
 
 - [ ] Subtask 2.1: 🔴 红 — 编写渲染器失败测试（含变异实证：outline 层级生成改坏 → 红 → 还原 → 绿）
@@ -536,15 +536,15 @@ class PdfReportGenerationServicePort(Protocol):
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_pdf_report_generation_service.py` 引文面（收集：assumptions 多行合并去重保序【跨步骤重复 chunk_id → 唯一索引】/evidence_refs 缺键容错 `.get("evidence_refs", [])`；解析：get_point→payload.document_id→find→filename+chunks 匹配 page_start 全链 mock 断言【AsyncMock(spec=Port) 九依赖 + `_make_*` 工厂——6-5a `_make_service` 形态扩展；find 调用参数值级断言：tenant_id==服务注入租户 + document_id==UUID 化值（payload str→uuid 转换链）】；降级三态：point_missing/document_missing/page 缺 0 各钉一用例 + unresolvable_citation_count 计数；组装：附录 C section 追加【table 块型四列 + 空引文单行 callout】+ document VO 追加后原 11 小节不变【聚合复用不破坏】） |
-| 🟢 绿 | 实现 `src/application/ports/pdf_report.py`（双端口 + 常量）+ `src/application/services/pdf_report_generation_service.py` 引文聚合私有函数族（`_collect_citation_ids`/`_resolve_citation`/`_build_citation_section`） |
+| 🔴 红 | 编写 `tests/unit/application/test_pdf_report_generation_service.py` 引文面（收集：assumptions 多行合并去重保序【跨步骤重复 chunk_id → 唯一索引】/evidence_refs 缺键容错 `.get("evidence_refs", [])`；解析：get_point→payload.document_id→find→filename+chunks 匹配 page_start 全链 mock 断言【AsyncMock(spec=Port) 九依赖 + `_make_*` 工厂——6-5a `_make_service` 形态扩展；find 调用参数值级断言：tenant_id==服务注入租户 + document_id==UUID 化值（payload str→uuid 转换链）】；降级三态：point_missing/document_missing/page 缺 0 各钉一用例 + unresolvable_citation_count 计数 + 整体容错一用例（query_archive raise → 报告成功 + 附录 C 空态说明 + citation_count==0——AC-3 整体容错边界）；组装：附录 C section 追加【table 块型四列 + 空引文单行 callout】+ document VO 追加后原 11 小节不变【聚合复用不破坏】） |
+| 🟢 绿 | 实现 `src/application/ports/pdf_report.py`（双端口 + 常量）+ `src/application/services/pdf_report_generation_service.py` 引文聚合私有函数族（`_collect_citation_ids(records) -> list[str]`【去重保序，首现次序】/`_resolve_citation(chunk_id, stage) -> CitationEntry`【三态降级判定 + 整体容错边界】/`_build_citation_section(entries) -> 附录 C section`【table 四列/空态 callout，追加进 document VO】） |
 | 🔄 重构 | 引文局部累积清单（与 6-5a 附录 B 同纪律——AC-7 并发/20 轮防互扰） |
 
 #### TDD 循环 C：六段编排 + 事件
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展同文件（六段编排顺序断言【聚合→latest 快照辅源（容错）→引文→渲染→L4 archive 调用参数值级（bucket=="archive-evidence"/object_key 模板渲染比对——archive 签名无 content_type 勿断言）→L2 save→事件】；490 全缺同判；492 渲染异常包装【mock render raise → PdfRenderingError 492 context.plan_id】；493 L4 失败包装【mock archive raise → ReportEvidenceStorageError 493】；事件组装值级断言【report_type=="pdf" 三键非空——独立构造期望比对】；发布失败两形态宽容【失败 PublishResult/raise 各钉一用例——is_success 双防线】；L2 metadata citations/citation_count 键断言） |
+| 🔴 红 | 扩展同文件（六段编排顺序断言【聚合→latest 快照辅源（容错）→引文→渲染→L4 archive 调用参数值级（bucket=="archive-evidence"/object_key 模板渲染比对——archive 签名无 content_type 勿断言）→L2 save→事件】——与 AC-1 ⑥段同构、⑤段=L4+L2 两动作细粒度展开；490 全缺同判；492 渲染异常包装【mock render raise → PdfRenderingError 492 context.plan_id】；493 L4 失败包装【mock archive raise → ReportEvidenceStorageError 493】；事件组装值级断言【report_type=="pdf" 三键非空——独立构造期望比对】；发布失败两形态宽容【失败 PublishResult/raise 各钉一用例——is_success 双防线】；L2 metadata citations/citation_count 键断言） |
 | 🟢 绿 | 实现编排主体（`generate_pdf_report`：计时窗口→490 判定→聚合复用→latest 快照辅源（容错——与 6-5a :174 同形态）→引文聚合→渲染【同步调用——CPU 密集直接调用不经 to_thread，注记落 docstring】→L4 archive【exception 包装 493】→实体构造【file_path=PDF_OBJECT_KEY_TEMPLATE 派生】→L2 save→事件发布→返回） |
 | 🔄 重构 | 计时窗口注记（generation_ms = 聚合起点→L2 落库前——6-5a CR1-F16 口径同款；与 P95 窗口【聚合起点→事件发布返回】双窗口辨析：起点同、终点异，generation_ms 是实体字段记录单次耗时、P95 是 AC-7 采样统计口径，非同一窗口）+ ruff/mypy |
 
@@ -571,7 +571,7 @@ class PdfReportGenerationServicePort(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/application/use_cases/test_generate_pdf_report_use_case.py`（plan_id UUID 守卫 242/透传/返回实体——6-5a 用例三用例同构） |
-| 🟢 绿 | 实现 `src/application/use_cases/generate_pdf_report.py` + 组合根 `=== Story 6-5b ===` 三注册块（pdf_renderer SINGLETON【ReportLabPdfRenderer 无状态】/ pdf_report_generation_service SINGLETON 九依赖 / pdf_report_generation_use_case SINGLETON——增量注册零既有 lambda 改动） |
+| 🟢 绿 | 实现 `src/application/use_cases/generate_pdf_report.py` + 组合根 `=== Story 6-5b ===` 三注册块（pdf_renderer SINGLETON【ReportLabPdfRenderer 无状态】/ pdf_report_generation_service SINGLETON 九依赖 / pdf_report_generation_use_case SINGLETON——增量注册零既有 lambda 改动；collection/tenant_id 构造参数组合根**不显式传参即用服务默认值**（"documents"/str(MVP_TENANT_ID)）——测试经服务构造参数覆写注入，生产走默认，与 6-5a 服务实例默认值形态一致） |
 | 🔄 重构 | 契约测试 resolve 断言转绿 + 既有组合根断言零破坏复核 |
 
 #### TDD 循环 B：CLI --format 参数扩展
@@ -579,7 +579,7 @@ class PdfReportGenerationServicePort(Protocol):
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`--format` 参数解析【默认 markdown 向后兼容——既有用例零修改通过】/`--format pdf` 分发到 pdf_report_generation_use_case/成功打印【report_id/file_path（L4 对象键）/报告类型 pdf/引文计数/生成耗时——打印面含 citation_count 汇总】/490/492/493 双层异常定式【DomainError=`[{code}] {message}` stderr + return 1】/CLI 生产通道 L4 resolve 可达断言） |
-| 🟢 绿 | 扩展 `src/entrypoints/agent_cli.py`：report-generate 加 `--format {markdown,pdf}` choices 参数（default=markdown）+ `_run_report_generate` 按 format 分发 resolve（`report_generation_use_case` / `pdf_report_generation_use_case`）+ `_print_report_summary` 扩展（format 感知：memory_id 反解仅 markdown 分支——PDF 分支打印对象键与 bucket） |
+| 🟢 绿 | 扩展 `src/entrypoints/agent_cli.py`：report-generate 加 `--format {markdown,pdf}` choices 参数（default=markdown）+ `_run_report_generate` 按 format 分发 resolve（`report_generation_use_case` / `pdf_report_generation_use_case`）+ `_print_report_summary` 扩展（format 感知：memory_id 反解仅 markdown 分支——PDF 分支打印对象键与 bucket【bucket = `EVIDENCE_BUCKET_TYPE` 常量，CLI 自 application/ports/pdf_report import——实体不携 bucket 字段】） |
 | 🔄 重构 | 打印格式统一 + CLI 全量回归（既有 markdown 用例零破坏实证） |
 
 - [ ] Subtask 4.1: 🔴 红 — 编写用例失败测试
@@ -602,7 +602,7 @@ class PdfReportGenerationServicePort(Protocol):
 > **性质说明：** 负向契约断言 + 全量回归（复用面 Story 的回归面守卫）。
 
 - [ ] Subtask 5.1: 🔴🟢 编写 `tests/contracts/test_event_channel_mapping_pdf_report.py`（event_channels.yaml + DEFAULT_MAPPINGS 零 diff 守护——键集合冻结快照全等断言：56 键基线 + ReportGenerated 既有登记存在性【6-5a test_event_channel_mapping_report.py 形态平移】）
-- [ ] Subtask 5.2: 冻结面零触碰验证（workflow_events.py/event_channels.yaml/channel_router.py/blm_planning_prompts.py/blm_planning.py/strategic_report.py/report_exceptions.py 491 值域——git diff 逐文件实证 + 聚合公开化更名的唯一允许改动注记）
+- [ ] Subtask 5.2: 冻结面零触碰验证（workflow_events.py/event_channels.yaml/channel_router.py/blm_planning_prompts.py/blm_planning.py/strategic_report.py **全文件零 diff**——git diff 逐文件实证；report_generation_service.py 与 report_exceptions.py 为**本 Story 钦定改动文件**【前者仅聚合更名一行、后者仅 492/493 两类追加】——diff 范围限钦定改动行，491 既有行零触碰即非冻结违例 + 聚合公开化更名的唯一允许改动注记）
 - [ ] Subtask 5.3: 全量回归（四目录显式两轮稳定）
 - [ ] Subtask 5.4: 红线三查（`grep -rn "raise ValueError" src/` + `grep -rn "HTTPException" src/ | grep -v handlers` + `grep -rn "# noqa\|# type: ignore\|# pylint" src/ tests/` 本 Story 新建/修改文件零输出）+ 提交信息禁 AI 署名
 
@@ -641,7 +641,7 @@ class PdfReportGenerationServicePort(Protocol):
 
 #### 架构验证测试实现
 
-- [ ] Subtask 7.1: 🔴 编写 `tests/unit/architecture/test_pdf_report.py`（epics L2303 钦定名——四验证器：A domain 零依赖【citation_entry.py 白名单双向校验】/B 应用层隔离【pdf_report_generation_service 零 infrastructure import + 禁本地 Protocol】/**C reportlab 唯一宿主**【全 src/ AST 扫描 import reportlab 仅命中 reportlab_pdf_renderer.py——本 Story 特有验证器】/D 落位守护【新文件冻结路径清单 + rglob 防散落 + CLI resolve 端口名】）
+- [ ] Subtask 7.1: 🔴 编写 `tests/unit/architecture/test_pdf_report.py`（epics L2303 钦定名——四验证器：A domain 零依赖【citation_entry.py 白名单双向校验】/B 应用层隔离【pdf_report_generation_service 零 infrastructure import + 禁本地 Protocol】/**C reportlab 唯一宿主**【全 src/ AST 扫描 import reportlab 仅命中 reportlab_pdf_renderer.py——本 Story 特有验证器】/D 落位守护【新文件冻结路径清单——单源 = 「项目结构说明」节硬编码进验证器 + rglob 防散落 + CLI resolve 端口名】）
 - [ ] Subtask 7.2: 实现 + 循环依赖检测（ruff `I` 规则——不引入 pylint）+ 验收 13 场景转绿 + pytestmark 复核（六项齐备）+ Run with docstring
 - [ ] Subtask 7.3: 运行 `pytest`（四目录显式）、`ruff check`、`mypy` 收尾校验 + 覆盖率门禁复核（整体≥80%/application≥85%/integration≥75%/domain≥90%）
 - [ ] Subtask 7.4: 三红线 grep + 提交信息审查（禁 AI 署名）+ deferred-work 留项终置 + architecture.md 桶表 evidence-packages 行实况注记回填（蓝图名保留为逻辑分类、证据归档实况统一落 archive-evidence 复合物理桶【3-10 起】——OD-4 裁定伴生义务）
@@ -672,8 +672,8 @@ class PdfReportGenerationServicePort(Protocol):
 |----|------|------|
 | **OD-1** | 范围边界：6-5b = 同源 PDF 渲染（infrastructure reportlab）+ 引文索引（evidence_refs 首消费→附录 C）+ PDF 内部导航（书签/目录内链/引文锚点）+ L4 WORM 归档 + L2 元数据（report_type="pdf"）+ ReportGenerated 复用（report_type="pdf"）+ CLI `--format pdf`。**不含**：bbox 高亮跳转（数据缺口在 ingestion 侧+Web 阅读器归 6-8——defer 登记）、白标（6-11）、REST 导出（6.5a-DF1 维持）、图本体位图（OD-9 表格承载延续）、溯源树（6-7）、Markdown 链任何行为变化（零改动复用） | epics L2266-2307 + 6-5a 范围边界表 L30（PDF/引文明文留位）+ 依赖链 L2015/2020/2035 |
 | **OD-2** | **宿主形态延续零新偏离**：应用服务+用例+CLI 直交（6-5a OD-2 偏离 Prefect 的既定形态直接沿用——PDF 生成同为单次同步 <60s 纯读+渲染+写，无 DAG 编排需求）；data_pipeline 轨不激活（deferred-work L129 注记维持） | 6-5a OD-2 全部四理由对本 Story 同构成立 |
-| **OD-3** | **同源双渲染**：「将 Markdown 转换为 PDF，保持格式一致」（epics L2274）的承载形态 = **同一聚合产物（aggregate_report_document → MarkdownReportDocument VO）双渲染器分派**（render_markdown_report→str / PdfRendererPort.render→bytes），非 Markdown 文本再解析（round-trip 解析需引入 Markdown 解析依赖且 GFM 转义面复杂——结构同源是更强的一致性保证）。聚合复用前置 = `_aggregate_document` 公开化（更名 `aggregate_report_document`——同文件内更名行为零变，tests 零直接引用实证）。Given「Markdown 报告已生成」口径重读 = 归档数据面就绪即 PDF 可生成（同数据源平行生成——不要求 Markdown 报告行存在，不引入顺序耦合） | report_generation_service.py:176-177 聚合/渲染两步分离实证 + 单源优先 + epics Given 语义重读（6-5a Given「八步归档在位」同构） |
-| **OD-4** | **PDF 二进制走 L4 WORM 归档**（不走 L0——L0 全通道 str 钉死：write `content: str` 文本模式 + `.md` 扩展名六处硬编码【file_memory_adapter.py :49-69/:71-89/:91-109/:111-125/:127-143/:251-261】，扩端口波及 Protocol/适配器/组合根/既有 mock 且与「L0=markdown 记忆文件」定位冲突）：`L4ObjectPort.archive(bucket_type="archive-evidence", object_key=f"reports/{plan_id}/{report_id}.pdf", content=bytes, retention_days=2555)`——**桶名对齐代码单源**（strategic_archive_service.py:40 `L4_BUCKET_TYPE`——与 6-3/6-4 证据归档同桶：evidence_refs 上游 EVIDENCE_PACKAGE 归档即在此桶，证据流一桶贯通；对象键 `reports/` 前缀与归档键 `{archive_id}/` 前缀天然隔离零互撞；architecture.md L2548 蓝图名 `evidence-packages` 为逻辑分类未落地且归档链路不自动建桶——新桶全环境首建是纯增量风险，蓝图分歧实况注记 Task 7 回填）；bytes 直传 + WORM 7 年（报告交付物审计语义恰配 architecture §10.1「7 年存储」+ L4 定位「原始文档、证据包、审计归档」）；**对象键锚 report_id**（非 memory_id 秒级时间戳——每 report 恰一对象天然唯一：无同秒覆写、无 WORM 冲突、幂等锚语义完美；6.5a-DF2 撕裂风险面在 PDF 链路不存在——L4 put 服务端原子，留项范围收窄至 Markdown 面）。file_path = 对象键逻辑路径（可移植审计语义延续 6-5a OD-4 哲学；CLI 打印 bucket+对象键定位）。**GOVERNANCE 模式注记**（architecture L1024 警告现状未升 COMPLIANCE）：测试清理 bypass_governance_mode=True 先例在位 | architecture.md L417/L2548/L1024 + 代码桶名单源（strategic_archive_service.py:40 / chain_of_thought_archive_service.py:63——6-3/6-4 全线沿用）+ L4ObjectPort.archive bytes 签名（l4_object.py:107-124 + minio_repository.py:207-249 BytesIO put 实证）+ 6-5a OD-4 defer 钦定 + 最小契约变更（L0 零扩展） |
+| **OD-3** | **同源双渲染**：「将 Markdown 转换为 PDF，保持格式一致」（epics L2276；L2274 是 Given「Markdown 报告已生成」行恰为下句重读对象）的承载形态 = **同一聚合产物（aggregate_report_document → MarkdownReportDocument VO）双渲染器分派**（render_markdown_report→str / PdfRendererPort.render→bytes），非 Markdown 文本再解析（round-trip 解析需引入 Markdown 解析依赖且 GFM 转义面复杂——结构同源是更强的一致性保证）。聚合复用前置 = `_aggregate_document` 公开化（更名 `aggregate_report_document`——同文件内更名行为零变，tests 零直接引用实证）。Given「Markdown 报告已生成」口径重读 = 归档数据面就绪即 PDF 可生成（同数据源平行生成——不要求 Markdown 报告行存在，不引入顺序耦合） | report_generation_service.py:176-177 聚合/渲染两步分离实证 + 单源优先 + epics Given 语义重读（6-5a Given「八步归档在位」同构） |
+| **OD-4** | **PDF 二进制走 L4 WORM 归档**（不走 L0——L0 全通道 str 钉死：write `content: str` 文本模式 + `.md` 扩展名六处硬编码【src/infrastructure/storage/fs/file_memory_adapter.py :49-69/:71-89/:91-109/:111-125/:127-143/:251-261】，扩端口波及 Protocol/适配器/组合根/既有 mock 且与「L0=markdown 记忆文件」定位冲突）：`L4ObjectPort.archive(bucket_type="archive-evidence", object_key=f"reports/{plan_id}/{report_id}.pdf", content=bytes, retention_days=2555)`——**桶名对齐代码单源**（strategic_archive_service.py:40 `L4_BUCKET_TYPE`——与 6-3/6-4 证据归档同桶：evidence_refs 上游 EVIDENCE_PACKAGE 归档即在此桶，证据流一桶贯通；对象键 `reports/` 前缀与归档键 `{archive_id}/` 前缀天然隔离零互撞；architecture.md L2548 蓝图名 `evidence-packages` 为逻辑分类未落地且归档链路不自动建桶——新桶全环境首建是纯增量风险，蓝图分歧实况注记 Task 7 回填）；bytes 直传 + WORM 7 年（报告交付物审计语义恰配 architecture §10.1「7 年存储」+ L4 定位「原始文档、证据包、审计归档」）；**对象键锚 report_id**（非 memory_id 秒级时间戳——每 report 恰一对象天然唯一：无同秒覆写、无 WORM 冲突、幂等锚语义完美；6.5a-DF2 撕裂风险面在 PDF 链路不存在——L4 put 服务端原子，留项范围收窄至 Markdown 面）。file_path = 对象键逻辑路径（可移植审计语义延续 6-5a OD-4 哲学；CLI 打印 bucket+对象键定位）。**GOVERNANCE 模式注记**（architecture L1024 警告现状未升 COMPLIANCE）：测试清理 bypass_governance_mode=True 先例在位 | architecture.md L417/L2548/L1024 + 代码桶名单源（strategic_archive_service.py:40 / chain_of_thought_archive_service.py:63——6-3/6-4 全线沿用）+ L4ObjectPort.archive bytes 签名（l4_object.py:107-124 + minio_repository.py:207-249 BytesIO put 实证）+ 6-5a OD-4 defer 钦定 + 最小契约变更（L0 零扩展） |
 | **OD-5** | **PDF 渲染器层位 = application 端口 + infrastructure 实现**：`PdfRendererPort`（application/ports——R2 具体应用端口，仅被报告编排消费无领域消费者，ReportGenerationServicePort 同层先例）+ `ReportLabPdfRenderer`（infrastructure/reporting/——**reportlab 唯一宿主**，架构测试 C 验证器守护）。**与 6-5a markdown 渲染器 domain 落位的差异是必然非不一致**：markdown 渲染=纯字符串拼接零依赖可进 domain；PDF 渲染=第三方库依赖（importlinter forbidden 面）必须出 domain——「渲染规则是领域知识，渲染技术是基础设施」的分界线 | importlinter domain-no-external-dependencies + pdf_page_renderer（domain 端口 bytes 先例）与 ReportGenerationServicePort（application 端口先例）双先例中取语义贴合面 + R2/R3 设计规则 |
 | **OD-6** | **引文索引数据链与降级**：三段链（收集 `query_archive(ArchiveQuery(plan_id, archive_type=EVIDENCE_PACKAGE))` → assumptions["evidence_refs"] 去重保序；解析 chunk_id → `L3VectorPort.get_point(collection, chunk_id)` → payload.document_id（str→uuid.UUID 转换）→ `DocumentRepositoryPort.find(DocumentQuery(tenant_id, document_id))`（tenant_id 服务构造注入默认 str(MVP_TENANT_ID)——数据链无租户可用【StrategicArchive/ArchiveQuery/Qdrant payload 均无 tenant_id】，5-3 单租户先例，多租户归后续 Story）→ filename + metadata["chunks"] 匹配 page_start；组装附录 C table 四列）。**降级三态宽容**（point_missing/document_missing/page 缺——引文是增强面非阻断面，unresolvable_citation_count 入 metadata）。**bbox 缺口 defer**：Qdrant payload 现状仅 6 键无 bbox/page_start（chunk_indexing_handler.py:156-168——3-8 story L118 自注记前置未实现，属 ingestion 侧遗留非报告侧）；本 Story 交付页码级溯源（chunks 元数据 page_start 真实可得）+ 溯源三元组完整携带（L2 metadata citations——6-8 Web PDF.js 高亮/6-7 溯源树的查询面）；**不复用 3-8 TraceabilityPort**（trace(claim) 按文本检索非 chunk_id 解析；get_citation_detail 内存缓存不持久——语义不匹配，直用 L3 get_point）；**不复用 Citation VO**（检索溯源域语义：text/offset/bbox/confidence 无 filename——报告引文条目新 VO）。正文不插句级引用标记（evidence_refs 步骤级粒度不支持——附录 C 按步骤分组语义经「首现次序索引」承载，步骤归属信息经 L2 metadata stage 关联保留） | chain_of_thought_archive_service.py:200-209 实证（assumptions 写侧 + EVIDENCE_PACKAGE）+ Agent 双验数据面 + FR-SR-08 三元组口径 + 6-5a 降级哲学延续 + YAGNI |
 | **OD-7** | **测试文件命名**（epics 半采半离——6-5a OD-7 同款）：unit/architecture 用 epics 钦定 `test_pdf_report.py`（L2303 采）；integration `test_integration_pdf_report.py`（**对 epics L2304 `test_pdf_report_integration.py` 显式偏离**——仓规 test_integration_* 惯例，6-3 OD-8/6-4 OD-7/6-5a OD-7 四连先例）；acceptance `test_acceptance_pdf_report.feature/.py`；渲染器 `test_reportlab_pdf_renderer.py`；服务 `test_pdf_report_generation_service.py`；用例 `test_generate_pdf_report_use_case.py`；契约 `test_port_contract_pdf_report.py`/`test_event_channel_mapping_pdf_report.py` | epics 钦定名半采半离 + 记忆「禁止故事编号命名文件」+ 四连先例 |
@@ -717,6 +717,7 @@ tests/
 │   ├── application/test_pdf_report_generation_service.py ★ 新建（Task 3）
 │   ├── application/use_cases/test_generate_pdf_report_use_case.py ★ 新建（Task 4）
 │   ├── interfaces/cli/test_agent_cli.py                  ▲ --format pdf 用例扩展（Task 4）
+│   └── interfaces/api/test_exception_handlers.py         ▲ EXCEPTION_HTTP_MAP 键集合快照同步 492/493（Task 1）
 │   └── architecture/test_pdf_report.py                   ★ 新建（Task 7，epics 钦定名）
 ├── integration/test_integration_pdf_report.py            ★ 新建（Task 6，OD-7）
 ├── contracts/
@@ -772,7 +773,7 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 | 4 | L369（6.5a-DF1） | REST 导出面 `/plans/{id}/export` | **维持注记**：CLI-only 延续（`--format pdf` 扩展不改变入口形态）；触发条件不变（6-8/Epic 7 立项） |
 | 5 | L370（6.5a-DF2） | 同 plan 同秒并发 L0 撕裂文件 | **范围收窄注记**：PDF 链 L4 键锚 report_id + put 服务端原子——撕裂面在 PDF 链不存在；留项范围收窄至 Markdown 链（6-8 REST 读侧上线前处置不变） |
 | 6 | 新登记 | **bbox ingestion 写入缺口**（3-8 遗留） | **新留项登记**：chunk_indexing_handler.py Qdrant payload 未写 bbox/page_start（3-8 story L118 自注记前置未实现）——引文索引页码级溯源经 chunks 元数据兑现（OD-6），bbox 高亮完整形态依赖该缺口闭合 + Web 阅读器（6-8）；触发 = 6-7 溯源树立项或 6-8 Web 高亮立项 |
-| 7 | 新登记 | 引文解析批量性能瓶颈（条件性） | **条件性登记**：M>50 引文 × 2 查询若实测超 P95 窗口——批量 get/缓存优化登记（Task 6.4 实测后定夺：达标则不登记） |
+| 7 | 新登记 | 引文解析批量性能瓶颈（条件性） | **条件性登记**：M>50 引文 × 2 查询若实测超 P95 窗口——批量 get/缓存优化登记（处置归 **Task 6.4** 实测后定夺：达标则不登记；Task 0.7 仅条件性占位） |
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -931,6 +932,31 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 
 **统计：P0×2 + P1×7 + P2×8（+4 附注）+ P3×5 = 26 项修复落档；6 Agent 并行审查（代码事实×4/一致性内审/P0 方案设计）+ 主会话逐项复核（Agent 误报 1 项经原文复核排除）**
 
+**Round 2（2026-11-04，回归核查 + 交叉引用 + 深度推演共 3 Agent 并行）：**
+
+**回归核查（Round 1 修复联动完整性——24/26 落位完整，2 项联动残留）：**
+- R2-1【P1】AC-1 验证标准残留 `retrieve(EVIDENCE_PACKAGES, ...)` 未定义标识（R1-9 桶标识统一漏此一处）→ 改 `retrieve(EVIDENCE_BUCKET_TYPE, ...)`
+- R2-2【P2】OD-3 表内残留旧行号「epics L2274」（R1-6 只修了范围边界表）→ L2276 双行号并列
+
+**交叉引用与深层一致性：**
+- R2-3【P2】citations 结构与 OD-6「stage 保留」矛盾——AC-3 citations 六键无 stage → 补 stage 键（七键，stage=首现步骤名——6-7/6-8 溯源展示查询面）
+- R2-4【P2】锚定义务清单 #7 处置在 Task 6.4 非 Task 0.7 + REST 复核与 #4 重叠 → #7 注明归 Task 6.4 / REST 并入 #4
+- R2-5【P3】AC-4 outline 断言缺「附录 A 可选」限定 + outline 含 H1/目录自 H2 起的差异注记 → 补
+- R2-6【P3】增量冻结节括号未闭合（R1-8 修订引入）→ 补
+- R2-7【P3】项目结构树缺 test_exception_handlers.py 行 → 补
+- R2-8【P3】OD-4 file_memory_adapter.py 裸文件名 → 补全路径 src/infrastructure/storage/fs/
+
+**深度推演（模拟 dev agent 按 Task 0~7 走查——路径 47/48 存在 + 锚点抽查 10/10 命中 + contracts 1342 test 函数实测）：**
+- R2D-1【P1】**引文聚合整体故障容错未定义行为**——query_archive 抛异常/get_point 连接级异常时上抛会炸主链 → 裁定：整体 try 容错降级空附录 C + warning（增强面不阻断——与事件发布宽容哲学同构）；AC-3 补边界 + Task 3 循环 B 补用例
+- R2D-2【P1】Task 5.2 冻结面 git diff 清单含本 Story 必改文件（report_exceptions.py）操作性矛盾 → 改「钦定改动文件 diff 限钦定行，491 既有行零触碰即非违例」
+- R2D-3【P2】poetry 依赖组迁移无操作序列（add/remove 会重解析版本）→ 补手工编辑 + `poetry lock --no-update` 序列
+- R2D-4【P2】13 场景「钉死」缺机制 → 补「场景逐一标注覆盖 AC 编号 + 双向覆盖互检」
+- R2D-5【P2】`__post_init__` 校验清单与字段表不对齐（漏 page≥0/document_id UUID 格式）→ 补齐
+- R2D-6【P2】`_publish_event`「逐字复用」复制 vs 共享未裁定 → 裁定同款代码复制（6-5a 文件冻结不可提取，docstring 注形态溯源）
+- R2D-7~13【P3】collect-only 验证命令 / 1479+ 口径注明（collected 含参数化） / 三态样例构造来源 / linkRect 前向引用机制提示（单遍渲染） / 三私有函数签名 / CLI bucket 打印来源（EVIDENCE_BUCKET_TYPE 常量 import） / 冻结路径清单单源指回
+
+**统计：P1×3 + P2×6 + P3×9 = 25 项修复（含 2 项 Round 1 联动残留清偿）；AC-1 标题与 Then 六段切分统一（聚合→快照→引文→渲染→L4+L2→事件）；组合根构造参数默认值形态注记补齐**
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -948,9 +974,10 @@ _bmad-output/implementation-artifacts/sprint-status.yaml   ▲ 状态流转（Ta
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-04
 **最后更新/Last Updated:** 2026-11-04
 **更新说明/Description:**
+- v1.2.0: 文档审查 Round 2 修订（3 Agent 并行：回归核查 + 交叉引用 + 深度推演；P1×3+P2×6+P3×9 共 25 项——R1 联动残留清偿【EVIDENCE_PACKAGES 残留/L2274】/引文聚合整体容错边界裁定【query_archive 异常降级空附录 C 不炸主链】/Task 5.2 冻结面与必改文件操作性矛盾修正/citations 补 stage 键/AC-1 六段切分统一/poetry 迁移操作序列/13 场景覆盖互检机制/_publish_event 复制裁定/linkRect 前向引用提示等；详见 Docs Review Fixes）
 - v1.1.0: 文档审查 Round 1 修订（6 Agent 并行：代码事实核查×4 + 一致性内审 + P0 方案设计；P0×2+P1×7+P2×8+P3×5 共 26 项修复——tenant_id 构造注入裁定【MVP_TENANT_ID 单源】/L4 桶名对齐代码单源 archive-evidence【蓝图注记 Task 7 回填】/字段数口径统一/行号漂移修正/limit=64 理由重述/快照步补齐等；详见 Docs Review Fixes）
 - v1.0.0: 创建故事文件（四 Agent 并行调研【报告链路/引文数据面/测试样板/架构治理】+ 主会话八项亲验；OD-1~OD-12 十二项架构裁定落档——同源双渲染（聚合公开化复用）/L4 WORM 归档（键锚 report_id）/PDF 渲染器 application 端口+infrastructure 实现（reportlab 唯一宿主）/引文 evidence_refs 首消费三段链（bbox 缺口 defer）/异常开码 492-493（不扩 491 值域）/CLI --format 参数/依赖组迁移为关键裁定；6-5a defer 钩子五条+新留项两条逐条处置）
