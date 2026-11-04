@@ -87,12 +87,14 @@ from src.domain.exceptions import (
     OCRConnectionError,
     OCRProcessingError,
     PasswordValidationError,
+    PdfRenderingError,
     PermissionDeniedError,
     PlanningExecutionError,
     PlanningNotFoundError,
     PlanningStateError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
+    ReportEvidenceStorageError,
     ReportGenerationError,
     ReportStorageError,
     RerankError,
@@ -312,6 +314,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     CheckpointIntegrityError: status.HTTP_409_CONFLICT,  # 484 — Checkpoint 完整性守卫/校验失败（Story 6.3）
     ReportGenerationError: status.HTTP_404_NOT_FOUND,  # 490 — 报告数据源全缺（chain total==0——Story 6.5a）
     ReportStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 491 — 报告持久化失败（layer 二元 l0/l2——Story 6.5a）
+    PdfRenderingError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 492 — PDF 报告渲染失败（reportlab 异常领域包装——Story 6.5b）
+    ReportEvidenceStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 493 — PDF 报告 L4 证据归档失败（Story 6.5b）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

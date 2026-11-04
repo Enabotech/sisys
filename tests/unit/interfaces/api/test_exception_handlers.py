@@ -93,12 +93,14 @@ from src.domain.exceptions import (
     OCRConnectionError,
     OCRProcessingError,
     PasswordValidationError,
+    PdfRenderingError,
     PermissionDeniedError,
     PlanningExecutionError,
     PlanningNotFoundError,
     PlanningStateError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
+    ReportEvidenceStorageError,
     ReportGenerationError,
     ReportStorageError,
     RerankError,
@@ -376,6 +378,8 @@ class TestExceptionHttpMap:
             CheckpointIntegrityError,  # 484 — Story 6.3 完整性守卫/校验失败（409）
             ReportGenerationError,  # 490 — Story 6.5a 报告数据源全缺（404）
             ReportStorageError,  # 491 — Story 6.5a 报告持久化失败（500）
+            PdfRenderingError,  # 492 — Story 6.5b PDF 报告渲染失败（500）
+            ReportEvidenceStorageError,  # 493 — Story 6.5b PDF 报告 L4 证据归档失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

@@ -173,7 +173,7 @@ class ReportGenerationService:
         # ② latest 快照辅源（缺失/TTL 过期/读失败同形态容错——附录 A 省略）
         snapshot = await self._load_snapshot(plan_id)
         # ③ 领域渲染纯函数（聚合 → 文档 VO → Markdown 文本）
-        aggregation = _aggregate_document(str(plan_id), trace.records, snapshot, started)
+        aggregation = aggregate_report_document(str(plan_id), trace.records, snapshot, started)
         markdown_text = render_markdown_report(aggregation.document)
         # ④ L0 写 + L2 元数据行落库（真相源二元——失败 491）
         memory_id = f"{plan_id}_{datetime.now(timezone.utc):%Y%m%d%H%M%S}"
@@ -425,13 +425,19 @@ def _str_field(payload: dict[str, Any], key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _aggregate_document(
+def aggregate_report_document(
     plan_id: str,
     records: list[dict[str, Any]],
     snapshot: Any,
     started: float,
 ) -> _Aggregation:
     """双源聚合为文档 VO（冻结章节结构 + 三态判定 + 附录 B 局部累积）。
+
+    公开函数（Story 6-5b 聚合公开化——原 ``_aggregate_document`` 更名，签名/
+    行为/返回结构零变）：被 6-5a Markdown 链与 6-5b PDF 链双链消费的同源
+    聚合单源（OD-3 同源双渲染）。返回的 ``MarkdownReportDocument`` 是双渲染
+    共用的中间文档模型（IR）——名字带 Markdown 前缀但已成 PDF 链同源 IR
+    （VO 本体属 6-5a 冻结面不可改名，docstring 消歧——R3B-2）。
 
     Args:
         plan_id: 规划任务标识。

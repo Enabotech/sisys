@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 
@@ -3397,6 +3397,100 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("report", "use_case", "application"),
+    )
+
+    # === Story 6-5b — PDF 报告生成（同源双渲染 + 引文索引 + L4 WORM 归档 + report_type=pdf）===
+    # 渲染器/服务/用例三注册块（增量注册零既有 lambda 改动）；collection/
+    # tenant_id 构造参数不显式传参即用服务默认值（"documents"/str(MVP_TENANT_ID)
+    # ——OD-6 单源默认，测试经服务构造参数覆写注入）
+    from src.application.ports.pdf_report import (
+        PdfRendererPort,
+        PdfReportGenerationServicePort,
+    )
+    from src.application.services.pdf_report_generation_service import PdfReportGenerationService
+    from src.application.use_cases.generate_pdf_report import GeneratePdfReportUseCase
+    from src.infrastructure.reporting.reportlab_pdf_renderer import ReportLabPdfRenderer
+    from src.infrastructure.storage.postgresql.session_context import session_context
+
+    class _SessionScopedDocumentRepository:
+        """引文链 find 的会话包装（组合根装配位——CLI/后台上下文对偶）。
+
+        document_repository 严格 ContextVar 会话（无 factory fallback——与
+        archive/report 仓储双模式不同族），PDF 引文解析的 find 在 Web 请求
+        外（CLI）需显式会话；包装在组合根（infrastructure import 合法层）
+        注入，服务层保持纯 application（session_context 是 infrastructure
+        模块——entrypoints/application 均禁引，装配是唯一合法宿主）。
+        """
+
+        def __init__(self, inner: Any, session_factory: Any) -> None:
+            """初始化包装。
+
+            Args:
+                inner: 被包装的 document_repository 实例。
+                session_factory: 会话工厂（session_context 入参形态）。
+            """
+            self._inner = inner
+            self._session_factory = session_factory
+
+        async def find(self, query: Any) -> Any:
+            """会话内执行 find（每次经 session_context 新建独立会话——退出经 Token 恢复）。
+
+            实际语义：无条件新建会话并遮蔽当前活动会话（session_context 无
+            optional 复用分支）——不参与 Web 请求事务（READ COMMITTED 快照），
+            每次调用独立 commit。读场景每条引文一次会话 checkout 是已知形态
+            （6.5b-DF4 登记台账）；扩展消费面（新增端口方法调用）时须同步
+            扩展本包装——未包装方法以 AttributeError 裸露（单方法收窄的
+            显式失败面）。
+            """
+            async with session_context(self._session_factory):
+                return await self._inner.find(query)
+
+    register_port(
+        name="pdf_renderer",
+        version="v1.0.0",
+        interface=PdfRendererPort,
+        impl=ReportLabPdfRenderer,
+        module="src.infrastructure.reporting.reportlab_pdf_renderer",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("report", "pdf", "infrastructure"),
+    )
+    register_port(
+        name="pdf_report_generation_service",
+        version="v1.0.0",
+        interface=PdfReportGenerationServicePort,
+        impl=lambda resolver: PdfReportGenerationService(
+            chain_archive_service=resolver.resolve("chain_of_thought_archive_service"),
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+            report_repository=resolver.resolve("report_repository"),
+            event_publisher=resolver.resolve("event_publisher"),
+            pdf_renderer=resolver.resolve("pdf_renderer"),
+            l4_object=resolver.resolve("l4_object"),
+            l3_vector=resolver.resolve("l3_vector"),
+            # cast 契约面收窄注记：包装对象仅承载 find 会话语境（服务消费面
+            # 唯一方法——6-5a cast 先例形态；端口七方法全量委托非本 Story 面）
+            document_repository=cast(
+                "DocumentRepositoryPort",
+                _SessionScopedDocumentRepository(resolver.resolve("document_repository"), resolver.resolve("session_factory")),
+            ),
+            archive_service=resolver.resolve("strategic_archive_service"),
+        ),
+        module="src.application.services.pdf_report_generation_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("report", "pdf", "application"),
+    )
+    register_port(
+        name="pdf_report_generation_use_case",
+        version="v1.0.0",
+        interface=GeneratePdfReportUseCase,
+        impl=lambda resolver: GeneratePdfReportUseCase(
+            report_service=resolver.resolve("pdf_report_generation_service"),
+        ),
+        module="src.application.use_cases.generate_pdf_report",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("report", "pdf", "use_case", "application"),
     )
 
     # === 事件处理器注册（register_handlers）===

@@ -1843,3 +1843,167 @@ class TestReportGenerateExecution:
         assert exit_code == 1
         assert caplog.records[-1].exc_info is not None
         assert "[EXCEPTION" not in capsys.readouterr().err
+
+
+# ======================================================================
+# Story 6-5b: report-generate --format pdf（PDF 报告 CLI 入口）
+# ======================================================================
+
+
+class _StubPdfReport:
+    """PDF 形态报告替身（file_path=L4 对象键 + citation_count 汇总面）。"""
+
+    def __init__(self) -> None:
+        """初始化替身（真实枚举成员——CR1-F9 纪律延续）。"""
+        import uuid as _uuid
+
+        from src.domain.entities.strategic_report import ReportType
+
+        self.report_id = _uuid.uuid4()
+        self.plan_id = "plan-pdf-1"
+        self.report_type = ReportType.PDF  # 真实枚举成员（.value 打印为 "pdf"）
+        self.file_path = f"reports/plan-pdf-1/{_uuid.uuid4()}.pdf"  # L4 对象键逻辑路径
+        self.section_count = 11
+        self.degraded_section_count = 0
+        self.generation_ms = 240
+        self.citation_count = 7  # 打印面汇总（实体不携该字段——getattr 容错面）
+
+
+class _StubPdfReportUseCase:
+    """pdf_report_generation_use_case 替身（calls 记录 + 可注入 error）。"""
+
+    def __init__(self) -> None:
+        """初始化替身。"""
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.result = _StubPdfReport()
+
+    async def execute(self, *, plan_id: str) -> object:
+        """替身 execute（记录调用）。"""
+        self.calls.append({"plan_id": plan_id})
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def _patch_format_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    markdown_use_case: _StubReportGenerateUseCase,
+    pdf_use_case: _StubPdfReportUseCase,
+) -> None:
+    """CLI 入口替身注入（resolve 按 name 分发两用例——format 分发通道锚）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+
+    def _fake_resolve(name: str) -> object:
+        if name == "pdf_report_generation_use_case":
+            return pdf_use_case
+        return markdown_use_case
+
+    monkeypatch.setattr(agent_cli, "resolve", _fake_resolve)
+
+
+class TestReportGenerateFormatParser:
+    """--format 参数解析（默认 markdown 向后兼容 + choices 校验）。"""
+
+    def test_format_defaults_markdown(self) -> None:
+        """缺省 --format == "markdown"（既有用户脚本零破坏——OD-11）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["report-generate", "--plan-id", "plan-1"])
+        assert args.format == "markdown"
+
+    def test_format_pdf_parsed(self) -> None:
+        """--format pdf 解析。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["report-generate", "--plan-id", "plan-1", "--format", "pdf"])
+        assert args.format == "pdf"
+
+    def test_format_invalid_exits_two(self) -> None:
+        """非法 format 值 → argparse choices 校验 exit 2。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["report-generate", "--plan-id", "plan-1", "--format", "docx"])
+        assert exc_info.value.code == 2
+
+
+class TestReportGenerateFormatExecution:
+    """--format 分发执行（PDF 分支打印/异常定式/默认通道零变化）。"""
+
+    def test_pdf_dispatch_and_prints_summary(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--format pdf：分发 pdf 用例 + 打印对象键/bucket/报告类型 pdf/引文计数。"""
+        from src.application.ports.pdf_report import EVIDENCE_BUCKET_TYPE
+
+        markdown_stub = _StubReportGenerateUseCase()
+        pdf_stub = _StubPdfReportUseCase()
+        _patch_format_entry(monkeypatch, markdown_stub, pdf_stub)
+        passed_plan_id = str(uuid.uuid4())
+        exit_code = agent_cli.main(["report-generate", "--plan-id", passed_plan_id, "--format", "pdf"])
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "报告生成完成" in out
+        assert str(pdf_stub.result.report_id) in out
+        assert pdf_stub.result.file_path in out  # L4 对象键逻辑路径打印
+        assert "  报告类型: pdf" in out.splitlines()
+        assert EVIDENCE_BUCKET_TYPE in out  # bucket 打印（常量 import——实体不携 bucket）
+        assert "引文计数: 7" in out  # citation_count 汇总行
+        assert "memory_id" not in out  # memory_id 反解仅 markdown 分支（.md 钉死不适用 PDF）
+        assert pdf_stub.calls == [{"plan_id": passed_plan_id}]
+        assert not markdown_stub.calls  # 不误分发 markdown 用例
+
+    def test_default_format_dispatches_markdown(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """缺省 format：markdown 用例分发（既有行为零变化——AC-6 向后兼容）。"""
+        markdown_stub = _StubReportGenerateUseCase()
+        pdf_stub = _StubPdfReportUseCase()
+        _patch_format_entry(monkeypatch, markdown_stub, pdf_stub)
+        exit_code = agent_cli.main(["report-generate", "--plan-id", str(uuid.uuid4())])
+        assert exit_code == 0
+        assert len(markdown_stub.calls) == 1
+        assert not pdf_stub.calls
+
+    def test_pdf_492_domain_error_prints_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """PDF 渲染失败 492：[EXCEPTION_492] stderr + exit 1（双层定式首层）。"""
+        from src.domain.exceptions import PdfRenderingError
+
+        pdf_stub = _StubPdfReportUseCase()
+        pdf_stub.error = PdfRenderingError(plan_id="plan-x")
+        _patch_format_entry(monkeypatch, _StubReportGenerateUseCase(), pdf_stub)
+        exit_code = agent_cli.main(["report-generate", "--plan-id", str(uuid.uuid4()), "--format", "pdf"])
+        assert exit_code == 1
+        err = capsys.readouterr().err
+        assert "[EXCEPTION_492]" in err
+        assert "PDF 报告渲染失败" in err
+
+    def test_pdf_493_domain_error_prints_code(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """L4 证据归档失败 493：[EXCEPTION_493] stderr + exit 1。"""
+        from src.domain.exceptions import ReportEvidenceStorageError
+
+        pdf_stub = _StubPdfReportUseCase()
+        pdf_stub.error = ReportEvidenceStorageError(plan_id="plan-x")
+        _patch_format_entry(monkeypatch, _StubReportGenerateUseCase(), pdf_stub)
+        exit_code = agent_cli.main(["report-generate", "--plan-id", str(uuid.uuid4()), "--format", "pdf"])
+        assert exit_code == 1
+        assert "[EXCEPTION_493]" in capsys.readouterr().err
+
+    def test_pdf_cli_production_channel_l4_resolvable(self) -> None:
+        """CLI 生产通道 L4 resolve 可达（三步排查法自动化——组合根注册链实证）。"""
+        from src.domain.ports.l4_object import L4ObjectPort
+        from src.domain.ports.resolver import get_resolver
+
+        if not _global_registry_has("pdf_report_generation_use_case"):
+            from src.composition_root import bootstrap
+
+            bootstrap()
+        instance = get_resolver().resolve("l4_object")
+        assert isinstance(instance, L4ObjectPort)
+
+
+def _global_registry_has(name: str) -> bool:
+    """组合根注册探测（bootstrap 幂等守卫——conftest 已装配则零重复）。"""
+    from src.domain.ports.registry import _global_registry
+
+    return _global_registry.get(name) is not None

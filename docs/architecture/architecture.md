@@ -1683,6 +1683,7 @@ _session_ctx: ContextVar[AsyncSession | None] = ContextVar("pg_session", default
 | | 关系数据库 | PostgreSQL | 15+ | ✅ 低 |
 | | 对象存储 | MinIO | 最新 | ✅ 低 |
 | | 图数据库 | Neo4j | 5.x | ✅ 低 |
+| | PDF 渲染 | reportlab | 4.5.1+ | ✅ 低（Story 6-5b 引入——PDF 报告生成；`STSong-Light` 内置 CID 字体零字体文件依赖；唯一宿主 `src/infrastructure/reporting/reportlab_pdf_renderer.py`（架构测试守护）——渲染技术禁入 domain） |
 | **AI/ML** | 嵌入模型 | BGE-M3 | 最新 | ✅ 低 |
 | | LLM 代理 | LiteLLM | 1.0+ | ✅ 低 |
 | | 本地 LLM | Ollama+Qwen2.5 | 最新 | ✅ 低 |
@@ -2545,7 +2546,11 @@ semantic_cache, agent_state, session_data
 buckets/
 ├── raw-documents/          # 原始文档（WORM 7 年）
 ├── processed-documents/    # 处理后的文档
-├── evidence-packages/      # 证据包
+├── evidence-packages/      # 证据包（逻辑分类——代码实况自 3-10 起统一落
+│                           #   `archive-evidence` 复合物理桶（strategic_archive_
+│                           #   service.L4_BUCKET_TYPE 单源；6-3/6-4 证据归档与
+│                           #   6-5b PDF 报告 WORM 归档同桶贯通，对象键前缀
+│                           #   天然隔离——Story 6-5b 实况注记）
 └── audit-archives/         # 审计归档（WORM 7 年）
 ```
 

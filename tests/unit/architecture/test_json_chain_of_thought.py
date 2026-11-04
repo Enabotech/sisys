@@ -80,7 +80,12 @@ class TestValidatorAEvidencePackageUniqueConstruction:
         """构造位唯一：枚举定义处（strategic_archive.py）+ 组装归档服务一处
         代码级构造（ArchiveType.EVIDENCE_PACKAGE 成员引用）——其余全 src 零
         出现（CR1-F9 如实化：正则为全 token 行扫描含注释/docstring 文本，
-        当前全 src 许可外零 token 含文本命中——过严方向守护，非恒真）。"""
+        当前全 src 许可外零 token 含文本命中——过严方向守护，非恒真）。
+
+        6-5b 许可扩展（2026-11-04）：PDF 报告引文收集是 EVIDENCE_PACKAGE 的
+        钦定**查询消费面**（AC-1 ③ ``query_archive(ArchiveQuery(..., archive_
+        type=EVIDENCE_PACKAGE))``——读侧非构造位），pdf_report_generation_
+        service.py 入许可清单。"""
         occurrences: list[tuple[str, int]] = []
         for path in sorted(SRC_ROOT.rglob("*.py")):
             for line_no, line in enumerate(_read(path).splitlines(), start=1):
@@ -90,9 +95,10 @@ class TestValidatorAEvidencePackageUniqueConstruction:
                     occurrences.append((str(path.relative_to(SRC_ROOT)), line_no))
         service_relative = "application/services/chain_of_thought_archive_service.py"
         enum_relative = "domain/entities/strategic_archive.py"
+        pdf_query_consumer = "application/services/pdf_report_generation_service.py"
         service_construction = [occ for occ in occurrences if occ[0] == service_relative]
         assert service_construction, "组装归档服务缺 EVIDENCE_PACKAGE 构造（首激活缺失）"
-        others = [occ for occ in occurrences if occ[0] not in (enum_relative, service_relative)]
+        others = [occ for occ in occurrences if occ[0] not in (enum_relative, service_relative, pdf_query_consumer)]
         assert not others, f"ArchiveType.EVIDENCE_PACKAGE 代码级引用出现于许可外文件（唯一构造位违例）: {others}"
 
     def test_construction_passes_enum_member_not_string(self) -> None:

@@ -188,7 +188,7 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   缺失 persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测)
     # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；485-489 预留 planning 域（486-489 留 6-6 恢复执行面）
     "planning": (480, 489),
-    # 报告子域（490-499）—— Story 6-5a 新开 1 批 2 个
+    # 报告子域（490-499）—— Story 6-5a 新开 1 批 2 个 + 6-5b 增 2 个
     # （planning 段 480-489 之后九代开段先例第九段：data_source 410/debate 420/
     #  tool_version 430/agent 440/evaluation 450/sap 460/financial 470/planning 480
     #  同款「前段满/双重成文预留不可占/语义独立 → 开独立段」——报告交付物域与
@@ -199,8 +199,14 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   亦同判[时间线摘要非报告素材])
     # EXCEPTION_491 ReportStorageError (Story 6-5a, 报告持久化失败——L0 写
     #   layer="l0"/L2 落库 layer="l2" 二元值域；事件发布失败不走本码[AC-5
-    #   宽容语义 warning 不回滚]；492-499 预留 report 域)
-    # 490-491 语义归属 business（报告失败是调用方可处理结果）；492-499 预留 report 域
+    #   宽容语义 warning 不回滚])
+    # EXCEPTION_492 PdfRenderingError (Story 6-5b, PDF 渲染失败——reportlab
+    #   原生异常领域包装：渲染异常/中文字体注册失败/未注册锚点引用 save 期
+    #   抛错；构造器领域参在前同构 490 形态)
+    # EXCEPTION_493 ReportEvidenceStorageError (Story 6-5b, L4 证据对象归档
+    #   失败——archive 异常态；开新码不扩 491 值域[二元值域是 6-5a 冻结面
+    #   且负向测试钉死]；494-499 预留 report 域)
+    # 490-493 语义归属 business（报告失败是调用方可处理结果）；494-499 预留 report 域
     "report": (490, 499),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -383,9 +389,12 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "CheckpointCreationError": "planning",
     "CheckpointIntegrityError": "planning",
     # report_exceptions.py (Story 6-5a 新增 2 个异常——Markdown 报告生成
-    #   数据源全缺/持久化失败双码)
+    #   数据源全缺/持久化失败双码；6-5b 增 492/493 两类——PDF 渲染失败
+    #   /L4 证据归档失败)
     "ReportGenerationError": "report",
     "ReportStorageError": "report",
+    "PdfRenderingError": "report",
+    "ReportEvidenceStorageError": "report",
 }
 
 

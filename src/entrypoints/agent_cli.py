@@ -336,10 +336,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Story 6-5a: report-generate 扁平子命令（Markdown 报告生成——双源聚合+
     # 领域渲染+L0/L2 持久化+ReportGenerated 首激活；同 plan_id 重复生成产生新
-    # 报告不拦截——OD-10 幂等锚=report_id）
+    # 报告不拦截——OD-10 幂等锚=report_id）；Story 6-5b: --format {markdown,pdf}
+    # 参数扩展（默认 markdown 向后兼容——OD-11，单入口演进友好）
     report_generate = subparsers.add_parser(
         "report-generate",
-        help="按 plan_id 生成 Markdown 战略规划报告（BLM 前两阶段交付物）",
+        help="按 plan_id 生成战略规划报告（Markdown/PDF——BLM 前两阶段交付物）",
     )
     report_generate.add_argument(
         "--plan-id",
@@ -347,6 +348,14 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="PLAN_ID",
         help="规划任务标识（UUID 字符串——与 BLM plan_id 同源）",
+    )
+    report_generate.add_argument(
+        "--format",
+        type=str,
+        choices=("markdown", "pdf"),
+        default="markdown",
+        metavar="FORMAT",
+        help="报告格式（默认 markdown 向后兼容；pdf 含引文索引与 L4 WORM 归档——Story 6-5b）",
     )
 
     # Story 6-3: checkpoint-create 扁平子命令（Checkpoint 完整形态快照显式创建——
@@ -835,16 +844,19 @@ async def _run_chain_trace(plan_id: str, include_blob: bool) -> object:
         await _close_connection_pools()
 
 
-async def _run_report_generate(plan_id: str) -> object:
-    """执行报告生成（resolve 用例——与 _run_chain_trace 同款资源收尾）。
+async def _run_report_generate(plan_id: str, report_format: str = "markdown") -> object:
+    """执行报告生成（按 format 分发 resolve 两用例——与 _run_chain_trace 同款资源收尾）。
 
     Args:
         plan_id: 规划任务标识。
+        report_format: 报告格式（markdown→report_generation_use_case /
+            pdf→pdf_report_generation_use_case——OD-11 单入口分发表）。
 
     Returns:
         StrategicReport 报告实体。
     """
-    use_case = resolve("report_generation_use_case")
+    # 分发显式两分支（resolve 端口名字面保留——架构测试 CLI resolve 形态守护）
+    use_case = resolve("pdf_report_generation_use_case") if report_format == "pdf" else resolve("report_generation_use_case")
     try:
         return await use_case.execute(plan_id=plan_id)
     finally:
@@ -913,17 +925,19 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
         return 1
 
 
-def _print_report_summary(result: object) -> None:
-    """打印报告生成摘要（report_id/file_path 逻辑路径/memory_id/章节计数）。
+def _print_report_summary(result: object, report_format: str = "markdown") -> None:
+    """打印报告生成摘要（format 感知——markdown 分支含 memory_id，PDF 分支含对象键+bucket+引文计数）。
 
-    memory_id 打印（R2-10）：人类用户经 memory_id + L0StoragePort.read 或
-    base 目录提示定位物理文件——逻辑路径单独打印不构成定位信息。
+    memory_id 打印（R2-10，仅 markdown 分支）：人类用户经 memory_id +
+    L0StoragePort.read 或 base 目录提示定位物理文件；PDF 分支 file_path 是
+    L4 对象键逻辑路径（``.md`` 反解不适用——6-5b format 感知扩展），定位
+    信息 = 对象键 + bucket（bucket 自端口常量 import——实体不携 bucket 字段）。
 
     Args:
-        result: StrategicReport 实体（getattr 属性面消费——零 import 依赖）。
+        result: StrategicReport 实体（getattr 属性面消费——零实体 import 依赖）。
+        report_format: 报告格式（markdown/pdf——分发方透传）。
     """
     file_path = str(getattr(result, "file_path", ""))
-    memory_id = file_path.rsplit("/", 1)[-1].removesuffix(".md") if file_path else ""
     print("报告生成完成：")
     print(f"  报告标识: {getattr(result, 'report_id', '')}")
     # CR1-F9：report_type 是 ReportType 枚举成员——f-string 直渲染为
@@ -932,20 +946,30 @@ def _print_report_summary(result: object) -> None:
     report_type_value = getattr(getattr(result, "report_type", None), "value", getattr(result, "report_type", ""))
     print(f"  报告类型: {report_type_value}")
     print(f"  逻辑路径: {file_path}")
-    print(f"  memory_id: {memory_id}")
+    if report_format == "pdf":
+        # PDF 分支：对象键 + bucket 定位（L4 WORM）；引文计数汇总（实体不携
+        # 该字段——getattr 容错面，缺失时打印 0）
+        from src.application.ports.pdf_report import EVIDENCE_BUCKET_TYPE
+
+        print(f"  存储桶: {EVIDENCE_BUCKET_TYPE}")
+        print(f"  引文计数: {getattr(result, 'citation_count', 0)}")
+    else:
+        memory_id = file_path.rsplit("/", 1)[-1].removesuffix(".md") if file_path else ""
+        print(f"  memory_id: {memory_id}")
     print(f"  正文章节数: {getattr(result, 'section_count', 0)}（降级 {getattr(result, 'degraded_section_count', 0)}）")
     print(f"  生成耗时: {getattr(result, 'generation_ms', 0)} ms")
 
 
-def _run_report_generate_cli(plan_id: str) -> int:
-    """report-generate 子命令执行（五步定式——chain-query 模板）。
+def _run_report_generate_cli(plan_id: str, report_format: str = "markdown") -> int:
+    """report-generate 子命令执行（五步定式——chain-query 模板；6-5b --format 分发）。
 
-    exit 0 判据 = 报告生成返回（L0/L2 已落盘+事件已发布——宽容语义）；
-    plan_id 非 UUID → 守卫 exit 1；490/491 DomainError → [code] stderr
-    exit 1（双层异常定式）。
+    exit 0 判据 = 报告生成返回（持久化已落盘+事件已发布——宽容语义）；
+    plan_id 非 UUID → 守卫 exit 1；490/491/492/493 DomainError → [code]
+    stderr exit 1（双层异常定式）。
 
     Args:
         plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        report_format: --format 值（markdown/pdf——分发透传，默认 markdown）。
 
     Returns:
         退出码（0=报告生成完成，1=业务异常/参数守卫失败）。
@@ -963,12 +987,13 @@ def _run_report_generate_cli(plan_id: str) -> int:
 
     try:
         _ensure_bootstrapped()
-        result = asyncio.run(_run_report_generate(plan_id))
-        _print_report_summary(result)
+        result = asyncio.run(_run_report_generate(plan_id, report_format))
+        _print_report_summary(result, report_format)
         logger.info(
-            "报告生成完成: plan_id=%s report_id=%s",
+            "报告生成完成: plan_id=%s report_id=%s format=%s",
             plan_id,
             getattr(result, "report_id", ""),
+            report_format,
         )
         return 0
     except DomainError as error:
@@ -1363,7 +1388,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "chain-query":
         return _run_chain_query_cli(args.plan_id, args.include_blob)
     if args.command == "report-generate":
-        return _run_report_generate_cli(args.plan_id)
+        return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":

@@ -113,6 +113,8 @@ from src.domain.exceptions.relevance_exceptions import (
     RelevanceEvaluationError,
 )
 from src.domain.exceptions.report_exceptions import (
+    PdfRenderingError,
+    ReportEvidenceStorageError,
     ReportGenerationError,
     ReportStorageError,
 )
@@ -348,9 +350,12 @@ __all__ = [
     "CheckpointCreationError",
     "CheckpointIntegrityError",
     # 报告子域异常（Story 6-5a Markdown 报告生成——490 数据源全缺[404] +
-    # 491 持久化失败[layer 二元 500]）
+    # 491 持久化失败[layer 二元 500]；6-5b PDF 报告——492 渲染失败[500] +
+    # 493 L4 证据归档失败[500]）
     "ReportGenerationError",
     "ReportStorageError",
+    "PdfRenderingError",
+    "ReportEvidenceStorageError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

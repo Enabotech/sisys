@@ -75,6 +75,7 @@ pypdf = "^6.12.1"
 pdfplumber = "^0.11.0"
 tinytag = "^2.2.1"
 ffmpeg-python = "^0.2.0"
+reportlab = "^4.5.1"  # PDF 渲染（Story 6-5b——自 test 组迁入主依赖组，src 面首次消费）
 
 # OCR
 rapidocr = "3.9.2"
@@ -123,7 +124,6 @@ coverage = "^7.4.0"
 factory_boy = "^3.3.0"  # 测试数据工厂
 pytest-html = "^4.2.0"
 fakeredis = "^2.28.0"
-reportlab = "^4.5.1"
 testcontainers = "^4.13.0"
 
 [tool.poetry.group.dev.dependencies]
