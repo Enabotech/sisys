@@ -4,7 +4,7 @@
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
-> 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
+> 运行文档审查修订循环（本 Story 已执行五轮——见 Docs Review Fixes 表）+ 人工按 story-template 合规清单核对后再执行 `dev-story`（`validate-create-story` 系上游模板措辞，本仓无该名 skill）。
 
 ---
 
@@ -75,7 +75,7 @@
 **Then** 引擎 `execute_recovery` 编排五步：①入口守卫（checkpoint_no 三重守卫复用——`_parse_checkpoint_number` 零改动）→ ②恢复数据面（复用 `recover_checkpoint`：load+verify+后续清单+建议模式）→ **②.5 模式裁定（裁定先于修正应用——与边界表 L36 编排序对齐：mode 显式传入时执行强制语义执法 487，冲突即拒（零副作用——correction 场景下先落修正再 487 会破坏零副作用语义，裁定必须前置于③））**→ ③修正应用（correction 非 None 时经 `apply_correction`，乐观锁基线取自②视图 state_version；**486 try 面扩包③④两处 save**——修正一体场景下③步 save 失败的 StorageError(103) 不裸逃逸，统一归 486 fail-loud；482/484 在 save 之前触发仍经既有触发点透传不受影响）→ ④双模式分支落恢复记录（第三键族，OD-3）→ ⑤发布 `CheckpointRecovered`（首激活——字段族与 metadata 见 OD-2）
 **And** **Override 分支**（<2 后续）：后续 checkpoint 标记 pending_sync（"基于旧版本"——or.md L483 语义，经恢复记录承载不删快照；**pending_sync 清单长度上限=1**——Override 可执行当且仅当后续 ≤1，≥2 后续时建议模式=REPLAY、请求 Override 必 487 拒绝，模式执法的必然推论）；`consistency_risk_level="medium"`（有后续时）/`"low"`（无后续）；一致性风险提示随 CLI 输出
 **And** **Replay 分支**（≥2 后续）：后续 checkpoint 全部标记 invalidated（作废——修改点后所有状态重新计算，MVP 形态为标记+指引，实质 LLM 重跑 defer 归 Epic 10，OD-1 四条物理约束论证）；`consistency_risk_level` 恒 `"low"`（强一致作废语义——⑤步恒显式传 `assess_consistency_risk` 函数输出，Replay 输出恰与事件字段默认值同值；CLI dry-run 评估与引擎⑤步同源消费，见数据模型节）；重跑指引（next_action_hint：建议以新 plan_id 经 `blm-plan` 重跑）随 CLI 输出
-**And** **模式强制执法**（FR-SP-07 不变约束 or.md L622——OD-6；**执法点=②.5，先于③修正应用**）：显式 `--mode override` 而建议为 REPLAY → 487 `RecoveryModeConflictError` 拒绝执行（零副作用——恢复记录不写、事件不发、**修正不应用**——487 单测补「correction+冲突组合→apply_correction 零调用断言」防裁定后置的实现漂移）；建议 OVERRIDE 而请求 REPLAY → 允许（用户可选更强一致性模式）
+**And** **模式强制执法**（FR-SP-07 不变约束 or.md L622——OD-6；**执法点=②.5，先于③修正应用**）：显式 `--mode override` 而建议为 REPLAY → 487 `RecoveryModeConflictError` 拒绝执行（零副作用——恢复记录不写、事件不发、**修正不应用**——487 单测补「correction+冲突组合→apply_correction 零调用断言」防裁定后置的实现漂移）；建议 OVERRIDE 而请求 REPLAY → 允许（用户可选更强一致性模式）；**L623 Replay 幂等性 MVP 承载声明**：恢复标记面单键覆盖天然幂等（同 plan 二次恢复覆盖前次记录、invalidated 重复标记幂等——L177 注记②），执行缓存级幂等随实质重跑归 Epic 10
 **And** 恢复执行窗口实测填充事件 `execution_delay_ms`（⑤步事件构造前 perf_counter 毫秒差——窗口含①~④步；事件字段的数据源钦定）；事件 `cost` 字段恒 0.0 不显式传（恢复链零 LLM——OD-1，MVP 无成本模型）；恢复记录持久化 TTL 30 天（对齐 checkpoint 键族合规窗）
 
 **验证标准/Validation Criteria:**
@@ -135,7 +135,7 @@
 **And** 486/487 为 planning 段新码（486-489 预留段取码——`_code_ranges.py:189` 成文「留 6-6 恢复执行面」的兑现；485 属 OD-7 钦定永不设码的段内空洞、488/489 继续预留）；6-4 两处缺席断言让位更新（`tests/unit/architecture/test_json_chain_of_thought.py:338-360`（docstring :339-343，range 本体 :356-358）+ `tests/acceptance/test_acceptance_json_chain_of_thought.py:2150-2171`（range 本体 :2168）的 `range(485, 490)` 收窄为**残留码元组 `(485, 488, 489)`**——保留 485 缺席守护（OD-7 永不设码的执法面）；断言处注记「6-6 让位」的兑现义务）
 
 **验证标准/Validation Criteria:**
-- [ ] 验收面五码各至少一条专属场景（242/480/482/484/487——红测先行 Task 0 钉死；486 编排失败注入归单测层 AsyncMock 承载——no-mock 红线互斥裁定 6-3 R3-4 先例）
+- [ ] 验收面五码各至少一条专属场景（242/480/482/484/487——红测先行 Task 0 钉死；486 编排失败注入归单测层 AsyncMock 承载——no-mock 红线互斥裁定 6-2 R3-4 先例（6-3 沿用））
 - [ ] CLI 面六码 stderr `[EXCEPTION_xxx]` 形态统一（6-3 R1-F18 前缀统一先例继承）
 - [ ] 6-4 让位后其守护测试零适配通过（断言收窄而非删除——缺席断言对残留码元组 (485, 488, 489) 继续有效）
 
@@ -236,7 +236,7 @@
   - `checkpoint-recover --plan-id --checkpoint-no [--correction-type V --previous-value V --new-value V --applied-by V] [--mode {replay,override}] [--confirm] [--confirmed-by V]`：
     - 四个 --correction-* 参数**成组约束**（部分出现 → 242——**CLI 层唯一落位** post-parse 检测+构造真实 EntityValidationError，见 AC-2）
     - `--mode` 缺省取引擎建议；`--mode override` 违反强制语义 → 487；**转换层位钦定**：`add_argument("--mode", choices=("replay","override"))`（:355 choices 先例）+ CLI 层 `RecoveryMode(args.mode)` str-Enum 按值构造 → 用例/端口全链 entities 枚举（events 大写转换仅在引擎⑤步 to_event_recovery_mode 一处）
-    - 无 `--confirm` = dry-run（影响评估输出+exit 0+三零；**评估输出含将应用的修正五参数展示**（带 --correction-* 时——仅展示零应用）与 confirmed_by 缺省链提示；风险等级经 assess_consistency_risk 同源计算——与引擎⑤步单一事实源；**冲突组合评估语义**：dry-run 带 `--mode override` 而建议 REPLAY 时评估输出附「该组合 confirm 必拒 487」预检提示——执法在执行态，评估态展示建议/请求双模式并预警）；有 = 执行（AC-3/AC-4）
+    - 无 `--confirm` = dry-run（影响评估输出+exit 0+三零；**评估输出含将应用的修正五参数展示**（带 --correction-* 时——仅展示零应用）与 confirmed_by 缺省链提示；风险等级经 assess_consistency_risk 同源计算——与引擎⑤步单一事实源；**冲突组合评估语义**：dry-run 带 `--mode override` 而建议 REPLAY 时评估输出附「该组合 confirm 必拒 487」预检提示——执法在执行态，评估态展示建议/请求双模式并预警；**预计耗时/成本展示 defer 声明**：or.md L484「前端展示预计耗时与成本」MVP 不承载——无成本模型（cost 恒 0.0 事后字段非事前预估），预估展示随完整评估协议归 Epic 10 Story 10.3）；有 = 执行（AC-3/AC-4）
     - `--confirmed-by` 双态语义钦定：dry-run 不要求（评估态未确认）；confirm 执行路径必填——缺省取 `--applied-by`（修正场景）或 CLI 层+用例层双落位守卫 242（纯恢复场景；无修正且无 confirmed-by 时要求显式提供，审批人身份不可缺省空）
     - exit 0 口径：dry-run 评估完成 / 恢复记录落库成功（发布降级不改 exit code——AC-4；exit 1=DomainError `[code] {message}` stderr、exit 2=用法错误——main docstring :1361 既有语义；**缺参与守卫分工**：缺参（--plan-id 等未提供）=argparse required 拦截 exit 2；显式传入的空串/畸形/越域/非 canonical 别名形态（""、cp3、3、CP-99、CP-01）统一 242 守卫）
 - [ ] CLI 参数守卫前缀统一：`[EXCEPTION_xxx]` 形态（6-3 R1-F18 真实异常构造纪律——禁字面前缀）
@@ -277,13 +277,13 @@
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_checkpoint_recovery.feature`（OD-11 命名——功能名族，禁故事编号后缀）
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_checkpoint_recovery.py`
 - [ ] 业务方评审通过
-- [ ] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **14 场景**（AC-1×2 / AC-2×2 / AC-3×3 / AC-4×2 / AC-5×1 / AC-6×2 / AC-7×1 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）
+- [ ] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **14 场景**（AC-1×2 / AC-2×2 / AC-3×3 / AC-4×2 / AC-5×1 / AC-6×2 / AC-7×1 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）；**epic 架构测试三项落位对账**（epics L2325-2327）：摘要显示测试→S1/S2、参数修正测试（修正后正确恢复执行）→S3+S9、审批流程测试→S8/S9（OD-5 显式对账）——功能等价重分布
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试（模块级 `event_loop` fixture + `_run_async` helper——6-1/6-2/6-3 三件套）
 - 同一中文文本可能需要同时支持 given/when 装饰器（共用文本按模块各自重新定义一份 @given——6-x 样板实证形态；Given/When 语义复用时写不同文本）
 - 不要使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
-- **Edge Cases 必须包含异常路径**——本 Story 六码全景 242/480/482/484/486/487，验收面承载五码 = 480（不存在键恢复执行）/484（checksum 损坏恢复执行）/482（旧基线修正）/242（畸形 checkpoint_no+四参数部分出现）/487（强制 Replay 违反）；486（编排失败注入）与发布失败注入归单测层 AsyncMock 承载（no-mock 红线互斥裁定——6-3 R3-4 先例：验收/集成层无法构造的真实服务失败归单测层）
+- **Edge Cases 必须包含异常路径**——本 Story 六码全景 242/480/482/484/486/487，验收面承载五码 = 480（不存在键恢复执行）/484（checksum 损坏恢复执行）/482（旧基线修正）/242（畸形 checkpoint_no+四参数部分出现）/487（强制 Replay 违反）；486（编排失败注入）与发布失败注入归单测层 AsyncMock 承载（no-mock 红线互斥裁定——6-2 R3-4 先例（6-3 沿用）：验收/集成层无法构造的真实服务失败归单测层）
 - **R6 模板合规**：feature/py 组织结构对齐 `tests/acceptance/test_acceptance_postgresql_relational_layer.feature`/`.py`——`# language: zh-CN` 中文 Gherkin + AC 横幅注释分组（`# ===` 分隔）+ `@scenario(...)` 多行字面量路径绑定 + **14 场景全绑定**（R6 文件自身仅绑定 30 场景中 17 个属旧模板欠账，新文件禁沿用）；pytestmark/context dict/`_run_async` 由 6-x 三件套基建承载；**断言必须真实**（禁 then-pass 占位）；装配形态对齐 6-3（真实服务链 + Fake LLM/Fake Embedding 双豁免（外部 SaaS）+ 延迟 import 纪律 + 场景三属性分档表 docstring + teardown 链「断言失败也执行」）
 - **BDD 时长纪律（事实口径）**：6-3 形态裸 `_run_async` **无实际硬超时**（conftest `run_with_bdd_timeout` 30s 机制存在但全仓唯一消费方是 test_acceptance_llm_client.py（真 LLM 客户端文件），6-3 checkpoint 验收未接线、pytest-timeout 装而未配；Fake LLM 链无挂死面）——耗时纪律靠场景成本设计承载：多 checkpoint 前置（AC-3 Replay 场景需 3 点：恢复点+2 后续）分 Given 步骤逐个创建（每步一次全链——6-3 R2-F6 先例；实测基线：单创建链 ~0.14-0.23s（2026-11 实测），最重场景粗估 3-5s 无压力）；AC-5 并发场景 5 plan×（1 创建+1 恢复）gather 并行执行（**创建与恢复均入 gather——每任务会话隔离钦定**：per-plan 协程体内自建 `AsyncSession`+`set_session()`（PEP 567 task 级 context 拷贝不外泄，深层 `get_session()` 调用期解析自动命中本任务会话）——6-3 装配链共享单 AsyncSession 形态下 gather 必触发 SQLAlchemy 并发会话防呆，装配契约在 Task 0.5 落档；Fake LLM 是 AsyncMock 固定返回值单循环无线程安全问题）；AC-6 性能采样场景独立化（20 轮窗口直调——6-3 AC-8 形态）
 - **场景分化维度表（Task 0.4 钉死输入——含收尾共 14 场景全枚举；S 编号为 6-6 自有编号，跨故事引用一律带故事号前缀）**：AC-1×2 = plan 级清单（3 点全列+sync join+空 plan 空清单边界）/单点详情（9 键+四要素显示——**经 CLI checkpoint-show 入口保红**，见 Task 0.6）；AC-2×2 = 修正往返（history 追加+**连续修正两条累积**+版本递增+checksum 绿——**经 ExecuteCheckpointRecoveryUseCase 修正路径保红**）/修正异常（482 旧基线+242 部分参数双红+**畸形 checkpoint_no 242**——AC-7 畸形面在此承载；482 腿经编程面 apply_correction 构造——execute_recovery 基线引擎内部取②视图，单线程不可构造旧基线（设计使然））；AC-3×3 = Override 执行（恢复记录+**pending_sync 一点**（3 点=CP-1/CP-3/CP-5 恢复 CP-3、后续 CP-5 一点——上限 1 见 AC-3 钦定）+事件+**恢复后再查清单验证 in_sync+pending_sync 两态**+**CP-8 尾点无后续 low 风险边界**（**独立第二 plan 单点 CP-8 恢复承载**——同 plan 二次恢复会单键覆盖洗掉第一 plan 的三态标记（L177 注记①陷阱），故尾点边界用独立 plan 隔离））/Replay 执行（invalidated+指引+**恢复后再查清单 invalidated 态**——与 S5 合并覆盖 sync 三态全谱）/模式冲突 487（零副作用）；AC-4×2 = dry-run 三零（**含带 --correction-* 的评估输出展示断言**）/confirm 执行+修正恢复一体（--correction-* 与 --confirm 同给——AC-3 VC 落位）+outbox 恰一行（checkpoint_id+plan_id 双通道值级——预期值单源 Outcome.recovered_snapshot_id）；AC-5×1 = 5 并发独立 plan 互不干扰；AC-6×2 = 摘要 P95<200ms（show 窗口 20 轮+**list 窗口同门禁**——AC-6 VC 落位）/恢复执行窗口+成功率（采样矩阵钉死：Override×5（建议模式单点 plan）+Replay×5（显式 --mode replay 单点 plan——OD-6 方向性执法「弱替强允」的消费面复用，每样本省 2 次创建链）共 10 次恢复，逐次窗口 <15s+全读回；**窗口载体与蕴含声明**：断言值=Outcome.execution_ms（①~⑤ 组装点窗口 ⊇ ②~⑤ 引擎声明窗口，含①守卫解析差为保守方向）；逐次 <15s 断言严格蕴含 P95<15s≤P95<60s 双门禁——工程冗余断言口径成文）；AC-7×1 = 异常五码分立验收面（480/484 恢复执行入口——242/482→S4、487→S7 已承载，本场景补 480/484 两条）；收尾×1 = src 与四测试目录完成清单存在性断言（Task 7.3 承载）
@@ -326,7 +326,7 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 双枚举转换纯函数 | entities↔events 枚举映射/未知值防御 | `tests/unit/domain/services/test_recovery_mode.py`（扩展） | Task 1 |
+| **TDD 单元测试** | 双枚举+风险等级纯函数 | entities↔events 枚举映射（入参域内显式映射——枚举闭集下非法值经类型系统不可构造，无 else raise 面）/assess_consistency_risk 三分支矩阵 | `tests/unit/domain/services/test_recovery_mode.py`（扩展） | Task 1 |
 | **TDD 单元测试** | 领域异常 | 486/487 构造/message 组合/context/to_dict/HTTP 映射 | `tests/unit/domain/exceptions/test_planning_exceptions.py`（扩展）+ `tests/unit/interfaces/api/test_exception_handlers.py`（扩展） | Task 1 |
 | **TDD 单元测试** | 读面（list_checkpoints） | probe 全量/升序/sync_status 三态推导/空族空清单/plan_id 守卫 | `tests/unit/application/test_checkpoint_service.py`（扩展——TestListCheckpoints 组） | Task 2 |
 | **TDD 单元测试** | 恢复执行引擎（execute_recovery） | 五步编排调用序/模式裁定+487/双模式分支/恢复记录 12 键/事件构造与容错/execution_ms 窗口/486 fail-loud | `tests/unit/application/test_checkpoint_service.py`（扩展——TestExecuteRecovery 组） | Task 3 |
@@ -351,17 +351,17 @@
 
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**（本 Story 主改动层——epics 钦定）
+- [ ] **整体覆盖率 ≥80%**（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance --cov-fail-under=80`——**禁裸收集**：无路径回落 testpaths=tests 即记忆钦定的挂起形态；addopts 已带 --cov=src 无需重复）- **P0 阻断门禁**
+- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application` 语义——**口径注记**：addopts `--cov=src` 累积使 TOTAL 行为全 src 并集，分层百分比按报告内 application 组 per-file 行人工聚合判读，或以 `-o addopts` 剥离后单跑）- **P1 阻断门禁**（本 Story 主改动层——epics 钦定）
 - [ ] **领域层覆盖率 ≥90%**（`pytest --cov=src/domain`）——转换纯函数+异常扩展部分遵循
 - [ ] **集成测试覆盖率 ≥75%**（epics 钦定——**口径钦定**：集成测试对本 Story 交付面的行覆盖，`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/integration/test_integration_checkpoint_recovery.py --cov=src.application.services.checkpoint_service --cov=src.application.use_cases.checkpoint_approval --cov-report=term-missing` 人工核新增方法行 ≥75%；禁「只跑集成目录+--cov=src 全量」的无意义口径）
 - [ ] **关键路径 100% 覆盖（枚举分支逐一有专属用例口径）**：execute_recovery 五步调用序（含 487 拒绝零副作用分支/486 fail-loud 分支/发布降级分支）/ list_checkpoints 三态 join（含无恢复记录全量 in_sync 边界）/ dry-run 三零 / CLI 两态 / 六码异常各一（验收五码+单测 486）
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`ruff check src/`）
-- [ ] **MyPy 类型检查通过**（`mypy src/`）
+- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`——与 CLAUDE.md/6-3/6-5b 同款双目录）
+- [ ] **MyPy 类型检查通过**（`mypy src/`——当前基线 752 零错误不回退（6-5b R4 实证基线，新增面零新增错误））
 - [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`；**push-stage 注记**：validate-schemas/validate-openapi/pytest-bdd 三钩子 stages=[push]，`--all-files` 默认 commit stage 跳过它们——全覆盖补 `--hook-stage push` 或以逐提交 push 证据链收窄（6-3 先例））
 
 #### 测试隔离约束
 
@@ -391,8 +391,8 @@
 - ❌ 裸 `tests/` 运行（显式四目录）
 
 **验证要求：**
-- [ ] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance -n 8` 通过（显式四目录——裸 tests/ 挂起）
-- [ ] 连续 5 次运行无随机失败
+- [ ] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance -n 8` 通过（显式四目录——裸 tests/ 挂起；-n 8 为对 addopts -n auto 的有意 cap——6-3/6-5b 同款+DF3 负载教训）
+- [ ] 无随机失败**等效证据链**（6-3 先例形态，与 Task 7.2 双轮口径统一）：四目录全量双轮零失败+验收单文件 ≥5 轮+关键场景（S5/S9/S10/S12）场景级多轮复跑稳定
 - [ ] `poetry run ruff check` 通过
 - [ ] `poetry run mypy` 通过
 
@@ -439,7 +439,7 @@
 - [ ] Subtask 0.3: 冻结异常契约——486/487 类名、码位、message 组合语义、HTTP 映射、488/489 残留注记；预检 `grep -rn "EXCEPTION_48[6-9]" src/` 零类占用
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_checkpoint_recovery.feature`（14 场景钉死：AC-1×2/AC-2×2/AC-3×3/AC-4×2/AC-5×1/AC-6×2/AC-7×1/收尾×1——AC 横幅分组+中文 Gherkin，R6 模板）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_checkpoint_recovery.py` 骨架（docstring 场景三属性分档表/pytestmark 全套+xdist_group/14 场景全绑定/模块级期望常量独立构造/三件套+teardown 链扩展恢复记录键族/Fake LLM/Fake Embedding 工厂复用 6-3 形态/装配链基于 6-3 `_assemble_checkpoint_chain` 扩展）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——**红形态逐场景预判**：S1/S4/S5/S6/S7/S9/S10/S12/S13 ≈9-10 场景延迟 import 抛 ImportError/AttributeError（list_checkpoints/execute_recovery/486/487/新用例缺失）；S2/S3/S11 三场景天然路由到 6-3 既有行为面（recover_checkpoint 9 键视图/apply_correction 修正往返/show 窗口数据面已交付）——**其场景文本必须触达新符号**（S2 经 CLI checkpoint-show 入口/S3 经 ExecuteCheckpointRecoveryUseCase 修正路径/S11 经 checkpoint-show CLI 入口+list 窗口）保红；S8 dry-run 的 AssertionError 形态是步骤内 try/except 包裹 ImportError 转断言三零的实现选择（与延迟 import 纪律通则的显式例外声明）；S14 收尾 AssertionError（完成清单存在性）；合计 14 场景全红、收集期零错误）
+- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——**红形态逐场景预判**：S1/S4/S5/S6/S7/S9/S10/S12/S13 ≈9-10 场景延迟 import 抛 ImportError/AttributeError（list_checkpoints/execute_recovery/486/487/新用例缺失）；S2/S3/S11 三场景天然路由到 6-3 既有行为面（recover_checkpoint 9 键视图/apply_correction 修正往返/show 窗口数据面已交付）——**其场景文本必须触达新符号**（S2 经 CLI checkpoint-show 入口/S3 经 ExecuteCheckpointRecoveryUseCase 修正路径/S11 经 checkpoint-show CLI 入口+list 窗口）保红；S8 dry-run 的 AssertionError 形态是步骤内 try/except 包裹 ImportError 转断言三零的实现选择（与延迟 import 纪律通则的显式例外声明）；S11 经 **list 窗口（list_checkpoints 新符号）**保红——show 窗口经 recover_checkpoint 数据面采样（采样调用面见 Task 0.5 矩阵——S11 采样=编程面，经 CLI 进程面采样会把建连开销计入窗口冲破 200ms 口径）；S14 收尾 AssertionError（完成清单存在性）；合计 14 场景全红、收集期零错误）
 - [ ] Subtask 0.7: deferred-work.md 六条锚定义务处置注记落档（见 Dev Notes 表）
 - [ ] Subtask 0.8: 既有资产复核（四 Agent 调研结论主会话已亲验——实施时行号漂移复核）：① CheckpointRecovered 字族与双登记/监听（checkpoint_events.py:40-69/yaml:192-195/router:249-254/auto_trigger:65）② RecoverCheckpointUseCase 与组合根注册（:89-129/:2321-2332）③ checkpoint_service 五方法行为面（call_order 断言族清单）④ CheckpointRecoveryView 9 键 ⑤ 6-4 两处缺席断言现状（architecture :338-360 + acceptance :2150-2171）⑥ `_FROZEN_EVENT_COUNT=56` 基线
 - [ ] Subtask 0.9: 链路接线断言清单四项定义（Task 0 完成标志节钦定内容落档）
@@ -459,7 +459,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/services/test_recovery_mode.py` 扩展（转换两方向断言：REPLAY→"Replay"/OVERRIDE→"Override" 值级——events 枚举 `.value` 断言防只验类型） |
+| 🔴 红 | 编写 `tests/unit/domain/services/test_recovery_mode.py` 扩展（转换两方向断言：REPLAY→"Replay"/OVERRIDE→"Override" 值级——events 枚举 `.value` 断言防只验类型；**assess_consistency_risk 三分支矩阵逐支钉死**：Override+1 后续→"medium"/Override+0→"low"/Replay+任意（含 ≥2）→"low"——medium 腿是同源消费漂移的唯一可判别腿（low 与事件默认值同值，Replay 腿不可判别漂移）） |
 | 🟢 绿 | 实现 `to_event_recovery_mode(mode)` 于 `src/domain/services/recovery_mode.py` 就地追加（纯标准库映射） |
 | 🔄 重构 | 类型注解+docstring（引用 6-3 双枚举知悉注记） |
 
@@ -502,7 +502,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_checkpoint_use_case.py` 扩展（ListCheckpointsUseCase 守卫/透传）+ `test_agent_cli.py` 扩展（checkpoint-list 表格五列/checkpoint-show 九键输出/UUID 守卫 `[EXCEPTION_242]`/退出码）+ 契约测试扩展（PORT_NAMES+resolve） |
+| 🔴 红 | 编写 `test_checkpoint_use_case.py` 扩展（ListCheckpointsUseCase 守卫/透传）+ `test_agent_cli.py` 扩展（checkpoint-list **表格断言形态钦定：表头行精确串（五列头+` | `分隔符）+至少一行值级断言（含 sync_status 三态值与 true/false——禁子串存在性弱断言）**/checkpoint-show 九键输出/UUID 守卫 `[EXCEPTION_242]`/退出码）+ 契约测试扩展（PORT_NAMES+resolve）；TestListCheckpoints 补 **timestamp isoformat 字符串值级断言**（实体 datetime→VO str 转换的漂移哨兵——返回 datetime 对象即红） |
 | 🟢 绿 | 实现 ListCheckpointsUseCase + 组合根注册 `checkpoint_list_use_case` + CLI 两命令（五步定式——`_run_checkpoint_create_cli` 直系样板；show 命令 resolve 既有 `checkpoint_recovery_use_case`——首消费方） |
 | 🔄 重构 | CLI 输出函数 getattr 属性访问形态（零实体 import 依赖——6-3 `_print_checkpoint_result` 先例） |
 
@@ -529,7 +529,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 TestExecuteRecovery 组（五步调用序精确列表断言——含 487 零副作用 save/publish 零调用断言（6-3 call_order 断言形态）+**correction+冲突组合 apply_correction 零调用断言**（裁定②.5 前置的实现漂移哨兵）/模式裁定三分支（None 取建议/冲突 487 于②.5/更强允许）/恢复记录 12 键 exact set+confirmed_by 键**值级**断言/事件构造字段值级（recovery_mode 大写转换/modification_content 投影/metadata 双关联键/**checkpoint_id 传值断言**（修正一体=③步 sealed.snapshot_id、纯恢复=uuid.UUID(②视图.snapshot_id)）/execution_delay_ms>0/cost==0.0）/486 fail-loud（**try 面扩包③④两处 save**：修正场景 apply_correction save 注入+纯恢复场景恢复记录 save 注入，双路 side_effect StorageError→486 且事件零发布）/发布降级（publish 失败→Outcome 正常返回+恢复记录在）） |
+| 🔴 红 | 编写 TestExecuteRecovery 组（五步调用序精确列表断言——含 487 零副作用 save/publish 零调用断言（6-3 call_order 断言形态）+**correction+冲突组合 apply_correction 零调用断言**（裁定②.5 前置的实现漂移哨兵）/模式裁定三分支（None 取建议/冲突 487 于②.5/更强允许）/恢复记录 12 键 exact set+confirmed_by 键**值级**断言/事件构造字段值级（recovery_mode 大写转换/modification_content 投影/metadata 双关联键/**checkpoint_id 传值断言**（修正一体=③步 sealed.snapshot_id、纯恢复=uuid.UUID(②视图.snapshot_id)）/**consistency_risk_level 值级（Override+1 后续="medium" 腿承载——同源消费漂移哨兵；Replay="low" 与默认值同值仅断言不判别漂移）**/execution_delay_ms>0/cost==0.0）/486 fail-loud（**try 面扩包③④两处 save**：修正场景 apply_correction save 注入+纯恢复场景恢复记录 save 注入，双路 side_effect StorageError→486 且事件零发布）/发布降级（publish 失败→Outcome 正常返回+恢复记录在）） |
 | 🟢 绿 | 实现 `execute_recovery` + `CheckpointRecoveryOutcome`（ports/checkpoint.py 追加；service 实现——①守卫复用 ②recover_checkpoint 内调 ③apply_correction 条件调用（基线取②视图）④分支+恢复记录构造 save（except StorageError → 486 包裹）⑤事件发布（checkpoint_id 传值钦定+转换函数+assess_consistency_risk 同源+降级容错）+Outcome 组装（窗口 perf_counter+recovered_snapshot_id 单源锚） |
 | 🔄 重构 | 步骤拆私有方法（编排可读性）+ Raises 面 docstring |
 
@@ -550,7 +550,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] 恢复执行引擎全链实现
-- [ ] 变异实证×7（487 执法点删除→冲突场景假绿/恢复记录 12 键删键→exact set 红/事件 mode 不转换→值级断言红/**恢复起点恒 in_sync 覆盖规则删除→join 红**/**CLI dry-run 分支误调引擎→三零断言红**/**confirmed_by 硬编码空串→值级断言红**/**execution_delay_ms 恒 0.0→红**）
+- [ ] 变异实证×8（487 执法点删除→冲突场景假绿/恢复记录 12 键删键→exact set 红/事件 mode 不转换→值级断言红/**恢复起点恒 in_sync 覆盖规则删除→join 红**/**CLI dry-run 分支误调引擎→三零断言红**/**confirmed_by 硬编码空串→值级断言红**/**execution_delay_ms 恒 0.0→红**/**⑤步 checkpoint_id 不传值走 default uuid4→S9 值级断言红（R1-2 P1 史契约的回归锚）**）
 - [ ] CheckpointRecovered 发布点唯一性（grep 全仓单构造位——`re.compile(r"CheckpointRecovered\(")` 形态+**排除事件定义文件 checkpoint_events.py**（类定义行假阳性——6-3 契约 :161-170 先例的排除形态复刻，排除文件名按本事件定义文件适配），6-3 契约先例）
 - [ ] CLI 两态 exit code+异常路径退出语义正确
 
@@ -640,13 +640,13 @@
 - **设计约束:** 领域层零依赖（import-linter 强制）；frozen dataclass 不可变 VO；恢复记录经既有 `SnapshotRepositoryProtocol` 通用 KV 承载（禁直持 Redis 客户端）；6-3 冻结契约零触碰（state_data 13 键/checksum 参与集/五方法行为面）
 - **接口治理:** 统一端口注册（PortSpec 演进 v1.0.0→v1.1.0 走 ContractGate 兼容检查——纯新增方法非破坏）、Registry/Resolver、组合根唯一装配、契约优先
 - **技术栈:** Python 3.11+ / Redis 7.0+（快照+恢复记录 Hash）/ PostgreSQL（outbox）/ pytest-bdd
-- **关键设计条款:** 设计文档 §2.2 Replay 流程（L217-283——应用修改→后续清单→重放日志→逐步执行→回滚→审计）/ §2.3 Override 流程（L285-420——影响评估→人工确认→应用修改→mark_pending_sync→审计→双触发同步）/ §3 第一阶段单点恢复=本 Story；**第二阶段分支对比/合并（§3-4）不在本 Story（V2）**；or.md L69 (3)/L482-484/L622-624 恢复协议语义
+- **关键设计条款:** 设计文档 §2.2 Replay 流程（L217-283——应用修改→后续清单→重放日志→逐步执行→回滚→审计）/ §2.3 Override 流程（L285-420——影响评估→人工确认→应用修改→mark_pending_sync→审计→双触发同步）/ §3 第一阶段单点恢复=本 Story；**第二阶段分支对比/合并（§3-4）不在本 Story（归 Epic 10 Story 10.5——FR-SP-09 V1 规划承接，时相以 FR Map 为准）**；or.md L69 (3)/L482-484/L622-624 恢复协议语义
 
 ### 关键架构决策（OD 偏离声明——Task 0 落档）
 
 | OD | 裁定 | 依据 |
 |----|------|------|
-| **OD-1** | **范围边界——MVP 恢复执行形态=数据面恢复+重跑指引，LLM 实质重跑 defer 归 Epic 10**。6-6 交付：摘要读面（list/show）+ 修正入口（CLI）+ 恢复执行引擎（模式裁定执法 487→修正应用→双模式分支→恢复记录→CheckpointRecovered 发布）。**Replay 分支 MVP 语义**：后续 checkpoint 全部标记 invalidated（作废）+ 新基线=修正后快照 + 重跑指引输出（建议新 plan_id 经 `blm-plan` 重跑）——「修改点后所有状态重新计算」的**执行**由人工触发新 run 承载，系统保证旧后续不被误用（标记）+审计可溯（恢复记录+事件）。**四条物理约束**（实质重跑在 6-6 不可达）：① checkpoint 无 agent_id/task 关联——6-3 冻结 state_data 13 键无此二键（6-3 Task 0 冻结唯一版本），重跑语境在快照内不可得，扩键=冻结契约变更+13 键 exact set 断言面 ×4 全红；② 同 plan_id 重跑 482 守卫（blm_planning_service.py:253-259 `completed_steps>0` 即拒）+ BLM 服务无「从第 N 步续跑」入口（RunBlmPlanningUseCase 七步一次跑完）；③ `_runs`/`_PlanRunState` 进程内 dict（blm_planning_service.py:182）——CLI 每次调用新进程跨进程不可用 + SpBlmGraph 无 checkpointer（sp_blm_graph.py:105——:14-15 钦定注释+6-3 锚定义务 #4 裁定不引入维持）；④ 完整形态 checkpoint 仅 summary+compressed_context——`run_insight_step` 的 prior_outputs 需 InsightStepResult 结构化对象链（:337-352）不可从压缩产物重建 + per-step 骨架 TTL 86400 << checkpoint 30 天窗口外不可达。**epics 权威映射背书**：FR Coverage Map L535-538 将 FR-SP-06 Replay/FR-SP-08 Override/FR-SP-09 Time-travel 映射 Epic 10 Story 10.2/10.4/10.5（P1）；Epic 6 FR 集仅 SP-01~04+UI-11（L2003）——6-6 无独立 FR，深化 SP-03 交互语义（or.md 五.4「用户可反馈与修正该结果，然后继续执行后续任务」）。6-3 OD-1 预期的「Replay 重放重跑后续阶段」按本裁定收敛为「标记作废+指引」，完整协议（拓扑重排/WORM 旧版归档/执行缓存幂等/scheduler 双触发/惰性同步/一致性风险检测算法）归 Epic 10 | epics FR Coverage Map 权威映射 + 四条物理约束代码实证 + BDD 30s 硬超时与 Fake LLM 六步装配成本（6-3 OD-13 ~150 行成本不对称先例）+ YAGNI（P1 FR 不在 MVP 强交付） |
+| **OD-1** | **范围边界——MVP 恢复执行形态=数据面恢复+重跑指引，LLM 实质重跑 defer 归 Epic 10**。6-6 交付：摘要读面（list/show）+ 修正入口（CLI）+ 恢复执行引擎（模式裁定执法 487→修正应用→双模式分支→恢复记录→CheckpointRecovered 发布）。**Replay 分支 MVP 语义**：后续 checkpoint 全部标记 invalidated（作废）+ 新基线=修正后快照 + 重跑指引输出（建议新 plan_id 经 `blm-plan` 重跑）——「修改点后所有状态重新计算」的**执行**由人工触发新 run 承载，系统保证旧后续不被误用（标记）+审计可溯（恢复记录+事件）。**四条物理约束**（实质重跑在 6-6 不可达）：① checkpoint 无 agent_id/task 关联——6-3 冻结 state_data 13 键无此二键（6-3 Task 0 冻结唯一版本），重跑语境在快照内不可得，扩键=冻结契约变更+13 键 exact set 断言面 ×4 全红；② 同 plan_id 重跑 482 守卫（blm_planning_service.py:253-259 `completed_steps>0` 即拒）+ BLM 服务无「从第 N 步续跑」入口（RunBlmPlanningUseCase 七步一次跑完）；③ `_runs`/`_PlanRunState` 进程内 dict（blm_planning_service.py:182）——CLI 每次调用新进程跨进程不可用 + SpBlmGraph 无 checkpointer（sp_blm_graph.py:105——:14-15 钦定注释+6-3 锚定义务 #4 裁定不引入维持）；④ 完整形态 checkpoint 仅 summary+compressed_context——`run_insight_step` 的 prior_outputs 需 InsightStepResult 结构化对象链（:337-352）不可从压缩产物重建 + per-step 骨架 TTL 86400 << checkpoint 30 天窗口外不可达。**epics 权威映射背书**：FR Coverage Map L535-538 将 FR-SP-06 Replay/FR-SP-07 评估/FR-SP-08 Override/FR-SP-09 Time-travel 映射 Epic 10 Story 10.2/10.3/10.4/10.5（P1，四条全枚举）；Epic 6 FR 集仅 SP-01~04+UI-11（L2003）——6-6 无独立 FR，深化 SP-03 交互语义（or.md 五.4「用户可反馈与修正该结果，然后继续执行后续任务」）。6-3 OD-1 预期的「Replay 重放重跑后续阶段」按本裁定收敛为「标记作废+指引」，完整协议（拓扑重排/失败回滚/WORM 旧版归档/执行缓存幂等/预计耗时成本预估展示/scheduler 双触发/惰性同步/一致性风险检测算法）归 Epic 10 | epics FR Coverage Map 权威映射 + 四条物理约束代码实证 + BDD 30s 硬超时与 Fake LLM 六步装配成本（6-3 OD-13 ~150 行成本不对称先例）+ YAGNI（P1 FR 不在 MVP 强交付） |
 | **OD-2** | **零新增领域事件 + CheckpointRecovered 首激活 + CorrectionApproved 不激活**。① CheckpointRecovered（checkpoint_events.py:40-69）字段族与 or.md L49 (9) 逐字段吻合（Checkpoint ID/恢复模式/修改内容/影响后续列表/一致性风险等级/执行延迟/成本），双登记+auto_trigger 监听在位只欠发布点——本 Story 落发布点（恢复引擎⑤步），事件定义零 diff；② 蓝图事件 CheckpointReplayed/CheckpointOverridden/CheckpointOverrideCompleted（or.md L140/L482-483/设计文档 §2.3 L324）**不新建**——双模式语义经 recovery_mode 单事件字段区分（零新增纪律三连先例：6-3 OD-9/6-4 OD-6/6-5a OD-6）；③ CorrectionApproved（correction_events.py:16-40，通道在位）不激活——apply_correction 是 6-3 冻结行为面（call_order 断言族在位），加发布会动 6-3 既有测试；审批留痕经恢复记录 confirmed_by+correction.applied_by 双写承载；多级 approval_chain 是 V1 语义——deferred-work 登记；④ 发布容错=降级 warning 不回滚恢复记录（6-3 ⑤步 checkpoint_service.py:281-296 成文先例同构——恢复记录是审计真相源、事件是通知面）；⑤ metadata 双关联键 {"plan_id","checkpoint_no"}（R3-3 通道直接复用）；⑥ 双枚举转换经 to_event_recovery_mode 显式映射（6-3 story L171 钦定注记兑现——entities "replay"≠events "Replay" 成员值不等是代码事实）；⑦ **⑤步 checkpoint_id 显式传值**（字段默认 default_factory=uuid.uuid4 随机，不传则值级断言不可预期）：修正一体=③步 sealed.snapshot_id（with_updated_state 轮换后的新值）/纯恢复=uuid.UUID(②视图.snapshot_id)（str 逆转换）——6-3 R6-24 UUID 同型直传直系先例；断言预期值单源=Outcome.recovered_snapshot_id；cost 恒 0.0 不显式传 | 事件字段族与需求语义逐字段吻合实证 + 零新增=零 yaml/router diff（`_FROZEN_EVENT_COUNT=56` 零变化）+ 6-3 行为面冻结纪律 + 最小契约变更原则 |
 | **OD-3** | **恢复记录承载=第三键族 CheckpointSnapshot 通用 KV 形态**（`blm-checkpoint-recovery-{plan_id}`，`CHECKPOINT_RECOVERY_SESSION_PREFIX` 单源常量）。设计文档 §2.2/§2.3 的 ReplayLog/OverrideLog/SyncLog 三日志族在 MVP **合并为单一恢复记录**（每 plan 最新一次恢复单键覆盖——与 6-2 latest 键同构；历史经事件 outbox 可溯）；承载形态=CheckpointSnapshot（checkpoint_no="" **非完整形态**——不触发构造守卫/persistent_note_ref 强制/checksum 空——非完整性保护对象，恢复记录自身无篡改防护需求（审计面由 outbox 事件+WORM 归档承载）；state_data 12 键冻结）。**否决的备选**：a) 扩 checkpoint state_data 加 sync_status 第 14 键——动 6-3 冻结 13 键契约+checksum 参与集+exact set 断言面 ×4；b) 逐 checkpoint 标记键（pending_sync 写进各后续 checkpoint 键）——同 a) 破坏信封；c) 新增 PG 表——checkpoint 域全 Redis+零 migration（6-3 零 alembic 先例维持，WORM 语义由事件通道承载）；d) 独立标记键族+RedisAdapter 直写——绕开 SnapshotRepositoryProtocol 违反 6-3 端口纪律。sync_status 经恢复记录 join 推导（推导规则 Task 0 钦定——恢复起点恒 in_sync 新基线） | 零新存储设施/零 infra 改动/零新依赖（复用 snapshot_repository）+ 6-3 冻结契约零触碰 + 键族前缀判别先例（OD-3 双轨制扩展为三轨制）+ 设计文档三日志合一的 MVP 收敛（YAGNI） |
 | **OD-4** | **端口演进 v1.1.0（单端口继续承载）+ 三 CLI 命令 + 两新用例**。CheckpointServicePort 就地新增 list_checkpoints/execute_recovery（6-3 Task 0 钦定「单端口双方法组，避免同义接口重复」的延续——恢复执行与恢复数据面同域职责；纯新增方法 ContractGate 兼容）；**否决备选**：新 CheckpointRecoveryServicePort——同义接口重复违反端口纪律。CLI 三命令 `checkpoint-list`/`checkpoint-show`/`checkpoint-recover`（扁平子命令族——6-3 checkpoint-create 直系延续；**否决嵌套分组名**——顶级 prog="sisys-agent" 扁平族先例 R2-F18）；checkpoint-correct 独立命令**不设**——修正经 recover --correction-* 内嵌（「修正关键参数后恢复执行」是连续动作 epic 语义）+ 编程面 apply_correction 端口已开放（服务层直接可用）；checkpoint-show resolve 既有 `checkpoint_recovery_use_case`（首消费方——终结零消费方状态） | 端口纪律（禁同义重复）+ CLI 惯例（扁平+五步定式）+ epic AC 语义（修正+恢复连续动作）+ R3-2 乐观锁基线消费闭环 |
@@ -656,7 +656,7 @@
 | **OD-8** | **性能口径三段声明**：① 摘要显示 P95<200ms=show 单点窗口（load+verify+视图组装）与 list 清单窗口（≤8 probe+join）双覆盖——纯 Redis 读面毫秒级达标，20 轮采样数学口径沿用 6-3 AC-8（预热含首次 load 建连——R8-F5 注记继承）；② 恢复执行成功率 100%=N 次恢复 N 次恢复记录可读回（强制环节零吞错——486 是显式失败非静默）；③ Replay P95<60s/Override P95<15s（epics 6.3 L2164 归 6-6 的完整执行口径）=**引擎编排窗口口径**（②~⑤步纯数据面毫秒量级）——**口径差声明**（6-3 OD-6 先例形态）：引擎窗口不含 LLM 重跑（OD-1 defer），epic 预算针对的完整重放口径由 Epic 10 承接时本引擎窗口是其编排子集；口径差落测试 docstring | epic 性能行与交付面口径对齐（6-3 OD-6 同款纪律）+ 断言工程冗余（<15s 断言远小于门禁，漂移即红） |
 | **OD-9** | **双 RecoveryMode 枚举显式转换**：entities 版（checkpoint.py:45-49，"replay"/"override" 小写——RecoveryView.recommended_mode/引擎入参/恢复记录 state_data 用）与 events 版（events/enums.py:48-52，"Replay"/"Override" 首字母大写——CheckpointRecovered.recovery_mode 用）成员值不等；转换纯函数 `to_event_recovery_mode` 落 domain/services/recovery_mode.py（6-3 story L171 钦定注记「6-6 恢复执行面消费建议恢复模式时需显式转换」兑现；同文件增 `assess_consistency_risk` 风险等级纯函数——CLI dry-run 与引擎⑤步同源）；恢复记录 state_data 用 **entities 小写形态**（与 recommended_mode 可直比——读侧免二次转换）；CLI `--mode` 参数接受小写值域 {replay,override}（choices 拦截+CLI 层 RecoveryMode(args.mode) str-Enum 按值构造——全链单次转换） | 代码事实（两枚举值不等）+ 读侧直比便利 + 纯函数落 domain（零依赖合规） |
 | **OD-10** | **并发审批口径=5 独立 plan_id**（epics「并发审批 5 个 Checkpoint」L2332）：asyncio.gather 5 路（各 plan 一创建一恢复）；**同 plan 并发不承载**——恢复记录单键覆盖语义下同 plan 并发恢复会互相覆盖（6-3 单键单版本语义的自然约束），5 独立 plan=5 高管各审各的（epic 语义正解）；并发安全依赖键族 plan_id 隔离（零锁——gather 值级断言无交叉污染） | epic 语义解读（「5 个 Checkpoint」非「1 个 Checkpoint 5 路」）+ 恢复记录单键结构事实 + 零锁简单性 |
-| **OD-11** | **测试文件命名（禁故事编号后缀）**：acceptance `test_acceptance_checkpoint_recovery.feature/.py`；integration `test_integration_checkpoint_recovery.py`（**对 epics L2345 钦定名 `test_checkpoint_recovery_integration.py` 的显式偏离**——仓规 tests/integration/ 全目录 test_integration_* 前缀惯例，6-3 OD-8 同款拆分声明）；unit/architecture `test_checkpoint_recovery.py`（**epics L2344 钦定名采纳**——epics 原文语境为单元测试文件名，6-6 落位 unit/architecture/ 子目录承载 SDD 架构验证（名采纳+落位仓规）；与既有 test_checkpoint.py 不同名并存；6-3 半采半离先例）；service 单测扩展既有 `test_checkpoint_service.py`（同服务同文件分组——6-3 恢复数据面同文件先例）；用例单测扩展既有 `test_checkpoint_use_case.py`；事件通道契约新文件 `test_event_channel_mapping_checkpoint_recovery.py`（6-5b 按功能新文件先例） | epics 钦定名半采半离（6-3 OD-8 先例）+ 记忆「禁止故事编号命名文件」+ 仓规目录前缀惯例 |
+| **OD-11** | **测试文件命名（禁故事编号后缀）**：acceptance `test_acceptance_checkpoint_recovery.feature/.py`；integration `test_integration_checkpoint_recovery.py`（**对 epics L2345 钦定名 `test_checkpoint_recovery_integration.py` 的显式偏离**——仓规 tests/integration/ 主流 test_integration_* 前缀惯例（36 文件主流+8 遗留非前缀），6-3 OD-8 同款拆分声明）；unit/architecture `test_checkpoint_recovery.py`（**epics L2344 钦定名采纳**——epics 原文语境为单元测试文件名，6-6 落位 unit/architecture/ 子目录承载 SDD 架构验证（名采纳+落位仓规）；与既有 test_checkpoint.py 不同名并存；6-3 半采半离先例）；service 单测扩展既有 `test_checkpoint_service.py`（同服务同文件分组——6-3 恢复数据面同文件先例）；用例单测扩展既有 `test_checkpoint_use_case.py`；事件通道契约新文件 `test_event_channel_mapping_checkpoint_recovery.py`（6-5b 按功能新文件先例） | epics 钦定名半采半离（6-3 OD-8 先例）+ 记忆「禁止故事编号命名文件」+ 仓规目录前缀惯例 |
 | **OD-12** | **本 Story 零 infrastructure 改动 + 零 PG 新依赖**：恢复记录经既有 RedisSnapshotStore 通用 KV 承载（OD-3）；事件经既有 event_publisher（outbox 写入由既有装配承载——组合根 lambda 无 PG 仓储新增）；**6-4 CLI session P0 教训的适用面核验**：本 Story CLI 链 resolve 的服务（checkpoint_service/list·execute 用例/recovery 用例）全部经 Redis+既有 publisher，零新 PG 仓储家族成员——无 session_factory 缺口面（三步排查法核验：组合根 impl lambda 无新 PG 构造/无新仓储成员/CLI 零 set_session 维持既有形态）；agent_cli 五步定式函数族 :885/:963/:1008-1065 直用 | OD-3 承载形态的连带红利 + 6-4 CR1-F1 三步排查法预防性核验（教训应用而非补救） |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
@@ -775,7 +775,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 - **风险集中登记**：①最大回归风险=CheckpointServicePort 演进与 checkpoint_service 追加方法（纯新增预期零适配——Task 4.3 六面实证；失配即回 Task 2/3）；②契约风险=恢复记录 12 键与 sync 推导规则（Task 0 冻结唯一版本——实现禁增删键）；③口径风险=性能三段（OD-8）；④发布风险=CheckpointReached 既有断言面零修改（Task 4.2 复跑）；⑤让位风险=6-4 两处断言（收窄后守护测试必须绿——Task 1 红绿双向）；⑥**并发风险=gather 路径共享 AsyncSession**（SQLAlchemy 并发会话防呆必现——每任务会话隔离钦定，Task 0.5/5.1 装配契约承载）；⑦断言风险=checkpoint_id 值级断言的值源（OD-2⑦ 传值钦定+Outcome.recovered_snapshot_id 单源锚——不钦定则 Task 7 验收红且易误诊）
 - **三条红线**：禁 `raise ValueError` / 手动 HTTPException / 继承内置 Exception（提交前三条 grep 自查零输出）；禁 noqa/type: ignore/pylint disable；提交信息禁 AI 署名
 - **覆盖率**：整体≥80% / application≥85%（主改动层）/ domain≥90% / 集成≥75%
-- **验收/集成禁 mock**（真实服务优先 + `pytest.skip()` 动态跳过；Fake LLM+Fake Embedding 双豁免——外部 SaaS；486 编排失败/发布失败注入归单测层 AsyncMock——no-mock 红线互斥裁定 6-3 R3-4 先例）
+- **验收/集成禁 mock**（真实服务优先 + `pytest.skip()` 动态跳过；Fake LLM+Fake Embedding 双豁免——外部 SaaS；486 编排失败/发布失败注入归单测层 AsyncMock——no-mock 红线互斥裁定 6-2 R3-4 先例（6-3 沿用））
 - **运行命令**：`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`（显式四目录，裸 `tests/` 挂起）
 - **xdist 串行组**：pytestmark `xdist_group("blm-planning-perf")` 整模块挂法（与 6-3 验收+集成同 worker 串行）
 
@@ -899,6 +899,8 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 | R2-6 | 其余 P3×17：S13 错引 S3（482 归 S4）/L333 五码→六码/L54 修正点→恢复起点/S3 连续修正承载/execution_ms 三窗口未钦定/Replay 恒 low 改显式传函数输出/结构树漏 assess_consistency_risk/S2/S3 保红入口限定/plan_id 守卫层位三处信号/new_state_version 无修正取值+sealed str 化/恢复记录损坏退化注记/Task 1.4 红实证时序措辞/缺席 grep 事件定义文件排除（CheckpointRecovered+CorrectionApproved 两处——类定义行假阳性）/Task 4.4 第七面登记/dry-run 冲突评估预检提示/gather 会话 try/finally 生命周期/实测双数值统一 0.14-0.23s | P3 | 逐项就地订正（正文 18 处） |
 | R3-1 | S2/S8 CLI 直调前 `clear_singleton()` 单清不充分——snapshot_repository 是 SCOPED，单清不清 `_scoped_context`，scoped 残留旧 store 持死 loop 客户端且 load 吞错返 None→show 误报 480/sync join 假 in_sync 的静默失败（R3 真实 Redis 实跑证伪）；二次 bootstrap 抛 ConflictError（registry 持久） | P1 | 改双清钦定 `clear_singleton()`+`clear_scoped()`（markdown_report.py:145-148 先例）+禁重新 bootstrap 注记（ensure 自动短路） |
 | R3-2 | 其余 P3×7：list 窗口采样轮数未钉（同 20 轮）/S12 窗口载体与蕴含声明缺（Outcome①~⑤⊇②~⑤；逐次<15s 蕴含 P95 双门禁）/「CP-1 值域」可误读为编号约束（实为 stage_id 值域）/调用面矩阵缺 S14 注记/assess_consistency_risk 消费点「④⑤」与「⑤」两套口径（契约唯一落点=⑤）/CLI 缺参 exit 2 与 242 守卫分工未成文（空串归 242）/R2-6 计数 13→17+R1 对码「19+3」→「19 完整+2 部分」订正 | P3 | 逐项就地订正；另 Task 0.1 补合理性终审两注记（probe 半途失败边缘 defer 登记/TTL 写时序无孤儿窗+反向边缘） |
+| R4-1 | assess_consistency_risk 判别链断裂（三分支矩阵未逐支钉死+Task 3 事件字段清单漏 consistency_risk_level——「硬编码 low」漂移可存活）；S11 保红入口两套钦定互斥（Task 0.6 CLI 入口 vs 调用面矩阵编程面）；整体覆盖率门禁命令裸收集挂起形态（与四目录纪律自相矛盾） | P2 | Task 1.1 三分支矩阵钉死（medium 腿=唯一可判别腿）+Task 3 字段清单补 consistency_risk_level（Override+1 后续=medium 承载）；S11 改「list 窗口新符号保红+show 数据面采样」；覆盖率命令补显式四目录 |
+| R4-2 | 其余 P3×15：分层覆盖率 addopts 累积口径注记/ruff 补 tests//mypy 基线 752 锚/5 次 vs 双轮等效证据链统一/no-mock 先例 6-3 R3-4→6-2 R3-4（三处）/validate-create-story 模板遗留措辞/OD-11 主流前缀措辞/pre-commit push-stage 注记/三红线 git diff 命令化待实施期/dry-run 预计耗时成本 defer 声明（or.md L484 唯一零承载项）/L623 幂等性 MVP 承载声明/OD-1 枚举补 SP-07→10.3+失败回滚/epic 架构测试三项落位对账/V2→Epic 10 措辞/CLI 表格断言形态钦定（表头精确串+行值级）/timestamp isoformat 断言/checkpoint_id 传值变异锚×8/未知值防御悬空义务裁定（枚举闭集不可构造，删短语） | P3 | 逐项就地订正（需求覆盖六源 17 条 100% 承载+门禁全可执行复核结论同步落档） |
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -922,18 +924,18 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 ### 下一步 Next Steps
 
 - [ ] Story created with `ready-for-dev` status
-- [ ] 运行 `validate-create-story` 质量检查
+- [ ] 文档审查五轮收敛（本 Story 已执行——v1.5.0 定稿）；story-template 合规人工核对（仓内无 validate-create-story skill）
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-11-05
 **最后更新/Last Updated:** 2026-11-05
 **更新说明/Description:**
-- v1.3.0: 文档审查 Round 3 修订（3 Agent 并行【技术实证实跑（8 项：PEP 567 会话隔离/str-Enum 构造/to_dict payload 下钻/恢复记录真实 Redis round-trip/CLI 跨循环/485 空洞/重复 load/降级 except 面——7 通过+1 证伪）/方案合理性终审（13 OD+4 钉+2 专项=15 项：13 维持+2 维持带注记+0 建议修订——对标 terraform plan-apply/一致性级别 floor/Saga validate-before-execute/CQRS latest+append-only 配对等业界模式）/边界数理扫描（11 组：P95 公式/键数实数/CP 编号/TTL/三窗口/称谓自洽——零 P1P2+P3×8）】；**P1×1**：S2/S8 CLI 直调前 clear_singleton() 单清证伪（SCOPED snapshot_repository 缓存不被单清驱逐+load 吞错静默假 480/假 in_sync——真实 Redis 实跑证伪）→双清钦定 clear_singleton()+clear_scoped()（markdown_report:145-148 先例）+禁二次 bootstrap 注记（ConflictError 实证）；P3×7 就地订正（list 20 轮/S12 窗口载体蕴含声明/stage_id 值域消歧/S14 矩阵注记/⑤步口径统一/缺参与 242 分工/计数订正）+合理性终审两注记落 Task 0.1（probe 半途失败边缘 defer Epic 10/TTL 写时序无孤儿窗+反向边缘）；Docs Review Fixes 表 R3-1~R3-2 落档）
+- v1.4.0: 文档审查 Round 4 完备性核查+门禁复核修订（3 Agent 并行【需求覆盖六源核查（epics 17 条 100% 承载+零超范围+P3 声明缺口×6）/测试矩阵七维度判别力复核（断言/覆盖空隙/红绿/变异锚 15 对照/回归面 grep 全集/隔离清理/Fake 契约）/质量门禁九项可执行性复核（pyproject/pre-commit/importlinter 实据）】；**P0/P1 双零收敛**；P2×3：assess_consistency_risk 判别链闭合（三分支矩阵+medium 腿=Override+1 后续唯一可判别腿+S9 值级承载）/S11 保红入口两套钦定互斥消解（Task 0.6 对齐调用面矩阵编程面）/整体覆盖率命令补显式四目录（裸收集挂起形态封堵）；P3×15 就地订正（mypy 752 基线锚/ruff 双目录/等效证据链统一双轮口径/no-mock 先例 6-2 R3-4 正名/validate-create-story 模板遗留处理/or.md L484 预计耗时成本 defer 声明——六源唯一零承载项/L623 幂等性 MVP 承载/OD-1 四条全枚举+失败回滚/epic 架构测试三项对账/V2→Epic 10/CLI 表格断言形态/timestamp 断言/checkpoint_id 变异锚×8/未知值防御悬空裁定等）；Docs Review Fixes 表 R4-1~R4-2 落档）
 - v1.2.0: 文档审查 Round 2 修订（3 Agent 并行【回归核查（R1 21 项对码：19 完整+2 部分落地）/交叉引用深度核查（五向闭环 27 条 VC 严格闭环率 85.2%→修正后 27/27；锚点 60+ 个逐一对码零漂移）/执行序深度推演（五步/14 场景/CLI 双态/读侧/让位序/回归面六面全推演）】+主会话亲验 P2 依据两组；P2×5+P3 批量：**顺序语义与调用面四钉死**——②.5 模式裁定前置（correction+冲突零副作用哨兵）/486 try 面扩包③④两处 save（103 逃逸封堵）/逐场景调用面矩阵（S2/S8 CLI in-process+clear_singleton 跨循环防线、S11 采样=数据面窗口、CLI 完整覆盖归单测）/S5 尾点独立 plan 钉死（单键覆盖陷阱消除）；R1 联动残留四处清偿+P3×17 就地订正（execution_ms 三窗口/grep 类定义排除/第七面/会话生命周期等）；Docs Review Fixes 表 R2-1~R2-6 落档）
 - v1.1.0: 文档审查 Round 1 修订（7 Agent 并行【D1 调研×4：checkpoint 域核心/事件体系与组合根/异常体系与 6-4 让位/CLI 与测试样板 + D2 审查×3：一致性内审/正确性对码与方案合理性/可行性与最佳实践（含 6-3 验收实测基线）】+ 主会话亲验 8 组关键锚点；P1×8+P2×12+P3×1 计 21 项编号修复+附注若干：**P1 面五项实质矛盾全清**——集成场景① Override pending_sync 两点不可构造（模式执法必然推论上限 1 点）/outbox checkpoint_id 值级断言三重不可达（默认 uuid4 随机+先例引用失实+with_updated_state 轮换 snapshot_id——OD-2⑦ 显式传值钦定+Outcome 第 10 键 recovered_snapshot_id 断言单源锚）/让位收窄 range(488,490) 丢 485 守护（残留码元组 (485,488,489)）/gather 共享 AsyncSession 并发防呆必现（每任务会话隔离钦定）/§3.12 C4 设计文档同步义务遗漏（Checklist 4→5 项）+六码口径统一+Status 四处同步+五条 VC 场景落位；**P2 面**：成组守卫层位正名（CLI 层唯一落位——CorrectionRecord 默认值兜底实证）/风险等级同源纯函数 assess_consistency_risk+Replay 恒 low+cost 恒 0 钦定/创建侧 CheckpointReached 行清理补位/判别规则权威键改 recovery_mode/30s 硬超时表述事实化/Task 0.6 逐场景红锚符号表/两覆盖率口径钦定/off-by-one 家族修复语继承/sync 覆盖读面注记/12 组行号锚点 30+ 处订正；Docs Review Fixes 表 21 项编号落档）
 - v1.0.0: 创建故事文件（四 Agent 并行调研【checkpoint 域全景/BLM 编排与 CLI/验收集成测试样板/架构治理与设计文档】+ 主会话亲验六组关键锚点；钦定 OD-1~OD-12 偏离声明：MVP 恢复执行形态四条物理约束论证与 Epic 10 分界/CheckpointRecovered 零新增首激活+CorrectionApproved 不激活/恢复记录第三键族/端口 v1.1.0 演进+CLI 三命令/dry-run 两态确认/模式强制 487/486-487 取码+6-4 让位/性能三段口径/双枚举转换/并发 5 独立 plan/测试命名半采半离/零 infra 零 PG 改动；14 验收场景钉死；锚定义务六条处置预案；6-3 边界表出处逐行声明）
