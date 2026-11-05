@@ -2961,7 +2961,7 @@ class TestTraceTreeExecution:
     def test_empty_tree_outputs_no_archive_note(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """空树（无归档）：exit 0 + 「该 plan 无归档行」提示（空树是正常态——AC-5）."""
+        """空树（无归档）：exit 0 + 「该 plan 无思维链归档行」提示（空树是正常态——AC-5；R3-F3 精确化）."""
         stub = _StubTreeUseCase(_make_stub_tree(build_degraded=False, stages=()))
         _patch_trace_tree_entry(monkeypatch, stub)
 
@@ -2969,7 +2969,7 @@ class TestTraceTreeExecution:
 
         assert exit_code == 0
         out = capsys.readouterr().out
-        assert "该 plan 无归档行" in out, f"空树应打无归档提示（实测={out!r}）"
+        assert "该 plan 无思维链归档行" in out, f"空树应打无归档提示（实测={out!r}）"
         assert "归档查询失败" not in out, "真空树不得打降级提示（与顶层失败分立——DR1-9）"
 
     def test_degraded_tree_outputs_query_failed_note(
@@ -2984,7 +2984,7 @@ class TestTraceTreeExecution:
         assert exit_code == 0
         out = capsys.readouterr().out
         assert "归档查询失败（已降级）" in out, f"顶层降级应打失败提示（实测={out!r}）"
-        assert "该 plan 无归档行" not in out, "降级空树不得打无归档提示（分立哨兵）"
+        assert "该 plan 无思维链归档行" not in out, "降级空树不得打无归档提示（分立哨兵——R3-F3 同步新文案防永真）"
 
     def test_collapsed_tree_outputs_archive_stats_not_empty_note(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -3000,5 +3000,88 @@ class TestTraceTreeExecution:
         assert exit_code == 0
         out = capsys.readouterr().out
         assert "归档对照" in out, f"折叠形态应打对照行（实测={out!r}）"
-        assert "该 plan 无归档行" not in out, "total>0 时不得打无归档假话（读模型诚实性——DR1-9）"
+        assert "该 plan 无思维链归档行" not in out, "total>0 时不得打无归档假话（读模型诚实性——DR1-9/R3-F3 同步）"
         assert "归档查询失败" not in out, "非降级形态不得打降级提示"
+
+    def test_degradation_markers_visible_in_output(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """降级状态呈现（R3-F1）：切片/文档行携带 status 标记 + 顶层降级 stage 行——解析降级对分析视用户可见."""
+        from types import SimpleNamespace
+
+        degraded_doc = SimpleNamespace(
+            document_id="d-9",
+            filename="年报.pdf",
+            version=1,
+            page=3,
+            object_key="raw-documents/test/d-9.pdf",
+            bucket="raw-documents",
+            bbox=None,
+            status="document_missing",
+            jump_ready=False,
+        )
+        missing_chunk = SimpleNamespace(
+            chunk_id="chunkmissing01",
+            content_excerpt="",
+            page_start=None,
+            page_end=None,
+            status="point_missing",
+            children=(),
+        )
+        ok_doc = SimpleNamespace(
+            document_id="d-1",
+            filename="月报.pdf",
+            version=1,
+            page=2,
+            object_key="raw-documents/test/d-1.pdf",
+            bucket="raw-documents",
+            bbox=None,
+            status="resolved",
+            jump_ready=True,
+        )
+        ok_chunk = SimpleNamespace(
+            chunk_id="chunkok01abcdef",
+            content_excerpt="正常切片",
+            page_start=2,
+            page_end=2,
+            status="resolved",
+            children=[ok_doc, degraded_doc],
+        )
+        stage_node = SimpleNamespace(
+            stage="market_insight_trend",
+            display_name="看趋势",
+            summary="摘要",
+            degraded=False,
+            degrade_reason="",
+            tools_used=("t1",),
+            reflection_excerpt="反思",
+            evidence_count=2,
+            children=[missing_chunk, ok_chunk],
+        )
+        root = SimpleNamespace(
+            plan_id=str(uuid.uuid4()),
+            title="BLM 战略规划溯源",
+            summary="综合结论",
+            stage_count=1,
+            children=(stage_node,),
+        )
+        tree = SimpleNamespace(
+            plan_id=root.plan_id,
+            root=root,
+            adopted_archives=1,
+            total_archives=1,
+            degraded_stages=("market_insight_trend",),
+            build_degraded=False,
+            generated_at="2026-11-06T00:00:00+00:00",
+        )
+        stub = _StubTreeUseCase(tree)
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", root.plan_id])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "[point_missing]" in out, f"点失效切片行应携带状态标记（实测={out!r}）"
+        assert "[document_missing]" in out, f"文档缺失行应携带状态标记（实测={out!r}）"
+        assert "降级 stage: market_insight_trend" in out, f"degraded_stages 非空应打顶层降级行（实测={out!r}）"
+        assert "[resolved]" not in out, "resolved 正常态不打标记（标记仅降级态）"

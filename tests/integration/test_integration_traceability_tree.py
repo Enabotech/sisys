@@ -521,7 +521,9 @@ async def test_scenario_two_multi_run_and_real_degradation() -> None:
         assert by_chunk["ov-trend-1"].children[0].status == "document_missing", "文档行已真实删除→document_missing"
         assert rebuilt.degraded_stages == (_COMPETITION_STAGE, _TREND_STAGE), "升序上卷"
     finally:
-        await _cleanup_plan_and_documents([plan_id], [gap_document_id])  # shared 行已在场景内删除
+        # shared 行入清理清单（R3-F5）：场景内删除是判别构造，失败路径行残留由本清单兜底
+        # （DELETE 不存在行是 no-op——happy path 二次删除无害）
+        await _cleanup_plan_and_documents([plan_id], [gap_document_id, shared_document_id])
         await _drop_collection(collection)
 
 
@@ -652,8 +654,13 @@ async def test_scenario_four_handler_payload_roundtrip() -> None:
             assert payload["page_end"] == expected_end, f"page_end 读回值级: {payload['page_end']}"
             assert payload["chunk_id"] == chunk_id
             assert "created_at" in payload, "infra upsert 追加 created_at（实存第 9 键——存在性断言不计数 DR1-3）"
-        # 清理：共享 collection 定向点删（禁整删——DR2-3）+ PG 行定向 DELETE
-        await l3.delete_points("documents", chunk_ids)
-        assert await l3.get_point("documents", chunk_ids[0]) is None, "定向点删后 get_point 返 None（清理闭环）"
     finally:
+        # 共享 collection 定向点删兜底（禁整删——DR2-3；R3-F5：入 finally 使断言失败路径
+        # 亦清——键计数净增 0 纪律；容错包裹防 finally 内异常掩蔽原失败）
+        try:
+            await l3.delete_points("documents", chunk_ids)
+        except Exception as error:  # teardown 容错（清理失败不阻断测试结果上报）
+            print(f"[teardown:scenario4-points] 清理异常（容错）: {error}")
         await _cleanup_plan_and_documents([plan_id], [document_id])
+    # 清理闭环断言（happy path——finally 已删；失败路径 finally 容错时此断言兜底网不可达）
+    assert await l3.get_point("documents", chunk_ids[0]) is None, "定向点删后 get_point 返 None（清理闭环）"

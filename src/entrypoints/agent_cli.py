@@ -656,15 +656,23 @@ async def _close_connection_pools() -> None:
     触碰 Redis）；load-profile 侧 event_publisher → outbox 链路会实例化 PG
     engine（RELIABLE 事件落 outbox 表）——退出不关均留 ResourceWarning
     （R1-F7 对称清理）。仅关闭已实例化的 manager（peek 不触发懒实例化）；
-    禁用全量 shutdown()——它会在退出路径惰性实例化 Qdrant/Neo4j 等
-    本 CLI 未触达的 manager。
+    禁用全量 shutdown()——它会在退出路径惰性实例化未触达的 manager。Qdrant/
+    Neo4j 面（R3-F2）：run 链（blm_planning→hybrid_search→dense/sparse→l3_vector
+    →qdrant；graph_search→l5_graph→neo4j）与 trace-tree 链（l3_vector→qdrant）
+    均在构造期急切实例化对应 manager——两 manager 入列关闭（peek 未实例化者
+    no-op；QdrantManager.close 判空自愈、Neo4jManager 构造注入 driver 恒可关）。
 
     逐 manager 独立 try/except：一处关闭失败不跳过另一处（Redis 失败仍关
     PG）。本方法在 finally 中调用：关闭异常（如断连超时）若上抛会反噬主
     结果——实例化成功被误报 exit 1、失败路径丢失根因异常，故内部消化记
     warning（对齐 run_tool_chain 发布失败「记日志不回滚」先例的防御面收窄）。
     """
-    for manager_name in ("redis_connection_manager", "postgresql_connection_manager"):
+    for manager_name in (
+        "redis_connection_manager",
+        "postgresql_connection_manager",
+        "qdrant_connection_manager",
+        "neo4j_connection_manager",
+    ):
         try:
             manager = get_resolver().peek_singleton(manager_name)
             if manager is not None:
@@ -1358,9 +1366,13 @@ def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> N
     规范序（服务已重排——DR3-1）；--stage 客户端过滤作用于 depth 构建结果且保留
     结论层行（DR3-7）；切片行 page 取 ChunkNode.page_start（DR3-7）。空树输出三分化
     （R1-F3——DR1-9 读模型诚实性）：build_degraded=True 打「⚠ 归档查询失败（已降级）」/
-    total==0 打「该 plan 无归档行」/ total>0 无分析层节点打归档对照行+成因提示
-    （depth 折叠或 stage 越域——空结果自我解释是「没有数据」「拿不到数据」还是
-    「有数据未展开」）。getattr 形态零 VO import 依赖（6-3 _print_checkpoint_result 先例）。
+    total==0 打「该 plan 无思维链归档行」（total 是 kind 过滤后口径——R3-F3 精确化）/
+    total>0 无分析层节点打归档对照行+成因提示（depth 折叠或 stage 越域——空结果自我
+    解释是「没有数据」「拿不到数据」还是「有数据未展开」）。降级状态呈现（R3-F1——
+    与 R1-F3 同族诚实性）：切片行 status≠resolved 追加「[点失效]」、文档行
+    document_missing 追加「[文档缺失]」、degraded_stages 非空时对照行后打降级 stage
+    行——解析降级对分析视用户可见。getattr 形态零 VO import 依赖（6-3
+    _print_checkpoint_result 先例）。
     """
     root = getattr(tree, "root", None)
     adopted = getattr(tree, "adopted_archives", 0)
@@ -1374,11 +1386,14 @@ def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> N
         if getattr(tree, "build_degraded", False):
             print("  ⚠ 归档查询失败（已降级）")
         elif total == 0:
-            print("  该 plan 无归档行")
+            print("  该 plan 无思维链归档行")
         else:
             print(f"  归档对照: 采纳 {adopted} / 候选 {total}（无分析层节点——depth 折叠或 stage 越域）")
         return
     print(f"  归档对照: 采纳 {adopted} / 候选 {total}")
+    degraded_stages = getattr(tree, "degraded_stages", None) or ()
+    if degraded_stages:
+        print(f"  降级 stage: {', '.join(str(stage) for stage in degraded_stages)}")
     for stage_node in children:
         stage = getattr(stage_node, "stage", "")
         if stage_filter is not None and stage != stage_filter:
@@ -1391,10 +1406,14 @@ def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> N
         for chunk_node in getattr(stage_node, "children", None) or ():
             chunk_id = str(getattr(chunk_node, "chunk_id", ""))
             excerpt = str(getattr(chunk_node, "content_excerpt", ""))[:60]
-            print(f"    切片: {chunk_id[:8]} {excerpt} page={getattr(chunk_node, 'page_start', None)}")
+            chunk_status = str(getattr(chunk_node, "status", "resolved"))
+            chunk_mark = "" if chunk_status == "resolved" else f" [{chunk_status}]"
+            print(f"    切片: {chunk_id[:8]}{chunk_mark} {excerpt} page={getattr(chunk_node, 'page_start', None)}")
             for doc_node in getattr(chunk_node, "children", None) or ():
+                doc_status = str(getattr(doc_node, "status", "resolved"))
+                doc_mark = "" if doc_status == "resolved" else f" [{doc_status}]"
                 print(
-                    f"      文档: {getattr(doc_node, 'filename', '')}"
+                    f"      文档: {getattr(doc_node, 'filename', '')}{doc_mark}"
                     f" page={getattr(doc_node, 'page', None)}"
                     f" 对象={getattr(doc_node, 'bucket', '')}/{getattr(doc_node, 'object_key', None)}"
                 )

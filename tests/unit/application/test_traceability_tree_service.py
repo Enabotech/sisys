@@ -74,6 +74,7 @@ EXPECTED_DOCUMENT_KEYS: frozenset[str] = frozenset(
 
 _GAP_STAGE = "performance_gap"
 _TREND_STAGE = "market_insight_trend"
+_COMPETITION_STAGE = "market_insight_competition"
 _SYNTHESIS_STAGE = "market_insight_synthesis"
 
 
@@ -454,6 +455,65 @@ class TestBuildTraceTree:
         assert stage_node.evidence_count == 0, "非 dict assumptions 降零证据"
         assert stage_node.children == (), "非 dict assumptions 无 chunk 子节点"
         assert tree.adopted_archives == 1
+
+    @pytest.mark.asyncio
+    async def test_dirty_chain_and_payload_family_degrades(self) -> None:
+        """②③chain 值类型脏（list）/final_answer 合法 JSON 非 dict → 三键降级不炸（R3-F4 锚族）.
+
+        chain 非 dict 经 isinstance 守卫降 {}——summary/tools/reflection 三键全降空；
+        final_answer='[1,2]'（合法 JSON array）经 _parse_final_answer isinstance(payload, dict)
+        分支返 None——summary 降 chain.input_summary 兜底（兜底锚保 payload 消费路径可达，
+        删守卫变异经 AttributeError 必红）。
+        """
+        plan_id = uuid.uuid4()
+        dirty_chain_row = _make_archive(stage=_GAP_STAGE, chunk_ids=("chunk-a",), plan_id=plan_id)
+        dirty_chain_row.decision_basis["chain"] = ["not", "a", "dict"]
+        bad_payload_row = _make_archive(stage=_TREND_STAGE, chunk_ids=("chunk-b",), plan_id=plan_id)
+        bad_payload_row.decision_basis["chain"]["final_answer"] = "[1,2]"
+        dirty_refs_row = _make_archive(stage=_COMPETITION_STAGE, chunk_ids=("chunk-c",), plan_id=plan_id)
+        dirty_refs_row.assumptions["evidence_refs"] = "not-a-list"
+        service, _ = _make_service(archives=[dirty_chain_row, bad_payload_row, dirty_refs_row])
+        tree = await service.build_trace_tree(plan_id=str(plan_id), depth=2)
+        by_stage = {node.stage: node for node in tree.root.children}
+        gap_node = by_stage[_GAP_STAGE]
+        assert gap_node.summary == "", "chain 非 dict → summary 降空串"
+        assert gap_node.tools_used == (), "chain 非 dict → tools_used 降空元组"
+        assert gap_node.reflection_excerpt == "", "chain 非 dict → reflection 降空串"
+        trend_node = by_stage[_TREND_STAGE]
+        assert trend_node.summary == "输入摘要（market_insight_trend#0）", "final_answer 非 dict → summary 降兜底"
+        assert trend_node.tools_used == ("tool-market_insight_trend-0",), "chain 其余键不受解析失败影响"
+        assert by_stage[_COMPETITION_STAGE].evidence_count == 0, "evidence_refs 非 list → 零证据（str 不按字符迭代）"
+
+    @pytest.mark.asyncio
+    async def test_dirty_document_family_degrades(self) -> None:
+        """④version 脏（0）/metadata 非 dict → 降级不炸（R3-F4 锚族——VO 类型域闭合）."""
+        plan_id = uuid.uuid4()
+        doc1_id, doc2_id = str(uuid.uuid4()), str(uuid.uuid4())
+        row = _make_archive(
+            stage=_GAP_STAGE,
+            chunk_ids=("chunk-v", "chunk-m"),
+            archived_at=datetime(2026, 1, 1, tzinfo=UTC),
+            plan_id=plan_id,
+        )
+        doc1 = _make_document_mock(doc1_id, chunks_meta=[{"chunk_id": "chunk-v", "page_start": 3, "page_end": 3}])
+        doc1.version = 0
+        doc2 = _make_document_mock(doc2_id, filename="脏元数据.pdf")
+        doc2.metadata = "not-a-dict"
+        service, _ = _make_service(
+            archives=[row],
+            points={
+                "chunk-v": _make_point_payload("chunk-v", doc1_id),
+                "chunk-m": _make_point_payload("chunk-m", doc2_id),
+            },
+            documents={doc1_id: doc1, doc2_id: doc2},
+        )
+        tree = await service.build_trace_tree(plan_id=str(plan_id), depth=4)
+        docs = {c.chunk_id: c.children[0] for c in tree.root.children[0].children}
+        assert docs["chunk-v"].version == 1, "version 脏值（0）降 1（VO int 类型域——missing=0/脏=1 双口径注记）"
+        assert docs["chunk-v"].page == 3, "version 脏不影响 page 正常匹配"
+        assert docs["chunk-m"].page is None, "metadata 非 dict → page 降 None"
+        assert docs["chunk-m"].object_key is None, "metadata 非 dict → object_key 降 None"
+        assert docs["chunk-m"].jump_ready is False, "metadata 非 dict → 半跳转不可达"
 
     @pytest.mark.asyncio
     async def test_judge_last_write_wins(self) -> None:

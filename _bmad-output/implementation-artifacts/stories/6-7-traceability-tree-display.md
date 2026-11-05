@@ -110,9 +110,9 @@
 
 **Given** 归档链在位
 **When** 执行 `sisys-agent trace-tree --plan-id <uuid> [--depth {1,2,3,4}] [--stage <stage>]`
-**Then** 树形层级输出（缩进表达四层——每层两级空格缩进 + 层级标签前缀「结论/分析/切片/文档」；纯标准库打印形态——6-6 `checkpoint-list` 表格「输出即契约」同哲学；**行序=root.children 流程规范序**（DR3-1））：结论层（plan summary 首行）、分析层每 stage 一行（stage/display_name/degraded 标记/evidence_count）、切片层每 chunk 一行（chunk_id 前 8 位/content_excerpt 60 字符/**page=ChunkNode.page_start**——DR3-7）、文档层每文档一行（filename/page/对象键）
+**Then** 树形层级输出（缩进表达四层——每层两级空格缩进 + 层级标签前缀「结论/分析/切片/文档」；纯标准库打印形态——6-6 `checkpoint-list` 表格「输出即契约」同哲学；**行序=root.children 流程规范序**（DR3-1））：结论层（plan summary 首行）、汇总区（归档对照行+**degraded_stages 非空时「降级 stage」行**——R3-F1）、分析层每 stage 一行（stage/display_name/degraded 标记/evidence_count）、切片层每 chunk 一行（chunk_id 前 8 位/**status≠resolved 时携带 `[point_missing]` 状态标记**——R3-F1/content_excerpt 60 字符/**page=ChunkNode.page_start**——DR3-7）、文档层每文档一行（filename/**document_missing 时携带 `[document_missing]` 状态标记**——R3-F1/page/对象键）
 **And** `--stage` 客户端过滤（**按 `--depth` 构建后**客户端过滤展示——depth×stage 组合语义钦定：过滤作用于 depth 构建结果（DR1-15）；**过滤保留结论层行**（「其余 stage 零输出」仅指分析层以下——DR3-7）；服务端不支持 stage 过滤参数，YAGNI：全树 ≤8 stage 量级；epics/UX 无服务端过滤需求）；`--depth` 默认 4（全树）透传端口（**runner 签名钦定 `_run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int`**——原始字符串入参（checkpoint-show :1275 样板同构）+runner 内 `int(depth)` 转换——DR3-7）
-**And** 退出语义：正常 exit 0（含空树——空树是正常态非错误，AC-5 语义；**空树输出三分化（R1-F3）**：build_degraded=True 时打「⚠ 归档查询失败（已降级）」、total==0 打「该 plan 无归档行」提示、total>0 无分析层节点打「归档对照: 采纳 X / 候选 Y（无分析层节点——depth 折叠或 stage 越域）」——DR1-9 读模型诚实性：空结果自我解释是「没有数据」「拿不到数据」还是「有数据未展开」）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-3 R1-F18 前缀统一先例）；**CLI 面越域 depth 由 argparse choices 拦截 exit 2 不走 242**（分工钦定见 API 契约节——DR1-1：R1-1 修复只达 VC 未达正文，本行补齐）
+**And** 退出语义：正常 exit 0（含空树——空树是正常态非错误，AC-5 语义；**空树输出三分化（R1-F3/R3-F3）**：build_degraded=True 时打「⚠ 归档查询失败（已降级）」、total==0 打「该 plan 无思维链归档行」提示（total 是 kind 过滤后口径——R3-F3 精确化）、total>0 无分析层节点打「归档对照: 采纳 X / 候选 Y（无分析层节点——depth 折叠或 stage 越域）」——DR1-9 读模型诚实性：空结果自我解释是「没有数据」「拿不到数据」还是「有数据未展开」）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-3 R1-F18 前缀统一先例）；**CLI 面越域 depth 由 argparse choices 拦截 exit 2 不走 242**（分工钦定见 API 契约节——DR1-1：R1-1 修复只达 VC 未达正文，本行补齐）
 **And** 本 Story CLI 面无角色门槛（「分析师」是 UX 语义——3-8/3-6 查询端点先例仅 Bearer 认证无角色检查，`interface-design.md:2006` 分析师视图是 Web 面；RBAC 门槛归 7-2 REST 入口立项时评估——注记落档）
 
 **验证标准/Validation Criteria:**
@@ -913,6 +913,15 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - [x] R2-F2（P3·AgentF）：验收/集成 teardown docstring 声明序「归档/Qdrant/PG」与实现执行序「归档→PG→Qdrant」互换（三处：验收 :457/集成头注/故事 :265 预置纪律行）——docstring 就实现非反向（事务性删除先于 collection 整删是合理序；「三步各步独立」钦定不含顺序约束）
 - [x] R2-F3（P3·AgentE·登记不落码）：`--stage` 过滤零命中时输出仅结论行+归档对照行+零分析行、无「零命中」提示——设计空白观察：AC-6 VC 仅要求「其余 stage 零输出」、DR3-7 仅钦定保留结论层行、:114 明文服务端过滤 YAGNI；归档对照行计数已给自判材料——YAGNI 裁定登记留痕
 - [x] R2-F4（P3·AgentF·零动作）：R1 台账两处行号快照漂移（:1417/:2026→:1420/:2029 等——R1 落码自身致偏）——适用 :815 快照惯例（「行内引用行号是修复时点快照不随后续维护」），计数与存在性均准确，零动作
+
+**Round 3（单深度推演 Agent——状态空间 24 格/CLI 全链时间线/S11 数学/工厂域对照/契约边界全序，2026-11-06；C3 单评审员两处修订后落码）：P0:0 / P1:0 / P2×1 / P3×5（4 修+1 登记）**
+
+- [x] R3-F1（P2·推演Agent）：CLI 输出面零消费解析降级状态——status/degraded_stages 对分析视用户不可见（切片行 point_missing 呈现 `page=None` 空文案、无法区分「点失效/文档行删/脏点」三态）——与 R1-F3「空结果自我解释」同族哲学的反向缺口；修复=切片/文档行 status≠resolved 追加 `[status原值]` 标记（零翻译层+值域直连 VO 契约——微偏离评审描述的中文别名，台账注记）+ degraded_stages 非空时对照行后打「降级 stage」行 + CLI 单测新用例（三标记断言+[resolved] 不出现反断言）+ AC-6 正文 Then 行同步
+- [x] R3-F2（P3·推演Agent·C3 修订）：`_close_connection_pools` 仅关 redis/pg 两 manager 且注释「本 CLI 未触达 Qdrant/Neo4j」失实——run 链（blm_planning→hybrid_search→dense/sparse→l3_vector→qdrant；graph_search→l5_graph→neo4j）与 trace-tree 链均构造期急切实例化；修复=元组补 qdrant+neo4j 两 manager（peek no-op 安全——QdrantManager.close 判空/Neo4jManager 构造注入 driver）+ docstring 事实准确改写（主会话原拟注记「trace-tree 首个触达」被 C3 证伪为假——run 先于 6-7 触达）
+- [x] R3-F3（P3·推演Agent·C3 修订）：空树文案「该 plan 无归档行」在「有归档但零思维链行」格失真（total 是 kind 过滤后口径）→ 改「该 plan 无思维链归档行」；**C3 抓主会话论证方向反误**：旧串非新串子串→not-in 两断言（:2987/:3003）将永真化（分立哨兵守护死亡）——同步两断言+docstring+AC-6 文本
+- [x] R3-F4（P3·推演Agent）：守卫分支「有实现无锚」族补锚 +2 单测——A=dirty chain 家族（chain 值 list→三键降空/final_answer='[1,2]' 合法 JSON 非 dict→summary 降 input_summary 兜底/evidence_refs str→零证据不按字符迭代）；B=dirty document 家族（version 0→VO 1/metadata 非 dict→page·object_key None+jump_ready False）——变异必红推演（删守卫经 AttributeError 红）
+- [x] R3-F5（P3·推演Agent）：集成失败路径残留——场景④ delete_points+闭环断言在 try 内（断言失败 2 点残留共享 "documents" 永久泄漏）→ delete 入 finally（容错包裹防掩蔽）+闭环断言移块后（happy path 保留+finally 容错时兜底网）；场景② shared_document_id 行删在 try 中段（finally 清单缺口+注释失败路径失实）→ 入清理清单（DELETE no-op 安全）
+- [x] R3-登记-1（P3·推演Agent·登记不落码）：`--stage` 过滤零命中无提示——与 R2-F3 同项复现（第五格），维持 YAGNI 裁定（归档对照行计数已给自判材料）；R3-F1 落码后 CLI 降级呈现面已增强，零命中提示仍无契约要求
 
 ---
 
