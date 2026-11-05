@@ -21,6 +21,12 @@ sisys-uni-exception-design.md §3.3.2 编码表双处成文）不可占用——
   恰是 483 触发面，独立码语义冗余）
 - CheckpointIntegrityError (484)——完整性违约（Story 6-3：完整形态缺失
   persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测——AC-2/AC-3）
+- CheckpointRecoveryError (486)——恢复执行编排强制环节失败（Story 6-6：
+  try 面扩包③修正应用/④恢复记录两处 save 的 StorageError 统一包裹——
+  fail-loud；485 空洞维持——OD-7 段内空洞永不设码）
+- RecoveryModeConflictError (487)——模式强制执法拒绝（Story 6-6：建议
+  Replay 而请求 Override → 零副作用拒绝——or.md L622 不变约束承载；
+  488/489 继续预留——planning 段残留位）
 """
 
 from __future__ import annotations
@@ -30,9 +36,11 @@ from src.domain.exceptions.business_exceptions import BusinessException
 __all__ = [
     "CheckpointCreationError",
     "CheckpointIntegrityError",
+    "CheckpointRecoveryError",
     "PlanningExecutionError",
     "PlanningNotFoundError",
     "PlanningStateError",
+    "RecoveryModeConflictError",
 ]
 
 
@@ -218,4 +226,90 @@ class CheckpointIntegrityError(BusinessException):
         context: dict[str, str] = {"session_id": session_id, "checkpoint_no": checkpoint_no, "reason": reason}
         if context_extra:
             context.update(context_extra)
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class CheckpointRecoveryError(BusinessException):
+    """Checkpoint 恢复执行编排失败（EXCEPTION_486——系统执行语义 500）。
+
+    触发场景（Story 6-6 恢复引擎 execute_recovery 强制环节失败——AC-7
+    fail-loud）：③修正应用步 apply_correction 内 save 失败与④恢复记录
+    save 失败统一归 486（try 面扩包③④两处 save——不扩包则 StorageError
+    103 裸逃逸破坏六码全景；save 无 try 是 6-3 冻结行为面、486 包裹是
+    恢复编排层职责）；except 面钦定 StorageError（RedisSnapshotStore.save
+    唯一异常出口，包装一切异常）。480/482/484 在 save 之前触发经既有
+    触发点透传不并入；⑤发布独立降级面不属 486（发布失败降级 warning
+    不回滚恢复记录——恢复记录是审计真相源、事件是通知面）。
+    """
+
+    code = "EXCEPTION_486"
+    message = "Checkpoint 恢复执行失败"
+
+    def __init__(
+        self,
+        plan_id: str = "",
+        checkpoint_no: str = "",
+        reason: str = "",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """构造 Checkpoint 恢复执行失败异常。
+
+        Args:
+            plan_id: 规划任务标识。
+            checkpoint_no: 恢复起点检查点编号（如 "CP-3"）。
+            reason: 失败环节描述（如 "恢复记录落库失败: Redis 写入超时"）。
+            message: 覆写消息（缺省回落类静态文案）。
+            cause: 底层异常（可选——StorageError 链透传）。
+            context_extra: 附加领域上下文（合并进 context）。
+        """
+        context: dict[str, str] = {"plan_id": plan_id, "checkpoint_no": checkpoint_no, "reason": reason}
+        if context_extra:
+            context.update(context_extra)
+        # message 组合语义（6-3 R1-F3 组合先例直接继承）：reason 非空且调用方
+        # 未覆写 message 时，默认 message 组合根因描述（根因对 CLI/API 操作者可见）
+        if message is None and reason:
+            message = f"Checkpoint 恢复执行失败: {reason}"
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class RecoveryModeConflictError(BusinessException):
+    """恢复模式强制执法冲突（EXCEPTION_487——冲突语义 409）。
+
+    触发场景（Story 6-6 模式执法——or.md L622 不变约束「修改影响≥2 个
+    后续 Checkpoint 强制采用 Replay 模式」）：建议 REPLAY（后续 ≥2）而请求
+    OVERRIDE → 拒绝执行（零副作用——恢复记录不写、事件不发、修正不应用；
+    执法点②.5 前置于③修正应用）；建议 OVERRIDE 而请求 REPLAY → 允许
+    （用户可选更强一致性模式——弱替强允方向性执法，OD-6）。
+    """
+
+    code = "EXCEPTION_487"
+    message = "恢复模式冲突"
+
+    def __init__(
+        self,
+        recommended_mode: str = "Replay",
+        requested_mode: str = "Override",
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """构造恢复模式冲突异常。
+
+        Args:
+            recommended_mode: 建议恢复模式（大写展示形态 "Replay"/"Override"——
+                与事件枚举值同形，引擎构造时经 to_event_recovery_mode 转换传入）。
+            requested_mode: 请求恢复模式（同上大写形态）。
+            message: 覆写消息（缺省组合建议/请求双模式）。
+            cause: 底层异常（可选）。
+            context_extra: 附加领域上下文（合并进 context）。
+        """
+        context: dict[str, str] = {"recommended_mode": recommended_mode, "requested_mode": requested_mode}
+        if context_extra:
+            context.update(context_extra)
+        # message 组合语义（可理解性裁决面）：默认 message 携带建议模式与请求
+        # 模式（操作者免查 context 即可理解冲突两方——OD-6）
+        if message is None:
+            message = f"恢复模式冲突: 影响≥2 个后续 Checkpoint 强制 Replay（建议={recommended_mode}, 请求={requested_mode}）"
         super().__init__(message=message, cause=cause, context=context)

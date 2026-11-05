@@ -34,6 +34,7 @@ from src.domain.exceptions import (
     ChainOfThoughtValidationError,
     CheckpointCreationError,
     CheckpointIntegrityError,
+    CheckpointRecoveryError,
     ChunkingError,
     ComplianceLockError,
     ConfigurationError,
@@ -92,6 +93,7 @@ from src.domain.exceptions import (
     PlanningExecutionError,
     PlanningNotFoundError,
     PlanningStateError,
+    RecoveryModeConflictError,
     RelevanceEvaluationBlockedError,
     RelevanceEvaluationError,
     ReportEvidenceStorageError,
@@ -312,6 +314,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     PlanningStateError: status.HTTP_409_CONFLICT,  # 482 — 状态机非法推进（第二触发点——6.3 修正面乐观锁）
     CheckpointCreationError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 483 — Checkpoint 五步编排强制环节失败（Story 6.3）
     CheckpointIntegrityError: status.HTTP_409_CONFLICT,  # 484 — Checkpoint 完整性守卫/校验失败（Story 6.3）
+    CheckpointRecoveryError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 486 — Checkpoint 恢复执行编排强制环节失败（Story 6.6）
+    RecoveryModeConflictError: status.HTTP_409_CONFLICT,  # 487 — 恢复模式强制执法拒绝（Story 6.6）
     ReportGenerationError: status.HTTP_404_NOT_FOUND,  # 490 — 报告数据源全缺（chain total==0——Story 6.5a）
     ReportStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 491 — 报告持久化失败（layer 二元 l0/l2——Story 6.5a）
     PdfRenderingError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 492 — PDF 报告渲染失败（reportlab 异常领域包装——Story 6.5b）

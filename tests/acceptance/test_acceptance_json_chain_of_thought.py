@@ -2153,7 +2153,10 @@ def four_guard_files_zero_diff(context: dict[str, Any]) -> None:
     仅在未提交窗口有判别力、提交后恒真失效，转持久缺席断言；@then 绑定串
     与 feature 文本维持锁步不变。token 锚定 6-4 事件名族——不含
     ChainOfThought 大驼峰（既有 445 类是 5-3 合法登记）与裸 chain 子串
-    （撞 ToolChainExecuted 既有登记）；485-489 预留码在 6-6 落地时让位更新）。"""
+    （撞 ToolChainExecuted 既有登记）；485-489 预留码让位更新（2026-11-05）：
+    6-6 落地 486/487 后收窄为残留码元组 (485, 488, 489)——485 段内空洞
+    守护保留，488/489 继续预留；本侧扫描面仅四守护文件，按计划零字面
+    不红（预防性对称收窄——architecture 侧 src/domain rglob 面承载红实证）。"""
     guard_files = {
         "configs/event_channels.yaml": REPO_ROOT / "configs" / "event_channels.yaml",
         "channel_router.py": REPO_ROOT / "src" / "infrastructure" / "messaging" / "channel_router.py",
@@ -2161,11 +2164,13 @@ def four_guard_files_zero_diff(context: dict[str, Any]) -> None:
         "exception_handlers.py": REPO_ROOT / "src" / "interfaces" / "api" / "exception_handlers.py",
     }
     event_tokens = ("chain_of_thought", "ChainArchived", "BlmChain")
+    # 残留码元组（486/487 已由 6-6 实占——本守护让位收窄，非违例）
+    reserved_codes = (485, 488, 489)
     for name, path in guard_files.items():
         content = path.read_text(encoding="utf-8")
         for token in event_tokens:
             assert token not in content, f"{name} 出现思维链事件登记 {token}（零新事件违例）"
-        for code in range(485, 490):
+        for code in reserved_codes:
             assert f"EXCEPTION_{code}" not in content, (
-                f"{name} 出现预留码 EXCEPTION_{code} 占用（零新异常违例——6-6 落地时本断言让位更新）"
+                f"{name} 出现预留码 EXCEPTION_{code} 占用（485 段内空洞/488-489 预留违例——486/487 已由 6-6 实占让位）"
             )

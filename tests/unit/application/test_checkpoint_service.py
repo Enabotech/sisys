@@ -967,3 +967,661 @@ class TestCheckpointNoGuard:
             completed=True,
         )
         assert snapshot.checkpoint_no == valid_no
+
+
+class TestListCheckpoints:
+    """读面 list_checkpoints（Story 6-6 AC-1——全量 probe+sync join+8 键 VO）。
+
+    延迟 import 形态：方法/VO 未定义时红 = 运行期 AttributeError/ImportError。
+    """
+
+    def _make_service_with_store(self) -> tuple[Any, dict[str, Any]]:
+        """带内存存储的服务工厂（形态同 TestRecoverCheckpoint）。"""
+        service, mocks = _make_service()
+        store: dict[str, Any] = {}
+        mocks["snapshot_repository"].load = AsyncMock(side_effect=lambda session_id: store.get(session_id))
+
+        async def _save(snapshot: Any) -> None:
+            store[snapshot.session_id] = snapshot
+
+        mocks["snapshot_repository"].save = AsyncMock(side_effect=_save)
+        mocks["store"] = store
+        return service, mocks
+
+    def _seed(self, service: Any, mocks: dict[str, Any], plan_id: str, checkpoint_no: str) -> Any:
+        """种入指定编号快照（build_snapshot+v0——stage 用 performance_gap 值域）。"""
+        snapshot = service.build_snapshot(
+            plan_id=plan_id,
+            checkpoint_no=checkpoint_no,
+            stage_id="performance_gap",
+            compressed=_make_compressed_context(),
+            summary=f"{checkpoint_no} 摘要",
+            completed=True,
+        )
+        mocks["store"][snapshot.session_id] = snapshot
+        return snapshot
+
+    def _seed_recovery_record(self, mocks: dict[str, Any], plan_id: str, state_data: dict[str, Any]) -> None:
+        """种入恢复记录（第三键族——blm-checkpoint-recovery-{plan}，checkpoint_no 空）。"""
+        from datetime import UTC, datetime
+
+        from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
+
+        record = CheckpointSnapshot(
+            session_id=f"blm-checkpoint-recovery-{plan_id}",
+            stage_id="recovery_record",
+            state_version=0,
+            state_data=state_data,
+            timestamp=datetime.now(UTC),
+            ttl_seconds=2_592_000,
+            checkpoint_no="",
+        )
+        mocks["store"][record.session_id] = record
+
+    async def test_list_probe_full_ascending_with_eight_keys(self) -> None:
+        """全量 probe（CP-1 起）+升序+8 键 exact set（R8-F1 增量模式的全量扩展）。"""
+        from dataclasses import fields as dc_fields
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        for checkpoint_no in ("CP-5", "CP-1", "CP-3"):  # 乱序种入验证升序输出
+            self._seed(service, mocks, plan_id, checkpoint_no)
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+
+        assert [s.checkpoint_no for s in summaries] == ["CP-1", "CP-3", "CP-5"]
+        for summary in summaries:
+            assert {field.name for field in dc_fields(summary)} == {
+                "checkpoint_no",
+                "stage_id",
+                "completed",
+                "summary",
+                "state_version",
+                "created_via",
+                "timestamp",
+                "sync_status",
+            }
+
+    async def test_list_entries_payload_values(self) -> None:
+        """条目载荷值（stage/summary/completed/state_version/created_via 直投影）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-1")
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+        entry = summaries[0]
+
+        assert entry.stage_id == "performance_gap"
+        assert entry.summary == "CP-1 摘要"
+        assert entry.completed is True
+        assert entry.state_version == seeded.state_version
+        assert entry.created_via == "use_case"
+
+    async def test_list_timestamp_isoformat_string(self) -> None:
+        """timestamp 是 isoformat 字符串（实体 datetime→VO str 转换的漂移哨兵——
+        返回 datetime 对象即红）。"""
+        from datetime import datetime
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed(service, mocks, plan_id, "CP-1")
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+        timestamp = summaries[0].timestamp
+
+        assert isinstance(timestamp, str), f"timestamp 实测类型={type(timestamp)} 期望 str（isoformat 转换）"
+        assert timestamp  # 非空
+        parsed = datetime.fromisoformat(timestamp)  # 可解析（合法 isoformat）
+        assert parsed.tzinfo is not None
+
+    async def test_list_no_recovery_record_all_in_sync(self) -> None:
+        """无恢复记录→全量 in_sync（键恒在纪律的读侧镜像）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        for checkpoint_no in ("CP-1", "CP-3", "CP-5"):
+            self._seed(service, mocks, plan_id, checkpoint_no)
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+
+        assert [s.sync_status for s in summaries] == ["in_sync", "in_sync", "in_sync"]
+
+    async def test_list_sync_status_override_pending(self) -> None:
+        """sync 三态推导矩阵——Override 恢复记录（恢复起点恒 in_sync+后续 pending_sync）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        for checkpoint_no in ("CP-1", "CP-3", "CP-5"):
+            self._seed(service, mocks, plan_id, checkpoint_no)
+        self._seed_recovery_record(
+            mocks,
+            plan_id,
+            {
+                "plan_id": plan_id,
+                "checkpoint_no": "CP-3",
+                "recovery_mode": "override",
+                "corrected": False,
+                "correction": {},
+                "affected_checkpoints": ["CP-5"],
+                "pending_sync_checkpoints": ["CP-5"],
+                "invalidated_checkpoints": [],
+                "confirmed_by": "高管",
+                "recovered_at": "2026-11-05T00:00:00+00:00",
+                "execution_ms": 1.0,
+                "created_via": "use_case",
+            },
+        )
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+        by_no = {s.checkpoint_no: s.sync_status for s in summaries}
+
+        assert by_no == {"CP-1": "in_sync", "CP-3": "in_sync", "CP-5": "pending_sync"}, (
+            "恢复起点恒 in_sync（新基线）+前序不受影响+后续 pending_sync"
+        )
+
+    async def test_list_sync_status_replay_invalidated(self) -> None:
+        """sync 三态推导矩阵——Replay 恢复记录（后续 invalidated 全标）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        for checkpoint_no in ("CP-1", "CP-3", "CP-5"):
+            self._seed(service, mocks, plan_id, checkpoint_no)
+        self._seed_recovery_record(
+            mocks,
+            plan_id,
+            {
+                "plan_id": plan_id,
+                "checkpoint_no": "CP-1",
+                "recovery_mode": "replay",
+                "corrected": False,
+                "correction": {},
+                "affected_checkpoints": ["CP-3", "CP-5"],
+                "pending_sync_checkpoints": [],
+                "invalidated_checkpoints": ["CP-3", "CP-5"],
+                "confirmed_by": "高管",
+                "recovered_at": "2026-11-05T00:00:00+00:00",
+                "execution_ms": 1.0,
+                "created_via": "use_case",
+            },
+        )
+
+        summaries = await service.list_checkpoints(plan_id=plan_id)
+        by_no = {s.checkpoint_no: s.sync_status for s in summaries}
+
+        assert by_no == {"CP-1": "in_sync", "CP-3": "invalidated", "CP-5": "invalidated"}
+
+    async def test_list_empty_plan_returns_empty_list(self) -> None:
+        """空族返回空清单（枚举面非单点面——不抛 480，AC-1 语义分立）。"""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        service, mocks = self._make_service_with_store()
+
+        summaries = await service.list_checkpoints(plan_id=str(uuid.uuid4()))
+
+        assert summaries == []
+        # 零抛出显式断言（480 语义分立的运行面证据）
+        try:
+            await service.list_checkpoints(plan_id=str(uuid.uuid4()))
+        except PlanningNotFoundError:
+            pytest.fail("list_checkpoints 不得抛 480（清单是枚举面非单点面）")
+
+    async def test_list_probe_calls_covers_full_domain(self) -> None:
+        """probe 覆盖全值域 CP-1..CP-8（从 CP-1 起的全量扩展——R8-F1 现状仅探 n+1 起）。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        load_calls: list[str] = []
+
+        def _record_load(session_id: str) -> None:
+            load_calls.append(session_id)
+
+        mocks["snapshot_repository"].load = AsyncMock(side_effect=_record_load)
+
+        await service.list_checkpoints(plan_id=plan_id)
+
+        probed = [call.split(":")[-1] for call in load_calls if "blm-checkpoint-recovery-" not in call]
+        assert probed == [f"CP-{number}" for number in range(1, 9)], (
+            f"probe 实测={probed} 期望 CP-1..CP-8 全量（含恢复记录键共 9 次 load）"
+        )
+
+
+class TestExecuteRecovery:
+    """恢复执行引擎（Story 6-6 AC-3——五步编排/模式裁定 487/双模式分支/12 键/事件）。"""
+
+    def _make_service_with_store(self) -> tuple[Any, dict[str, Any]]:
+        """带内存存储+事件捕获的服务工厂（store 承载快照与恢复记录）。"""
+        service, mocks = _make_service()
+        store: dict[str, Any] = {}
+        mocks["snapshot_repository"].load = AsyncMock(side_effect=lambda session_id: store.get(session_id))
+
+        async def _save(snapshot: Any) -> None:
+            store[snapshot.session_id] = snapshot
+
+        mocks["snapshot_repository"].save = AsyncMock(side_effect=_save)
+        mocks["store"] = store
+        published: list[Any] = []
+        mocks["published"] = published
+
+        async def _capture_publish(event: Any) -> Any:
+            from src.domain.events.publish_result import ChannelResult, PublishResult
+
+            published.append(event)
+            mocks["call_order"].append("publish")
+            return PublishResult(event_id=str(uuid.uuid4()), results=(ChannelResult("reliable", True),))
+
+        mocks["publisher"].publish = AsyncMock(side_effect=_capture_publish)
+        return service, mocks
+
+    def _seed(self, service: Any, mocks: dict[str, Any], plan_id: str, checkpoint_no: str) -> Any:
+        """种入指定编号快照（build_snapshot+v0）。"""
+        snapshot = service.build_snapshot(
+            plan_id=plan_id,
+            checkpoint_no=checkpoint_no,
+            stage_id="performance_gap",
+            compressed=_make_compressed_context(),
+            summary=f"{checkpoint_no} 摘要",
+            completed=True,
+        )
+        mocks["store"][snapshot.session_id] = snapshot
+        return snapshot
+
+    def _seed_three(self, service: Any, mocks: dict[str, Any], plan_id: str) -> None:
+        """三 Checkpoint 前置（CP-1/CP-3/CP-5——Replay 场景≥2 后续）。"""
+        for checkpoint_no in ("CP-1", "CP-3", "CP-5"):
+            self._seed(service, mocks, plan_id, checkpoint_no)
+
+    async def test_override_execution_record_and_event(self) -> None:
+        """Override 执行：恢复记录 12 键+pending_sync 一点+事件 Override/medium。"""
+        from src.domain.events.enums import RecoveryMode as EventRecoveryMode
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+
+        outcome = await service.execute_recovery(
+            plan_id=plan_id,
+            checkpoint_no="CP-3",
+            confirmed_by="高管-审批人",
+        )
+
+        # Outcome 10 键断言
+        assert outcome.checkpoint_no == "CP-3"
+        assert outcome.recovery_mode == "override"
+        assert outcome.corrected is False
+        assert outcome.new_state_version == 0
+        assert outcome.affected_checkpoints == ["CP-5"]
+        assert outcome.marked_checkpoints == ["CP-5"]
+        assert outcome.execution_ms > 0.0
+        assert outcome.recovery_record_session_id == f"blm-checkpoint-recovery-{plan_id}"
+        assert outcome.recovered_snapshot_id  # 非空（②视图 snapshot_id）
+
+        # 恢复记录 12 键 exact set + Override 分支字段
+        record = mocks["store"].get(f"blm-checkpoint-recovery-{plan_id}")
+        assert record is not None, "恢复记录未落库（第三键族）"
+        assert set(record.state_data.keys()) == {
+            "plan_id",
+            "checkpoint_no",
+            "recovery_mode",
+            "corrected",
+            "correction",
+            "affected_checkpoints",
+            "pending_sync_checkpoints",
+            "invalidated_checkpoints",
+            "confirmed_by",
+            "recovered_at",
+            "execution_ms",
+            "created_via",
+        }
+        state = record.state_data
+        assert state["checkpoint_no"] == "CP-3"
+        assert state["recovery_mode"] == "override"
+        assert state["corrected"] is False
+        assert state["correction"] == {}
+        assert state["pending_sync_checkpoints"] == ["CP-5"]
+        assert state["invalidated_checkpoints"] == []
+        assert state["confirmed_by"] == "高管-审批人"  # 审批留痕值级断言
+        assert state["created_via"] == "use_case"
+        assert state["execution_ms"] > 0.0
+        assert record.ttl_seconds == 2_592_000  # 30 天对齐 checkpoint 合规窗
+        assert record.checkpoint_no == ""  # 非完整形态（不触发构造守卫）
+
+        # 事件构造字段值级
+        assert len(mocks["published"]) == 1
+        event = mocks["published"][0]
+        assert event.event_type == "CheckpointRecovered"
+        assert event.recovery_mode is EventRecoveryMode.OVERRIDE  # events 枚举大写形态
+        assert event.recovery_mode.value == "Override"
+        assert event.consistency_risk_level == "medium"  # Override+1 后续（同源计算唯一可判别腿）
+        assert event.affected_checkpoints == ["CP-5"]
+        assert event.modification_content == {}
+        assert event.execution_delay_ms > 0.0
+        assert event.cost == 0.0
+        assert event.metadata["plan_id"] == plan_id  # R3-3 双关联键
+        assert event.metadata["checkpoint_no"] == "CP-3"
+
+    async def test_replay_execution_invalidated_and_hint(self) -> None:
+        """Replay 执行：invalidated 全标+事件 Replay/low+重跑指引非空。"""
+        from src.domain.events.enums import RecoveryMode as EventRecoveryMode
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+
+        outcome = await service.execute_recovery(
+            plan_id=plan_id,
+            checkpoint_no="CP-1",
+            confirmed_by="高管-审批人",
+        )
+
+        assert outcome.recovery_mode == "replay"
+        assert outcome.affected_checkpoints == ["CP-3", "CP-5"]
+        assert outcome.marked_checkpoints == ["CP-3", "CP-5"]
+        record = mocks["store"][f"blm-checkpoint-recovery-{plan_id}"]
+        assert record.state_data["invalidated_checkpoints"] == ["CP-3", "CP-5"]
+        assert record.state_data["pending_sync_checkpoints"] == []
+        assert outcome.next_action_hint, "重跑指引非空（Replay 分支——建议新 plan_id 经 blm-plan 重跑）"
+        assert "blm-plan" in outcome.next_action_hint
+
+        event = mocks["published"][0]
+        assert event.recovery_mode is EventRecoveryMode.REPLAY
+        assert event.recovery_mode.value == "Replay"
+        assert event.consistency_risk_level == "low"  # 恒显式传函数输出（同源）
+
+    async def test_tail_cp8_no_subsequent_low_risk(self) -> None:
+        """CP-8 尾点边界：affected 空清单+low 风险+事件正常发布。"""
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed(service, mocks, plan_id, "CP-8")
+
+        outcome = await service.execute_recovery(
+            plan_id=plan_id,
+            checkpoint_no="CP-8",
+            confirmed_by="高管",
+        )
+
+        assert outcome.recovery_mode == "override"
+        assert outcome.affected_checkpoints == []
+        event = mocks["published"][0]
+        assert event.consistency_risk_level == "low"  # Override 无后续
+
+    async def test_mode_conflict_487_zero_side_effect(self) -> None:
+        """模式强制执法：≥2 后续+显式 OVERRIDE → 487 零副作用（save/publish 零调用）。"""
+        from src.domain.entities.checkpoint import RecoveryMode
+        from src.domain.exceptions import RecoveryModeConflictError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+        # 恢复执行前记录 save/publish 基线计数
+        save_calls_before = mocks["snapshot_repository"].save.call_count
+
+        with pytest.raises(RecoveryModeConflictError) as exc_info:
+            await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-1",
+                mode=RecoveryMode.OVERRIDE,
+                confirmed_by="高管",
+            )
+
+        assert exc_info.value.code == "EXCEPTION_487"
+        assert "Replay" in exc_info.value.message and "Override" in exc_info.value.message
+        # 零副作用断言：恢复记录键不存在+事件零发布+state_version 不变
+        assert f"blm-checkpoint-recovery-{plan_id}" not in mocks["store"]
+        assert mocks["published"] == []
+        assert mocks["snapshot_repository"].save.call_count == save_calls_before
+
+    async def test_mode_conflict_with_correction_apply_zero_call(self) -> None:
+        """correction+冲突组合：apply_correction 零调用（裁定②.5 前置的实现漂移哨兵）。"""
+        from src.domain.entities.checkpoint import CorrectionRecord, RecoveryMode
+        from src.domain.exceptions import RecoveryModeConflictError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+        apply_calls: list[dict[str, Any]] = []
+
+        async def _apply(**kwargs: Any) -> Any:
+            apply_calls.append(kwargs)
+            return self._seed(service, mocks, plan_id, "CP-1")  # 形态无关（不应触达）
+
+        service.apply_correction = AsyncMock(side_effect=_apply)
+
+        with pytest.raises(RecoveryModeConflictError):
+            await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-1",
+                mode=RecoveryMode.OVERRIDE,
+                correction=CorrectionRecord(correction_type="L2", previous_value="a", new_value="b", applied_by="u"),
+                confirmed_by="高管",
+            )
+
+        assert apply_calls == [], "487 须前置于③修正应用（correction+冲突组合零应用）"
+
+    async def test_stronger_mode_allowed(self) -> None:
+        """弱替强允：建议 OVERRIDE（1 后续）而显式请求 REPLAY → 允许执行。"""
+        from src.domain.entities.checkpoint import RecoveryMode
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed(service, mocks, plan_id, "CP-1")
+        self._seed(service, mocks, plan_id, "CP-3")
+
+        outcome = await service.execute_recovery(
+            plan_id=plan_id,
+            checkpoint_no="CP-1",
+            mode=RecoveryMode.REPLAY,
+            confirmed_by="高管",
+        )
+
+        assert outcome.recovery_mode == "replay"  # 显式更强模式被采纳
+        assert outcome.affected_checkpoints == ["CP-3"]
+
+    async def test_correction_integrated_recovery(self) -> None:
+        """修正+恢复一体：③④⑤链式成功+checkpoint_id=③步 sealed.snapshot_id。"""
+        from src.domain.entities.checkpoint import CorrectionRecord
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        seeded = self._seed(service, mocks, plan_id, "CP-3")
+        self._seed(service, mocks, plan_id, "CP-5")
+
+        outcome = await service.execute_recovery(
+            plan_id=plan_id,
+            checkpoint_no="CP-3",
+            correction=CorrectionRecord(
+                correction_type="L2",
+                previous_value="旧战略参数",
+                new_value="新战略参数",
+                applied_by="高管-修正人",
+            ),
+            confirmed_by="高管-确认人",
+        )
+
+        assert outcome.corrected is True
+        assert outcome.new_state_version == 1
+        assert outcome.recovered_snapshot_id != str(seeded.snapshot_id), (
+            "修正一体须取③步 sealed.snapshot_id（with_updated_state 轮换后的新值——②视图值已失效）"
+        )
+        event = mocks["published"][0]
+        assert str(event.checkpoint_id) == outcome.recovered_snapshot_id, (
+            "⑤步 checkpoint_id 显式传值断言（修正一体=③步 sealed.snapshot_id）"
+        )
+        assert set(event.modification_content.keys()) == {
+            "correction_type",
+            "previous_value",
+            "new_value",
+            "applied_by",
+            "applied_at",
+        }
+        assert event.modification_content["new_value"] == "新战略参数"
+        record = mocks["store"][f"blm-checkpoint-recovery-{plan_id}"]
+        assert record.state_data["corrected"] is True
+        assert record.state_data["correction"]["correction_type"] == "L2"
+        assert record.state_data["correction"]["applied_by"] == "高管-修正人"
+        assert record.state_data["confirmed_by"] == "高管-确认人"  # 与 applied_by 双写
+
+    async def test_486_on_correction_save_failure(self) -> None:
+        """486 fail-loud：③步 apply_correction save 失败（修正一体场景）→ 486 且事件零发布。"""
+        from src.domain.entities.checkpoint import CorrectionRecord
+        from src.domain.exceptions import CheckpointRecoveryError, StorageError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed(service, mocks, plan_id, "CP-3")
+        self._seed(service, mocks, plan_id, "CP-5")
+
+        async def _failing_save(snapshot: Any) -> None:
+            raise StorageError("Failed to save snapshot: redis down")
+
+        mocks["snapshot_repository"].save = AsyncMock(side_effect=_failing_save)
+
+        with pytest.raises(CheckpointRecoveryError) as exc_info:
+            await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-3",
+                correction=CorrectionRecord(correction_type="L2", previous_value="a", new_value="b", applied_by="u"),
+                confirmed_by="高管",
+            )
+
+        assert exc_info.value.code == "EXCEPTION_486"
+        assert "redis down" in exc_info.value.message  # reason 组合（根因可见）
+        assert mocks["published"] == [], "486 触发时事件零发布"
+
+    async def test_486_on_recovery_record_save_failure(self) -> None:
+        """486 fail-loud：④步恢复记录 save 失败（纯恢复场景）→ 486 且事件零发布。"""
+        from src.domain.exceptions import CheckpointRecoveryError, StorageError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+        save_target = f"blm-checkpoint-recovery-{plan_id}"
+        store = mocks["store"]
+
+        async def _failing_save_only_record(snapshot: Any) -> None:
+            if snapshot.session_id == save_target:
+                raise StorageError("Failed to save snapshot: recovery record write fail")
+            store[snapshot.session_id] = snapshot
+
+        mocks["snapshot_repository"].save = AsyncMock(side_effect=_failing_save_only_record)
+
+        with pytest.raises(CheckpointRecoveryError) as exc_info:
+            await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-3",
+                confirmed_by="高管",
+            )
+
+        assert exc_info.value.code == "EXCEPTION_486"
+        assert mocks["published"] == []
+
+    async def test_publish_failure_degrades_without_rollback(self, caplog: pytest.LogCaptureFixture) -> None:
+        """发布降级：⑤步 publish 失败→Outcome 正常返回+恢复记录在+warning 日志（不回滚）。"""
+        import logging as std_logging
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+
+        async def _failing_publish(event: Any) -> Any:
+            raise RuntimeError("rabbitmq unavailable")
+
+        mocks["publisher"].publish = AsyncMock(side_effect=_failing_publish)
+
+        with caplog.at_level(std_logging.WARNING, logger="src.application.services.checkpoint_service"):
+            outcome = await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-3",
+                confirmed_by="高管",
+            )
+
+        assert outcome.checkpoint_no == "CP-3"  # Outcome 正常返回
+        assert f"blm-checkpoint-recovery-{plan_id}" in mocks["store"], "恢复记录仍落库（审计真相源不回滚）"
+        assert "发布降级" in caplog.text, "降级 warning 日志须落（R1-F12 观测锚）"
+
+    async def test_publish_result_failure_degrades_with_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """发布返回 PublishResult(False) 形态降级（生产真实形态——代码审查 R1-F1）。
+
+        生产 reliable 总线（RabbitMQEventBus）吞一切异常返 PublishResult(False)
+        不 raise——except 面对其不可达，发布失败观测经 is_success 返回值检查承载
+        （本用例是该检查的红锚：删除 is_success 分支则 warning 断言红）。
+        """
+        import logging as std_logging
+
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+        self._seed_three(service, mocks, plan_id)
+
+        async def _false_result_publish(event: Any) -> PublishResult:
+            return PublishResult(
+                event_id=str(uuid.uuid4()),
+                results=(ChannelResult("reliable", False, "outbox save failed"),),
+            )
+
+        mocks["publisher"].publish = AsyncMock(side_effect=_false_result_publish)
+
+        with caplog.at_level(std_logging.WARNING, logger="src.application.services.checkpoint_service"):
+            outcome = await service.execute_recovery(
+                plan_id=plan_id,
+                checkpoint_no="CP-3",
+                confirmed_by="高管",
+            )
+
+        assert outcome.checkpoint_no == "CP-3"  # Outcome 正常返回（降级不阻断）
+        assert f"blm-checkpoint-recovery-{plan_id}" in mocks["store"], "恢复记录仍落库（审计真相源不回滚）"
+        assert "发布降级" in caplog.text and "部分通道失败" in caplog.text, (
+            "is_success=False 须打 warning（生产观测面——R1-F1 修复锚）"
+        )
+
+    async def test_guards_before_engine(self) -> None:
+        """入口守卫复用：畸形 checkpoint_no → 242 且 load 零调用（6-3 R1-F2 形态继承）。"""
+        from src.domain.exceptions import EntityValidationError
+
+        service, mocks = self._make_service_with_store()
+        load_calls: list[str] = []
+
+        def _record_load(session_id: str) -> None:
+            load_calls.append(session_id)
+
+        mocks["snapshot_repository"].load = AsyncMock(side_effect=_record_load)
+
+        with pytest.raises(EntityValidationError):
+            await service.execute_recovery(plan_id=str(uuid.uuid4()), checkpoint_no="cp3", confirmed_by="x")
+
+        assert load_calls == []
+
+    async def test_execute_recovery_rejects_raw_str_mode(self) -> None:
+        """mode 裸 str 防御守卫（代码审查 R1-F8/G1）：非枚举形态 242 且 load 零调用。
+
+        str-Enum 身份比较陷阱：裸 str（含同值 "override"）经②.5 的 is 比较
+        恒 False 会绕过 487 执法、④步 .value 抛裸 AttributeError 逃逸异常
+        体系——入口守卫 fail-fast（编程面/未来 REST 入口的防御纵深）。
+        """
+        from src.domain.exceptions import EntityValidationError
+
+        service, mocks = self._make_service_with_store()
+        load_calls: list[str] = []
+
+        def _record_load(session_id: str) -> None:
+            load_calls.append(session_id)
+
+        mocks["snapshot_repository"].load = AsyncMock(side_effect=_record_load)
+
+        raw_mode: Any = "override"  # 故意裸 str（Any 注解承载非枚举形态——不触 mypy 参数类型红）
+        with pytest.raises(EntityValidationError) as exc_info:
+            await service.execute_recovery(
+                plan_id=str(uuid.uuid4()),
+                checkpoint_no="CP-1",
+                mode=raw_mode,
+                confirmed_by="高管",
+            )
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert load_calls == [], "mode 类型守卫须 fail-fast 先于 load（零 IO）"
+
+    async def test_transparent_errors_not_wrapped(self) -> None:
+        """既有触发点透传：480（不存在键）/484（checksum 损坏）不并入 486。"""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        service, mocks = self._make_service_with_store()
+        plan_id = str(uuid.uuid4())
+
+        with pytest.raises(PlanningNotFoundError):
+            await service.execute_recovery(plan_id=plan_id, checkpoint_no="CP-1", confirmed_by="x")

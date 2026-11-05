@@ -336,12 +336,16 @@ class TestValidatorENegativeContractFace:
                 assert token not in content, f"{name} 出现思维链事件登记 {token}（零新事件违例——OD-6）"
 
     def test_reserved_code_range_485_489_unoccupied(self) -> None:
-        """planning 段 485-489 预留码零占用（零新异常——OD-6 持久缺席断言）。
+        """planning 段残留预留码零占用（485 空洞+488/489 预留——OD-6 持久缺席断言）。
 
-        _code_ranges.py:186-190 钦定 486-489 留 6-6 恢复执行面——本断言在
-        6-6 落地新增 EXCEPTION_486+ 时**预期让位更新**（届时按 6-6 实占码段
-        收窄缺席区间，非违例）。
+        6-6 让位更新（2026-11-05）：原 range(485, 490) 全段缺席断言已由
+        Story 6-6 落地 CheckpointRecoveryError(486)/RecoveryModeConflictError
+        (487) 实占让位——收窄为残留码元组 (485, 488, 489)：485 属 OD-7 三处
+        成文钦定「独立码不设」的段内空洞（缺席守护保留——range(488, 490)
+        形态会丢 485 守护故弃）；488/489 继续预留 planning 域。
         """
+        # 残留码元组（486/487 已由 6-6 实占——本守护让位收窄，非违例）
+        reserved_codes = (485, 488, 489)
         check_targets = {
             **GUARD_FILES,
             "domain/": SRC_ROOT / "domain",
@@ -353,7 +357,7 @@ class TestValidatorENegativeContractFace:
                 file_paths = [path]
             for file_path in file_paths:
                 content = _read(file_path)
-                for code in range(485, 490):
+                for code in reserved_codes:
                     assert f"EXCEPTION_{code}" not in content, (
-                        f"{name} 出现预留码 EXCEPTION_{code} 占用（零新异常违例——OD-6；6-6 落地时本断言让位更新）"
+                        f"{name} 出现预留码 EXCEPTION_{code} 占用（485 段内空洞/488-489 预留违例；486/487 已由 6-6 实占让位）"
                     )

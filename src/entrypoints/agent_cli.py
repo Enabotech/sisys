@@ -66,6 +66,7 @@ import logging
 import sys
 import uuid as uuid_module
 from datetime import datetime
+from typing import Any
 
 from src.application.ports.isolation_management import (
     IsolationManagementServicePort,
@@ -413,6 +414,108 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="完成状态（默认 True；--no-completed 构造未完成恢复点——R6-21）",
+    )
+
+    # Story 6-6: checkpoint-list/checkpoint-show/checkpoint-recover 扁平子命令族
+    # （Checkpoint 摘要查看与恢复——审批面三入口；扁平族先例 R2-F18 维持；
+    # recover 的四 --correction-* 参数成组约束在 post-parse 检测（CLI 层唯一
+    # 落位——CorrectionRecord 默认值兜底下部分出现在用例层不可表达，AC-2 裁定））
+    checkpoint_list = subparsers.add_parser(
+        "checkpoint-list",
+        help="查看 plan 下全部 Checkpoint 摘要清单（8 键+sync 状态——Story 6-6）",
+    )
+    checkpoint_list.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+
+    checkpoint_show = subparsers.add_parser(
+        "checkpoint-show",
+        help="查看单点 Checkpoint 恢复视图（9 键——修正面乐观锁基线随附）",
+    )
+    checkpoint_show.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+    checkpoint_show.add_argument(
+        "--checkpoint-no",
+        type=str,
+        required=True,
+        metavar="CP_NO",
+        help='恢复起点检查点编号（"CP-1".."CP-8"）',
+    )
+
+    checkpoint_recover = subparsers.add_parser(
+        "checkpoint-recover",
+        help="恢复执行（无 --confirm 输出影响评估 dry-run；带 --confirm 执行双模式恢复）",
+    )
+    checkpoint_recover.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+    checkpoint_recover.add_argument(
+        "--checkpoint-no",
+        type=str,
+        required=True,
+        metavar="CP_NO",
+        help='恢复起点检查点编号（"CP-1".."CP-8"）',
+    )
+    checkpoint_recover.add_argument(
+        "--correction-type",
+        type=str,
+        default=None,
+        metavar="TYPE",
+        help="关键参数修正类型（四 --correction-* 参数成组提供）",
+    )
+    checkpoint_recover.add_argument(
+        "--previous-value",
+        type=str,
+        default=None,
+        metavar="OLD",
+        help="修正前值（四 --correction-* 参数成组提供）",
+    )
+    checkpoint_recover.add_argument(
+        "--new-value",
+        type=str,
+        default=None,
+        metavar="NEW",
+        help="修正后值（四 --correction-* 参数成组提供）",
+    )
+    checkpoint_recover.add_argument(
+        "--applied-by",
+        type=str,
+        default=None,
+        metavar="APPLIER",
+        help="修正人（四 --correction-* 参数成组提供；--confirmed-by 缺省链兜底）",
+    )
+    checkpoint_recover.add_argument(
+        "--mode",
+        type=str,
+        choices=("replay", "override"),
+        default=None,
+        metavar="MODE",
+        help="显式恢复模式（缺省取引擎建议；建议 replay 而请求 override 将被 487 拒绝）",
+    )
+    checkpoint_recover.add_argument(
+        "--confirm",
+        action="store_true",
+        help="确认执行（缺省为 dry-run 影响评估——不调引擎三零）",
+    )
+    checkpoint_recover.add_argument(
+        "--confirmed-by",
+        type=str,
+        default=None,
+        metavar="APPROVER",
+        help="审批人标识（confirm 路径必填；缺省取 --applied-by）",
     )
 
     isolation_status = subparsers.add_parser(
@@ -1065,6 +1168,395 @@ def _run_checkpoint_create_cli(
         return 1
 
 
+async def _run_checkpoint_list(plan_id: str) -> list[Any]:
+    """checkpoint-list 异步执行壳（resolve 清单用例——Story 6-6）。
+
+    resolve 入 try（代码审查 R1-F17）：resolve 抛出（注册名漂移等）时 finally
+    关池在同 loop 收口——bootstrap 连接池不泄漏绑死已关闭的 loop。
+    """
+    try:
+        use_case = resolve("checkpoint_list_use_case")
+        summaries: list[Any] = await use_case.execute(plan_id=plan_id)
+        return summaries
+    finally:
+        await _close_connection_pools()
+
+
+def _print_checkpoint_summary_table(summaries: list[Any]) -> None:
+    """摘要清单表格打印（纯标准库动态列宽——Story 6-6 钦定新形态）。
+
+    两遍法：max(len(header), max(len(v))) 算列宽 + str.ljust 对齐 + 表头行 +
+    ` | ` 分隔（弃 ASCII 边框——值域有界全表 ≤64 字符远小于 128 行宽无需截断；
+    completed 输出英文 true/false 保持单测值级断言直白——输出即契约）。
+    """
+    headers = ("checkpoint_no", "stage", "completed", "version", "sync_status")
+    rows = [
+        (
+            str(getattr(summary, "checkpoint_no", "")),
+            str(getattr(summary, "stage_id", "")),
+            "true" if getattr(summary, "completed", False) else "false",
+            str(getattr(summary, "state_version", 0)),
+            str(getattr(summary, "sync_status", "")),
+        )
+        for summary in summaries
+    ]
+    widths = [
+        max(len(header), *(len(row[column]) for row in rows)) if rows else len(header) for column, header in enumerate(headers)
+    ]
+    print(" | ".join(header.ljust(widths[column]) for column, header in enumerate(headers)))
+    for row in rows:
+        print(" | ".join(value.ljust(widths[column]) for column, value in enumerate(row)))
+
+
+def _run_checkpoint_list_cli(plan_id: str) -> int:
+    """checkpoint-list 子命令执行（五步定式——_run_checkpoint_create_cli 直系样板）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+
+    Returns:
+        退出码（0=清单查询成功（空清单亦 0——枚举面非错误），1=业务异常）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "checkpoint-list", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("Checkpoint 清单失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        summaries = asyncio.run(_run_checkpoint_list(plan_id))
+        if summaries:
+            _print_checkpoint_summary_table(summaries)
+        else:
+            print("该 plan_id 下无 Checkpoint（空清单）")
+        logger.info("Checkpoint 清单查询完成: plan_id=%s 条目数=%d", plan_id, len(summaries))
+        return 0
+    except DomainError as error:
+        logger.error("Checkpoint 清单查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Checkpoint 清单查询异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _run_checkpoint_show(plan_id: str, checkpoint_no: str) -> Any:
+    """checkpoint-show 异步执行壳（resolve 既有恢复视图用例——首消费方）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_checkpoint_list 注记）。
+    """
+    try:
+        use_case = resolve("checkpoint_recovery_use_case")
+        return await use_case.execute(plan_id=plan_id, checkpoint_no=checkpoint_no)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_checkpoint_recovery_view(view: Any) -> None:
+    """恢复视图打印（9 键——getattr 形态零实体 import 依赖，6-3 先例）。"""
+    print("Checkpoint 恢复视图：")
+    print(f"  checkpoint_no: {getattr(view, 'checkpoint_no', '')}")
+    print(f"  stage: {getattr(view, 'stage', '')}")
+    print(f"  compressed_context: {getattr(view, 'compressed_context', '')[:120]}")
+    print(f"  state_data keys: {sorted(getattr(view, 'state_data', {}).keys())}")
+    print(f"  correction_history: {getattr(view, 'correction_history', [])}")
+    print(f"  subsequent_checkpoints: {getattr(view, 'subsequent_checkpoints', [])}")
+    print(f"  recommended_mode: {getattr(view, 'recommended_mode', '')}")
+    print(f"  state_version: {getattr(view, 'state_version', 0)}")
+    print(f"  snapshot_id: {getattr(view, 'snapshot_id', '')}")
+
+
+def _run_checkpoint_show_cli(plan_id: str, checkpoint_no: str) -> int:
+    """checkpoint-show 子命令执行（五步定式——resolve 既有 checkpoint_recovery_use_case）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        checkpoint_no: --checkpoint-no 原始字符串。
+
+    Returns:
+        退出码（0=视图查询成功，1=业务异常）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "checkpoint-show", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("Checkpoint 详情失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        view = asyncio.run(_run_checkpoint_show(plan_id, checkpoint_no))
+        _print_checkpoint_recovery_view(view)
+        logger.info("Checkpoint 详情查询完成: plan_id=%s checkpoint_no=%s", plan_id, checkpoint_no)
+        return 0
+    except DomainError as error:
+        logger.error("Checkpoint 详情查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Checkpoint 详情查询异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _run_checkpoint_recovery_view(plan_id: str, checkpoint_no: str) -> Any:
+    """dry-run 评估数据面（resolve 既有恢复视图用例——仅取②步视图零执行）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_checkpoint_list 注记）。
+    """
+    try:
+        use_case = resolve("checkpoint_recovery_use_case")
+        return await use_case.execute(plan_id=plan_id, checkpoint_no=checkpoint_no)
+    finally:
+        await _close_connection_pools()
+
+
+async def _run_checkpoint_recover(plan_id: str, **kwargs: Any) -> Any:
+    """恢复执行异步执行壳（resolve 执行用例——confirm 路径）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_checkpoint_list 注记）。
+    """
+    try:
+        use_case = resolve("checkpoint_recovery_execute_use_case")
+        return await use_case.execute(plan_id=plan_id, **kwargs)
+    finally:
+        await _close_connection_pools()
+
+
+def _parse_correction_group(
+    correction_type: str | None,
+    previous_value: str | None,
+    new_value: str | None,
+    applied_by: str | None,
+) -> Any:
+    """四 --correction-* 参数成组守卫（CLI 层唯一落位——post-parse 检测）。
+
+    四个 args 原始形态（None=未提供）仅在 CLI 层可见——CorrectionRecord 字段
+    默认值兜底下「部分出现」到用例层已不可表达（AC-2 裁定）；部分出现 →
+    构造真实 EntityValidationError 242（R1-F18 真实异常构造纪律）。
+
+    Returns:
+        CorrectionRecord（四参数全提供）或 None（全未提供——纯恢复场景）。
+
+    Raises:
+        EntityValidationError: 242——四参数部分出现；或 correction_type 显式空串
+            （修正判别键不可空——空修正无审计语义；previous/new/applied_by 空串
+            属显式退化值，applied_by 空由 confirm 审批守卫兜底——代码审查 R1-F9）。
+    """
+    provided = [value for value in (correction_type, previous_value, new_value, applied_by) if value is not None]
+    if provided and len(provided) < 4:
+        raise EntityValidationError(
+            message=(
+                "--correction-type/--previous-value/--new-value/--applied-by 四参数必须成组提供"
+                f"（实测仅提供 {len(provided)}/4）"
+            ),
+            context={
+                "command": "checkpoint-recover",
+                "field": "correction_group",
+                "provided_count": str(len(provided)),
+            },
+        )
+    if not provided:
+        return None
+    if not (correction_type or "").strip():
+        raise EntityValidationError(
+            message="--correction-type 不可为空串（修正判别键必填——空修正无审计语义）",
+            context={
+                "command": "checkpoint-recover",
+                "field": "correction_type",
+                "correction_type": correction_type or "",
+            },
+        )
+    from src.domain.entities.checkpoint import CorrectionRecord
+
+    return CorrectionRecord(
+        correction_type=correction_type or "",
+        previous_value=previous_value or "",
+        new_value=new_value or "",
+        applied_by=applied_by or "",
+    )
+
+
+def _print_recovery_assessment(view: Any, mode_raw: str | None, correction: Any, confirmed_by: str | None) -> None:
+    """dry-run 影响评估输出（后续清单+建议模式+风险提示+修正展示+待确认提示）。
+
+    风险等级经 assess_consistency_risk 同源计算（与引擎⑤步单一事实源——OD-5）；
+    冲突组合附「confirm 必拒 487」预检提示（执法在执行态，评估态展示建议/请求
+    双模式并预警）。
+    """
+    from src.domain.entities.checkpoint import RecoveryMode
+    from src.domain.services.recovery_mode import assess_consistency_risk
+
+    recommended = getattr(view, "recommended_mode", None)
+    subsequent = list(getattr(view, "subsequent_checkpoints", []))
+    if isinstance(recommended, RecoveryMode):
+        recommended_mode = recommended
+    elif isinstance(recommended, str) and recommended:
+        recommended_mode = RecoveryMode(recommended)  # str-Enum 按值构造（小写值域）
+    else:
+        recommended_mode = RecoveryMode.OVERRIDE
+    requested_mode = RecoveryMode(mode_raw) if mode_raw else None
+    effective = requested_mode if requested_mode is not None else recommended_mode
+    risk = assess_consistency_risk(effective, len(subsequent))
+
+    print("恢复影响评估（dry-run——未执行）：")
+    print(f"  恢复起点: {getattr(view, 'checkpoint_no', '')}")
+    print(f"  后续 Checkpoint 清单: {subsequent or '（无）'}")
+    print(f"  建议恢复模式: {recommended_mode.value}")
+    if requested_mode is not None:
+        print(f"  请求恢复模式: {requested_mode.value}")
+    print(f"  一致性风险等级: {risk}")
+    if correction is not None:
+        print("  将应用的关键参数修正（仅展示零应用）：")
+        print(f"    correction_type: {getattr(correction, 'correction_type', '')}")
+        print(f"    previous_value: {getattr(correction, 'previous_value', '')}")
+        print(f"    new_value: {getattr(correction, 'new_value', '')}")
+        print(f"    applied_by: {getattr(correction, 'applied_by', '')}")
+    approver = confirmed_by or getattr(correction, "applied_by", "") or "（未提供——confirm 时必填）"
+    print(f"  审批人: {approver}")
+    if requested_mode is not None and recommended_mode is RecoveryMode.REPLAY and requested_mode is RecoveryMode.OVERRIDE:
+        print("  ⚠ 预检提示：该组合 confirm 必被 487 拒绝（影响≥2 个后续 Checkpoint 强制 Replay）")
+    print("待确认：加 --confirm 执行恢复（评估态不落恢复记录/不发布事件/不应用修正）")
+
+
+def _print_recovery_outcome(outcome: Any) -> None:
+    """恢复执行结果输出（Outcome 展示面——getattr 形态零实体依赖）。"""
+    print("Checkpoint 恢复执行完成：")
+    print(f"  checkpoint_no: {getattr(outcome, 'checkpoint_no', '')}")
+    print(f"  recovery_mode: {getattr(outcome, 'recovery_mode', '')}")
+    print(f"  corrected: {getattr(outcome, 'corrected', False)}")
+    print(f"  new_state_version: {getattr(outcome, 'new_state_version', 0)}")
+    print(f"  affected_checkpoints: {getattr(outcome, 'affected_checkpoints', [])}")
+    print(f"  execution_ms: {getattr(outcome, 'execution_ms', 0.0):.2f}")
+    print(f"  next_action_hint: {getattr(outcome, 'next_action_hint', '')}")
+    print(f"  recovery_record_session_id: {getattr(outcome, 'recovery_record_session_id', '')}")
+
+
+def _run_checkpoint_recover_cli(
+    plan_id: str,
+    checkpoint_no: str,
+    correction_type: str | None,
+    previous_value: str | None,
+    new_value: str | None,
+    applied_by: str | None,
+    mode_raw: str | None,
+    confirm: bool,
+    confirmed_by: str | None,
+) -> int:
+    """checkpoint-recover 子命令执行（两态——OD-5 CLI 同步确认形态）。
+
+    无 --confirm = dry-run（影响评估输出 + exit 0 + 三零——不调执行引擎仅
+    resolve ②步视图）；有 --confirm = 执行 AC-3 全链。exit 0 口径：dry-run
+    评估完成 / 恢复记录落库成功（发布降级不改 exit code——AC-4）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        checkpoint_no: --checkpoint-no 原始字符串。
+        correction_type: --correction-type（四参数成组）。
+        previous_value: --previous-value（四参数成组）。
+        new_value: --new-value（四参数成组）。
+        applied_by: --applied-by（四参数成组；--confirmed-by 缺省链兜底）。
+        mode_raw: --mode 原始字符串（choices 已拦截小写值域）。
+        confirm: --confirm 旗标（缺省 dry-run）。
+        confirmed_by: --confirmed-by（confirm 路径必填；缺省取 --applied-by）。
+
+    Returns:
+        退出码（0=评估完成/恢复记录落库成功，1=业务异常）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "checkpoint-recover", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("Checkpoint 恢复失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    # 四参数成组守卫（CLI 层唯一落位——post-parse 检测+真实异常构造）
+    try:
+        correction = _parse_correction_group(correction_type, previous_value, new_value, applied_by)
+    except DomainError as error:
+        logger.error("Checkpoint 恢复失败（修正参数成组守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+
+    # 两态参数校验面一致：confirmed_by 缺省链（dry-run 不要求；confirm 必填）。
+    # is None 判缺省（代码审查 R1-F9）：显式空串 "" 原样保留——不静默滑入
+    # --applied-by 兜底（审批人身份被静默替换），由 confirm 守卫 242 fail-loud
+    effective_confirmed_by = confirmed_by if confirmed_by is not None else (applied_by or "")
+
+    if not confirm:
+        try:
+            _ensure_bootstrapped()
+            view = asyncio.run(_run_checkpoint_recovery_view(plan_id, checkpoint_no))
+            _print_recovery_assessment(view, mode_raw, correction, confirmed_by)
+            logger.info("Checkpoint 恢复评估完成（dry-run）: plan_id=%s checkpoint_no=%s", plan_id, checkpoint_no)
+            return 0
+        except DomainError as error:
+            logger.error("Checkpoint 恢复评估失败: %s", error)
+            print(f"[{error.code}] {error.message}", file=sys.stderr)
+            return 1
+        except Exception as error:
+            logger.error("Checkpoint 恢复评估异常: %s", error, exc_info=True)
+            return 1
+
+    # confirm 路径守卫（CLI 层与用例层双落位——纯恢复场景无修正兜底时要求显式提供）
+    if not effective_confirmed_by:
+        validation_error = EntityValidationError(
+            message="confirm 执行必须提供 --confirmed-by（或 --applied-by）——审批人身份不可缺省空",
+            context={"command": "checkpoint-recover", "field": "confirmed_by", "confirmed_by": ""},
+        )
+        logger.error("Checkpoint 恢复失败（审批人守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    # --mode 转换层位钦定：CLI 层 str-Enum 按值构造 → 全链 entities 枚举
+    explicit_mode = None
+    if mode_raw is not None:
+        from src.domain.entities.checkpoint import RecoveryMode
+
+        explicit_mode = RecoveryMode(mode_raw)
+
+    try:
+        _ensure_bootstrapped()
+        outcome = asyncio.run(
+            _run_checkpoint_recover(
+                plan_id,
+                checkpoint_no=checkpoint_no,
+                correction=correction,
+                mode=explicit_mode,
+                confirmed_by=effective_confirmed_by,
+                created_via="cli",
+            )
+        )
+        _print_recovery_outcome(outcome)
+        logger.info(
+            "Checkpoint 恢复执行完成: plan_id=%s checkpoint_no=%s mode=%s",
+            plan_id,
+            checkpoint_no,
+            mode_raw or "（建议模式）",
+        )
+        return 0
+    except DomainError as error:
+        logger.error("Checkpoint 恢复失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("Checkpoint 恢复异常: %s", error, exc_info=True)
+        return 1
+
+
 def _run_instantiate_cli(role_raw: str) -> int:
     """instantiate 子命令执行（守卫 → bootstrap → 执行 → UUID 输出）。
 
@@ -1384,6 +1876,22 @@ def main(argv: list[str] | None = None) -> int:
             args.user_id,
             args.summary,
             args.completed,
+        )
+    if args.command == "checkpoint-list":
+        return _run_checkpoint_list_cli(args.plan_id)
+    if args.command == "checkpoint-show":
+        return _run_checkpoint_show_cli(args.plan_id, args.checkpoint_no)
+    if args.command == "checkpoint-recover":
+        return _run_checkpoint_recover_cli(
+            args.plan_id,
+            args.checkpoint_no,
+            args.correction_type,
+            args.previous_value,
+            args.new_value,
+            args.applied_by,
+            args.mode,
+            args.confirm,
+            args.confirmed_by,
         )
     if args.command == "chain-query":
         return _run_chain_query_cli(args.plan_id, args.include_blob)

@@ -248,3 +248,133 @@ class TestCheckpointExceptions:
         from src.domain.exceptions.planning_exceptions import __all__ as planning_all
 
         assert "CheckpointCompressionError" not in planning_all
+
+
+class TestCheckpointRecoveryExceptions:
+    """Story 6-6 — 恢复执行面异常（486/487——planning 段 486-489 预留段取码）。
+
+    延迟 import 形态：类未定义时红 = 运行期 ImportError（6-3 同款 owning 落位）。
+    """
+
+    def test_checkpoint_recovery_error_code_486(self) -> None:
+        """486 编码 + context 领域上下文（恢复编排强制环节失败——fail-loud）。"""
+        from src.domain.exceptions import CheckpointRecoveryError
+
+        exc = CheckpointRecoveryError(
+            plan_id="plan-recovery-1",
+            checkpoint_no="CP-3",
+            reason="恢复记录落库失败: Redis 写入超时",
+        )
+
+        assert exc.code == "EXCEPTION_486"
+        assert exc.context["plan_id"] == "plan-recovery-1"
+        assert exc.context["checkpoint_no"] == "CP-3"
+        assert exc.context["reason"].startswith("恢复记录落库失败")
+
+    def test_checkpoint_recovery_error_default_message_combines_reason(self) -> None:
+        """486 默认 message 双形态（R1-F3 组合语义先例直接继承——根因对 CLI/API 操作者可见）。"""
+        from src.domain.exceptions import CheckpointRecoveryError
+
+        with_reason = CheckpointRecoveryError(plan_id="p", checkpoint_no="CP-1", reason="修正应用落库失败: 连接中断")
+        assert with_reason.message == "Checkpoint 恢复执行失败: 修正应用落库失败: 连接中断"
+        assert with_reason.message.startswith("Checkpoint 恢复执行失败")
+
+        without_reason = CheckpointRecoveryError(plan_id="p", checkpoint_no="CP-1")
+        assert without_reason.message == "Checkpoint 恢复执行失败"
+
+        overridden = CheckpointRecoveryError(plan_id="p", checkpoint_no="CP-1", reason="r", message="自定义消息")
+        assert overridden.message == "自定义消息"
+
+    def test_checkpoint_recovery_error_cause_chain(self) -> None:
+        """486 cause 链透传（except StorageError 包装——底层异常可追溯）。"""
+        from src.domain.exceptions import CheckpointRecoveryError
+
+        root = RuntimeError("Redis connection reset")
+        exc = CheckpointRecoveryError(plan_id="p", checkpoint_no="CP-1", reason="save 失败", cause=root)
+
+        assert exc.cause is root
+        assert exc.to_dict().get("cause") is not None
+        assert exc.to_dict()["code"] == "EXCEPTION_486"
+
+    def test_recovery_mode_conflict_error_code_487(self) -> None:
+        """487 编码（模式强制执法拒绝——or.md L622 不变约束承载）。"""
+        from src.domain.exceptions import RecoveryModeConflictError
+
+        exc = RecoveryModeConflictError(recommended_mode="Replay", requested_mode="Override")
+
+        assert exc.code == "EXCEPTION_487"
+        assert exc.context["recommended_mode"] == "Replay"
+        assert exc.context["requested_mode"] == "Override"
+
+    def test_recovery_mode_conflict_message_carries_dual_modes(self) -> None:
+        """487 message 携带建议/请求双模式（可理解性裁决面——OD-6）。"""
+        from src.domain.exceptions import RecoveryModeConflictError
+
+        exc = RecoveryModeConflictError(recommended_mode="Replay", requested_mode="Override")
+        assert "Replay" in exc.message, f"message 缺建议模式（实测={exc.message!r}）"
+        assert "Override" in exc.message, f"message 缺请求模式（实测={exc.message!r}）"
+        assert "强制 Replay" in exc.message or "强制" in exc.message, "message 缺不变约束语义"
+
+    def test_recovery_exceptions_subclass_business_error(self) -> None:
+        """两异常均为 BusinessException 子类（planning 段语义继承）。"""
+        from src.domain.exceptions import CheckpointRecoveryError, RecoveryModeConflictError
+
+        assert issubclass(CheckpointRecoveryError, BusinessException)
+        assert issubclass(RecoveryModeConflictError, BusinessException)
+
+    def test_recovery_exception_codes_distinct_and_reserved_range(self) -> None:
+        """486/487 与既有码互异且落预留段（486-489 留 6-6——485 空洞+488/489 残留维持）。"""
+        from src.domain.exceptions import CheckpointRecoveryError, RecoveryModeConflictError
+
+        existing = {
+            PlanningNotFoundError.code,
+            PlanningExecutionError.code,
+            PlanningStateError.code,
+            "EXCEPTION_483",
+            "EXCEPTION_484",
+        }
+        assert CheckpointRecoveryError.code == "EXCEPTION_486"
+        assert RecoveryModeConflictError.code == "EXCEPTION_487"
+        assert CheckpointRecoveryError.code not in existing
+        assert RecoveryModeConflictError.code not in existing
+
+    def test_recovery_exception_http_map_registered_value_level(self) -> None:
+        """EXCEPTION_HTTP_MAP 值级断言（486→500 / 487→409——改挂状态码即红）。"""
+        from fastapi import status
+
+        from src.domain.exceptions import CheckpointRecoveryError, RecoveryModeConflictError
+        from src.interfaces.api.exception_handlers import EXCEPTION_HTTP_MAP
+
+        assert EXCEPTION_HTTP_MAP[CheckpointRecoveryError] == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert EXCEPTION_HTTP_MAP[RecoveryModeConflictError] == status.HTTP_409_CONFLICT
+
+    def test_recovery_exception_class_registry_registered(self) -> None:
+        """_CLASS_TO_SUBDOMAIN 注册（planning 子域——码段校验 Rule 联动）。"""
+        from src.domain.exceptions._code_ranges import _CLASS_TO_SUBDOMAIN
+
+        assert _CLASS_TO_SUBDOMAIN["CheckpointRecoveryError"] == "planning"
+        assert _CLASS_TO_SUBDOMAIN["RecoveryModeConflictError"] == "planning"
+
+    def test_485_hole_and_488_489_reserved_maintained(self) -> None:
+        """485 段内空洞维持 + 488/489 继续预留（OD-7——占 486/487 后残留位零占用）。"""
+        from src.domain.exceptions.planning_exceptions import __all__ as planning_all
+
+        occupied = {str(number) for number in range(480, 490) if f"EXCEPTION_{number}" in _occupied_code_literals()}
+        assert occupied == {"480", "481", "482", "483", "484", "486", "487"}, (
+            f"planning 段实占码实测={sorted(occupied)} 期望 480-484+486/487（485 空洞+488/489 预留维持——OD-7）"
+        )
+        assert len(planning_all) >= 7, "planning 导出面应含 7 类（480-484+486/487）"
+
+
+def _occupied_code_literals() -> set[str]:
+    """planning 异常模块内实占的 EXCEPTION_nnn 字面量集合（485 空洞/488-489 预留判定基面）。"""
+    import inspect
+
+    from src.domain.exceptions import planning_exceptions
+
+    source = inspect.getsource(planning_exceptions)
+    found: set[str] = set()
+    for number in range(480, 490):
+        if f'EXCEPTION_{number}"' in source or f"EXCEPTION_{number}'" in source:
+            found.add(f"EXCEPTION_{number}")
+    return found

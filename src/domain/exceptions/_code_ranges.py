@@ -186,14 +186,16 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     #   快照落库；485 独立码不设——OD-7 门禁落编排层恰是 483 触发面)
     # EXCEPTION_484 CheckpointIntegrityError (Story 6-3, 完整性违约——完整形态
     #   缺失 persistent_note_ref 构造守卫 + checksum 校验失败/篡改检测)
-    # 480-482 语义归属 business（规划流程结果是调用方可处理结果）；485-489 预留 planning 域（486-489 留 6-6 恢复执行面）
+    # 486/487 已由 Story 6-6 恢复执行面实占（486 编排强制环节失败 fail-loud /
+    #   487 模式强制执法拒绝）；480-482 语义归属 business（规划流程结果是调用方
+    #   可处理结果）；485 段内空洞维持（OD-7 永不设码）；488/489 预留 planning 域
     "planning": (480, 489),
     # 报告子域（490-499）—— Story 6-5a 新开 1 批 2 个 + 6-5b 增 2 个
     # （planning 段 480-489 之后九代开段先例第九段：data_source 410/debate 420/
     #  tool_version 430/agent 440/evaluation 450/sap 460/financial 470/planning 480
     #  同款「前段满/双重成文预留不可占/语义独立 → 开独立段」——报告交付物域与
     #  规划流程域语义分立（报告是规划产物的事后聚合交付 ≠ 规划流程本身）；
-    #  planning 段 485 预留、486-489 成文「留 6-6 恢复执行面」不可占）:
+    #  planning 段 485 预留、486/487 由 6-6 实占、488/489 成文预留不可占）:
     # EXCEPTION_490 ReportGenerationError (Story 6-5a, 报告数据源全缺——chain
     #   total==0[plan 从未跑过与归档全失败两形态同判]；404 语义；最新快照在位
     #   亦同判[时间线摘要非报告素材])
@@ -382,12 +384,15 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     # financial_exceptions.py (Story 5.12 新增 1 个异常——财务建模估值计算失败码)
     "FinancialCalculationError": "financial",
     # planning_exceptions.py (Story 6-1 新增 3 个异常——BLM 规划流程三码；
-    #   Story 6-3 追加 2 个——Checkpoint 创建/完整性)
+    #   Story 6-3 追加 2 个——Checkpoint 创建/完整性；
+    #   Story 6-6 追加 2 个——恢复执行编排失败/模式强制执法拒绝)
     "PlanningNotFoundError": "planning",
     "PlanningExecutionError": "planning",
     "PlanningStateError": "planning",
     "CheckpointCreationError": "planning",
     "CheckpointIntegrityError": "planning",
+    "CheckpointRecoveryError": "planning",
+    "RecoveryModeConflictError": "planning",
     # report_exceptions.py (Story 6-5a 新增 2 个异常——Markdown 报告生成
     #   数据源全缺/持久化失败双码；6-5b 增 492/493 两类——PDF 渲染失败
     #   /L4 证据归档失败)

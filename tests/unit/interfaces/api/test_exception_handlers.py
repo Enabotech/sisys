@@ -224,6 +224,9 @@ class TestExceptionHttpMap:
 
     def test_map_contains_all_expected_exception_types(self):
         """验证映射表包含所有关键异常类型."""
+        # Story 6-6 两新异常延迟 import（类未落地时红=运行期 ImportError，收集期零错误——6-x 纪律）
+        from src.domain.exceptions import CheckpointRecoveryError, RecoveryModeConflictError
+
         expected_types = {
             # 三层基类
             SystemException,
@@ -376,6 +379,8 @@ class TestExceptionHttpMap:
             PlanningStateError,  # 482 — Story 6.1 状态机非法推进（409——已激活：重跑守卫 R1-5）
             CheckpointCreationError,  # 483 — Story 6.3 Checkpoint 五步编排强制环节失败（500）
             CheckpointIntegrityError,  # 484 — Story 6.3 完整性守卫/校验失败（409）
+            CheckpointRecoveryError,  # 486 — Story 6.6 恢复执行编排强制环节失败（500）
+            RecoveryModeConflictError,  # 487 — Story 6.6 模式强制执法拒绝（409）
             ReportGenerationError,  # 490 — Story 6.5a 报告数据源全缺（404）
             ReportStorageError,  # 491 — Story 6.5a 报告持久化失败（500）
             PdfRenderingError,  # 492 — Story 6.5b PDF 报告渲染失败（500）
@@ -388,6 +393,13 @@ class TestExceptionHttpMap:
         """验证 483→500 / 484→409 值级映射（Story 6.3——改挂状态码即红）。"""
         assert EXCEPTION_HTTP_MAP[CheckpointCreationError] == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert EXCEPTION_HTTP_MAP[CheckpointIntegrityError] == status.HTTP_409_CONFLICT
+
+    def test_recovery_exception_http_map_values(self):
+        """验证 486→500 / 487→409 值级映射（Story 6.6——改挂状态码即红）。"""
+        from src.domain.exceptions import CheckpointRecoveryError, RecoveryModeConflictError
+
+        assert EXCEPTION_HTTP_MAP[CheckpointRecoveryError] == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert EXCEPTION_HTTP_MAP[RecoveryModeConflictError] == status.HTTP_409_CONFLICT
 
     def test_system_exception_maps_to_500(self):
         """验证系统级异常映射到 500."""

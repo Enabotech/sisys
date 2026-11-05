@@ -282,6 +282,32 @@ class TestBootstrapAndCleanupRobustness:
         assert stub.last_result is not None
         assert uuid.UUID(capsys.readouterr().out.strip()) == stub.last_result.agent_id
 
+    def test_resolve_failure_still_closes_pools(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """resolve 抛出时 finally 关池仍执行（代码审查 R1-F17/G8——连接池不泄漏绑死 loop）。
+
+        修复前异步壳的 resolve 在 try 之外——注册名漂移等 resolve 失败会跳过
+        finally 的 _close_connection_pools；修复后 resolve 入 try，同 loop 收口。
+        """
+
+        def _boom_resolve(name: str) -> Any:
+            raise RuntimeError("registry drift")
+
+        close_calls: list[int] = []
+
+        async def _spy_close() -> None:
+            close_calls.append(1)
+
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", _boom_resolve)
+        monkeypatch.setattr(agent_cli, "_close_connection_pools", _spy_close)
+        with caplog.at_level(logging.ERROR, logger="src.entrypoints.agent_cli"):
+            exit_code = agent_cli.main(["checkpoint-list", "--plan-id", str(uuid.uuid4())])
+        assert exit_code == 1
+        assert close_calls, "resolve 抛出后 finally 关池仍须执行（R1-F17 修复锚）"
+        assert "registry drift" in caplog.text
+
 
 # ===================================================================
 # Story 5-2 — load-profile 子命令（档案加载）
@@ -2008,3 +2034,656 @@ def _global_registry_has(name: str) -> bool:
     from src.domain.ports.registry import _global_registry
 
     return _global_registry.get(name) is not None
+
+
+class _StubSummaryView:
+    """摘要视图替身（checkpoint-list 表格输出 getattr 消费面）。"""
+
+    def __init__(self, *, checkpoint_no: str, sync_status: str = "in_sync") -> None:
+        self.checkpoint_no = checkpoint_no
+        self.stage_id = "performance_gap"
+        self.completed = True
+        self.summary = f"{checkpoint_no} 阶段摘要"
+        self.state_version = 0
+        self.created_via = "use_case"
+        self.timestamp = "2026-11-05T10:00:00+00:00"
+        self.sync_status = sync_status
+
+
+class _StubListUseCase:
+    """清单用例替身（calls 记录 + 可编程异常）。"""
+
+    def __init__(self, summaries: list[_StubSummaryView] | None = None) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.summaries = summaries if summaries is not None else []
+
+    async def execute(self, **kwargs) -> list[_StubSummaryView]:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return self.summaries
+
+
+class _StubRecoveryView:
+    """恢复视图替身（checkpoint-show 九键输出 getattr 消费面）。"""
+
+    def __init__(self, *, plan_id: str, checkpoint_no: str = "CP-1") -> None:
+        self.checkpoint_no = checkpoint_no
+        self.stage = "performance_gap"
+        self.compressed_context = "压缩语境摘要"
+        self.state_data = {"checkpoint_no": checkpoint_no, "plan_id": plan_id}
+        self.correction_history: list[dict[str, Any]] = []
+        self.subsequent_checkpoints = ["CP-3"]
+        self.recommended_mode = "override"
+        self.state_version = 0
+        self.snapshot_id = str(uuid.uuid4())
+
+
+class _StubRecoveryViewUseCase:
+    """恢复视图用例替身（checkpoint-show 消费面——既有 checkpoint_recovery_use_case 首消费方）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+
+    async def execute(self, **kwargs) -> _StubRecoveryView:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return _StubRecoveryView(plan_id=kwargs["plan_id"], checkpoint_no=kwargs["checkpoint_no"])
+
+
+class TestCheckpointListParser:
+    """checkpoint-list 子命令解析（单必填参数面）。"""
+
+    def test_checkpoint_list_requires_plan_id(self) -> None:
+        """必填参数缺失 usage error exit 2（--plan-id）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["checkpoint-list"])
+        assert exc_info.value.code == 2
+
+    def test_checkpoint_list_full_arguments(self) -> None:
+        """全参数解析（单 --plan-id 必填）。"""
+        args = agent_cli.build_parser().parse_args(["checkpoint-list", "--plan-id", str(uuid.uuid4())])
+        assert args.command == "checkpoint-list"
+
+
+class TestCheckpointListExecution:
+    """checkpoint-list 执行（五步定式+纯标准库动态列宽表格——钦定新形态）。"""
+
+    def test_success_table_header_and_rows(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功路径：表头行精确串（五列头 + ` | ` 分隔符）+ 行值级断言（sync 三态/true）。"""
+        stub = _StubListUseCase(
+            [
+                _StubSummaryView(checkpoint_no="CP-1"),
+                _StubSummaryView(checkpoint_no="CP-3", sync_status="pending_sync"),
+            ]
+        )
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        plan_id = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", plan_id])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        # 表头行精确断言（五列钦定：checkpoint_no/stage/completed/version/sync_status；
+        # ljust 动态列宽填充——按 ` | ` 分割后逐列 strip 值级比较）
+        first_line = out.splitlines()[0] if out else ""
+        columns = [cell.strip() for cell in first_line.split(" | ")]
+        assert columns == ["checkpoint_no", "stage", "completed", "version", "sync_status"], (
+            f"表头五列钦定形态缺（实测首行={first_line!r}）"
+        )
+        # 行值级断言（含 sync 三态值与 true——禁子串存在性弱断言之外的形态漂移）
+        assert "CP-1" in out and "CP-3" in out
+        assert "performance_gap" in out
+        assert "true" in out
+        assert "in_sync" in out and "pending_sync" in out
+        assert stub.calls and stub.calls[0]["plan_id"] == plan_id
+
+    def test_empty_list_outputs_empty_note(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空清单路径：exit 0 + 空态提示（枚举面非错误）。"""
+        stub = _StubListUseCase([])
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "无 Checkpoint" in out, f"空态提示缺（实测={out!r}）"
+
+    def test_invalid_plan_id_exit_1_before_bootstrap(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """plan_id 非 UUID：守卫先于 bootstrap（[EXCEPTION_242] stderr 形态）。"""
+        stub = _StubListUseCase()
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", "not-a-uuid"])
+
+        assert exit_code == 1
+        assert not stub.calls, "守卫失败后不得触达用例"
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+
+class TestCheckpointShowParser:
+    """checkpoint-show 子命令解析（双必填参数面）。"""
+
+    def test_checkpoint_show_requires_core_params(self) -> None:
+        """必填参数缺失 usage error exit 2（--plan-id/--checkpoint-no）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["checkpoint-show", "--plan-id", str(uuid.uuid4())])
+        assert exc_info.value.code == 2
+
+    def test_checkpoint_show_full_arguments(self) -> None:
+        """全参数解析（双必填）。"""
+        args = agent_cli.build_parser().parse_args(
+            ["checkpoint-show", "--plan-id", str(uuid.uuid4()), "--checkpoint-no", "CP-1"]
+        )
+        assert args.command == "checkpoint-show"
+        assert args.checkpoint_no == "CP-1"
+
+
+class TestCheckpointShowExecution:
+    """checkpoint-show 执行（resolve 既有 checkpoint_recovery_use_case——首消费方）。"""
+
+    def test_success_nine_keys_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功路径：exit 0 + 9 键视图逐键输出（零适配复用 CheckpointRecoveryView）。"""
+        stub = _StubRecoveryViewUseCase()
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        plan_id = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["checkpoint-show", "--plan-id", plan_id, "--checkpoint-no", "CP-1"])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        for key in (
+            "checkpoint_no",
+            "stage",
+            "compressed_context",
+            "state_data",
+            "correction_history",
+            "subsequent_checkpoints",
+            "recommended_mode",
+            "state_version",
+            "snapshot_id",
+        ):
+            assert key in out, f"输出缺 9 键视图键 {key}（实测={out!r}）"
+        assert "override" in out
+        assert stub.calls and stub.calls[0]["plan_id"] == plan_id
+        assert stub.calls[0]["checkpoint_no"] == "CP-1"
+
+    def test_resolves_recovery_view_use_case(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """resolve 目标 = checkpoint_recovery_use_case（既有注册首消费方——接线断言③）。"""
+        stub = _StubRecoveryViewUseCase()
+        resolved_names: list[str] = []
+
+        def _record_resolve(name: str) -> Any:
+            resolved_names.append(name)
+            return stub
+
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", _record_resolve)
+
+        exit_code = agent_cli.main(["checkpoint-show", "--plan-id", str(uuid.uuid4()), "--checkpoint-no", "CP-1"])
+
+        assert exit_code == 0
+        assert "checkpoint_recovery_use_case" in resolved_names, (
+            f"checkpoint-show 须 resolve 既有 checkpoint_recovery_use_case（实测={resolved_names}）"
+        )
+
+    def test_business_exception_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """业务异常路径：480 → exit 1 + stderr 含 code。"""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        stub = _StubRecoveryViewUseCase()
+        stub.error = PlanningNotFoundError(plan_id="p")
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+        exit_code = agent_cli.main(["checkpoint-show", "--plan-id", str(uuid.uuid4()), "--checkpoint-no", "CP-2"])
+
+        assert exit_code == 1
+        assert "EXCEPTION_480" in capsys.readouterr().err
+
+
+class _StubRecoveryOutcome:
+    """恢复结果替身（checkpoint-recover 输出 getattr 消费面）。"""
+
+    def __init__(self) -> None:
+        self.checkpoint_no = "CP-3"
+        self.recovery_mode = "override"
+        self.corrected = True
+        self.new_state_version = 1
+        self.affected_checkpoints = ["CP-5"]
+        self.marked_checkpoints = ["CP-5"]
+        self.execution_ms = 3.2
+        self.next_action_hint = "一致性风险提示：后续 Checkpoint 基于旧版本"
+        self.recovery_record_session_id = "blm-checkpoint-recovery-plan"
+        self.recovered_snapshot_id = str(uuid.uuid4())
+
+
+class _StubRecoveryViewOutcome:
+    """恢复视图替身（dry-run 评估输出消费面——recover_checkpoint ②步视图）。"""
+
+    def __init__(self) -> None:
+        self.checkpoint_no = "CP-3"
+        self.stage = "performance_gap"
+        self.subsequent_checkpoints = ["CP-5"]
+        self.recommended_mode = "override"
+        self.state_version = 0
+        self.snapshot_id = str(uuid.uuid4())
+
+
+class _StubRecoveryExecuteUseCase:
+    """恢复执行用例替身（calls 记录 + 可编程异常）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+
+    async def execute(self, **kwargs) -> _StubRecoveryOutcome:
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return _StubRecoveryOutcome()
+
+
+class TestCheckpointRecoverParser:
+    """checkpoint-recover 子命令解析（双必填+修正四参数+mode+confirm）。"""
+
+    def test_checkpoint_recover_requires_core_params(self) -> None:
+        """必填参数缺失 usage error exit 2（--plan-id/--checkpoint-no）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["checkpoint-recover", "--plan-id", str(uuid.uuid4())])
+        assert exc_info.value.code == 2
+
+    def test_checkpoint_recover_mode_choices(self) -> None:
+        """--mode 值域 choices 拦截（replay/override 小写——非法值 exit 2）。"""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(
+                ["checkpoint-recover", "--plan-id", str(uuid.uuid4()), "--checkpoint-no", "CP-1", "--mode", "REPLAY"]
+            )
+        assert exc_info.value.code == 2
+
+    def test_checkpoint_recover_full_arguments(self) -> None:
+        """全参数解析（修正四参数成组+--mode+--confirm+--confirmed-by）。"""
+        args = agent_cli.build_parser().parse_args(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--previous-value",
+                "旧",
+                "--new-value",
+                "新",
+                "--applied-by",
+                "高管",
+                "--mode",
+                "override",
+                "--confirm",
+                "--confirmed-by",
+                "审批人",
+            ]
+        )
+        assert args.command == "checkpoint-recover"
+        assert args.correction_type == "L2"
+        assert args.confirm is True
+        assert args.mode == "override"
+
+
+class _StubRecoveryViewUseCaseForDryRun:
+    """dry-run 评估视图用例替身（execute 返回可定制视图——按名分派消费面）。"""
+
+    def __init__(self, view: Any = None) -> None:
+        self._view = view if view is not None else _StubRecoveryViewOutcome()
+
+    async def execute(self, **kwargs: Any) -> Any:
+        return self._view
+
+
+class TestCheckpointRecoverDryRun:
+    """checkpoint-recover dry-run 两态（无 --confirm——评估输出不调引擎）。"""
+
+    def _patch_dual(self, monkeypatch: pytest.MonkeyPatch, exec_stub: Any, view_use_case: Any) -> list[str]:
+        """双 resolve 目标注入（执行用例+恢复视图用例——按名分派）。"""
+        resolved: list[str] = []
+
+        def _resolve(name: str) -> Any:
+            resolved.append(name)
+            if name == "checkpoint_recovery_use_case":
+                return view_use_case
+            return exec_stub
+
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", _resolve)
+        return resolved
+
+    def test_dry_run_exit_0_with_assessment_no_engine_call(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """dry-run：exit 0 + 影响评估输出 + 执行用例零调用（三零之一）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+            ]
+        )
+
+        assert exit_code == 0
+        assert not exec_stub.calls, "dry-run 不得调用恢复执行引擎（三零——记录未写事件未发修正未应用）"
+        out = capsys.readouterr().out
+        assert "CP-5" in out, "评估输出缺后续清单"
+        assert "override" in out, "评估输出缺建议模式"
+        assert "确认" in out, "评估输出缺待确认提示"
+
+    def test_dry_run_with_correction_shows_parameters(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """dry-run 带修正参数：五参数展示（仅展示零应用）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--previous-value",
+                "旧战略参数",
+                "--new-value",
+                "新战略参数",
+                "--applied-by",
+                "高管-dryrun",
+            ]
+        )
+
+        assert exit_code == 0
+        assert not exec_stub.calls
+        out = capsys.readouterr().out
+        assert "新战略参数" in out, "评估输出缺修正展示（new_value）"
+        assert "L2" in out, "评估输出缺 correction_type 展示"
+
+    def test_dry_run_conflict_mode_pre_warning(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """dry-run 冲突组合评估预警（建议 replay+请求 override → 预检提示）。"""
+
+        class _ReplayView(_StubRecoveryViewOutcome):
+            def __init__(self) -> None:
+                super().__init__()
+                self.recommended_mode = "replay"
+                self.subsequent_checkpoints = ["CP-3", "CP-5"]
+
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun(_ReplayView()))
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--mode",
+                "override",
+            ]
+        )
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "487" in out, "冲突组合评估输出缺「confirm 必拒 487」预检提示"
+
+
+class TestCheckpointRecoverExecution:
+    """checkpoint-recover confirm 执行（五步定式+成组守卫+两态守卫分工）。"""
+
+    def _patch_exec(self, monkeypatch: pytest.MonkeyPatch, exec_stub: Any) -> None:
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: exec_stub)
+
+    def test_confirm_calls_engine_with_full_params(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """confirm 执行：全参调用引擎+created_via="cli"+confirmed_by 链。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+        plan_id = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                plan_id,
+                "--checkpoint-no",
+                "CP-3",
+                "--confirm",
+                "--confirmed-by",
+                "审批人",
+            ]
+        )
+
+        assert exit_code == 0
+        assert exec_stub.calls, "confirm 未调用引擎"
+        kwargs = exec_stub.calls[0]
+        assert kwargs["plan_id"] == plan_id
+        assert kwargs["confirmed_by"] == "审批人"
+        assert kwargs["created_via"] == "cli"
+        assert kwargs["correction"] is None
+        out = capsys.readouterr().out
+        assert "CP-3" in out
+
+    def test_confirm_with_correction_constructs_record(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """confirm+修正：CorrectionRecord 构造传抵（四参数成组完整形态）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--previous-value",
+                "旧",
+                "--new-value",
+                "新",
+                "--applied-by",
+                "修正人",
+                "--confirm",
+            ]
+        )
+
+        assert exit_code == 0
+        correction = exec_stub.calls[0]["correction"]
+        assert correction is not None
+        assert correction.correction_type == "L2"
+        assert correction.previous_value == "旧"
+        assert correction.new_value == "新"
+        assert correction.applied_by == "修正人"
+        # --confirmed-by 缺省链：修正场景缺省取 --applied-by
+        assert exec_stub.calls[0]["confirmed_by"] == "修正人"
+
+    def test_confirm_without_confirmed_by_and_correction_exit_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """纯恢复 confirm 无 --confirmed-by/--applied-by → 242（CLI 层+用例层双落位）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--confirm",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls, "守卫失败后不得触达引擎"
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+    def test_partial_correction_params_exit_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """四参数部分出现 → 242（CLI 层 post-parse 成组检测——唯一落位）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--confirm",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+        assert "成组" in stderr or "correction" in stderr.lower(), f"stderr 缺成组约束语义（实测={stderr!r}）"
+
+    def test_empty_correction_type_full_group_exit_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """四参全供但 --correction-type 空串 → 242（代码审查 R1-F9/G2——空修正无审计语义）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "",
+                "--previous-value",
+                "旧值",
+                "--new-value",
+                "新值",
+                "--applied-by",
+                "修正人",
+                "--confirm",
+                "--confirmed-by",
+                "高管",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls, "correction_type 空串守卫失败后不得触达引擎"
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+        assert "correction-type 不可为空" in stderr, f"stderr 缺空串守卫语义（实测={stderr!r}）"
+
+    def test_explicit_empty_confirmed_by_exit_1_not_silent_fallback(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--confirmed-by 显式空串 → 242 不静默滑入 --applied-by（代码审查 R1-F9/G2）。
+
+        修复前 `confirmed_by or (applied_by or "")` 使显式空串与缺省不可区分——
+        审批人身份被静默替换为修正人；修复后 is None 判缺省，显式空串 fail-loud。
+        """
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--previous-value",
+                "旧值",
+                "--new-value",
+                "新值",
+                "--applied-by",
+                "修正人A",
+                "--confirm",
+                "--confirmed-by",
+                "",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls, "显式空串审批人守卫失败后不得触达引擎"
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+        assert "confirmed-by" in stderr, f"stderr 缺审批人守卫语义（实测={stderr!r}）"
+
+    def test_mode_conflict_487_stderr(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--mode override 冲突 → 487 stderr [EXCEPTION_487] exit 1。"""
+        from src.domain.exceptions import RecoveryModeConflictError
+
+        exec_stub = _StubRecoveryExecuteUseCase()
+        exec_stub.error = RecoveryModeConflictError(recommended_mode="Replay", requested_mode="Override")
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-1",
+                "--mode",
+                "override",
+                "--confirm",
+                "--confirmed-by",
+                "高管",
+            ]
+        )
+
+        assert exit_code == 1
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_487]" in stderr
+        assert "Replay" in stderr and "Override" in stderr, "487 message 双模式可见"
+
+    def test_invalid_plan_id_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """plan_id 非 UUID → exit 1 [EXCEPTION_242]（守卫先于 bootstrap）。"""
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_exec(monkeypatch, exec_stub)
+
+        exit_code = agent_cli.main(
+            ["checkpoint-recover", "--plan-id", "not-a-uuid", "--checkpoint-no", "CP-1", "--confirm", "--confirmed-by", "x"]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls
+        assert "[EXCEPTION_242]" in capsys.readouterr().err

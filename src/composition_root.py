@@ -2285,14 +2285,17 @@ def bootstrap() -> None:
     # checkpoint_service：SINGLETON 编排服务注入四 SCOPED 依赖（blm_planning_service
     # :1580-1598 直接先例——单例捕获首次 resolve 的 SCOPED 实例，进程级共享既有形态）；
     # 检索-压缩循环激活：persistent_note_taker/context_compressor 首个生产消费方
-    # （deferred-work L132 部分核销——循环主链三组件）
+    # （deferred-work L132 部分核销——循环主链三组件）；
+    # Story 6-6：v1.0.0 → v1.1.0 端口演进（纯新增 list_checkpoints/execute_recovery
+    # 两方法组——ContractGate 兼容检查通过路径，OD-4；impl lambda 零变化）
     from src.application.ports.checkpoint import CheckpointServicePort
     from src.application.services.checkpoint_service import CheckpointService
+    from src.application.use_cases.checkpoint_approval import ListCheckpointsUseCase
     from src.application.use_cases.create_checkpoint import CreateCheckpointUseCase, RecoverCheckpointUseCase
 
     register_port(
         name="checkpoint_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=CheckpointServicePort,
         impl=lambda resolver: CheckpointService(
             note_taker=resolver.resolve("persistent_note_taker"),
@@ -2326,6 +2329,34 @@ def bootstrap() -> None:
             checkpoint_service=resolver.resolve("checkpoint_service"),
         ),
         module="src.application.use_cases.create_checkpoint",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("checkpoint", "use_case", "application"),
+    )
+    # Story 6-6：审批面两用例（薄透传+守卫——SINGLETON 无状态，6-3 用例注册形态同构；
+    # checkpoint_list_use_case=AC-1 清单面 / checkpoint_recovery_execute_use_case=AC-3 执行面）
+    from src.application.use_cases.checkpoint_approval import ExecuteCheckpointRecoveryUseCase
+
+    register_port(
+        name="checkpoint_list_use_case",
+        version="v1.0.0",
+        interface=ListCheckpointsUseCase,
+        impl=lambda resolver: ListCheckpointsUseCase(
+            checkpoint_service=resolver.resolve("checkpoint_service"),
+        ),
+        module="src.application.use_cases.checkpoint_approval",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("checkpoint", "use_case", "application"),
+    )
+    register_port(
+        name="checkpoint_recovery_execute_use_case",
+        version="v1.0.0",
+        interface=ExecuteCheckpointRecoveryUseCase,
+        impl=lambda resolver: ExecuteCheckpointRecoveryUseCase(
+            checkpoint_service=resolver.resolve("checkpoint_service"),
+        ),
+        module="src.application.use_cases.checkpoint_approval",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("checkpoint", "use_case", "application"),

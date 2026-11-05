@@ -19,34 +19,42 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import uuid
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 from src.application.ports.checkpoint import (
     CHECKPOINT_NO_MAX,
+    CHECKPOINT_RECOVERY_SESSION_PREFIX,
     CHECKPOINT_SESSION_PREFIX,
     CHECKPOINT_TTL_SECONDS,
+    CheckpointRecoveryOutcome,
     CheckpointRecoveryView,
+    CheckpointSummaryView,
 )
 from src.application.services.strategic_archive_service import StrategicArchiveService
 from src.domain.entities.checkpoint import Checkpoint, CheckpointStatus, CorrectionRecord, RecoveryMode
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.domain.events.checkpoint_events import CheckpointReached
+from src.domain.events.checkpoint_events import CheckpointReached, CheckpointRecovered
 from src.domain.exceptions import (
     ArchiveStorageError,
     CheckpointCreationError,
     CheckpointIntegrityError,
+    CheckpointRecoveryError,
     EntityValidationError,
     PlanningNotFoundError,
     PlanningStateError,
+    RecoveryModeConflictError,
+    StorageError,
 )
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.l3_vector import SearchResult
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 from src.domain.services.context_compressor import CompressedContext, ContextCompressor
 from src.domain.services.persistent_note_taker import PersistentNoteTaker
-from src.domain.services.recovery_mode import recommend_recovery_mode
+from src.domain.services.recovery_mode import assess_consistency_risk, recommend_recovery_mode, to_event_recovery_mode
 
 logger = logging.getLogger(__name__)
 
@@ -508,6 +516,262 @@ class CheckpointService:
             RecoveryMode 枚举（REPLAY/OVERRIDE）。
         """
         return recommend_recovery_mode(affected_checkpoint_count)
+
+    async def list_checkpoints(self, *, plan_id: str) -> list[CheckpointSummaryView]:
+        """读面清单（Story 6-6 AC-1——全量 probe + 恢复记录 join sync_status）。
+
+        全量 probe（range(1, CHECKPOINT_NO_MAX + 1) 从 CP-1 起——R8-F1 增量
+        模式的全量扩展），非 None 者按序号升序组装 8 键摘要 VO；sync_status
+        经恢复记录（第三键族）load join 推导——推导规则与口径注记见端口文件
+        第四级序列化契约（None→全量 in_sync 退化语义含 load 失败/JSON 损坏
+        同路径）。空族返回空清单不抛 480（枚举面非单点面——AC-1 语义分立）。
+
+        Args:
+            plan_id: 规划任务标识（UUID 守卫归用例层——服务层不重复守卫）。
+
+        Returns:
+            摘要视图清单（checkpoint_no 升序；空族空清单）。
+        """
+        # 恢复记录 join 面（第三键族——None/损坏同归全量 in_sync 退化语义）
+        recovery_session = f"{CHECKPOINT_RECOVERY_SESSION_PREFIX}{plan_id}"
+        recovery_record = await self._snapshot_repository.load(recovery_session)
+        pending_sync: list[Any] = []
+        invalidated: list[Any] = []
+        if recovery_record is not None:
+            pending_sync = list(recovery_record.state_data.get("pending_sync_checkpoints", []))
+            invalidated = list(recovery_record.state_data.get("invalidated_checkpoints", []))
+
+        summaries: list[CheckpointSummaryView] = []
+        for candidate_number in range(1, CHECKPOINT_NO_MAX + 1):
+            candidate_no = f"CP-{candidate_number}"
+            candidate_session = f"{CHECKPOINT_SESSION_PREFIX}{plan_id}:{candidate_no}"
+            snapshot = await self._snapshot_repository.load(candidate_session)  # None 静默跳过（R8-F1 同款）
+            if snapshot is None:
+                continue
+            if candidate_no in invalidated:
+                sync_status = "invalidated"
+            elif candidate_no in pending_sync:
+                sync_status = "pending_sync"
+            else:
+                sync_status = "in_sync"
+            summaries.append(
+                CheckpointSummaryView(
+                    checkpoint_no=candidate_no,
+                    stage_id=str(snapshot.state_data.get("stage_id", snapshot.stage_id)),
+                    completed=bool(snapshot.state_data.get("completed", False)),
+                    summary=str(snapshot.state_data.get("summary", "")),
+                    state_version=snapshot.state_version,
+                    created_via=str(snapshot.state_data.get("created_via", "use_case")),
+                    timestamp=snapshot.timestamp.isoformat(),  # 实体 datetime→VO str（漂移哨兵锚）
+                    sync_status=sync_status,
+                )
+            )
+        return summaries
+
+    async def execute_recovery(
+        self,
+        *,
+        plan_id: str,
+        checkpoint_no: str,
+        correction: CorrectionRecord | None = None,
+        mode: RecoveryMode | None = None,
+        confirmed_by: str = "",
+        created_via: str = "use_case",
+    ) -> CheckpointRecoveryOutcome:
+        """恢复执行引擎（Story 6-6 AC-3——五步编排）。
+
+        ①入口守卫（_parse_checkpoint_number 三重复用）→ ②恢复数据面
+        （recover_checkpoint：load+verify+后续清单+建议模式）→ ②.5 模式裁定
+        （前置于③修正应用——correction+冲突组合零副作用）→ ③修正应用
+        （correction 非 None 时经 apply_correction，乐观锁基线取②视图
+        state_version）→ ④双模式分支落恢复记录（第三键族 12 键）→ ⑤发布
+        CheckpointRecovered（首激活——失败降级 warning 不回滚恢复记录）。
+        486 try 面扩包③④两处 save（StorageError 统一包裹 fail-loud——不扩包
+        则 103 裸逃逸破坏六码全景）；480/482/484 在 save 之前触发经既有触发点
+        透传不并入；⑤发布独立降级面不属 486。
+
+        Args:
+            plan_id: 规划任务标识（UUID 守卫归用例层）。
+            checkpoint_no: 恢复起点检查点编号（"CP-1".."CP-8"）。
+            correction: 关键参数修正（None=纯恢复场景）。
+            mode: 显式恢复模式（None=取②步建议；显式传入时强制语义执法——
+                建议 REPLAY 而请求 OVERRIDE 抛 487 零副作用，反向允许）。
+            confirmed_by: 审批人标识（与 correction.applied_by 双写恢复记录）。
+            created_via: 触发源标识（"cli"/"use_case" 两值）。
+
+        Returns:
+            恢复执行结果（10 键 Outcome——断言锚单源）。
+
+        Raises:
+            EntityValidationError: 242——checkpoint_no 三重守卫或 mode 非 RecoveryMode
+                枚举（裸 str 防御守卫——R1-F8）。
+            PlanningNotFoundError: 480——键不存在（含 JSON 损坏同路径）。
+            PlanningStateError: 482——修正乐观锁版本冲突。
+            CheckpointIntegrityError: 484——恢复入口 verify 校验失败。
+            RecoveryModeConflictError: 487——模式强制执法拒绝（零副作用）。
+            CheckpointRecoveryError: 486——编排强制环节失败（③④ save 统一包裹）。
+        """
+        started = time.perf_counter()  # 三窗口同起点（①~④记录/①~⑤事件/①~⑤Outcome）
+        # ① 入口守卫（fail-fast 先于 load——畸形编号零 IO）
+        _parse_checkpoint_number(checkpoint_no)
+        if mode is not None and not isinstance(mode, RecoveryMode):
+            # str-Enum 身份比较陷阱防御（代码审查 R1-F8）：裸 str 经②.5 的 is 比较
+            # 恒 False 会绕过 487 执法、在④步 .value 抛裸 AttributeError 逃逸异常
+            # 体系——编程面/未来 REST 入口的防御纵深（CLI choices+按值构造、用例
+            # 层纯透传均恒产枚举，本守卫对既有路径零影响；isinstance 正向判定对
+            # 裸 str 含同值 "replay" 均 False、对枚举成员 True——实测定谳）
+            raise EntityValidationError(
+                message="mode 必须为 RecoveryMode 枚举成员（禁止裸 str——身份比较失配会绕过 487 执法）",
+                context={
+                    "service": "CheckpointService.execute_recovery",
+                    "field": "mode",
+                    "type": type(mode).__name__,
+                    "value": repr(mode),
+                },
+            )
+
+        # ② 恢复数据面（零改动复用：load→verify 484→后续清单→建议模式）
+        view = await self.recover_checkpoint(plan_id=plan_id, checkpoint_no=checkpoint_no)
+        subsequent = list(view.subsequent_checkpoints)
+        recommended = view.recommended_mode
+
+        # ②.5 模式裁定（前置于③——correction+冲突组合零副作用语义的结构保证）
+        effective_mode = mode if mode is not None else recommended
+        if recommended is RecoveryMode.REPLAY and effective_mode is RecoveryMode.OVERRIDE:
+            raise RecoveryModeConflictError(
+                recommended_mode=to_event_recovery_mode(recommended).value,
+                requested_mode=to_event_recovery_mode(effective_mode).value,
+            )
+
+        # ③ 修正应用（correction 非 None 时——乐观锁基线取②视图 state_version；
+        #    save 失败经 StorageError 统一归 486）
+        corrected = False
+        new_state_version = view.state_version
+        recovered_uuid = uuid.UUID(view.snapshot_id)  # 纯恢复场景：②视图 str 逆转换
+        correction_projection: dict[str, Any] = {}
+        if correction is not None:
+            session_id = f"{CHECKPOINT_SESSION_PREFIX}{plan_id}:{checkpoint_no}"
+            try:
+                sealed = await self.apply_correction(
+                    session_id=session_id,
+                    correction=correction,
+                    expected_state_version=view.state_version,
+                )
+            except StorageError as error:
+                raise CheckpointRecoveryError(
+                    plan_id=plan_id,
+                    checkpoint_no=checkpoint_no,
+                    reason=f"修正应用落库失败: {error}",
+                    cause=error,
+                ) from error
+            corrected = True
+            new_state_version = sealed.state_version
+            recovered_uuid = sealed.snapshot_id  # 修正一体：③步 sealed 轮换后的新 UUID 同型直传
+            correction_projection = {
+                "correction_type": correction.correction_type,
+                "previous_value": correction.previous_value,
+                "new_value": correction.new_value,
+                "applied_by": correction.applied_by,
+                "applied_at": correction.applied_at.isoformat(),
+            }
+
+        # ④ 双模式分支落恢复记录（第三键族 12 键——Override 后续 pending_sync /
+        #    Replay 后续 invalidated；均不删快照经标记承载）
+        affected = list(subsequent)
+        if effective_mode is RecoveryMode.OVERRIDE:
+            pending_sync_checkpoints = affected
+            invalidated_checkpoints: list[str] = []
+            next_action_hint = "一致性风险提示：后续 Checkpoint 基于恢复点旧版本（pending_sync）——建议尽快复核同步。"
+        else:
+            pending_sync_checkpoints = []
+            invalidated_checkpoints = affected
+            next_action_hint = (
+                "重跑指引：旧后续 Checkpoint 已作废（invalidated）——建议以新 plan_id "
+                "经 blm-plan 命令重跑后续阶段（修改点后所有状态重新计算）。"
+            )
+        record_ms = (time.perf_counter() - started) * 1000.0  # ①~④ 构造点窗口
+        recovery_session = f"{CHECKPOINT_RECOVERY_SESSION_PREFIX}{plan_id}"
+        recovery_record = CheckpointSnapshot(
+            session_id=recovery_session,
+            stage_id="recovery_record",
+            state_version=0,
+            state_data={
+                "plan_id": plan_id,
+                "checkpoint_no": checkpoint_no,
+                "recovery_mode": effective_mode.value,  # entities 小写形态（读侧直比）
+                "corrected": corrected,
+                "correction": correction_projection,  # 无修正时空 dict 键恒在
+                "affected_checkpoints": affected,
+                "pending_sync_checkpoints": pending_sync_checkpoints,
+                "invalidated_checkpoints": invalidated_checkpoints,
+                "confirmed_by": confirmed_by,
+                "recovered_at": datetime.now(UTC).isoformat(),
+                "execution_ms": record_ms,
+                "created_via": created_via,
+            },
+            ttl_seconds=CHECKPOINT_TTL_SECONDS,  # 30 天对齐 checkpoint 合规窗
+            checkpoint_no="",  # 非完整形态（不触发构造守卫——OD-3）
+        )
+        try:
+            await self._snapshot_repository.save(recovery_record)
+        except StorageError as error:
+            raise CheckpointRecoveryError(
+                plan_id=plan_id,
+                checkpoint_no=checkpoint_no,
+                reason=f"恢复记录落库失败: {error}",
+                cause=error,
+            ) from error
+
+        # ⑤ 发布 CheckpointRecovered（首激活——发布失败降级 warning 不回滚：
+        #    恢复记录是审计真相源、事件是通知面——6-3 ⑤步同语义先例）
+        event = CheckpointRecovered(
+            checkpoint_id=recovered_uuid,  # 显式传值（OD-2⑦——默认 uuid4 随机不可断言）
+            recovery_mode=to_event_recovery_mode(effective_mode),
+            modification_content=correction_projection,
+            affected_checkpoints=affected,
+            consistency_risk_level=assess_consistency_risk(effective_mode, len(affected)),  # 同源计算
+            execution_delay_ms=(time.perf_counter() - started) * 1000.0,  # ①~⑤构造前窗口
+            metadata={"plan_id": plan_id, "checkpoint_no": checkpoint_no},  # R3-3 双关联键
+        )
+        try:
+            publish_result = await self._event_publisher.publish(event)
+            if not publish_result.is_success:
+                # 生产 reliable 总线（RabbitMQEventBus）吞一切异常返 PublishResult(False)
+                # 不 raise——except 面对其不可达，发布失败观测经返回值检查承载
+                # （代码审查 R1-F1：is_success=False 精确对应 outbox 落行失败/路由缺失）
+                logger.warning(
+                    "CheckpointRecovered 发布降级（部分通道失败——恢复记录已落库不回滚）: session_id=%s results=%s error=%s",
+                    recovery_session,
+                    publish_result.results,
+                    publish_result.partial_error,
+                )
+        except Exception as error:
+            logger.warning(
+                "CheckpointRecovered 发布降级（恢复记录已落库不回滚）: session_id=%s error=%s",
+                recovery_session,
+                error,
+            )
+
+        logger.info(
+            "Checkpoint 恢复执行完成: plan_id=%s checkpoint_no=%s mode=%s corrected=%s affected=%d",
+            plan_id,
+            checkpoint_no,
+            effective_mode.value,
+            corrected,
+            len(affected),
+        )
+        return CheckpointRecoveryOutcome(
+            checkpoint_no=checkpoint_no,
+            recovery_mode=effective_mode,
+            corrected=corrected,
+            new_state_version=new_state_version,
+            affected_checkpoints=affected,
+            marked_checkpoints=pending_sync_checkpoints if effective_mode is RecoveryMode.OVERRIDE else invalidated_checkpoints,
+            execution_ms=(time.perf_counter() - started) * 1000.0,  # ①~⑤ 组装点窗口
+            next_action_hint=next_action_hint,
+            recovery_record_session_id=recovery_session,
+            recovered_snapshot_id=str(recovered_uuid),
+        )
 
     async def _load_or_480(self, session_id: str) -> CheckpointSnapshot:
         """快照读回或抛 480（键不存在与 JSON 损坏同路径统一承载——R1-D1/R6-22）。

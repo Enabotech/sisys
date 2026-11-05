@@ -104,9 +104,11 @@ from src.domain.exceptions.permission_exceptions import InsufficientTokenError
 from src.domain.exceptions.planning_exceptions import (
     CheckpointCreationError,
     CheckpointIntegrityError,
+    CheckpointRecoveryError,
     PlanningExecutionError,
     PlanningNotFoundError,
     PlanningStateError,
+    RecoveryModeConflictError,
 )
 from src.domain.exceptions.relevance_exceptions import (
     RelevanceEvaluationBlockedError,
@@ -349,6 +351,10 @@ __all__ = [
     "PlanningStateError",
     "CheckpointCreationError",
     "CheckpointIntegrityError",
+    # 恢复执行面异常（Story 6-6 Checkpoint 摘要查看与恢复——486 编排强制
+    # 环节失败[500] + 487 模式强制执法拒绝[409]）
+    "CheckpointRecoveryError",
+    "RecoveryModeConflictError",
     # 报告子域异常（Story 6-5a Markdown 报告生成——490 数据源全缺[404] +
     # 491 持久化失败[layer 二元 500]；6-5b PDF 报告——492 渲染失败[500] +
     # 493 L4 证据归档失败[500]）

@@ -185,3 +185,152 @@ class TestRecoverCheckpointUseCase:
             await use_case.execute(plan_id=str(uuid.uuid4()), checkpoint_no="CP-1")
 
         assert exc_info.value.code == "EXCEPTION_484"
+
+
+class TestListCheckpointsUseCase:
+    """摘要清单用例（Story 6-6 AC-1——UUID 守卫 + 薄透传）。"""
+
+    def _make_service_with_summaries(self) -> Any:
+        """带摘要清单的服务替身（AsyncMock(spec=CheckpointServicePort)）。"""
+        from src.application.ports.checkpoint import CheckpointServicePort, CheckpointSummaryView
+
+        service = AsyncMock(spec=CheckpointServicePort)
+        service.list_checkpoints = AsyncMock(
+            return_value=[
+                CheckpointSummaryView(checkpoint_no="CP-1", stage_id="performance_gap", completed=True, summary="s1"),
+                CheckpointSummaryView(checkpoint_no="CP-3", stage_id="performance_gap", completed=True, summary="s3"),
+            ]
+        )
+        return service
+
+    async def test_execute_passthrough_to_list(self) -> None:
+        """execute 透传 list_checkpoints（薄透传——plan_id 原样传抵）。"""
+        service = self._make_service_with_summaries()
+        from src.application.use_cases.checkpoint_approval import ListCheckpointsUseCase
+
+        use_case = ListCheckpointsUseCase(checkpoint_service=service)
+        plan_id = str(uuid.uuid4())
+
+        summaries = await use_case.execute(plan_id=plan_id)
+
+        service.list_checkpoints.assert_awaited_once()
+        kwargs = service.list_checkpoints.await_args.kwargs
+        assert kwargs["plan_id"] == plan_id
+        assert [s.checkpoint_no for s in summaries] == ["CP-1", "CP-3"]
+
+    async def test_execute_invalid_plan_id_raises_242(self) -> None:
+        """plan_id 非 UUID → 242（守卫与创建/恢复用例对称——plan_id UUID 守卫=用例层承载）。"""
+        from src.application.use_cases.checkpoint_approval import ListCheckpointsUseCase
+        from src.domain.exceptions import EntityValidationError
+
+        service = self._make_service_with_summaries()
+        use_case = ListCheckpointsUseCase(checkpoint_service=service)
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await use_case.execute(plan_id="not-a-uuid")
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "plan_id" in str(exc_info.value.context)
+        service.list_checkpoints.assert_not_awaited()
+
+    async def test_execute_empty_list_passthrough(self) -> None:
+        """空清单透传（空族不抛 480——枚举面语义在服务层承载，用例层零包装）。"""
+        service = self._make_service_with_summaries()
+        service.list_checkpoints = AsyncMock(return_value=[])
+        from src.application.use_cases.checkpoint_approval import ListCheckpointsUseCase
+
+        use_case = ListCheckpointsUseCase(checkpoint_service=service)
+
+        summaries = await use_case.execute(plan_id=str(uuid.uuid4()))
+
+        assert summaries == []
+
+
+class TestExecuteCheckpointRecoveryUseCase:
+    """恢复执行用例（Story 6-6 AC-3——UUID 守卫 + confirmed_by 非空守卫 + 透传）。"""
+
+    def _make_service_with_outcome(self) -> Any:
+        """带恢复结果的服务替身（AsyncMock(spec=CheckpointServicePort)）。"""
+        from src.application.ports.checkpoint import CheckpointRecoveryOutcome, CheckpointServicePort
+        from src.domain.entities.checkpoint import RecoveryMode
+
+        service = AsyncMock(spec=CheckpointServicePort)
+        service.execute_recovery = AsyncMock(
+            return_value=CheckpointRecoveryOutcome(
+                checkpoint_no="CP-3",
+                recovery_mode=RecoveryMode.OVERRIDE,
+            )
+        )
+        return service
+
+    async def test_execute_passthrough_with_correction_and_mode(self) -> None:
+        """execute 透传 execute_recovery（correction/mode/confirmed_by/created_via 全参传抵）。"""
+        service = self._make_service_with_outcome()
+        from src.application.use_cases.checkpoint_approval import ExecuteCheckpointRecoveryUseCase
+        from src.domain.entities.checkpoint import CorrectionRecord, RecoveryMode
+
+        use_case = ExecuteCheckpointRecoveryUseCase(checkpoint_service=service)
+        plan_id = str(uuid.uuid4())
+        correction = CorrectionRecord(correction_type="L2", previous_value="a", new_value="b", applied_by="u")
+
+        outcome = await use_case.execute(
+            plan_id=plan_id,
+            checkpoint_no="CP-3",
+            correction=correction,
+            mode=RecoveryMode.OVERRIDE,
+            confirmed_by="高管",
+            created_via="cli",
+        )
+
+        service.execute_recovery.assert_awaited_once()
+        kwargs = service.execute_recovery.await_args.kwargs
+        assert kwargs["plan_id"] == plan_id
+        assert kwargs["checkpoint_no"] == "CP-3"
+        assert kwargs["correction"] is correction
+        assert kwargs["mode"] is RecoveryMode.OVERRIDE
+        assert kwargs["confirmed_by"] == "高管"
+        assert kwargs["created_via"] == "cli"
+        assert outcome.checkpoint_no == "CP-3"
+
+    async def test_execute_defaults_passthrough(self) -> None:
+        """默认参透传（correction=None/mode=None/created_via="use_case"）。"""
+        service = self._make_service_with_outcome()
+        from src.application.use_cases.checkpoint_approval import ExecuteCheckpointRecoveryUseCase
+
+        use_case = ExecuteCheckpointRecoveryUseCase(checkpoint_service=service)
+
+        await use_case.execute(plan_id=str(uuid.uuid4()), checkpoint_no="CP-1", confirmed_by="x")
+
+        kwargs = service.execute_recovery.await_args.kwargs
+        assert kwargs["correction"] is None
+        assert kwargs["mode"] is None
+        assert kwargs["created_via"] == "use_case"
+
+    async def test_execute_invalid_plan_id_raises_242(self) -> None:
+        """plan_id 非 UUID → 242（守卫族对称）。"""
+        from src.application.use_cases.checkpoint_approval import ExecuteCheckpointRecoveryUseCase
+        from src.domain.exceptions import EntityValidationError
+
+        service = self._make_service_with_outcome()
+        use_case = ExecuteCheckpointRecoveryUseCase(checkpoint_service=service)
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await use_case.execute(plan_id="not-a-uuid", checkpoint_no="CP-1", confirmed_by="x")
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        service.execute_recovery.assert_not_awaited()
+
+    async def test_execute_empty_confirmed_by_raises_242(self) -> None:
+        """confirmed_by 空串 → 242（审批人身份不可缺省空——AC-4 审批留痕前提）。"""
+        from src.application.use_cases.checkpoint_approval import ExecuteCheckpointRecoveryUseCase
+        from src.domain.exceptions import EntityValidationError
+
+        service = self._make_service_with_outcome()
+        use_case = ExecuteCheckpointRecoveryUseCase(checkpoint_service=service)
+
+        with pytest.raises(EntityValidationError) as exc_info:
+            await use_case.execute(plan_id=str(uuid.uuid4()), checkpoint_no="CP-1", confirmed_by="")
+
+        assert exc_info.value.code == "EXCEPTION_242"
+        assert "confirmed_by" in str(exc_info.value.context)
+        service.execute_recovery.assert_not_awaited()
