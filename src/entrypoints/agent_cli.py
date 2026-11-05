@@ -518,6 +518,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="审批人标识（confirm 路径必填；缺省取 --applied-by）",
     )
 
+    # Story 6-7: trace-tree 扁平子命令（溯源树四层展示——CLI 分析视入口；
+    # --depth choices 用 str 元组（仓内先例均 str 元组——--format/--mode）+
+    # runner 内 int 转换（DR3-7/DR1-22）；CLI 面越域由 argparse 拦截 exit 2
+    # 不走 242——与用例层守卫分工钦定（API 契约节/AC-6））
+    trace_tree = subparsers.add_parser(
+        "trace-tree",
+        help="溯源树四层展示（结论→分析→数据切片→原始文档——Story 6-7）",
+    )
+    trace_tree.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+    trace_tree.add_argument(
+        "--depth",
+        type=str,
+        choices=("1", "2", "3", "4"),
+        default="4",
+        metavar="DEPTH",
+        help="展开深度（1=仅结论层/2=+分析层/3=+切片层/4=+文档层；默认 4 全树）",
+    )
+    trace_tree.add_argument(
+        "--stage",
+        type=str,
+        default=None,
+        metavar="STAGE",
+        help="客户端按 stage 过滤展示（按 --depth 构建后过滤；保留结论层行）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -1308,6 +1339,105 @@ def _run_checkpoint_show_cli(plan_id: str, checkpoint_no: str) -> int:
         return 1
 
 
+async def _run_trace_tree(plan_id: str, depth: int) -> Any:
+    """trace-tree 异步执行壳（resolve traceability_tree_use_case——Story 6-7）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_checkpoint_show 注记）。
+    """
+    try:
+        use_case = resolve("traceability_tree_use_case")
+        return await use_case.execute(plan_id=plan_id, depth=depth)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> None:
+    """溯源树打印（四层标签前缀「结论/分析/切片/文档」+ 逐层两级空格缩进——输出即契约）。
+
+    纯标准库 print 形态（6-6 checkpoint-list 表格同哲学）；行序=root.children 流程
+    规范序（服务已重排——DR3-1）；--stage 客户端过滤作用于 depth 构建结果且保留
+    结论层行（DR3-7）；切片行 page 取 ChunkNode.page_start（DR3-7）。空树输出三分化
+    （R1-F3——DR1-9 读模型诚实性）：build_degraded=True 打「⚠ 归档查询失败（已降级）」/
+    total==0 打「该 plan 无归档行」/ total>0 无分析层节点打归档对照行+成因提示
+    （depth 折叠或 stage 越域——空结果自我解释是「没有数据」「拿不到数据」还是
+    「有数据未展开」）。getattr 形态零 VO import 依赖（6-3 _print_checkpoint_result 先例）。
+    """
+    root = getattr(tree, "root", None)
+    adopted = getattr(tree, "adopted_archives", 0)
+    total = getattr(tree, "total_archives", 0)
+    print(f"结论: {getattr(root, 'title', '')}（plan={getattr(tree, 'plan_id', '')}）")
+    summary = getattr(root, "summary", "")
+    if summary:
+        print(f"  {summary}")
+    children = getattr(root, "children", None) or ()
+    if not children:
+        if getattr(tree, "build_degraded", False):
+            print("  ⚠ 归档查询失败（已降级）")
+        elif total == 0:
+            print("  该 plan 无归档行")
+        else:
+            print(f"  归档对照: 采纳 {adopted} / 候选 {total}（无分析层节点——depth 折叠或 stage 越域）")
+        return
+    print(f"  归档对照: 采纳 {adopted} / 候选 {total}")
+    for stage_node in children:
+        stage = getattr(stage_node, "stage", "")
+        if stage_filter is not None and stage != stage_filter:
+            continue
+        degraded_mark = " [降级]" if getattr(stage_node, "degraded", False) else ""
+        print(
+            f"  分析: {stage} {getattr(stage_node, 'display_name', '')}{degraded_mark}"
+            f" evidence={getattr(stage_node, 'evidence_count', 0)}"
+        )
+        for chunk_node in getattr(stage_node, "children", None) or ():
+            chunk_id = str(getattr(chunk_node, "chunk_id", ""))
+            excerpt = str(getattr(chunk_node, "content_excerpt", ""))[:60]
+            print(f"    切片: {chunk_id[:8]} {excerpt} page={getattr(chunk_node, 'page_start', None)}")
+            for doc_node in getattr(chunk_node, "children", None) or ():
+                print(
+                    f"      文档: {getattr(doc_node, 'filename', '')}"
+                    f" page={getattr(doc_node, 'page', None)}"
+                    f" 对象={getattr(doc_node, 'bucket', '')}/{getattr(doc_node, 'object_key', None)}"
+                )
+
+
+def _run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int:
+    """trace-tree 子命令执行（五步定式——_run_checkpoint_show_cli 直系样板）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+        depth: --depth 原始字符串（runner 内 int 转换——DR3-7 签名钦定）。
+        stage: --stage 客户端过滤参数（缺省 None 全量展示）。
+
+    Returns:
+        退出码（0=树构建完成含空树——空树是正常态；1=业务异常；2=argparse
+        用法错误由 argparse 原生承载）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "trace-tree", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("溯源树查询失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        tree = asyncio.run(_run_trace_tree(plan_id, int(depth)))
+        _print_traceability_tree(tree, stage_filter=stage)
+        logger.info("溯源树查询完成: plan_id=%s depth=%s stage=%s", plan_id, depth, stage)
+        return 0
+    except DomainError as error:
+        logger.error("溯源树查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("溯源树查询异常: %s", error, exc_info=True)
+        return 1
+
+
 async def _run_checkpoint_recovery_view(plan_id: str, checkpoint_no: str) -> Any:
     """dry-run 评估数据面（resolve 既有恢复视图用例——仅取②步视图零执行）。
 
@@ -1896,6 +2026,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "chain-query":
         return _run_chain_query_cli(args.plan_id, args.include_blob)
+    if args.command == "trace-tree":
+        return _run_trace_tree_cli(args.plan_id, args.depth, args.stage)
     if args.command == "report-generate":
         return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
     if args.command == "isolation-status":

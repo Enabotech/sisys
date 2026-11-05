@@ -85,7 +85,11 @@ class TestValidatorAEvidencePackageUniqueConstruction:
         6-5b 许可扩展（2026-11-04）：PDF 报告引文收集是 EVIDENCE_PACKAGE 的
         钦定**查询消费面**（AC-1 ③ ``query_archive(ArchiveQuery(..., archive_
         type=EVIDENCE_PACKAGE))``——读侧非构造位），pdf_report_generation_
-        service.py 入许可清单。"""
+        service.py 入许可清单。
+
+        6-7 许可扩展（2026-11-05）：溯源树聚合查询是 EVIDENCE_PACKAGE 的第二
+        个钦定**查询消费面**（Story 6-7 ①收集段同款 ``query_archive`` 读侧——
+        树形），traceability_tree_service.py 入许可清单（与 6-5b 同款正当演进）。"""
         occurrences: list[tuple[str, int]] = []
         for path in sorted(SRC_ROOT.rglob("*.py")):
             for line_no, line in enumerate(_read(path).splitlines(), start=1):
@@ -96,9 +100,14 @@ class TestValidatorAEvidencePackageUniqueConstruction:
         service_relative = "application/services/chain_of_thought_archive_service.py"
         enum_relative = "domain/entities/strategic_archive.py"
         pdf_query_consumer = "application/services/pdf_report_generation_service.py"
+        tree_query_consumer = "application/services/traceability_tree_service.py"
         service_construction = [occ for occ in occurrences if occ[0] == service_relative]
         assert service_construction, "组装归档服务缺 EVIDENCE_PACKAGE 构造（首激活缺失）"
-        others = [occ for occ in occurrences if occ[0] not in (enum_relative, service_relative, pdf_query_consumer)]
+        others = [
+            occ
+            for occ in occurrences
+            if occ[0] not in (enum_relative, service_relative, pdf_query_consumer, tree_query_consumer)
+        ]
         assert not others, f"ArchiveType.EVIDENCE_PACKAGE 代码级引用出现于许可外文件（唯一构造位违例）: {others}"
 
     def test_construction_passes_enum_member_not_string(self) -> None:

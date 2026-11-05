@@ -1,6 +1,6 @@
 # Story 6-7: 溯源树展示（四层追溯聚合查询——结论→分析→数据切片→原始文档 + 页码级跳转载荷 + ingestion payload 扩键半边清偿）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -50,9 +50,9 @@
 **And** 同 document_id 多 chunk 引用时文档查询按 document_id 去重（每 document_id 恰一次 `document_repository.find`——服务内缓存字典；性能窗口友好 + 6.5b-DF4 会话抖动知悉注记；**find 恰一次调用计数断言归 Task 2 单测承载**——验收面真实服务无调用记录面，DR1-5 同款分立，DR2-9）
 
 **验证标准/Validation Criteria:**
-- [ ] 全树四层落位：预置 **2 stage 各 1 chunk 且同一 document_id**（DR3-6——顺带断言两 DocumentNode 值等且各自在位（嵌套重复非共享——语义注记的验收级断言锚收编））→ 树节点层级/键集/值级断言（chunk_id 与预置一致、filename/page 值级、document_id 经 get_point payload 解析值级；**root.children 序=流程规范序值级断言**（DR3-1））
-- [ ] 结论层 summary：**腿1=synthesis+gap 双行预置**（取 conclusions 联展非空+stage_count==1——DR1-13 错实现给 2 必红，DR3-6）；**腿2=gap-only**（无 synthesis 行）降级空串+stage_count==1、树正常返回
-- [ ] 三元组承载：StageNode.tools_used 非空（预置行 chain.tools_used 值级）+ summary 非空 + evidence_count == len(evidence_refs)
+- [x] 全树四层落位：预置 **2 stage 各 1 chunk 且同一 document_id**（DR3-6——顺带断言两 DocumentNode 值等且各自在位（嵌套重复非共享——语义注记的验收级断言锚收编））→ 树节点层级/键集/值级断言（chunk_id 与预置一致、filename/page 值级、document_id 经 get_point payload 解析值级；**root.children 序=流程规范序值级断言**（DR3-1））
+- [x] 结论层 summary：**腿1=synthesis+gap 双行预置**（取 conclusions 联展非空+stage_count==1——DR1-13 错实现给 2 必红，DR3-6）；**腿2=gap-only**（无 synthesis 行）降级空串+stage_count==1、树正常返回
+- [x] 三元组承载：StageNode.tools_used 非空（预置行 chain.tools_used 值级）+ summary 非空 + evidence_count == len(evidence_refs)
 
 ### AC-2: 交互式展开（depth 懒加载语义）
 
@@ -62,10 +62,10 @@
 **And** depth=3 时切片层解析但文档层零解析（同款分层懒加载）；depth=4 全树（默认值）；**depth=1 仅结论层**（root.children==() 恒空——收集/kind 过滤/判 run 段照常执行（stage_count 可用），切片与文档层零解析——归单测矩阵第四档断言，DR1-2）；depth 越域（0 与 5 双边界）→ 用例层 242 `EntityValidationError`（用例层守卫直系先例=`GetBlmChainTraceUseCase` UUID 守卫同层同码；值域枚举形态（`not in {1,2,3,4}`）为仓内新形态注记——无完全同构先例，DR1-21）
 
 **验证标准/Validation Criteria:**
-- [ ] depth=2：树形断言 StageNode.children==()（验收面真实服务无调用记录面——**call_order 零调用断言归 Task 2 单测矩阵承载**（AsyncMock assert_not_called 天然可写），DR1-5）
-- [ ] depth=3：切片层 ChunkNode 在位 + 树内零 DocumentNode（find 零调用断言同归单测）
-- [ ] depth=1（单测矩阵第四档）：root.children==() + get_point/find 双零调用（DR1-2）
-- [ ] depth 越域 242（0 与 5 双边界——值级断言 code）
+- [x] depth=2：树形断言 StageNode.children==()（验收面真实服务无调用记录面——**call_order 零调用断言归 Task 2 单测矩阵承载**（AsyncMock assert_not_called 天然可写），DR1-5）
+- [x] depth=3：切片层 ChunkNode 在位 + 树内零 DocumentNode（find 零调用断言同归单测）
+- [x] depth=1（单测矩阵第四档）：root.children==() + get_point/find 双零调用（DR1-2）
+- [x] depth 越域 242（0 与 5 双边界——值级断言 code）
 
 ### AC-3: 页码级跳转载荷与 bbox 透传（Bounding Box 跳转的 MVP 口径）
 
@@ -76,9 +76,9 @@
 **And** 3-8 `TraceabilityService.trace` 的 `payload.get("page_start", 1)` 读取面（`traceability_service.py:125`）因 Task 1 扩键对新索引点**自然受益**（page_number 不再恒 1）——3-8 代码零改动（受益注记，非本 Story 断言面）
 
 **验证标准/Validation Criteria:**
-- [ ] 跳转载荷六键值级断言（预置 filename/version/object_key 与 PG 行一致）
-- [ ] bbox 键存在性断言（值 None 或 dict——透传语义，不合成坐标）
-- [ ] page 取值：预置 chunks 元数据 page_start 值级；chunk 不在 chunks 列表（脏形态）→ page=None 不抛异常（6-5b 脏形态守卫同款形态——**降级值按本 Story VO 契约取 None**（DocumentNode.page: int|None），非 6-5b `CitationEntry.page` 的 0 值语义——防复刻漂移注记；**S4 预置钦定=1 stage 2 chunk（1 干净+1 脏）**——DR3-6）
+- [x] 跳转载荷六键值级断言（预置 filename/version/object_key 与 PG 行一致）
+- [x] bbox 键存在性断言（值 None 或 dict——透传语义，不合成坐标；**R1-F2 收口注记**：S4 预置 8 业务键无 bbox → 断言强化为 `is None`（合成坐标变异即红——防按 VC 字面写回恒真形态））
+- [x] page 取值：预置 chunks 元数据 page_start 值级；chunk 不在 chunks 列表（脏形态）→ page=None 不抛异常（6-5b 脏形态守卫同款形态——**降级值按本 Story VO 契约取 None**（DocumentNode.page: int|None），非 6-5b `CitationEntry.page` 的 0 值语义——防复刻漂移注记；**S4 预置钦定=1 stage 2 chunk（1 干净+1 脏）**——DR3-6）
 
 ### AC-4: 多 run 叠加判别与截断对照（6.4-DF3 清偿）
 
@@ -89,9 +89,9 @@
 **And** 非思维链归档行（`decision_basis["kind"] != CHAIN_ARCHIVE_KIND`——同 plan 的 EVIDENCE_PACKAGE 行中 kind 非思维链者；查询已按 archive_type=EVIDENCE_PACKAGE 过滤、其他 ArchiveType 行不进结果集——S6 构造形态注记：直交一行 kind 非链的 EVIDENCE_PACKAGE 行，DR1-12）不进树且不计 total（kind 过滤——`CHAIN_ARCHIVE_KIND` 常量消费，6-5b 收集段同款）
 
 **验证标准/Validation Criteria:**
-- [ ] 同 stage 两行（**同 stage 连续两次直交归档**——archived_at 由服务自动 `datetime.now(UTC)` 生成、签名不可外传（`strategic_archive_service.py:107-118` 实证），两次直交含 PG 往返毫秒级间隔、Linux µs 分辨率下稳定非并列；新旧行以 `_make_material(stage, index=i)` 生成的不同 evidence_refs chunk_id 为判别锚，DR1-4；**行型钦定 gap 型**（input_summary 判别链最短——DR3-11））→ 树中该 stage 恰一节点 + **summary+tools_used（+reflection_excerpt）取新行值级断言**（判别锚——旧行值不同以区分；StageNode 无 chain 键——chain 派生键承载，DR3-11）+ adopted==3/total==4 对照值级断言（预置形态钦定：3 stage 各一行 + 第 4 行为某 stage 旧行——4 行全思维链）
-- [ ] kind 过滤：混入非思维链行（EVIDENCE_PACKAGE 且 kind≠CHAIN_ARCHIVE_KIND）→ 不进树且 total==3（kind 口径值级断言，DR1-12）
-- [ ] adopted/total 键恒在（空时为 0——键恒在纪律，6-2 R1-6 七键契约同族）
+- [x] 同 stage 两行（**同 stage 连续两次直交归档**——archived_at 由服务自动 `datetime.now(UTC)` 生成、签名不可外传（`strategic_archive_service.py:107-118` 实证），两次直交含 PG 往返毫秒级间隔、Linux µs 分辨率下稳定非并列；新旧行以 `_make_material(stage, index=i)` 生成的不同 evidence_refs chunk_id 为判别锚，DR1-4；**行型钦定 gap 型**（input_summary 判别链最短——DR3-11））→ 树中该 stage 恰一节点 + **summary+tools_used（+reflection_excerpt）取新行值级断言**（判别锚——旧行值不同以区分；StageNode 无 chain 键——chain 派生键承载，DR3-11）+ adopted==3/total==4 对照值级断言（预置形态钦定：3 stage 各一行 + 第 4 行为某 stage 旧行——4 行全思维链）
+- [x] kind 过滤：混入非思维链行（EVIDENCE_PACKAGE 且 kind≠CHAIN_ARCHIVE_KIND）→ 不进树且 total==3（kind 口径值级断言，DR1-12）
+- [x] adopted/total 键恒在（空时为 0——键恒在纪律，6-2 R1-6 七键契约同族）
 
 ### AC-5: 降级链路三态两层承载与空计划幂等读
 
@@ -102,9 +102,9 @@
 **And** 零归档行 plan（空计划）→ 仅根节点空树（adopted=0/total=0/**build_degraded=False**）**不抛异常**（幂等读语义——6-4 `ChainOfThoughtTraceView`「空档案返回 total=0 不抛异常」docstring 钦定先例；与 6-6 AC-1「空 plan 返回空清单不抛 480——清单是枚举面非单点面」语义分立同款）；畸形 plan_id（非 UUID）→ 242（用例层守卫——`GetBlmChainTraceUseCase` 直系先例）
 
 **验证标准/Validation Criteria:**
-- [ ] point_missing/document_missing **两态各一专属断言段**（S7=单场景单 plan、两 stage 各带一失效引用——status 值级 + 树整体正常返回 + degraded_stages==(stage_a, stage_b) 升序值级断言（stage 命名保升序判别力）+ **resolved/(resolved+missing) 占比值级断言**（如 2/4——AC-7 VC 降级统计可观测的落位锚，DR3-3/DR3-5））
-- [ ] 空计划空树（键恒在 + 零异常 + build_degraded==False）
-- [ ] 畸形 plan_id → 242（code 值级断言——编程面 `pytest.raises` 形态；CLI stderr 形态归 AC-6/S10，DR1-15）
+- [x] point_missing/document_missing **两态各一专属断言段**（S7=单场景单 plan、两 stage 各带一失效引用——status 值级 + 树整体正常返回 + degraded_stages==(stage_a, stage_b) 升序值级断言（stage 命名保升序判别力）+ **resolved/(resolved+missing) 占比值级断言**（如 2/4——AC-7 VC 降级统计可观测的落位锚，DR3-3/DR3-5））
+- [x] 空计划空树（键恒在 + 零异常 + build_degraded==False）
+- [x] 畸形 plan_id → 242（code 值级断言——编程面 `pytest.raises` 形态；CLI stderr 形态归 AC-6/S10，DR1-15）
 
 ### AC-6: CLI `trace-tree` 命令（分析视入口）
 
@@ -112,13 +112,13 @@
 **When** 执行 `sisys-agent trace-tree --plan-id <uuid> [--depth {1,2,3,4}] [--stage <stage>]`
 **Then** 树形层级输出（缩进表达四层——每层两级空格缩进 + 层级标签前缀「结论/分析/切片/文档」；纯标准库打印形态——6-6 `checkpoint-list` 表格「输出即契约」同哲学；**行序=root.children 流程规范序**（DR3-1））：结论层（plan summary 首行）、分析层每 stage 一行（stage/display_name/degraded 标记/evidence_count）、切片层每 chunk 一行（chunk_id 前 8 位/content_excerpt 60 字符/**page=ChunkNode.page_start**——DR3-7）、文档层每文档一行（filename/page/对象键）
 **And** `--stage` 客户端过滤（**按 `--depth` 构建后**客户端过滤展示——depth×stage 组合语义钦定：过滤作用于 depth 构建结果（DR1-15）；**过滤保留结论层行**（「其余 stage 零输出」仅指分析层以下——DR3-7）；服务端不支持 stage 过滤参数，YAGNI：全树 ≤8 stage 量级；epics/UX 无服务端过滤需求）；`--depth` 默认 4（全树）透传端口（**runner 签名钦定 `_run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int`**——原始字符串入参（checkpoint-show :1275 样板同构）+runner 内 `int(depth)` 转换——DR3-7）
-**And** 退出语义：正常 exit 0（含空树——空树是正常态非错误，AC-5 语义；**空树输出分立**：build_degraded=True 时打「⚠ 归档查询失败（已降级）」、否则打「该 plan 无归档行」提示——DR1-9）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-3 R1-F18 前缀统一先例）；**CLI 面越域 depth 由 argparse choices 拦截 exit 2 不走 242**（分工钦定见 API 契约节——DR1-1：R1-1 修复只达 VC 未达正文，本行补齐）
+**And** 退出语义：正常 exit 0（含空树——空树是正常态非错误，AC-5 语义；**空树输出三分化（R1-F3）**：build_degraded=True 时打「⚠ 归档查询失败（已降级）」、total==0 打「该 plan 无归档行」提示、total>0 无分析层节点打「归档对照: 采纳 X / 候选 Y（无分析层节点——depth 折叠或 stage 越域）」——DR1-9 读模型诚实性：空结果自我解释是「没有数据」「拿不到数据」还是「有数据未展开」）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-3 R1-F18 前缀统一先例）；**CLI 面越域 depth 由 argparse choices 拦截 exit 2 不走 242**（分工钦定见 API 契约节——DR1-1：R1-1 修复只达 VC 未达正文，本行补齐）
 **And** 本 Story CLI 面无角色门槛（「分析师」是 UX 语义——3-8/3-6 查询端点先例仅 Bearer 认证无角色检查，`interface-design.md:2006` 分析师视图是 Web 面；RBAC 门槛归 7-2 REST 入口立项时评估——注记落档）
 
 **验证标准/Validation Criteria:**
-- [ ] 树形输出断言：层级标签行精确匹配 + 至少一行 chunk 前 8 位值级 + 文档行 filename 值级（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-6 S2/S8 双清先例）
-- [ ] `--stage` 过滤：仅展示指定 stage 层（其余 stage 零输出断言）
-- [ ] 242 stderr 形态 + exit code 分工（畸形 plan_id → `[EXCEPTION_242]` stderr + exit 1；`--depth 0`（CLI 面）→ argparse choices 拦截 exit 2 **不走 242**——AC-6/API 契约节钦定分工；depth 越域 242 归编程面用例单测承载（0 与 5 双边界——AC-2 VC））
+- [x] 树形输出断言：层级标签行精确匹配 + 至少一行 chunk 前 8 位值级 + 文档行 filename 值级（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-6 S2/S8 双清先例）
+- [x] `--stage` 过滤：仅展示指定 stage 层（其余 stage 零输出断言）
+- [x] 242 stderr 形态 + exit code 分工（畸形 plan_id → `[EXCEPTION_242]` stderr + exit 1；`--depth 0`（CLI 面）→ argparse choices 拦截 exit 2 **不走 242**——AC-6/API 契约节钦定分工；depth 越域 242 归编程面用例单测承载（0 与 5 双边界——AC-2 VC））
 
 ### AC-7: 性能与解析成功率（三段口径——OD-7）
 
@@ -130,9 +130,9 @@
 **And** 空树/depth=2 窗口天然远小于门禁（懒加载语义的性能证明——不做独立断言，depth 窗口对照注记落 docstring）
 
 **验证标准/Validation Criteria:**
-- [ ] 20 轮采样 P95<300ms（预检服务可达 + 预热含首次 load——R8-F5 注记继承）
-- [ ] resolved 占比 100% 断言（预置全可解析数据）+ 混入失效引用后占比值级断言（**落位 S7**（resolved/(resolved+missing) 节点统计——DR3-3））
-- [ ] 口径差三声明（跳转载荷/真值/懒加载）落验收 docstring
+- [x] 20 轮采样 P95<300ms（预检服务可达 + 预热含首次 load——R8-F5 注记继承）
+- [x] resolved 占比 100% 断言（预置全可解析数据）+ 混入失效引用后占比值级断言（**落位 S7**（resolved/(resolved+missing) 节点统计——DR3-3））
+- [x] 口径差三声明（跳转载荷/真值/懒加载）落验收 docstring
 
 ---
 
@@ -146,32 +146,32 @@
 
 #### 领域事件 Schema (Domain Events)
 
-- [ ] **零新增领域事件、零事件发布调用**（本 Story 钦定——OD-2）：纯查询展示面零状态变更——「查询不发布事件」architecture.md:1293 成文 + 6-6 OD-2（**零新增领域事件**——CheckpointRecovered 为既有登记键首激活非新增，精确转述 DR1-21）/6-4 OD-6/6-5a OD-6 零发布查询面先例——**查询型故事零事件先例族**；`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` **零 diff**；`_FROZEN_EVENT_COUNT=56` 冻结键数基线零变化（`tests/contracts/test_event_channel_mapping_pdf_report.py:23-24`——Task 4 守护复跑）；蓝图无溯源树事件定义（or.md L240/L344 溯源树语义无事件载体——读侧聚合非状态变更）
-- [ ] 守护承载：Task 4 复跑 `_FROZEN_EVENT_COUNT=56` 断言（零新增=登记数不变）；架构验证器 B 含「树服务零 publish 调用」源码断言（grep `publish` 于服务文件——6-6「发布点守护」的零发布变体；字母口径对齐 Task 6.2/OD-2——DR1-15）
+- [x] **零新增领域事件、零事件发布调用**（本 Story 钦定——OD-2）：纯查询展示面零状态变更——「查询不发布事件」architecture.md:1293 成文 + 6-6 OD-2（**零新增领域事件**——CheckpointRecovered 为既有登记键首激活非新增，精确转述 DR1-21）/6-4 OD-6/6-5a OD-6 零发布查询面先例——**查询型故事零事件先例族**；`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` **零 diff**；`_FROZEN_EVENT_COUNT=56` 冻结键数基线零变化（`tests/contracts/test_event_channel_mapping_pdf_report.py:23-24`——Task 4 守护复跑）；蓝图无溯源树事件定义（or.md L240/L344 溯源树语义无事件载体——读侧聚合非状态变更）
+- [x] 守护承载：Task 4 复跑 `_FROZEN_EVENT_COUNT=56` 断言（零新增=登记数不变）；架构验证器 B 含「树服务零 publish 调用」源码断言（grep `publish` 于服务文件——6-6「发布点守护」的零发布变体；字母口径对齐 Task 6.2/OD-2——DR1-15）
 
 #### 数据模型 (Data Models)
 
 **零领域层改动**（无新领域实体/值对象/事件/异常/纯函数——树 VO 是应用层读侧 DTO；6-6「应用层 VO 落 ports 文件」先例 + 6-5b `CitationEntry` 是报告域特例对照）：
 
-- [ ] **新增应用层 VO 五个**（全部 frozen dataclass，落 `src/application/ports/traceability_tree.py` 新文件——Task 0 冻结唯一版本，键集 exact set 断言锚）：
+- [x] **新增应用层 VO 五个**（全部 frozen dataclass，落 `src/application/ports/traceability_tree.py` 新文件——Task 0 冻结唯一版本，键集 exact set 断言锚）：
   - `TraceabilityTree`（**7 键**）：`plan_id`(str)/`root`(`ConclusionNode`)/`adopted_archives`(int——判 run 后采纳行数)/`total_archives`(int——kind 过滤后思维链候选行数)/`degraded_stages`(tuple[str,...]——含 ≥1 非 resolved 后代节点的采纳 stage 值元组，升序去重，正常空元组——DR1-9)/`build_degraded`(bool——query_archive 顶层异常降级标记：空树与真空树分立哨兵——DR1-9)/`generated_at`(isoformat str——服务层 datetime→isoformat 转换，6-6 `CheckpointSummaryView.timestamp` 同款转换纪律)
   - `ConclusionNode`（**5 键**）：`plan_id`(str)/`title`(str——恒「BLM 战略规划溯源」固定文案)/`summary`(str——synthesis conclusions 联展，缺失降空串)/`stage_count`(int——分析层 StageNode 节点数（全 run=7——synthesis 不入分析层，DR1-13）)/`children`(tuple[`StageNode`,...])
   - `StageNode`（**9 键**）：`stage`(str——分析层七值（STAGE_VALUE_DOMAIN 八值去 synthesis——DR1-13）)/`display_name`(str——**三源拼装**：`PERFORMANCE_GAP_CONFIG`（:162）+`MARKET_INSIGHT_STEP_CONFIG` dict（:172，六子）+synthesis 归结论层（无单一映射表——Task 0.2 钉拼装形态，DR1-22）)/`summary`(str——**中间结论，三型分支钉死（DR1-14）**：六子型 payload{summary,findings} 取 summary；gap 型 payload 六键（financial_gap/operational_gap/root_causes/portfolio_health/degraded/degrade_reason）**无 summary**→降 `chain.input_summary`；payload 解析失败（非 JSON/非 dict）→同降)/`degraded`(bool——取 `decision_basis["degraded"]` 顶层布尔)/`degrade_reason`(str——取 `json.loads(chain.final_answer)` payload 的 `degrade_reason` 键缺省空串（gap 六键与六子降级信封{degraded,degrade_reason}含此键；六子正常形态{summary,findings}无则空串——与 degraded 布尔独立取值，DR1-14）)/`tools_used`(tuple[str,...]——取 `chain["tools_used"]`（assumptions 同名双写，单源取 chain；**.get 缺省空元组**——脏行兜底不抛，DR3-4）)/`reflection_excerpt`(str——取 `chain["reflection"]` 前 200 字符（**.get 缺省空串**——DR3-4）——**源键名是 reflection 非 reflection_excerpt**，DR1-14)/`evidence_count`(int)/`children`(tuple[`ChunkNode`,...])
   - `ChunkNode`（**6 键**）：`chunk_id`(str)/`content_excerpt`(str——300 字符截断)/`page_start`(int|None)/`page_end`(int|None)（两页码键取 Qdrant payload 扩键 page_start/page_end——Task 1 通道；point_missing 态为 None，DR1-23)/`status`(str——值域 "resolved"/"point_missing"——`CitationEntry.VALID_STATUSES` 三值中去掉 document_missing（该态归 DocumentNode——链路三态两层承载)/`children`(tuple[`DocumentNode`,...])
   - `DocumentNode`（**9 键**）：`document_id`(str)/`filename`(str)/`version`(int)/`page`(int|None)/`object_key`(str|None)/`bucket`(str——恒 "raw-documents")/`bbox`(dict|None——payload 透传，现状恒 None；**frozen 纪律例外显式化**：构造时 `types.MappingProxyType` 包裹防 dict 原地突变——DR1-23)/`status`(str——"resolved"/"document_missing")/`jump_ready`(bool——跳转载荷六键齐备判定：object_key 非空且 page 非 None；「30 秒溯源」可达性的节点级布尔面)
-- [ ] **语义注记**（Task 0 钉死）：树形嵌套 VO 中 chunk 在不同 stage 下重复出现（每条 stage→chunk 路径独立——6-5b 引文去重保序是 flat 表语义，树形不做跨 stage 去重；文档查询去重仅指 find 调用次数（AC-1），节点形态仍嵌套）；`jump_ready` 是读侧派生布尔非持久面（**半跳转语义由 object_key 非 None 直接判别（文档级）——不建 partial 三值枚举（对已暴露六键的冗余派生，YAGNI）——论证落 docstring**，DR1-23）；synthesis 行不产生 StageNode（结论层即其呈现位——conclusions 联展即根 summary，DR1-13）
+- [x] **语义注记**（Task 0 钉死）：树形嵌套 VO 中 chunk 在不同 stage 下重复出现（每条 stage→chunk 路径独立——6-5b 引文去重保序是 flat 表语义，树形不做跨 stage 去重；文档查询去重仅指 find 调用次数（AC-1），节点形态仍嵌套）；`jump_ready` 是读侧派生布尔非持久面（**半跳转语义由 object_key 非 None 直接判别（文档级）——不建 partial 三值枚举（对已暴露六键的冗余派生，YAGNI）——论证落 docstring**，DR1-23）；synthesis 行不产生 StageNode（结论层即其呈现位——conclusions 联展即根 summary，DR1-13）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] **新增应用层端口 1 个**（v1.0.0）：`TraceabilityTreePort`（`src/application/ports/traceability_tree.py`）单方法：
+- [x] **新增应用层端口 1 个**（v1.0.0）：`TraceabilityTreePort`（`src/application/ports/traceability_tree.py`）单方法：
   - `async def build_trace_tree(*, plan_id: str, depth: int = 4) -> TraceabilityTree`（**async 协程钦定**——三依赖 query_archive/get_point/find 全 async（D1 实证），同步签名物理不可实现，DR1-10；depth 值域 {1,2,3,4} 默认 4——越域守卫归用例层 242（服务层不重复守卫——6-6 list_checkpoints 服务层无 UUID 守卫先例一致）；单标识查找直接参数形态——端口查询参数决策规则「单字段标识查找→直接参数」；**无 Query Object**（非多字段组合分页——ArchiveQuery/DocumentQuery 既有 Query VO 复用不动）
-- [ ] **新增应用服务与用例**：
+- [x] **新增应用服务与用例**：
   - `TraceabilityTreeService`（`src/application/services/traceability_tree_service.py` 新文件）：四段编排（①收集 `strategic_archive_service.query_archive(ArchiveQuery(plan_id, archive_type=EVIDENCE_PACKAGE, limit=1000))` → kind 过滤 → ②判 run stage 分组 last-write-wins + 结论层 synthesis 提取 → ③depth≥3 切片解析 `l3_vector.get_point(collection, chunk_id)` 逐个 + 去重文档清单 → ④depth=4 文档解析 `document_repository.find(DocumentQuery(tenant_id, document_id))` 去重缓存 + chunks page 匹配 + 跳转载荷组装；全方法 async）；构造注入 `strategic_archive_service`/`l3_vector`/`document_repository` 三依赖（**strategic_archive_service 是具体应用类注入——仓内无 `StrategicArchiveServicePort`（组合根 interface 面即具体类 `StrategicArchiveService`，6-5b `pdf_report_generation_service.py:42/:119` 先例；单测 `AsyncMock(spec=StrategicArchiveService)` 可行——spec 不调 `__init__`、async 方法自动子 mock，DR1-8）**）+ `search_collection: str = "documents"`（组合根 env 传导——`BLM_SEARCH_COLLECTION` 单源，6-1 组合根 :1592 先例；**合流形态注记**：构造默认值（6-5b 形态）+env 传导（6-1 形态）——无完全同构先例、可行性实证，DR1-18）+ `tenant_id: str = str(MVP_TENANT_ID)`（6-5b 构造注入先例——数据链无租户可用，单租户口径）
   - `GetTraceabilityTreeUseCase`（`src/application/use_cases/get_traceability_tree.py` 新文件）：plan_id UUID 守卫 242 + depth 值域守卫 242 + 透传（`GetBlmChainTraceUseCase` 直系粒度——薄透传+双守卫；`async def execute`——直系先例同构，DR1-10）
-- [ ] **既有端口零改动复用清单**：`StrategicArchiveService`（**具体应用类**——query_archive 既有方法只读消费，DR1-8）/`L3VectorPort`（get_point）/`DocumentRepositoryPort`（find+DocumentQuery）/`ChainOfThoughtArchiveServicePort`（零触碰——树服务不经此端口，直读 query_archive 通道，6-5b 同款）/`TraceabilityPort`（3-8——零触碰，语义正交）
-- [ ] **ingestion 演进 1 处**（Task 1 承载）：`chunk_indexing_handler.py` payload 6→8 键（+page_start/page_end）——handler 无端口变更（内部 payload 构造，ChunkIndexingHandler 注册 spec 零变化）
-- [ ] 组合根注册 2 个新块：`traceability_tree_service`（SINGLETON——无状态聚合读服务；lambda 注入三 resolve + env collection/tenant 参数）/`traceability_tree_use_case`（SINGLETON 无状态透传——6-6 用例注册形态同构）；**既有注册行零删改**（Task 4 diff 审计）
-- [ ] 端口契约清单（唯一事实源——禁止语义重复新增）：
+- [x] **既有端口零改动复用清单**：`StrategicArchiveService`（**具体应用类**——query_archive 既有方法只读消费，DR1-8）/`L3VectorPort`（get_point）/`DocumentRepositoryPort`（find+DocumentQuery）/`ChainOfThoughtArchiveServicePort`（零触碰——树服务不经此端口，直读 query_archive 通道，6-5b 同款）/`TraceabilityPort`（3-8——零触碰，语义正交）
+- [x] **ingestion 演进 1 处**（Task 1 承载）：`chunk_indexing_handler.py` payload 6→8 键（+page_start/page_end）——handler 无端口变更（内部 payload 构造，ChunkIndexingHandler 注册 spec 零变化）
+- [x] 组合根注册 2 个新块：`traceability_tree_service`（SINGLETON——无状态聚合读服务；lambda 注入三 resolve + env collection/tenant 参数）/`traceability_tree_use_case`（SINGLETON 无状态透传——6-6 用例注册形态同构）；**既有注册行零删改**（Task 4 diff 审计）
+- [x] 端口契约清单（唯一事实源——禁止语义重复新增）：
 
 | 端口 | 层 | 注册名（composition_root） | 本 Story 动作 |
 |---|---|---|---|
@@ -186,32 +186,32 @@
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本清单是唯一事实源（Single Source of Truth）；实现中确需新端口时回 Task 0 补登记 + Contract Gate + 契约测试，禁止边写边加
-- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象（6-1~6-6 纪律沿袭）
-- [ ] 禁止绕过 `StrategicArchiveService` 直持 PG 会话读归档（读档=经既有服务）；禁止绕过 `L3VectorPort`/`DocumentRepositoryPort` 直连 Qdrant/PG；**禁止绕过 `L3VectorPort` 用裸 Qdrant client 预置/查询**（点 id 经 `_normalize_point_id` MD5 归一在 infra 层读写对称闭环——裸 client 原始 id 直写会被 get_point 漏查，6-5b 已踩坑；`point["id"]` 是 MD5 整数、chunk_id 原文以 `payload["chunk_id"]` 为准——DR1-3 防御注记）
-- [ ] 禁止演进 `ChainOfThoughtArchiveServicePort`（6-4 冻结面——evidence_refs 读取经 query_archive 通道，不动 6-4 端口方法族与其 call_order 断言族）
+- [x] 本清单是唯一事实源（Single Source of Truth）；实现中确需新端口时回 Task 0 补登记 + Contract Gate + 契约测试，禁止边写边加
+- [x] 禁止在服务文件中本地定义 Protocol / Port 抽象（6-1~6-6 纪律沿袭）
+- [x] 禁止绕过 `StrategicArchiveService` 直持 PG 会话读归档（读档=经既有服务）；禁止绕过 `L3VectorPort`/`DocumentRepositoryPort` 直连 Qdrant/PG；**禁止绕过 `L3VectorPort` 用裸 Qdrant client 预置/查询**（点 id 经 `_normalize_point_id` MD5 归一在 infra 层读写对称闭环——裸 client 原始 id 直写会被 get_point 漏查，6-5b 已踩坑；`point["id"]` 是 MD5 整数、chunk_id 原文以 `payload["chunk_id"]` 为准——DR1-3 防御注记）
+- [x] 禁止演进 `ChainOfThoughtArchiveServicePort`（6-4 冻结面——evidence_refs 读取经 query_archive 通道，不动 6-4 端口方法族与其 call_order 断言族）
 
 #### 领域异常契约 (Domain Exception Contract)
 
 > **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
 > 完整检查清单详见 [`sisys-uni-exception-design.md §3.12`](../../docs/architecture/sisys-uni-exception-design.md)；编码分配策略详见 §3.3。
 
-- [ ] **零新增领域异常、零既有异常改动**（本 Story 钦定——OD-3）：
+- [x] **零新增领域异常、零既有异常改动**（本 Story 钦定——OD-3）：
   - **畸形输入 242 复用**：`EntityValidationError`（plan_id 非 UUID/depth 越域）——用例层守卫，`GetBlmChainTraceUseCase` UUID 守卫直系先例
   - **空计划不抛异常**（幂等读——6-4 `ChainOfThoughtTraceView` docstring 钦定先例 + 6-6 空清单先例）：枚举面/树面返回空态非异常态
   - **依赖失效走节点降级**（point_missing/document_missing——status 值域承载，非异常路径）+ **顶层 query_archive 异常空树降级 + build_degraded=True**（6-5b 整体容错边界同构；空树与真空树分立——顶层失败可观测）——**异常语义纯度**：失败可观测（status/jump_ready/total/build_degraded 四对照面）而非 raise
   - **traceability 段 372-379 空位维持预留**（`_code_ranges.py` traceability (370,379) 段现仅占 370/371——本 Story 零取码；「树构建失败」类异常语义经降级承载后无真实触发面——YAGNI）
   - **无 404 语义面**：空树即「不存在」的语义承载（6-6 AC-1「清单是枚举面非单点面」语义分立先例——树是 plan 级枚举面）
-- [ ] **Story 异常契约文档**：本节即小节（复用码 242 单码 + 触发场景 + 守卫层位）
-- [ ] 异常路径 Gherkin 场景纳入 Edge Cases（AC-5/AC-6 场景钉死）
+- [x] **Story 异常契约文档**：本节即小节（复用码 242 单码 + 触发场景 + 守卫层位）
+- [x] 异常路径 Gherkin 场景纳入 Edge Cases（AC-5/AC-6 场景钉死）
 
 #### API 契约 (API Contract)
 
-- [ ] **零 REST API 变更**（BLM/溯源树面 REST 接线归 7-2——6.1-DF5 先例第六次沿袭；interface-design.md:1406 `GET /documents/{id}/trace` P0 端点归 Epic 7 API 入口立项）；`docs/api/openapi.yaml` **零 diff**（契约测试守护——6-5a/6-5b 同款）
-- [ ] CLI 新增子命令 **1 个**（argparse 扁平子命令族——`add_parser` 块 + `main()` 分发分支 + `_run_trace_tree_cli` 五步定式函数，`_run_checkpoint_show_cli` 直系样板（DomainError `[code]` exit 1）；现存子命令扁平族（`add_parser` 全量清单以 grep 为准）无重名——`trace-tree` 全仓零占用实证）：
+- [x] **零 REST API 变更**（BLM/溯源树面 REST 接线归 7-2——6.1-DF5 先例第六次沿袭；interface-design.md:1406 `GET /documents/{id}/trace` P0 端点归 Epic 7 API 入口立项）；`docs/api/openapi.yaml` **零 diff**（契约测试守护——6-5a/6-5b 同款）
+- [x] CLI 新增子命令 **1 个**（argparse 扁平子命令族——`add_parser` 块 + `main()` 分发分支 + `_run_trace_tree_cli` 五步定式函数，`_run_checkpoint_show_cli` 直系样板（DomainError `[code]` exit 1）；现存子命令扁平族（`add_parser` 全量清单以 grep 为准）无重名——`trace-tree` 全仓零占用实证）：
   - `trace-tree --plan-id <uuid> [--depth {1,2,3,4}] [--stage <stage>]`：树形缩进输出（四层标签前缀「结论/分析/切片/文档」+ 两空格逐层缩进——纯标准库 print 形态，输出即契约）；`--depth` choices 拦截（argparse 层）+ 服务端用例层守卫双落位（直接编程调用面归用例守卫——同 6-6 `--mode` choices+RecoveryMode 双层先例；**choices 用 str 元组（"1"~"4"）+ int 转换后传端口**——仓内 choices 先例均 str 元组（--format :353/--mode :503），DR1-22）；`--stage` 客户端过滤（AC-6）；CLI 面既有合规形态 = 直 import application.ports（VO/Protocol）+ `resolve("traceability_tree_use_case")` 字符串取用例——**禁在 CLI 顶部 import 用例类/服务类**（仓内无此先例，DR1-21）；**domain 异常 import 不在禁列**（checkpoint-show CLI 层 UUID 守卫先例 :1285-1294 需 EntityValidationError——trace-tree 同款 CLI 层守卫+用例层守卫双防线，两路径输出同 `[EXCEPTION_242]` stderr+exit 1 形态，S10 断言不区分——DR2-10）
   - exit 0 口径：树构建完成（含空树——空树是正常态）；exit 1=DomainError `[code] {message}` stderr；exit 2=argparse 用法错误（缺参/choices 越域由 argparse 拦截——`--depth 5` argparse choices 直接 exit 2，编程面越域才走 242——**缺参与守卫分工**钦定：argparse 可拦截的形态（choices 枚举）归 argparse exit 2，语义守卫（UUID 解析）归 242）
-- [ ] CLI 参数守卫前缀统一：`[EXCEPTION_xxx]` 形态（6-3 R1-F18 真实异常构造纪律——禁字面前缀）
+- [x] CLI 参数守卫前缀统一：`[EXCEPTION_xxx]` 形态（6-3 R1-F18 真实异常构造纪律——禁字面前缀）
 
 #### 六边形架构约束（必须遵守）
 
@@ -248,10 +248,10 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_traceability_tree.feature`（OD-9 命名——traceability_tree 功能名族，禁故事编号后缀；与 3-8 既有 `test_acceptance_traceability.*` 文件名区分）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_traceability_tree.py`
-- [ ] 业务方评审通过
-- [ ] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **12 场景**（AC-1×2 / AC-2×1 / AC-3×1 / AC-4×2 / AC-5×2 / AC-6×2 / AC-7×1 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）；**epics 架构测试三项落位对账**（epics L2366-2368）：溯源树结构测试→S1/S2、交互式展开测试→S3、Bounding Box 跳转测试→S4（跳转载荷组装口径——OD-7 显式对账）——功能等价重分布（6-6 OD-5 先例）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_traceability_tree.feature`（OD-9 命名——traceability_tree 功能名族，禁故事编号后缀；与 3-8 既有 `test_acceptance_traceability.*` 文件名区分）
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_traceability_tree.py`
+- [x] 业务方评审通过
+- [x] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **12 场景**（AC-1×2 / AC-2×1 / AC-3×1 / AC-4×2 / AC-5×2 / AC-6×2 / AC-7×1 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）；**epics 架构测试三项落位对账**（epics L2366-2368）：溯源树结构测试→S1/S2、交互式展开测试→S3、Bounding Box 跳转测试→S4（跳转载荷组装口径——OD-7 显式对账）——功能等价重分布（6-6 OD-5 先例）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试（模块级 `event_loop` fixture + `_run_async` helper——6-x 三件套）
@@ -266,11 +266,11 @@
 - **回归面（强制）**：payload 扩键后全仓 grep 消费方测试——6-1 BLM 证据提取（payload text/content 双键——不受影响实证）/3-8 traceability（`payload.get("page_start")` 受益注记——mock 自构 payload 不受影响）/LayeredRetrieval（parent 重构 4 键不含新键——透传面无断言冲突）/chunk_indexing 既有单测集成（**零预期适配实证**——四文件（index_payload/document_tasks/document_processing_flow/arch_layered_retrieval）实测零 payload 键集 exact set 断言，扩键不打破任何既有断言；Task 1 是**新增** 8 键断言面，DR1-19）；6-4/6-5b 全部既有测试零适配（纯新增服务+handler payload 纯增键）
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕（五 VO 键契约/端口签名/零事件零异常裁定/CLI 命令/OD 裁定落档）
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——预期失败形态 = 步骤函数运行期失败：延迟 import 抛 `ImportError`（缺失 `traceability_tree` 模块/类）或断言步 `AssertionError`；收集期零错误本身即延迟 import 纪律的自证——6-2/6-3/6-6 先例）
-- [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：① 组合根新注册 resolve 可达（`traceability_tree_service`/`traceability_tree_use_case`——注入链非 None + 三依赖 resolve 真实可达）② CLI `trace-tree` 入口接线（单测用例承载）③ 树服务零事件发布守护（架构验证器 B）④ payload 扩键接线（ingestion→Qdrant 8 业务键→get_point 读回 round-trip（实存第 9 键 created_at 存在不计——DR1-3）——集成场景承载）；「已实现未接线」组件登记 deferred-work
-- [ ] **锚定义务五条处置落档**（Task 0.7——deferred-work 台账更新）：6.5b-DF1（半边清偿+半边 defer 注记）/6.4-DF3（清偿注记）/6-5b R4N-1（思维链全文附录维持 YAGNI 裁定——OD-10）/L170 消费基建（顺延 Epic 8 注记——纯查询面零订阅）/L17 langgraph retry-timeout（顺延注记——零图引擎/checkpoint_table 消费）
+- [x] 上述规范项全部定义完毕（五 VO 键契约/端口签名/零事件零异常裁定/CLI 命令/OD 裁定落档）
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证——预期失败形态 = 步骤函数运行期失败：延迟 import 抛 `ImportError`（缺失 `traceability_tree` 模块/类）或断言步 `AssertionError`；收集期零错误本身即延迟 import 纪律的自证——6-2/6-3/6-6 先例）
+- [x] 规范文档通过人工评审或自动化校验
+- [x] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：① 组合根新注册 resolve 可达（`traceability_tree_service`/`traceability_tree_use_case`——注入链非 None + 三依赖 resolve 真实可达）② CLI `trace-tree` 入口接线（单测用例承载）③ 树服务零事件发布守护（架构验证器 B）④ payload 扩键接线（ingestion→Qdrant 8 业务键→get_point 读回 round-trip（实存第 9 键 created_at 存在不计——DR1-3）——集成场景承载）；「已实现未接线」组件登记 deferred-work
+- [x] **锚定义务五条处置落档**（Task 0.7——deferred-work 台账更新）：6.5b-DF1（半边清偿+半边 defer 注记）/6.4-DF3（清偿注记）/6-5b R4N-1（思维链全文附录维持 YAGNI 裁定——OD-10）/L170 消费基建（顺延 Epic 8 注记——纯查询面零订阅）/L17 langgraph retry-timeout（顺延注记——零图引擎/checkpoint_table 消费）
 
 ---
 
@@ -320,17 +320,17 @@
 
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
-- [ ] **整体覆盖率 ≥80%**（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——**显式四目录禁裸收集**：裸 `tests/` 回落 testpaths 即挂起形态，记忆钦定；addopts 已带 --cov=src 无需重复）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application` 语义——**口径注记**：addopts `--cov=src` 累积使 TOTAL 行为全 src 并集，分层百分比按报告内 application 组 per-file 行人工聚合判读，或以剥离单跑——**完整命令字面量**：`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit/application -o addopts="--cov=src/application --cov-report=term-missing:skip-covered"`（-o 覆写剥 -n/--strict-markers——6-6 口径注记升级为字面量，DR1-17））- **P1 阻断门禁**（本 Story 主改动层——epics L2376 钦定）
-- [ ] **领域层覆盖率 ≥90%** 维持（本 Story 零 domain 改动——存量基线不回退即可）
-- [ ] **集成测试覆盖率 ≥75%**（epics 钦定——**口径钦定**：集成测试对本 Story 交付面的行覆盖，`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/integration/test_integration_traceability_tree.py --cov=src.application.services.traceability_tree_service --cov=src.application.use_cases.get_traceability_tree --cov-report=term-missing` 人工核新增方法行 ≥75%（pytest-cov 多 `--cov` 取并集——命令可跑）；**顶层容错分支（query_archive 抛出→空树）在真实服务集成无触发面——归单测承载**（口径预声明防收口争议，DR1-17）；禁「只跑集成目录+--cov=src 全量」的无意义口径——6-6 AC 口径先例）
-- [ ] **关键路径 100% 覆盖（枚举分支逐一有专属用例口径）**：四段编排调用序（含 kind 过滤分支/**脏 stage 读侧过滤**（DR3-4）/判 run 分支（含双 synthesis 决胜——DR3-2）/depth 四档（含 depth=1 退化——DR1-2）/降级链路三态两层（**None 返回与 Exception 抛出两分支各一腿**——DR3-9）/顶层容错分支）/CLI exit 0/1 形态（argparse exit 2 由用法错误原生承载——DR1-23）/242 双守卫/去重缓存命中与未命中
+- [x] **整体覆盖率 ≥80%**（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——**显式四目录禁裸收集**：裸 `tests/` 回落 testpaths 即挂起形态，记忆钦定；addopts 已带 --cov=src 无需重复）- **P0 阻断门禁**
+- [x] **应用层覆盖率 ≥85%**（`pytest --cov=src/application` 语义——**口径注记**：addopts `--cov=src` 累积使 TOTAL 行为全 src 并集，分层百分比按报告内 application 组 per-file 行人工聚合判读，或以剥离单跑——**完整命令字面量**：`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit/application -o addopts="--cov=src/application --cov-report=term-missing:skip-covered"`（-o 覆写剥 -n/--strict-markers——6-6 口径注记升级为字面量，DR1-17））- **P1 阻断门禁**（本 Story 主改动层——epics L2376 钦定）
+- [x] **领域层覆盖率 ≥90%** 维持（本 Story 零 domain 改动——存量基线不回退即可）
+- [x] **集成测试覆盖率 ≥75%**（epics 钦定——**口径钦定**：集成测试对本 Story 交付面的行覆盖，`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/integration/test_integration_traceability_tree.py --cov=src.application.services.traceability_tree_service --cov=src.application.use_cases.get_traceability_tree --cov-report=term-missing` 人工核新增方法行 ≥75%（pytest-cov 多 `--cov` 取并集——命令可跑）；**顶层容错分支（query_archive 抛出→空树）在真实服务集成无触发面——归单测承载**（口径预声明防收口争议，DR1-17）；禁「只跑集成目录+--cov=src 全量」的无意义口径——6-6 AC 口径先例）
+- [x] **关键路径 100% 覆盖（枚举分支逐一有专属用例口径）**：四段编排调用序（含 kind 过滤分支/**脏 stage 读侧过滤**（DR3-4）/判 run 分支（含双 synthesis 决胜——DR3-2）/depth 四档（含 depth=1 退化——DR1-2）/降级链路三态两层（**None 返回与 Exception 抛出两分支各一腿**——DR3-9）/顶层容错分支）/CLI exit 0/1 形态（argparse exit 2 由用法错误原生承载——DR1-23）/242 双守卫/去重缓存命中与未命中
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`——双目录）
-- [ ] **MyPy 类型检查通过**（`mypy src/`——当前基线 753 零错误不回退（6-6 R4 实证基线），新增面零新增错误）
-- [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`；push-stage 注记：validate-schemas/validate-openapi/pytest-bdd 三钩子 stages=[push]，`--all-files` 默认 commit stage 跳过——全覆盖补 `--hook-stage push` 或以逐提交 push 证据链收窄，6-3/6-6 先例）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`——双目录）
+- [x] **MyPy 类型检查通过**（`mypy src/`——当前基线 753 零错误不回退（6-6 R4 实证基线），新增面零新增错误）
+- [x] **无 P0/P1 级别问题**（代码审查）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`；push-stage 注记：validate-schemas/validate-openapi/pytest-bdd 三钩子 stages=[push]，`--all-files` 默认 commit stage 跳过——全覆盖补 `--hook-stage push` 或以逐提交 push 证据链收窄，6-3/6-6 先例）
 
 #### 测试隔离约束
 
@@ -360,10 +360,10 @@
 - ❌ 验收 mock（验收面全真实服务——零 LLM/零 Embedding）；集成仅场景④ Fake-embedding 豁免（AsyncMock spec EmbeddingServicePort——外部 SaaS 豁免先例，DR1-7/DR2-2）；「点已删/document 已删」两形态均用真实删除构造，非 mock 返回 None
 
 **验证要求：**
-- [ ] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance -n 8` 通过（显式四目录；-n 8 为对 addopts -n auto 的有意 cap——6-3/6-5b/6-6 同款）
-- [ ] 连续运行无随机失败**等效证据链**（四目录全量双轮零失败+验收单文件 ≥5 轮+关键场景（S1/S7/S9/S12）场景级多轮复跑稳定——6-6 先例形态）
-- [ ] `poetry run ruff check` 通过
-- [ ] `poetry run mypy` 通过
+- [x] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance -n 8` 通过（显式四目录；-n 8 为对 addopts -n auto 的有意 cap——6-3/6-5b/6-6 同款）
+- [x] 连续运行无随机失败**等效证据链**（四目录全量双轮零失败+验收单文件 ≥5 轮+关键场景（S1/S7/S9/S12）场景级多轮复跑稳定——6-6 先例形态）
+- [x] `poetry run ruff check` 通过
+- [x] `poetry run mypy` 通过
 
 ---
 
@@ -401,20 +401,20 @@
 
 > **目的：** 在进入代码实现前，明确 VO 键契约、端口契约、零事件零异常裁定、CLI 入口、验收场景与架构边界。
 
-- [ ] Subtask 0.1: 冻结数据模型规范——五 VO 键契约（TraceabilityTree **7 键**（含 build_degraded 顶层降级哨兵 + degraded_stages stage 级上卷语义——DR1-9）/ConclusionNode 5 键/StageNode 9 键/ChunkNode 6 键/DocumentNode 9 键——含 `jump_ready` 派生布尔语义与 summary/degrade_reason/reflection_excerpt 三键**数据源链**（三型 payload 分支 + chain 键名映射（源键 reflection 非 reflection_excerpt）——DR1-14）+synthesis 行不产生 StageNode 裁定（DR1-13）+summary/reflection_excerpt/content_excerpt 三截断口径（synthesis 联展/200 字符/300 字符——6-1 证据文本截断同族，`blm_planning_service.py:98`））/树形嵌套 chunk 重复语义注记/去重缓存语义（find 调用次数 vs 节点形态）
-- [ ] Subtask 0.2: 冻结端口契约——`async build_trace_tree(plan_id, depth=4)` 签名（**async 钦定——DR1-10**；depth 值域+守卫层位：用例层 242/argparse choices exit 2 分工/choices=str 元组+int 转换位——DR1-22）/三依赖注入面（strategic_archive_service 具体类——DR1-8）+search_collection/tenant_id 构造参数（组合根 env 传导单源）+display_name 三源拼装形态（PERFORMANCE_GAP_CONFIG+MARKET_INSIGHT_STEP_CONFIG+synthesis 归结论层——DR1-22）
-- [ ] Subtask 0.3: 冻结零事件零异常裁定落档（OD-2/OD-3——含 traceability 段 372-379 维持预留注记与空树幂等读语义先例引用）
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_traceability_tree.feature`（12 场景钉死：AC-1×2/AC-2×1/AC-3×1/AC-4×2/AC-5×2/AC-6×2/AC-7×1/收尾×1——AC 横幅分组+中文 Gherkin，R6 模板；epics 三项架构测试落位对账注记）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_traceability_tree.py` 骨架（docstring 场景三属性分档表/pytestmark 全套+xdist_group（无 minio marker）/12 场景全绑定/模块级期望常量独立构造/三件套/数据面三预置通道（归档直交+Qdrant 点+PG 行）+teardown 三步链（归档行/Qdrant collection/PG 行——各步独立 try/except）/CLI 直调双清契约/延迟 import 纪律）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——预期失败形态：12 场景运行期 ImportError（`traceability_tree` 模块缺失）为主形态；收集期零错误（`--co` 12 collected——延迟 import 纪律自证）；S12 红色形态=**Then 文件存在性断言 AssertionError**（Background 装配触既有模块绿——先行红在断言步非装配步，DR1-23））
-- [ ] Subtask 0.7: deferred-work.md 五条锚定义务处置注记落档（6.5b-DF1 半边清偿+半边 defer 6-8/6.4-DF3 清偿/R4N-1 维持 YAGNI/L170 顺延 Epic 8/L17 顺延——见 Dev Notes 锚定义务表）
-- [ ] Subtask 0.8: 既有资产复核（四 Agent 调研+主会话亲验已完成——2026-11-05；实施期 Task 0.8 复核行号漂移：query_archive 签名/ArchiveQuery 字段/get_point 签名/DocumentQuery 签名/payload 6 键构造位/CLI 子命令清单（add_parser 全量）/`traceability_tree` 词族零占用/3.5 payload 测试宿主文件位/display_name 三源常量族/StrategicArchiveService 全 None 构造可行性——DR1-22/DR1-7）
-- [ ] Subtask 0.9: 链路接线断言清单四项定义（Task 0 完成标志节钦定内容落档）
+- [x] Subtask 0.1: 冻结数据模型规范——五 VO 键契约（TraceabilityTree **7 键**（含 build_degraded 顶层降级哨兵 + degraded_stages stage 级上卷语义——DR1-9）/ConclusionNode 5 键/StageNode 9 键/ChunkNode 6 键/DocumentNode 9 键——含 `jump_ready` 派生布尔语义与 summary/degrade_reason/reflection_excerpt 三键**数据源链**（三型 payload 分支 + chain 键名映射（源键 reflection 非 reflection_excerpt）——DR1-14）+synthesis 行不产生 StageNode 裁定（DR1-13）+summary/reflection_excerpt/content_excerpt 三截断口径（synthesis 联展/200 字符/300 字符——6-1 证据文本截断同族，`blm_planning_service.py:98`））/树形嵌套 chunk 重复语义注记/去重缓存语义（find 调用次数 vs 节点形态）
+- [x] Subtask 0.2: 冻结端口契约——`async build_trace_tree(plan_id, depth=4)` 签名（**async 钦定——DR1-10**；depth 值域+守卫层位：用例层 242/argparse choices exit 2 分工/choices=str 元组+int 转换位——DR1-22）/三依赖注入面（strategic_archive_service 具体类——DR1-8）+search_collection/tenant_id 构造参数（组合根 env 传导单源）+display_name 三源拼装形态（PERFORMANCE_GAP_CONFIG+MARKET_INSIGHT_STEP_CONFIG+synthesis 归结论层——DR1-22）
+- [x] Subtask 0.3: 冻结零事件零异常裁定落档（OD-2/OD-3——含 traceability 段 372-379 维持预留注记与空树幂等读语义先例引用）
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_traceability_tree.feature`（12 场景钉死：AC-1×2/AC-2×1/AC-3×1/AC-4×2/AC-5×2/AC-6×2/AC-7×1/收尾×1——AC 横幅分组+中文 Gherkin，R6 模板；epics 三项架构测试落位对账注记）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_traceability_tree.py` 骨架（docstring 场景三属性分档表/pytestmark 全套+xdist_group（无 minio marker）/12 场景全绑定/模块级期望常量独立构造/三件套/数据面三预置通道（归档直交+Qdrant 点+PG 行）+teardown 三步链（归档行/Qdrant collection/PG 行——各步独立 try/except）/CLI 直调双清契约/延迟 import 纪律）
+- [x] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——预期失败形态：12 场景运行期 ImportError（`traceability_tree` 模块缺失）为主形态；收集期零错误（`--co` 12 collected——延迟 import 纪律自证）；S12 红色形态=**Then 文件存在性断言 AssertionError**（Background 装配触既有模块绿——先行红在断言步非装配步，DR1-23））
+- [x] Subtask 0.7: deferred-work.md 五条锚定义务处置注记落档（6.5b-DF1 半边清偿+半边 defer 6-8/6.4-DF3 清偿/R4N-1 维持 YAGNI/L170 顺延 Epic 8/L17 顺延——见 Dev Notes 锚定义务表）
+- [x] Subtask 0.8: 既有资产复核（四 Agent 调研+主会话亲验已完成——2026-11-05；实施期 Task 0.8 复核行号漂移：query_archive 签名/ArchiveQuery 字段/get_point 签名/DocumentQuery 签名/payload 6 键构造位/CLI 子命令清单（add_parser 全量）/`traceability_tree` 词族零占用/3.5 payload 测试宿主文件位/display_name 三源常量族/StrategicArchiveService 全 None 构造可行性——DR1-22/DR1-7）
+- [x] Subtask 0.9: 链路接线断言清单四项定义（Task 0 完成标志节钦定内容落档）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
-- [ ] 五条锚定义务处置落档
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 五条锚定义务处置落档
 
 ---
 
@@ -432,16 +432,16 @@
 | 🟢 绿 | `chunk_indexing_handler.py:151-168` payload 构造追加 `"page_start": chunk.get("page_start")` / `"page_end": chunk.get("page_end")` 两键（.get 缺省 None——存量兼容读取侧天然降级，无需 collection 迁移） |
 | 🔄 重构 | docstring payload 键清单更新（5. 注释行「payload 包含 …」同步 8 键）+ 3-8 受益注记（`traceability_service.py:125` `payload.get("page_start", 1)` 对新点自然命中——代码零改动） |
 
-- [ ] Subtask 1.0: 全仓 grep 复核 chunk_indexing 测试宿主与 payload 键断言面（主会话已定位 `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py`——Story 3.5 索引管道 payload 测试（`test_handler_writes_chunk_level_payload` 断言面）；另 `test_document_processing_flow.py`/`test_document_tasks.py`/`test_arch_layered_retrieval.py`/验收 hybrid_search 引用 handler——实施期复核断言强度并核验**零适配预期**（四文件零键集断言实测+hybrid_search 验收 handler 步为 hasattr 退化断言——DR2-5）
-- [ ] Subtask 1.1: 🔴 红 — payload 8 键失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 两键扩键最小实现
-- [ ] Subtask 1.3: 🔄 重构 — docstring 与受益注记
-- [ ] Subtask 1.4: 回归面全绿——6-1 BLM 证据提取（payload text/content 键不受影响）/3-8 traceability 单测（mock 自构 payload 不受影响）/LayeredRetrieval 单测（parent 重构 4 键面）/chunk_indexing 既有全部测试（**零适配预期**——四文件零 payload 键集断言实测，DR1-19）
+- [x] Subtask 1.0: 全仓 grep 复核 chunk_indexing 测试宿主与 payload 键断言面（主会话已定位 `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py`——Story 3.5 索引管道 payload 测试（`test_handler_writes_chunk_level_payload` 断言面）；另 `test_document_processing_flow.py`/`test_document_tasks.py`/`test_arch_layered_retrieval.py`/验收 hybrid_search 引用 handler——实施期复核断言强度并核验**零适配预期**（四文件零键集断言实测+hybrid_search 验收 handler 步为 hasattr 退化断言——DR2-5）
+- [x] Subtask 1.1: 🔴 红 — payload 8 键失败测试
+- [x] Subtask 1.2: 🟢 绿 — 两键扩键最小实现
+- [x] Subtask 1.3: 🔄 重构 — docstring 与受益注记
+- [x] Subtask 1.4: 回归面全绿——6-1 BLM 证据提取（payload text/content 键不受影响）/3-8 traceability 单测（mock 自构 payload 不受影响）/LayeredRetrieval 单测（parent 重构 4 键面）/chunk_indexing 既有全部测试（**零适配预期**——四文件零 payload 键集断言实测，DR1-19）
 
 **完成标准/Definition of Done:**
-- [ ] payload 8 键落地（.get 缺省兼容）
-- [ ] 变异实证×1（删 page_start 键 → exact set 红）
-- [ ] 回归面全绿零适配（既有断言零打破实证——四文件零键集断言；若现红即回 Task 1 修实现而非改其他测试，DR1-19）
+- [x] payload 8 键落地（.get 缺省兼容）
+- [x] 变异实证×1（删 page_start 键 → exact set 红）
+- [x] 回归面全绿零适配（既有断言零打破实证——四文件零键集断言；若现红即回 Task 1 修实现而非改其他测试，DR1-19）
 
 ---
 
@@ -465,17 +465,17 @@
 | 🟢 绿 | `src/application/services/traceability_tree_service.py` 实现（四段私有方法拆分——编排可读性；perf_counter 窗口不入 VO（性能窗口归测试计时——树 VO 无 execution_ms 键，YAGNI：6-6 Outcome.execution_ms 是执行面语义，纯读面窗口归采样） |
 | 🔄 重构 | 分段私有方法+Raises/降级语义 docstring |
 
-- [ ] Subtask 2.1: 🔴 红 — VO/端口失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 五 VO+Protocol 实现
-- [ ] Subtask 2.3: 🔄 重构 — 契约 docstring
-- [ ] Subtask 2.4: 🔴 红 — 四段编排失败测试（全场景矩阵）
-- [ ] Subtask 2.5: 🟢 绿 — 服务实现
-- [ ] Subtask 2.6: 🔄 重构 — 私有方法拆分
+- [x] Subtask 2.1: 🔴 红 — VO/端口失败测试
+- [x] Subtask 2.2: 🟢 绿 — 五 VO+Protocol 实现
+- [x] Subtask 2.3: 🔄 重构 — 契约 docstring
+- [x] Subtask 2.4: 🔴 红 — 四段编排失败测试（全场景矩阵）
+- [x] Subtask 2.5: 🟢 绿 — 服务实现
+- [x] Subtask 2.6: 🔄 重构 — 私有方法拆分
 
 **完成标准/Definition of Done:**
-- [ ] 树服务全链实现（四段+降级+容错）
-- [ ] 变异实证×5（判 run 改旧行采纳→值级红/depth 懒加载边界破坏（如 `>=3` 改 `>=1`——depth=1 root.children+双零调用红与 depth=2 call_order 红一锚双档，DR2-4）/去重缓存删除→find 计数红/jump_ready 恒 True→降级场景红/**build_degraded 恒 False→顶层容错空树分立场景红（DR1-9 两键断言活着——DR2-4）**）
-- [ ] 单测 Mock 纪律合规（AsyncMock spec=ProtocolClass——验收/集成零 mock）
+- [x] 树服务全链实现（四段+降级+容错）
+- [x] 变异实证×5（判 run 改旧行采纳→值级红/depth 懒加载边界破坏（如 `>=3` 改 `>=1`——depth=1 root.children+双零调用红与 depth=2 call_order 红一锚双档，DR2-4）/去重缓存删除→find 计数红/jump_ready 恒 True→降级场景红/**build_degraded 恒 False→顶层容错空树分立场景红（DR1-9 两键断言活着——DR2-4）**）
+- [x] 单测 Mock 纪律合规（AsyncMock spec=ProtocolClass——验收/集成零 mock）
 
 ---
 
@@ -495,21 +495,21 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | `tests/unit/interfaces/cli/test_agent_cli.py` 扩展（参数解析+树形输出四层标签精确匹配+chunk 前 8 位值级+filename 值级/`--stage` 过滤零输出断言/畸形 plan_id 242 stderr+exit 1/**空树双形态输出断言**（stub VO 构造 build_degraded=True/False 两腿——「⚠ 归档查询失败（已降级）」/「该 plan 无归档行」各自精确匹配——顶层容错 CLI 面唯一可测位（DR1-17 归单测+DR2-7 断言孤儿消解））/五步定式） |
+| 🔴 红 | `tests/unit/interfaces/cli/test_agent_cli.py` 扩展（参数解析+树形输出四层标签精确匹配+chunk 前 8 位值级+filename 值级/`--stage` 过滤零输出断言/畸形 plan_id 242 stderr+exit 1/**空树输出断言（R1-F3 三腿）**（stub VO 构造 build_degraded=True/False/折叠三腿——「⚠ 归档查询失败（已降级）」/「该 plan 无归档行」/「归档对照（无分析层节点）」各自精确匹配+互斥反断言（DR1-17 归单测+DR2-7 断言孤儿消解））/五步定式） |
 | 🟢 绿 | CLI 注册块+分发分支+`_run_trace_tree_cli`（`_run_checkpoint_show_cli` 直系样板——树形打印纯标准库递归缩进函数） |
 | 🔄 重构 | 打印函数 getattr 形态（零 VO 强耦合——6-3 `_print_checkpoint_result` 先例） |
 
-- [ ] Subtask 3.1: 🔴 红 — 用例/契约失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 用例+组合根两注册
-- [ ] Subtask 3.3: 🔄 重构 — Raises docstring
-- [ ] Subtask 3.4: 🔴 红 — CLI 失败测试
-- [ ] Subtask 3.5: 🟢 绿 — CLI trace-tree 实现
-- [ ] Subtask 3.6: 🔄 重构 — 打印函数形态统一
+- [x] Subtask 3.1: 🔴 红 — 用例/契约失败测试
+- [x] Subtask 3.2: 🟢 绿 — 用例+组合根两注册
+- [x] Subtask 3.3: 🔄 重构 — Raises docstring
+- [x] Subtask 3.4: 🔴 红 — CLI 失败测试
+- [x] Subtask 3.5: 🟢 绿 — CLI trace-tree 实现
+- [x] Subtask 3.6: 🔄 重构 — 打印函数形态统一
 
 **完成标准/Definition of Done:**
-- [ ] 用例/CLI/组合根全链实现
-- [ ] 变异实证×2（depth 守卫删除→242 场景红/树形打印层级标签删除→精确匹配红）
-- [ ] 组合根 diff 纯新增（2 注册块——Task 4 审计）
+- [x] 用例/CLI/组合根全链实现
+- [x] 变异实证×2（depth 守卫删除→242 场景红/树形打印层级标签删除→精确匹配红）
+- [x] 组合根 diff 纯新增（2 注册块——Task 4 审计）
 
 ---
 
@@ -517,16 +517,16 @@
 
 **关联 AC:** 全 AC（接线与回归）
 
-- [ ] Subtask 4.1: 契约测试收口——五断言族全绿+新方法签名键位断言
-- [ ] Subtask 4.2: 事件面守护——`_FROZEN_EVENT_COUNT=56` 复跑零变化（零新增事件实证）+ 6-4/6-5b/6-6 既有事件契约断言面零修改复跑
-- [ ] Subtask 4.3: 回归面全绿——payload 扩键传播面（Task 1.4 清单复跑）+ 6-4 `query_chain_trace` 既有测试零适配（树服务不经 6-4 端口实证）+ 6-5b 引文链测试零适配 + 3-8 traceability 全部测试
-- [ ] Subtask 4.4: 组合根 diff 审计——功能行纯新增（2 注册块；git diff 形态检查——6-6 Task 4.5 同款）
-- [ ] Subtask 4.5: 「已实现未接线」排查——树服务/用例注册即接线（CLI 消费方在位）；无休眠组件产生（新注册全有消费方——`traceability_tree_use_case`→CLI、`traceability_tree_service`→use_case lambda）
+- [x] Subtask 4.1: 契约测试收口——五断言族全绿+新方法签名键位断言
+- [x] Subtask 4.2: 事件面守护——`_FROZEN_EVENT_COUNT=56` 复跑零变化（零新增事件实证）+ 6-4/6-5b/6-6 既有事件契约断言面零修改复跑
+- [x] Subtask 4.3: 回归面全绿——payload 扩键传播面（Task 1.4 清单复跑）+ 6-4 `query_chain_trace` 既有测试零适配（树服务不经 6-4 端口实证）+ 6-5b 引文链测试零适配 + 3-8 traceability 全部测试
+- [x] Subtask 4.4: 组合根 diff 审计——功能行纯新增（2 注册块；git diff 形态检查——6-6 Task 4.5 同款）
+- [x] Subtask 4.5: 「已实现未接线」排查——树服务/用例注册即接线（CLI 消费方在位）；无休眠组件产生（新注册全有消费方——`traceability_tree_use_case`→CLI、`traceability_tree_service`→use_case lambda）
 
 **完成标准/Definition of Done:**
-- [ ] 全部契约/守护测试通过
-- [ ] payload 扩键传播面零意外回归实证
-- [ ] 6-4/6-5b/3-8 回归面零适配实证
+- [x] 全部契约/守护测试通过
+- [x] payload 扩键传播面零意外回归实证
+- [x] 6-4/6-5b/3-8 回归面零适配实证
 
 ---
 
@@ -534,16 +534,16 @@
 
 **关联 AC:** AC-1/AC-3/AC-4/AC-5/AC-7（真实服务面）
 
-- [ ] Subtask 5.1: 新建 `tests/integration/test_integration_traceability_tree.py`——自包含装配类 `_TreeChain`（真实 PG/Qdrant/Redis + 组合根 resolve；**零 LLM/零 MinIO**；**embedding 仅场景④ Fake 豁免**（AsyncMock spec EmbeddingServicePort——**按批次等长返回**，见 5.4/DR2-6——6-5b `_make_fake_embedding` 外部 SaaS 豁免面直系先例，DR1-7）；**集成 pytestmark 无 minio marker**（handler 直调不触 MinIO——对齐验收口径，勿整块复刻 6-5b 集成 markers，DR2-10）；归档预置 StrategicArchiveService 全 None 依赖构造（纯 L2——见验收预置纪律）；teardown 三步链各步独立 try/except+预登记；裸 async def+`_fresh_resolver_per_test` 双清 autouse——6-5b 集成形态）
-- [ ] Subtask 5.2: 场景①全链 round-trip（归档两 stage 直交→Qdrant 点 8 业务键预置（**扩键后形态**——page_start 值级读回；实存第 9 键 created_at 存在不计数——DR1-3）→PG 行原生 SQL 预置→树构建四层值级断言+`jump_ready==True`）
-- [ ] Subtask 5.3: 场景②多 run 判别+降级（同 stage 连续两次直交（自动 now 先后）→新行采纳（index 区分 chunk_id 判别锚——DR1-4）+adopted/total 对照；Qdrant 点删除→point_missing 真实降级；PG 行删除→document_missing 真实降级——**真实删除构造非 mock**）
-- [ ] Subtask 5.4: 场景③性能采样（20 轮 P95<300ms+预热；resolved 占比断言）+ 场景④ingestion 扩键 round-trip（经 RAGIndexed 事件链或 handler 直调（两路均需 embedding——Fake 豁免 DR1-7；**fake.embed_documents 须按批次长度返回等长向量列表**（side_effect 按 len(batch) 构造）——6-5b fake 恒返长度 1 是单文本形态，直抄则第 2+ chunk 缺 vector 不可预期，DR2-6）→Qdrant 点 payload 8 业务键读回（+created_at 存在）；**collection 偏离钦定（DR2-3）**：handler 写目标硬编码 "documents"（`chunk_indexing_handler.py:215`）不受 BLM_SEARCH_COLLECTION 影响——读回经 `get_point("documents", chunk_id)`、清理经 `delete_points("documents", [chunk_id])` 定向点删（L3VectorPort.delete_points :70 在位），**禁对共享 collection 整删**——**扩键的生产通道级验证**，验收预置形态之外的补充）
-- [ ] Subtask 5.5: 变异验证型×2（判 run 规则反转→场景②红还原绿；depth 懒加载破坏→call_order 红——6-3 Task 5 验证型变异先例）
+- [x] Subtask 5.1: 新建 `tests/integration/test_integration_traceability_tree.py`——自包含装配类 `_TreeChain`（真实 PG/Qdrant/Redis + 组合根 resolve；**零 LLM/零 MinIO**；**embedding 仅场景④ Fake 豁免**（AsyncMock spec EmbeddingServicePort——**按批次等长返回**，见 5.4/DR2-6——6-5b `_make_fake_embedding` 外部 SaaS 豁免面直系先例，DR1-7）；**集成 pytestmark 无 minio marker**（handler 直调不触 MinIO——对齐验收口径，勿整块复刻 6-5b 集成 markers，DR2-10）；归档预置 StrategicArchiveService 全 None 依赖构造（纯 L2——见验收预置纪律）；teardown 三步链各步独立 try/except+预登记；裸 async def+`_fresh_resolver_per_test` 双清 autouse——6-5b 集成形态）
+- [x] Subtask 5.2: 场景①全链 round-trip（归档两 stage 直交→Qdrant 点 8 业务键预置（**扩键后形态**——page_start 值级读回；实存第 9 键 created_at 存在不计数——DR1-3）→PG 行原生 SQL 预置→树构建四层值级断言+`jump_ready==True`）
+- [x] Subtask 5.3: 场景②多 run 判别+降级（同 stage 连续两次直交（自动 now 先后）→新行采纳（index 区分 chunk_id 判别锚——DR1-4）+adopted/total 对照；Qdrant 点删除→point_missing 真实降级；PG 行删除→document_missing 真实降级——**真实删除构造非 mock**）
+- [x] Subtask 5.4: 场景③性能采样（20 轮 P95<300ms+预热；resolved 占比断言）+ 场景④ingestion 扩键 round-trip（经 RAGIndexed 事件链或 handler 直调（两路均需 embedding——Fake 豁免 DR1-7；**fake.embed_documents 须按批次长度返回等长向量列表**（side_effect 按 len(batch) 构造）——6-5b fake 恒返长度 1 是单文本形态，直抄则第 2+ chunk 缺 vector 不可预期，DR2-6）→Qdrant 点 payload 8 业务键读回（+created_at 存在）；**collection 偏离钦定（DR2-3）**：handler 写目标硬编码 "documents"（`chunk_indexing_handler.py:215`）不受 BLM_SEARCH_COLLECTION 影响——读回经 `get_point("documents", chunk_id)`、清理经 `delete_points("documents", [chunk_id])` 定向点删（L3VectorPort.delete_points :70 在位），**禁对共享 collection 整删**——**扩键的生产通道级验证**，验收预置形态之外的补充）
+- [x] Subtask 5.5: 变异验证型×2（判 run 规则反转→场景②红还原绿；depth 懒加载破坏→红——6-3 Task 5 验证型变异先例；**R1-F11 归属澄清**：真实端口无调用记录面（DR1-5），call_order 零调用断言由 Task 2 单测矩阵承载，集成侧实际红点=树形/值级断言）
 
 **完成标准/Definition of Done:**
-- [ ] 真实链场景全绿（服务不可达环境 skip）
-- [ ] 预置资源清理闭环（跑前后计数净增 0——归档行/Qdrant 点/PG 行三面）
-- [ ] 集成覆盖率 ≥75%（口径见覆盖率要求节）
+- [x] 真实链场景全绿（服务不可达环境 skip）
+- [x] 预置资源清理闭环（跑前后计数净增 0——归档行/Qdrant 点/PG 行三面）
+- [x] 集成覆盖率 ≥75%（口径见覆盖率要求节）
 
 ---
 
@@ -551,16 +551,16 @@
 
 **关联 AC:** 架构合规（六边形+零改动面守护）
 
-- [ ] Subtask 6.1: 新建 `tests/unit/architecture/test_traceability_tree.py`（**OD-9**：对 epics L2385 钦定名 `test_provenance_tree.py` 的显式偏离——词族统一 traceability_tree；与既有 `test_arch_traceability.py`（3-8）不同名并存）验证器 A：树服务/用例/VO 落位（application 层内——AST/import 扫描；VO 在 ports 文件非服务文件本地定义——禁本地 Protocol 守护）
-- [ ] Subtask 6.2: 验证器 B：零 publish 守护（`traceability_tree_service.py` 源码零 `publish` 调用——grep 断言）+ 零事件构造（零 DomainEvent 子类构造位）
-- [ ] Subtask 6.3: 验证器 C：零 domain 改动守护（本 Story 新增文件全部在 application/entrypoints 层——`src/domain/` 零新文件断言；payload 扩键仅触 application/event_handlers）+ 依赖方向（树服务 import 面=domain ports+application ports 白名单）
-- [ ] Subtask 6.4: 验证器 D：CLI 接线（agent_cli.py 含 trace-tree 分发分支+resolve `traceability_tree_use_case` 调用锚）
-- [ ] Subtask 6.5: 变异实证×2（pydantic 注入 VO→A 红（若实证 domain 零依赖扫描面）；publish 调用注入→B 红——6-3/6-6 Task 6 先例）
+- [x] Subtask 6.1: 新建 `tests/unit/architecture/test_traceability_tree.py`（**OD-9**：对 epics L2385 钦定名 `test_provenance_tree.py` 的显式偏离——词族统一 traceability_tree；与既有 `test_arch_traceability.py`（3-8）不同名并存）验证器 A：树服务/用例/VO 落位（application 层内——AST/import 扫描；VO 在 ports 文件非服务文件本地定义——禁本地 Protocol 守护）
+- [x] Subtask 6.2: 验证器 B：零 publish 守护（`traceability_tree_service.py` 源码零 `publish` 调用——grep 断言）+ 零事件构造（零 DomainEvent 子类构造位）
+- [x] Subtask 6.3: 验证器 C：零 domain 改动守护（本 Story 新增文件全部在 application/entrypoints 层——`src/domain/` 零新文件断言；payload 扩键仅触 application/event_handlers）+ 依赖方向（树服务 import 面=domain ports+application ports 白名单）
+- [x] Subtask 6.4: 验证器 D：CLI 接线（agent_cli.py 含 trace-tree 分发分支+resolve `traceability_tree_use_case` 调用锚）
+- [x] Subtask 6.5: 变异实证×2（pydantic 注入 VO→A 红（若实证 domain 零依赖扫描面）；publish 调用注入→B 红——6-3/6-6 Task 6 先例）
 
 **完成标准/Definition of Done:**
-- [ ] 四验证器全绿
-- [ ] 任何违规导致测试失败
-- [ ] 循环依赖检测经 ruff/isort（不引入额外工具）
+- [x] 四验证器全绿
+- [x] 任何违规导致测试失败
+- [x] 循环依赖检测经 ruff/isort（不引入额外工具）
 
 ---
 
@@ -574,16 +574,16 @@
 | 🟢 绿 | BDD 步骤实现收尾断言（文件存在性+关键符号存在性——6-3 S13/6-6 S14 形态先例） |
 | 🔄 重构 | 场景命名收敛、断言统一 |
 
-- [ ] Subtask 7.1: 12 场景全绿（数据面三预置通道回灌+teardown 三步链+xdist 同组串行验证+S9/S10 CLI 双清形态）
-- [ ] Subtask 7.2: 四目录全量回归（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——显式四目录）双轮零失败
-- [ ] Subtask 7.3: 收尾清单断言（src 新增/修改文件+四测试目录文件逐项存在性）
-- [ ] Subtask 7.4: 质量收口——ruff+mypy 全过（753 基线不回退）/专项覆盖率（application ≥85% 门禁+`traceability_tree_service.py`/`get_traceability_tree.py` 全新文件按文件级覆盖即新增面覆盖——6-6 口径钦定）/三红线 grep 自查零输出（raise ValueError/HTTPException/内置 Exception 继承——新增行）/提交信息禁 AI 署名
-- [ ] Subtask 7.5: 台账终态——deferred-work 五条处置注记核销状态回写+新留项登记（finding 级断言粒度引文 defer V1/bbox 四元组 defer 6-8——OD 登记）；sprint-status 注记更新
+- [x] Subtask 7.1: 12 场景全绿（数据面三预置通道回灌+teardown 三步链+xdist 同组串行验证+S9/S10 CLI 双清形态）
+- [x] Subtask 7.2: 四目录全量回归（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——显式四目录）双轮零失败
+- [x] Subtask 7.3: 收尾清单断言（src 新增/修改文件+四测试目录文件逐项存在性）
+- [x] Subtask 7.4: 质量收口——ruff+mypy 全过（753 基线不回退）/专项覆盖率（application ≥85% 门禁+`traceability_tree_service.py`/`get_traceability_tree.py` 全新文件按文件级覆盖即新增面覆盖——6-6 口径钦定）/三红线 grep 自查零输出（raise ValueError/HTTPException/内置 Exception 继承——新增行）/提交信息禁 AI 署名
+- [x] Subtask 7.5: 台账终态——deferred-work 五条处置注记核销状态回写+新留项登记（finding 级断言粒度引文 defer V1/bbox 四元组 defer 6-8——OD 登记）；sprint-status 注记更新
 
 **完成标准/Definition of Done:**
-- [ ] 12 验收场景全绿+四目录全量双轮零失败
-- [ ] 完成清单逐项确认
-- [ ] Story 可进入 `code-review`
+- [x] 12 验收场景全绿+四目录全量双轮零失败
+- [x] 完成清单逐项确认
+- [x] Story 可进入 `code-review`
 
 ---
 
@@ -705,14 +705,14 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - **红绿变异全链**（Epic 4 行动项 7.1-2）：新断言变异实证——本 Story 变异锚钦定 12 处（Task 1×1/Task 2×5/Task 3×2/Task 5×2 验证型/Task 6×2——DR2-4 扩 build_degraded 锚）
 
 **应用到本故事/Applied to This Story:**
-- [ ] 9 组关键锚点主会话亲验（创建期已执行——锚点表承载）
-- [ ] 6-4 端口零触碰+query_archive 直读（OD-1/OD-5）
-- [ ] 降级链路三态两层+顶层容错+空树幂等读（AC-5/OD-3）
-- [ ] exact set/call_order 零调用/值级三类断言形态（Task 2 矩阵）
-- [ ] CLI 双清+禁二次 bootstrap（S9/S10）
-- [ ] 性能三段口径差声明（OD-7）
-- [ ] payload 传播面 grep 回归（Task 1.4/4.3）
-- [ ] 全程禁抑制注释+提交信息禁 AI 署名+三红线 grep
+- [x] 9 组关键锚点主会话亲验（创建期已执行——锚点表承载）
+- [x] 6-4 端口零触碰+query_archive 直读（OD-1/OD-5）
+- [x] 降级链路三态两层+顶层容错+空树幂等读（AC-5/OD-3）
+- [x] exact set/call_order 零调用/值级三类断言形态（Task 2 矩阵）
+- [x] CLI 双清+禁二次 bootstrap（S9/S10）
+- [x] 性能三段口径差声明（OD-7）
+- [x] payload 传播面 grep 回归（Task 1.4/4.3）
+- [x] 全程禁抑制注释+提交信息禁 AI 署名+三红线 grep
 
 ### 其他约束速查
 
@@ -755,31 +755,35 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范（三零 Story/payload 扩键/两注册/CLI 一命令/锚定义务五条处置）
 - [x] 多 Agent 并行调研（四视角：BBox 溯源数据面/结论证据链/验收测试样板/架构治理与 API 模式）+ 主会话独立亲验 9 组关键代码事实（query_archive/ArchiveQuery/get_point/DocumentQuery/payload 6 键/CLI 子命令/词族零占用/SemanticChunk.to_dict/3.5 payload 测试宿主）
+- [x] dev-story 实施完成（2026-11-05，Task 0~7）：四 Agent 并行锚点复核（43 项锚点 39 项精确命中/4 项轻微漂移：pdf_report docstring :15-29/vector_storage 路径 qdrant 子包/chain 注册 :2370/契约样板名）+ Task 0 红阶段（12 collected 零错误+12 failed 预期形态）+ Task 1 payload 6→8 键（变异×1+回归面 94+37 passed 零适配）+ Task 2 五 VO+四段编排（33 单测+变异×5——判 run 反转/depth 边界/去重缓存/jump_ready/build_degraded）+ Task 3 用例双守卫+CLI 五步定式+组合根两注册（195 passed+变异×2）+ Task 4 事件冻结 56 复跑/组合根 50 行纯新增（R1-F11 勘误——原记 40 为功能行约数，实测 +50/-0）/消费方接线排查 + Task 5 集成四场景（双轮全绿+变异×2+覆盖率 82%/并集 79%）+ Task 6 架构四验证器（11 passed+变异×2——pydantic 注入/publish 注入）+ Task 7 收尾
+- [x] 实施攻坚三项：① 裸 document_repository 严格 ContextVar 会话（CLI/测试直调无会话——组合根 lambda _SessionScopedDocumentRepository 包装注入+测试 _SessionScopedFind 镜像双面修复，6-5b 同款先例）；② 6-4 EVIDENCE_PACKAGE 唯一构造位守护将查询消费面误判构造位（许可清单正当扩展——树服务为第二个钦定查询消费面，6-5b 同款演进）；③ sparse fake 返回 None 元素是畸形形态（改抛异常走 handler 真实降级分支）
+- [x] 质量门禁全过：ruff 双目录 All checks passed / mypy 756 source files 零错误（基线 753+3 新文件零回退）/ 三红线 grep 零输出 / application 覆盖率 91%（≥85%——树服务 93%/用例 100%）/ 集成交付面覆盖率 82%（≥75%）/ 整体覆盖率 93%（≥80%）
+- [x] 验收 12 场景全绿×6 轮稳定（S1~S12 含收尾存在性断言）+ 集成四场景双轮 + 四目录全量回归双轮（14977 passed ×2——第二轮数字见下）零失败
+- [x] 全仓 mypy 口径清零（`mypy .` 1924 文件——tests 面类型修复 12 处×4 文件，全根因修复零抑制）：is_dataclass TypeIs 窄化（vo_class Any 注解+helper 签名放宽）/typing.Protocol 特殊形态不可作 issubclass 第二参（改 `_is_protocol` 标记断言——运行时等价语义）/payload dict 首分支 list 值窄化（显式 dict[str, Any] 注解）/getsource 实参联合含 str（callable 窄化局部变量）/Redis `aclose()`→`close()` ×2（对齐仓内 6-5b 探测先例形态）/验收包装 cast 契约面收窄（组合根 _SessionScopedDocumentRepository 同款注记）；修复后 mypy . 1924 零错误+ruff 全绿+受影响四文件 56 passed 零行为变
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/6-7-traceability-tree-display.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/application/ports/traceability_tree.py` - 五 VO+端口契约
-- `src/application/services/traceability_tree_service.py` - 四段编排服务
-- `src/application/use_cases/get_traceability_tree.py` - 查询用例
-- `tests/unit/application/test_traceability_tree_service.py` - 服务单测
-- `tests/unit/application/use_cases/test_traceability_tree_use_case.py` - 用例单测
-- `tests/unit/architecture/test_traceability_tree.py` - 架构四验证器
+- `src/application/ports/traceability_tree.py` - 五 VO+端口契约（Task 2 循环 A）
+- `src/application/services/traceability_tree_service.py` - 四段编排服务（Task 2 循环 B）
+- `src/application/use_cases/get_traceability_tree.py` - 查询用例（Task 3 循环 A）
+- `tests/unit/application/test_traceability_tree_service.py` - 服务单测（33 用例）
+- `tests/unit/application/use_cases/test_traceability_tree_use_case.py` - 用例单测（6 用例）
+- `tests/unit/architecture/test_traceability_tree.py` - 架构四验证器（11 用例）
 - `tests/integration/test_integration_traceability_tree.py` - 集成四场景
 - `tests/contracts/test_port_contract_traceability_tree.py` - 端口契约五断言族
 - `tests/acceptance/test_acceptance_traceability_tree.feature` - Gherkin 12 场景
 - `tests/acceptance/test_acceptance_traceability_tree.py` - BDD 步骤实现
 
-**待修改的文件/To Be Modified (Dev Story 实施):**
-- `src/application/event_handlers/chunk_indexing_handler.py` - payload 6→8 键
-- `src/entrypoints/agent_cli.py` - trace-tree 子命令
-- `src/composition_root.py` - 两注册块
-- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 扩展
-- `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py` - payload 8 键断言扩展（同族四文件零键集断言——复核面零适配预期，DR1-19）
-- `_bmad-output/implementation-artifacts/deferred-work.md` - 五条处置注记+新留项
+**修改的文件/Modified Files (Dev Story 实施):**
+- `src/application/event_handlers/chunk_indexing_handler.py` - payload 6→8 键（+page_start/page_end）
+- `src/entrypoints/agent_cli.py` - trace-tree 子命令（注册块+分发+runner+打印函数）
+- `src/composition_root.py` - 两注册块（+50/-0 纯新增含 import/注释——document_repository 会话包装注入；R1-F11 口径订正）
+- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 扩展（12 用例）
+- `tests/unit/infrastructure/workflow/test_document_tasks_index_payload.py` - payload 8 键断言扩展（新增 1 用例）
+- `tests/unit/architecture/test_json_chain_of_thought.py` - EVIDENCE_PACKAGE 唯一构造位守护许可扩展（6-5b 同款正当演进——树服务为第二个钦定查询消费面）
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 五条处置注记+6-7 区段两条新留项
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 状态流转注记
 
 ---
@@ -878,20 +882,30 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待代码审查轮填充）
-**审查模式:** （待填充）
+**审查日期:** 2026-11-06（Round 1 起）
+**审查模式:** 暂存 diff（19 文件）四视角并行调研（A 树服务编排/B 接线层/C 测试质量/D payload 传播红线）+ 主会话逐条复核定谳 + 双评审员方案评审（非「优秀」不落码）+ 五轮循环（C1~C5）
 
 #### 需决策 Decision Needed
 
-- [ ] （待填充）
+- [x] R1-保留-1：架构 A :84「application in path.parts」/C :148 同源断言——调研报恒真微瑕，主会话复核**改判保留**：对常量漂移有防呆判别力（常量被误改指向他层时红），非遗漏（对视角C P3-5 部分改判——仅契约 :36 死断言删除）
 
 #### 已修复 Patch
 
-- [ ] （待填充）
+- [x] R1-F1（P2·视角A）：服务六处 `(x or {})`/isinstance 混用守卫统一为 `_as_dict()`（非 dict 脏形态降空 dict）——消除 decision_basis/assumptions 为 truthy 非 dict（JSONB 外部可写面）时 AttributeError 逃逸（违反端口「本方法不抛业务异常」+「树整体不因单点失效失败」）；+2 单测（非 dict decision_basis 排除出 total 不炸/非 dict assumptions 降 evidence_count=0 不炸——变异①实证红）；+1 升格锚（payload 缺 document_id → chunk 保持 resolved 无文档子节点+find 零调用——评审员②建议）；+4 docstring 注记（哨兵复用/version 双口径/payload 无 document_id/空串 summary 回退）+ `_empty_tree` docstring 失实修正（「共用」→顶层降级专责——真空树走正常构造路径）
+- [x] R1-F2（P2·视角C）：bbox「透传不合成」断言收口——验收 S4 恒真形态 `is None or isinstance(dict)` 改 `is None`（预置 8 业务键无 bbox——合成坐标变异②实证红）+ 单测 None 分支锚（`assert doc.bbox is None`——全仓首个「不合成」判别锚；dict 分支 :758 值级锚既有）+ AC-3 VC 行收口注记（防写回恒真形态——评审员②传播面）
+- [x] R1-F3（P3·视角B）：CLI 空树分支三分化（build_degraded=True→⚠；total==0→「该 plan 无归档行」；total>0 无分析层节点→归档对照行+「depth 折叠或 stage 越域」提示）——消除 depth=1 有归档/全脏 stage 两形态下输出假话「该 plan 无归档行」（DR1-9 读模型诚实性的 CLI 面补全）+ 单测第三腿（折叠 stub 断言对照行出现+「无归档行」不出现）+ AC-6 正文与 Task 3 红清单三腿同步（评审员②传播面）
+- [x] R1-F4（P3·视角C）：验收+集成 teardown 归档 DELETE 与 PG DELETE 拆独立 try/except（对齐 Subtask 0.5 钦定三步各步独立——消除归档步失败连坐 PG 清理；集成侧原无 except 异常直接上抛一并回归钦定形态）
+- [x] R1-F5（P3·视角C·评审员②升级）：架构 B 事件构造 AST 扫描升级为 **DomainEvent 子类名全集比对**（运行时递归 `__subclasses__()`+包级导入注册+Name/Attribute 双形态）——原方案补后缀启发式对 56 事件类覆盖率仅 ~15%（RAGIndexed 不命中四后缀——钦定变异例仍绿被证伪）；`events.RAGIndexed(...)` 注入变异③实证红
+- [x] R1-F6（P3·视角C·评审员①修订）：架构 D 注册锚改精确形态 `'add_parser(\n        "trace-tree"' in source`（删 or 右支恒真吞噬）——原方案 `count>=2` 被证伪：`"trace-tree"` 字面量实为 3 处（:526 注册/:1417 异常 context/:2026 分发——删注册后 count=2 仍绿漏报）；分发锚由第二测试独立承载
+- [x] R1-F7（P3·视角C）：契约测试删恒真死断言 `spec.version.startswith("v")`（前一行已 `== "v1.0.0"` 精确断言）
+- [x] R1-F8（P3·视角C）：payload 新增用例三裸 `AsyncMock()` 补 `spec=L3VectorPort/EmbeddingServicePort/DocumentRepositoryPort`（仅新增行——宿主 3.5 既有形态不触碰，Surgical）
+- [x] R1-F9（P3·视角B）：`get_traceability_tree.py` 补 `__all__ = ["GetTraceabilityTreeUseCase"]`（直系先例 get_blm_chain_trace.py:61 对齐——评审员①核 11/17 混合惯例，低价值微项保留）
+- [x] R1-F10（P3·视角C）：`_match_page`「匹配到但页码非正整数（字符串脏值）」子分支补单测锚（test_page_match_and_dirty_chunk 扩 chunk-badpage 腿）+ `test_guard_order_uuid_before_depth` 改名 `test_combined_invalid_uuid_and_depth_raises_242`（名实相符——顺序对调用方不可观测，docstring 同步）
+- [x] R1-F11（P3·视角D/C）：故事文件「40 行纯新增」三处订正实测口径（+50/-0——File List/完成清单内联勘误/sprint-status）+ Task 5.5「depth 懒加载破坏→call_order 红」归属措辞澄清（集成无 call_order 面——DR1-5 单测承载，锚活）
 
 #### 已推迟 Defer
 
-- [ ] （待填充）
+- [ ] （Round 1 无 defer 项——P3 全数清偿或保留改判；后续轮补充）
 
 ---
 
@@ -899,7 +913,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-6 五轮形态——R1~R5 五轮收敛定稿 v1.4.0：57 项累计修复+证伪留痕 26 组+严重度递减链 P1 10→4→1→0+零 P0/P1 残留）+ story-template 合规人工核对（R4 三轴/R5 六节终审承载——人工按模板清单最终核对仍建议在 dev-story 前过目一遍）
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 

@@ -2009,6 +2009,56 @@ def bootstrap() -> None:
         tags=("search", "traceability", "bounding-box"),
     )
 
+    # === Story 6-7: Traceability Tree（溯源树四层聚合查询——纯读侧零事件）===
+    # SINGLETON 捕获 SCOPED 三依赖声明（DR1-18）：CLI 一次性进程 + 测试双清下无
+    # 故障面（6-6 checkpoint_service 同款先例已跑通）；未来 7-2 长驻 REST 面改
+    # SCOPED（3-8 traceability_service 同构）——触发器注记。
+    from src.application.ports.traceability_tree import TraceabilityTreePort
+    from src.application.services.agent_workflow_context import MVP_TENANT_ID
+    from src.application.services.traceability_tree_service import TraceabilityTreeService
+
+    register_port(
+        name="traceability_tree_service",
+        version="v1.0.0",
+        interface=TraceabilityTreePort,
+        impl=lambda resolver: TraceabilityTreeService(
+            strategic_archive_service=resolver.resolve("strategic_archive_service"),
+            l3_vector=resolver.resolve("l3_vector"),
+            # cast 契约面收窄注记：包装对象仅承载 find 会话语境（6-5b pdf 注册
+            # 同款形态——document_repository 严格 ContextVar 会话，CLI/后台读
+            # 场景需显式会话；_SessionScopedDocumentRepository 定义于本函数下方，
+            # lambda 闭包 late binding 于 resolve 时可见）
+            document_repository=cast(
+                "DocumentRepositoryPort",
+                _SessionScopedDocumentRepository(
+                    resolver.resolve("document_repository"),
+                    resolver.resolve("session_factory"),
+                ),
+            ),
+            search_collection=os.getenv("BLM_SEARCH_COLLECTION", "documents"),
+            tenant_id=str(MVP_TENANT_ID),
+        ),
+        module="src.application.services.traceability_tree_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("traceability", "tree", "application"),
+    )
+
+    from src.application.use_cases.get_traceability_tree import GetTraceabilityTreeUseCase
+
+    register_port(
+        name="traceability_tree_use_case",
+        version="v1.0.0",
+        interface=GetTraceabilityTreeUseCase,
+        impl=lambda resolver: GetTraceabilityTreeUseCase(
+            tree_service=resolver.resolve("traceability_tree_service"),
+        ),
+        module="src.application.use_cases.get_traceability_tree",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("traceability", "use_case", "application"),
+    )
+
     # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 

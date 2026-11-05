@@ -122,7 +122,10 @@ class ChunkIndexingHandler:
         2. 从 metadata.chunks 读取 SemanticChunk 列表
         3. 分批嵌入 Dense + Sparse 向量（max_batch_size + token 截断）
         4. 逐块 upsert 到 Qdrant（点 ID = chunk_id）
-        5. payload 包含 parent_chunk_id/index_level/chunk_id/document_id
+        5. payload 包含 8 键：chunk_id/document_id/parent_chunk_id/index_level/content/
+           chunk_header/page_start/page_end（Story 6-7 扩键 page_start/page_end——页码级
+           跳转载荷通道；3-8 traceability_service 的 payload.get("page_start", 1) 读取面
+           对新索引点自然受益——page_number 不再恒 1，代码零改动）
 
         Args:
             event: RAGIndexed 事件实例
@@ -163,6 +166,11 @@ class ChunkIndexingHandler:
                         "index_level": chunk.get("index_level", "child"),
                         "content": content,
                         "chunk_header": str(chunk.get("chunk_header", "")),
+                        # 页码级跳转载荷通道（Story 6-7——6.5b-DF1 半边清偿）：
+                        # .get() 缺省 None——legacy chunks（无页码键）天然降级，存量 collection 无需迁移；
+                        # 数据源 SemanticChunk.to_dict() 已含两键（semantic_chunk.py:188-189）
+                        "page_start": chunk.get("page_start"),
+                        "page_end": chunk.get("page_end"),
                     },
                 }
             )

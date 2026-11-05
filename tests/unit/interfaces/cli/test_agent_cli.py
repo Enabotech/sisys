@@ -2759,3 +2759,246 @@ class TestCheckpointRecoverExecution:
         assert exit_code == 1
         assert not exec_stub.calls
         assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+
+# ===================================================================
+# Story 6-7: trace-tree 子命令（溯源树四层展示——CLI 分析视入口）
+# ===================================================================
+
+
+def _make_stub_tree(*, build_degraded: bool = False, stages: tuple[str, ...] | None = None) -> Any:
+    """构造树 VO 替身（SimpleNamespace——打印函数 getattr 形态零强耦合）."""
+    from types import SimpleNamespace
+
+    display_map = {"performance_gap": "业绩差距分析", "market_insight_trend": "看趋势"}
+    chunk_id_map = {"performance_gap": "chunkgap01abcdef", "market_insight_trend": "chunktrend01abc"}
+    stage_nodes = []
+    for stage, display in display_map.items():
+        if stages is not None and stage not in stages:
+            continue
+        chunk = SimpleNamespace(
+            chunk_id=chunk_id_map[stage],
+            content_excerpt="切片内容" * 5,
+            page_start=3,
+            page_end=3,
+            status="resolved",
+            children=[
+                SimpleNamespace(
+                    document_id="d-1",
+                    filename="年报.pdf",
+                    version=1,
+                    page=3,
+                    object_key="raw-documents/test/d-1.pdf",
+                    bucket="raw-documents",
+                    bbox=None,
+                    status="resolved",
+                    jump_ready=True,
+                )
+            ],
+        )
+        stage_nodes.append(
+            SimpleNamespace(
+                stage=stage,
+                display_name=display,
+                summary=f"{display}摘要",
+                degraded=False,
+                degrade_reason="",
+                tools_used=("t1",),
+                reflection_excerpt="反思",
+                evidence_count=1,
+                children=[chunk],
+            )
+        )
+    root = SimpleNamespace(
+        plan_id=str(uuid.uuid4()),
+        title="BLM 战略规划溯源",
+        summary="综合结论",
+        stage_count=len(stage_nodes),
+        children=tuple(stage_nodes),
+    )
+    return SimpleNamespace(
+        plan_id=root.plan_id,
+        root=root,
+        adopted_archives=len(stage_nodes),
+        total_archives=len(stage_nodes),
+        degraded_stages=(),
+        build_degraded=build_degraded,
+        generated_at="2026-11-05T00:00:00+00:00",
+    )
+
+
+class _StubTreeUseCase:
+    """trace-tree 用例替身（记录调用参数/可编程树或异常）."""
+
+    def __init__(self, tree: Any = None, error: Exception | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._tree = tree
+        self._error = error
+
+    async def execute(self, *, plan_id: str, depth: int = 4) -> Any:
+        self.calls.append({"plan_id": plan_id, "depth": depth})
+        if self._error is not None:
+            raise self._error
+        return self._tree
+
+
+def _patch_trace_tree_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubTreeUseCase) -> None:
+    """monkeypatch agent_cli 模块级 bootstrap/resolve（checkpoint 族注入器同款）."""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+class TestTraceTreeParser:
+    """trace-tree 子命令解析（--plan-id 必填 + --depth choices str 元组 + --stage）."""
+
+    def test_trace_tree_requires_plan_id(self) -> None:
+        """必填参数缺失 usage error exit 2（--plan-id）."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["trace-tree"])
+        assert exc_info.value.code == 2
+
+    def test_trace_tree_full_arguments(self) -> None:
+        """全参数解析（--plan-id/--depth/--stage）."""
+        args = agent_cli.build_parser().parse_args(
+            ["trace-tree", "--plan-id", str(uuid.uuid4()), "--depth", "2", "--stage", "performance_gap"]
+        )
+        assert args.command == "trace-tree"
+        assert args.depth == "2", "--depth 应为字符串入参（DR3-7——runner 内 int 转换）"
+        assert args.stage == "performance_gap"
+
+    def test_trace_tree_depth_default_4(self) -> None:
+        """--depth 默认 "4"（全树）."""
+        args = agent_cli.build_parser().parse_args(["trace-tree", "--plan-id", str(uuid.uuid4())])
+        assert args.depth == "4"
+        assert args.stage is None
+
+    def test_trace_tree_depth_zero_rejected_by_choices_exit_2(self) -> None:
+        """--depth 0 由 argparse choices 拦截 exit 2（CLI 面不走 242——分工钦定）."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["trace-tree", "--plan-id", str(uuid.uuid4()), "--depth", "0"])
+        assert exc_info.value.code == 2
+
+    def test_trace_tree_depth_five_rejected_by_choices_exit_2(self) -> None:
+        """--depth 5 由 argparse choices 拦截 exit 2."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["trace-tree", "--plan-id", str(uuid.uuid4()), "--depth", "5"])
+        assert exc_info.value.code == 2
+
+
+class TestTraceTreeExecution:
+    """trace-tree 执行（五步定式 + 树形缩进打印 + --stage 客户端过滤）."""
+
+    def test_success_four_layer_labels_and_values(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """成功路径：exit 0 + 四层层级标签 + chunk 前 8 位 + filename 值级."""
+        stub = _StubTreeUseCase(_make_stub_tree())
+        _patch_trace_tree_entry(monkeypatch, stub)
+        plan_id = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", plan_id])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        for label in ("结论:", "分析:", "切片:", "文档:"):
+            assert label in out, f"输出缺层级标签 {label!r}"
+        assert "chunkgap" in out, "输出应含 chunk_id 前 8 位"
+        assert "年报.pdf" in out, "输出应含文档 filename 值级"
+        assert stub.calls and stub.calls[0]["depth"] == 4
+
+    def test_stage_order_canonical(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """分析层行序=流程规范序（gap 在 trend 前——DR3-1）."""
+        stub = _StubTreeUseCase(_make_stub_tree())
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        gap_pos, trend_pos = out.find("业绩差距分析"), out.find("看趋势")
+        assert gap_pos >= 0 and trend_pos >= 0
+        assert gap_pos < trend_pos
+
+    def test_stage_filter_keeps_conclusion_line(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--stage 过滤：指定 stage 展示、其余分析层零输出、结论层行保留（DR3-7）."""
+        stub = _StubTreeUseCase(_make_stub_tree())
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4()), "--stage", "market_insight_trend"])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "结论:" in out, "过滤应保留结论层行"
+        assert "看趋势" in out
+        assert "业绩差距分析" not in out, "未指定 stage 分析层应零输出"
+        assert "chunkgap" not in out, "未指定 stage 的切片行应零输出（gap chunk 前 8 位锚）"
+
+    def test_depth_string_converted_to_int(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--depth 字符串入参在 runner 内 int 转换（DR3-7 签名钦定）."""
+        stub = _StubTreeUseCase(_make_stub_tree(stages=("market_insight_trend",)))
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4()), "--depth", "2"])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["depth"] == 2, "runner 应 int(depth) 转换后传端口"
+
+    def test_invalid_plan_id_stderr_242_exit_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """畸形 plan_id：CLI 层 UUID 守卫 → [EXCEPTION_242] stderr + exit 1（守卫先于 bootstrap）."""
+        stub = _StubTreeUseCase()
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", "not-a-uuid"])
+
+        assert exit_code == 1
+        assert not stub.calls, "守卫失败后不得触达用例"
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+    def test_empty_tree_outputs_no_archive_note(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """空树（无归档）：exit 0 + 「该 plan 无归档行」提示（空树是正常态——AC-5）."""
+        stub = _StubTreeUseCase(_make_stub_tree(build_degraded=False, stages=()))
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "该 plan 无归档行" in out, f"空树应打无归档提示（实测={out!r}）"
+        assert "归档查询失败" not in out, "真空树不得打降级提示（与顶层失败分立——DR1-9）"
+
+    def test_degraded_tree_outputs_query_failed_note(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """空树（顶层降级）：exit 0 + 「⚠ 归档查询失败（已降级）」提示（顶层容错 CLI 面可测位——DR2-7）."""
+        stub = _StubTreeUseCase(_make_stub_tree(build_degraded=True, stages=()))
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4())])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "归档查询失败（已降级）" in out, f"顶层降级应打失败提示（实测={out!r}）"
+        assert "该 plan 无归档行" not in out, "降级空树不得打无归档提示（分立哨兵）"
+
+    def test_collapsed_tree_outputs_archive_stats_not_empty_note(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """折叠空 children（depth=1 有归档/全脏 stage 形态）：打归档对照行而非「无归档行」假话（R1-F3 三分化第三腿）."""
+        stub_tree = _make_stub_tree(build_degraded=False, stages=("performance_gap",))
+        stub_tree.root.children = ()  # 模拟服务 depth=1 折叠/全脏 stage 形态（total>0 而 children 空）
+        stub = _StubTreeUseCase(stub_tree)
+        _patch_trace_tree_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["trace-tree", "--plan-id", str(uuid.uuid4()), "--depth", "1"])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "归档对照" in out, f"折叠形态应打对照行（实测={out!r}）"
+        assert "该 plan 无归档行" not in out, "total>0 时不得打无归档假话（读模型诚实性——DR1-9）"
+        assert "归档查询失败" not in out, "非降级形态不得打降级提示"
