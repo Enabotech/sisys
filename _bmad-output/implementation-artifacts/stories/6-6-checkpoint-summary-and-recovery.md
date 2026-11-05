@@ -926,6 +926,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 **审查日期:** 2026-11-05（Round 1）；2026-11-05（Round 2）
 **审查模式 Round 1:** 4 Agent 并行【盲审对抗（diff-only 7264 行全覆盖）/边界与失败路径猎审/验收标准对码审计/一致性回归架构核查】+ 主会话亲验（全部发现逐条复核定级——含 rabbitmq_event_bus 吞异常实态/抑制注释 grep/teardown 链实态/单清形态 lifetime 定谳）+ 运行面实测（ruff/mypy 753/定向 443/集成+验收 20/四目录全量 14882+1 环境性[hybrid_search 隔离复跑绿定谳]）
 **审查模式 Round 2:** 2 Agent 并行【回归核查（18 项 R1 修复逐项对码+修复引入新破口专项推演×5+传播完备性）/深度推演（execute_recovery 12 组输入组合全路径+list 5 组+CLI 双态约 20 组合守卫矩阵+并发时序 4 组+冻结面 hunk 逐行+文档代码 13 处对码）】+ 主会话突变实证×2（F1 is_success 分支注入→红→还原绿；F8 mode 守卫注入→红→还原绿）——结论：R1 十八项修复全部落地核验、零 P0/P1/P2 新破口
+**审查模式 Round 3:** 单深度 Agent【断言覆盖矩阵（21 项修复×守护位——13 项有锚+7 项正当豁免+1 项真缺口）+跨 Story 交互面五项（6-2 LIKE 正交 31 绿/6-3 回归终态 18 绿/6-4 让位 36 绿/组合根纯新增 diff 审计/台账三文件一致）+突变推演×5】——433 passed 零失败、零 P0/P1/P2
 **锚点基线注记:** 下列发现行号锚定**发现时点未提交工作树**（R1=2026-11-05 v1.6.0 实施态；R2=HEAD@59d044b3）；修复落码后行号漂移不回同步（发现时点记录口径——同文档审查 R1-18 HEAD 基线注记实践）
 
 #### 需决策 Decision Needed
@@ -974,6 +975,9 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 - [x] R2-登记①：6.6-DF3 注记补清单字段类型损坏两子形态（str 拆字符静默降级+不可迭代标量 list() 强转裸抛 TypeError :541-542）
 - [x] R2-登记②：InMemoryEventBus 空 results 潜态独立注记（6.6-R2-注记——独立锚定非 Epic 10 核销链）
 - [x] R2-观察（不落码）：P3-3 显示面枚举形态不一致（Outcome 打印 str-mixin 枚举前缀形态 vs dry-run .value——既有 6-3 输出即契约形态维持）；N4/N5 跨 Story 基建面维持裁定③不动
+- [x] R3-F1【P3】R2-F1 dry-run 审批人显示链零断言守护（21 项修复断言覆盖矩阵唯一行为性无锚项——突变回退 or 链全测试仍绿）→ 补展示面红锚（显式空串显示「（未提供）」+不滑入 applied_by 双断言）
+- [x] R3-F2【P3】注释跨 Story 编号混淆两处消歧（integration :326「R1-F1」与 agent_cli :1345「R1-F18」实指 6-3 审查轮次——补「6-3」前缀，与同文件 6-6 自身 R1-F16/R1-F9 裸引用并存会误指）
+- [x] R3-注记（不落码）：F18 dispose 仍在 DELETE try 块内（DELETE 失败残余路径 PG 已不可用，dispose 大概率同败——不构成缺陷）；F11 completed 为存在级断言（与台账宣称相符）
 
 ---
 

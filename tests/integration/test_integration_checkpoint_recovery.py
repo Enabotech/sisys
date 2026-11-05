@@ -322,7 +322,7 @@ class _RecoveryChain:
             self.plan_ids.append(plan_id)
 
     def register_sessions(self, *session_ids: str) -> None:
-        """登记 Redis 快照/恢复记录键（预登记——调用服务之前，R1-F1 纪律）。
+        """登记 Redis 快照/恢复记录键（预登记——调用服务之前，6-3 R1-F1 纪律）。
 
         键构造经 build_key 单源（代码审查 R1-F16——此前硬编码 sisys:snapshot:
         前缀与验收侧双源，键构造规则变更时清理面会静默失配）。

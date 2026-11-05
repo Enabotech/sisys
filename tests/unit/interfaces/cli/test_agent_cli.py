@@ -2457,6 +2457,43 @@ class TestCheckpointRecoverDryRun:
         assert "[EXCEPTION_242]" in stderr
         assert "correction-type 不可为空" in stderr, f"stderr 缺空串守卫语义（实测={stderr!r}）"
 
+    def test_dry_run_explicit_empty_confirmed_by_shows_not_provided(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """dry-run 显式空串审批人显示「（未提供）」不滑入 applied_by（代码审查 R3-F1）。
+
+        R2-F1 显示链对齐 is None 语义的展示面红锚：`--confirmed-by ""` 在
+        dry-run 显示兜底提示（与 confirm 态 242 拒绝的预期一致）——突变
+        回退 or 链则显示 applied_by 兜底值，本断言红。
+        """
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "L2",
+                "--previous-value",
+                "旧战略参数",
+                "--new-value",
+                "新战略参数",
+                "--applied-by",
+                "修正人A",
+                "--confirmed-by",
+                "",
+            ]
+        )
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "（未提供——confirm 时必填）" in out, f"显式空串审批人须显示兜底提示而非滑入 applied_by（实测={out!r}）"
+        assert "审批人: 修正人A" not in out, "显式空串不得静默滑入 applied_by 兜底（R2-F1 展示锚）"
+
     def test_dry_run_conflict_mode_pre_warning(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:

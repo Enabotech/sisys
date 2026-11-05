@@ -1342,7 +1342,7 @@ def _parse_correction_group(
 
     四个 args 原始形态（None=未提供）仅在 CLI 层可见——CorrectionRecord 字段
     默认值兜底下「部分出现」到用例层已不可表达（AC-2 裁定）；部分出现 →
-    构造真实 EntityValidationError 242（R1-F18 真实异常构造纪律）。
+    构造真实 EntityValidationError 242（6-3 R1-F18 真实异常构造纪律）。
 
     Returns:
         CorrectionRecord（四参数全提供）或 None（全未提供——纯恢复场景）。
