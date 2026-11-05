@@ -2394,7 +2394,7 @@ class TestCheckpointRecoverDryRun:
     def test_dry_run_with_correction_shows_parameters(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """dry-run 带修正参数：五参数展示（仅展示零应用）。"""
+        """dry-run 带修正参数：四参数展示（仅展示零应用——applied_at 构造时生成）。"""
         exec_stub = _StubRecoveryExecuteUseCase()
         self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun())
 
@@ -2421,6 +2421,41 @@ class TestCheckpointRecoverDryRun:
         out = capsys.readouterr().out
         assert "新战略参数" in out, "评估输出缺修正展示（new_value）"
         assert "L2" in out, "评估输出缺 correction_type 展示"
+
+    def test_dry_run_empty_correction_type_exit_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """dry-run 态 --correction-type 空串 → 242（代码审查 R2-F3/N6）。
+
+        成组守卫（含空串校验）先于两态分支——评估/执行参数校验面一致的
+        评估态红锚（此前仅 confirm 态有锚，结构保证成立但缺测试钉）。
+        """
+        exec_stub = _StubRecoveryExecuteUseCase()
+        self._patch_dual(monkeypatch, exec_stub, _StubRecoveryViewUseCaseForDryRun())
+
+        exit_code = agent_cli.main(
+            [
+                "checkpoint-recover",
+                "--plan-id",
+                str(uuid.uuid4()),
+                "--checkpoint-no",
+                "CP-3",
+                "--correction-type",
+                "",
+                "--previous-value",
+                "旧战略参数",
+                "--new-value",
+                "新战略参数",
+                "--applied-by",
+                "高管-dryrun",
+            ]
+        )
+
+        assert exit_code == 1
+        assert not exec_stub.calls, "空串守卫失败后不得触达任何用例"
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+        assert "correction-type 不可为空" in stderr, f"stderr 缺空串守卫语义（实测={stderr!r}）"
 
     def test_dry_run_conflict_mode_pre_warning(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

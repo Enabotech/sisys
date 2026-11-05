@@ -538,7 +538,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 ExecuteCheckpointRecoveryUseCase 测试（UUID 守卫/confirmed_by 非空 242/透传——四参数成组不在用例层）+ CLI 测试（dry-run 三零+评估输出 exit 0（含带 --correction-* 评估展示断言）/confirm 执行/`--mode override` 冲突 487 stderr `[EXCEPTION_487]`/CLI 层部分 correction 参数 242（post-parse 检测+真实 EntityValidationError）/`--confirmed-by` 双态缺省链（dry-run 不要求/confirm 必填）） |
-| 🟢 绿 | 实现用例（守卫链）+ CLI `_run_checkpoint_recover_cli`（两态分支：无 confirm 构造评估输出不调引擎——resolve ②步仅取视图+assess_consistency_risk 同源计算+修正五参数展示；有 confirm 全参调用）+ 组合根注册 |
+| 🟢 绿 | 实现用例（守卫链）+ CLI `_run_checkpoint_recover_cli`（两态分支：无 confirm 构造评估输出不调引擎——resolve ②步仅取视图+assess_consistency_risk 同源计算+修正四参数展示；有 confirm 全参调用）+ 组合根注册 |
 | 🔄 重构 | dry-run 评估输出与 Outcome 展示共用打印函数+同源风险计算 |
 
 - [x] Subtask 3.1: 🔴 红 — TestExecuteRecovery 失败测试
@@ -923,9 +923,10 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-11-05（Round 1）
-**审查模式:** 4 Agent 并行【盲审对抗（diff-only 7264 行全覆盖）/边界与失败路径猎审/验收标准对码审计/一致性回归架构核查】+ 主会话亲验（全部发现逐条复核定级——含 rabbitmq_event_bus 吞异常实态/抑制注释 grep/teardown 链实态/单清形态 lifetime 定谳）+ 运行面实测（ruff/mypy 753/定向 443/集成+验收 20/四目录全量 14882+1 环境性[hybrid_search 隔离复跑绿定谳]）
-**锚点基线注记:** 下列发现行号锚定**发现时点未提交工作树**（2026-11-05 v1.6.0 实施态）；R1 修复落码后行号漂移不回同步（发现时点记录口径——同文档审查 R1-18 HEAD 基线注记实践）
+**审查日期:** 2026-11-05（Round 1）；2026-11-05（Round 2）
+**审查模式 Round 1:** 4 Agent 并行【盲审对抗（diff-only 7264 行全覆盖）/边界与失败路径猎审/验收标准对码审计/一致性回归架构核查】+ 主会话亲验（全部发现逐条复核定级——含 rabbitmq_event_bus 吞异常实态/抑制注释 grep/teardown 链实态/单清形态 lifetime 定谳）+ 运行面实测（ruff/mypy 753/定向 443/集成+验收 20/四目录全量 14882+1 环境性[hybrid_search 隔离复跑绿定谳]）
+**审查模式 Round 2:** 2 Agent 并行【回归核查（18 项 R1 修复逐项对码+修复引入新破口专项推演×5+传播完备性）/深度推演（execute_recovery 12 组输入组合全路径+list 5 组+CLI 双态约 20 组合守卫矩阵+并发时序 4 组+冻结面 hunk 逐行+文档代码 13 处对码）】+ 主会话突变实证×2（F1 is_success 分支注入→红→还原绿；F8 mode 守卫注入→红→还原绿）——结论：R1 十八项修复全部落地核验、零 P0/P1/P2 新破口
+**锚点基线注记:** 下列发现行号锚定**发现时点未提交工作树**（R1=2026-11-05 v1.6.0 实施态；R2=HEAD@59d044b3）；修复落码后行号漂移不回同步（发现时点记录口径——同文档审查 R1-18 HEAD 基线注记实践）
 
 #### 需决策 Decision Needed
 
@@ -967,6 +968,12 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条锚定义务�
 - [x] R1-D2：Subtask 4.5「纯新增 2 注册块+1 行 version」→「功能行纯新增（2 注册块+1 行 version；另含注释续写与 import 增行——既有功能行零删改）」
 - [x] R1-D3：File List 补 `_bmad-output/implementation-artifacts/sprint-status.yaml` 行
 - [x] R1-D4：Story Details Status 行终态措辞对齐实态（code-review 收敛后随状态流转更新）
+- [x] R2-F1【P3】dry-run 审批人显示 or 链与执行面 is None 语义断裂（`--confirmed-by ""` 显式空串在 dry-run 显示 applied_by 兜底值而 confirm 同参被 242 拒——R1-F9 修复未传播到展示面）→ 显示链对齐 `(confirmed_by if confirmed_by is not None else applied_by) or 兜底`（N1/P3-1 双源发现）
+- [x] R2-F2【P3】「五参数展示」传播残留三处订正（故事 Task 3 绿行/单测 docstring/验收 docstring——R1-D1 只修了 L239 漏三处）
+- [x] R2-F3【P3】补 dry-run 态 correction_type 空串 242 测试红锚（N6——结构保证成立但缺评估态锚；同时钉死「守卫先于两态分支」顺序）
+- [x] R2-登记①：6.6-DF3 注记补清单字段类型损坏两子形态（str 拆字符静默降级+不可迭代标量 list() 强转裸抛 TypeError :541-542）
+- [x] R2-登记②：InMemoryEventBus 空 results 潜态独立注记（6.6-R2-注记——独立锚定非 Epic 10 核销链）
+- [x] R2-观察（不落码）：P3-3 显示面枚举形态不一致（Outcome 打印 str-mixin 枚举前缀形态 vs dry-run .value——既有 6-3 输出即契约形态维持）；N4/N5 跨 Story 基建面维持裁定③不动
 
 ---
 

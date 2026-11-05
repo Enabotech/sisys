@@ -1566,7 +1566,7 @@ def dry_run_call_with_correction(context: dict[str, Any], capsys: pytest.Capture
 
 @then("输出影响评估含修正展示且退出码为零")
 def dry_run_assessment_output_exit_zero(context: dict[str, Any]) -> None:
-    """dry-run 评估断言（exit 0+修正五参数展示+建议模式+风险提示+待确认提示）。"""
+    """dry-run 评估断言（exit 0+修正四参数展示+建议模式+风险提示+待确认提示）。"""
     assert context["_dryrun_exit_code"] == 0, f"dry-run 退出码实测={context['_dryrun_exit_code']} 期望=0（评估态非错误）"
     stdout = context["_dryrun_stdout"]
     assert "新战略参数" in stdout, "评估输出缺将应用的修正展示（new_value——仅展示零应用）"

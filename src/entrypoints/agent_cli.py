@@ -1421,7 +1421,8 @@ def _print_recovery_assessment(view: Any, mode_raw: str | None, correction: Any,
         print(f"    previous_value: {getattr(correction, 'previous_value', '')}")
         print(f"    new_value: {getattr(correction, 'new_value', '')}")
         print(f"    applied_by: {getattr(correction, 'applied_by', '')}")
-    approver = confirmed_by or getattr(correction, "applied_by", "") or "（未提供——confirm 时必填）"
+    approver_source = confirmed_by if confirmed_by is not None else getattr(correction, "applied_by", "")
+    approver = approver_source or "（未提供——confirm 时必填）"
     print(f"  审批人: {approver}")
     if requested_mode is not None and recommended_mode is RecoveryMode.REPLAY and requested_mode is RecoveryMode.OVERRIDE:
         print("  ⚠ 预检提示：该组合 confirm 必被 487 拒绝（影响≥2 个后续 Checkpoint 强制 Replay）")
