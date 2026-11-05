@@ -13,8 +13,8 @@ embedding 仅场景④ Fake 豁免——AsyncMock spec EmbeddingServicePort 外�
     ④ ingestion 扩键 round-trip（ChunkIndexingHandler 直调生产通道→共享 "documents"
       collection 落点→get_point 读回 8 业务键+created_at→delete_points 定向点删 DR2-3）
 
-teardown：归档行按 plan_id 定向 DELETE（原生 SQL）+ Qdrant collection 整删（场景④
-例外：共享 collection 定向点删禁整删）+ PG 行定向 DELETE——键计数净增 0 纪律。
+teardown：归档行按 plan_id 定向 DELETE（原生 SQL）+ PG 行定向 DELETE + Qdrant collection
+整删（场景④例外：共享 collection 定向点删禁整删）——执行序，R2-F2 对齐；键计数净增 0 纪律。
 """
 
 from __future__ import annotations

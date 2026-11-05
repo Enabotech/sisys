@@ -120,14 +120,21 @@ class TestValidatorBZeroPublish:
     def test_service_source_zero_domain_event_construction(self) -> None:
         """树服务零 DomainEvent 子类构造（AST 扫描——零事件构造位）.
 
-        事件名全集比对（R1-F5 升级）：运行时递归收集 DomainEvent 全部子类名
-        （包级 import 确保模块全注册）——后缀启发式仅覆盖 ~15% 事件类
-        （RAGIndexed 等不以 Event/Created 等结尾），全集比对零漏检零误报。
+        事件名全集比对（R1-F5 升级/R2-F1 补强）：pkgutil 强制导入 events 包全部
+        子模块后递归收集 DomainEvent 子类名（实测 53 全集——`__init__.py` re-export
+        面仅 47 漏 saga/sandbox/tool_chain/tool_schema 四模块 6 类）；后缀启发式仅
+        覆盖 ~15%（RAGIndexed 等不以 Event/Created 等结尾）。双防线：本全集比对 +
+        验证器 C import 白名单拒绝 src.domain.events.* import（构造必先 import）。
         """
+        import importlib
+        import pkgutil
+
         import src.domain.events as events_pkg
         from src.domain.events.base import DomainEvent
 
-        # 包级导入使全部事件模块注册进 __subclasses__（使用性断言兼 sanity——RAGIndexed 在位）
+        # 强制全子模块导入（re-export 面之外 6 类入集）+ 使用性断言兼 sanity（RAGIndexed 在位）
+        for module_info in pkgutil.iter_modules(events_pkg.__path__):
+            importlib.import_module(f"{events_pkg.__name__}.{module_info.name}")
         assert hasattr(events_pkg, "RAGIndexed"), "事件包导入 sanity：RAGIndexed 应在位"
 
         def _walk_subclasses(cls: type) -> set[str]:
@@ -138,7 +145,7 @@ class TestValidatorBZeroPublish:
             return names
 
         event_names = _walk_subclasses(DomainEvent)
-        assert event_names, "DomainEvent 子类集非空（包级导入 sanity）"
+        assert event_names, "DomainEvent 子类集非空（强制导入 sanity）"
         module_tree = ast.parse(TREE_SERVICE.read_text(encoding="utf-8"))
         for node in ast.walk(module_tree):
             if isinstance(node, ast.Call):

@@ -455,7 +455,7 @@ async def _preset_qdrant_points_and_pg_rows(ctx: dict[str, Any]) -> None:
 
 
 async def _teardown_tree_assets(ctx: dict[str, Any]) -> None:
-    """teardown 三步链（归档行定向 DELETE / Qdrant collection 整删 / PG 行定向 DELETE）.
+    """teardown 三步链（归档行定向 DELETE / PG 行定向 DELETE / Qdrant collection 整删——执行序，R2-F2 对齐）.
 
     各步独立 try/except——单步失败不阻断后续清理；归档行清理走原生 SQL 定向 DELETE
     （仓储与服务均无删除方法面——DR2-8）。
