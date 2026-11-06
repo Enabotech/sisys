@@ -466,92 +466,6 @@ async def _cleanup_redis_keys(ctx: dict[str, Any]) -> None:
         pass
 
 
-# ======================================================================
-# 场景绑定（13 场景全绑定——R6 旧欠账不承袭）
-# ======================================================================
-
-
-@scenario("test_acceptance_markdown_report.feature", "报告生成主链五段编排全落位")
-def test_report_generation_main_chain() -> None:
-    """S1: AC-1 主链五段编排（聚合→渲染→持久化→事件）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "同 plan_id 重复生成产生新报告")
-def test_repeat_generation_new_report() -> None:
-    """S2: AC-1 幂等锚=report_id（跨秒间隔断言件数）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "冻结章节结构全量输出")
-def test_frozen_section_structure() -> None:
-    """S3: AC-2 章节结构冻结全量断言。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "章节标题与要素字段逐字对齐配置源")
-def test_display_name_literal_alignment() -> None:
-    """S4: AC-2 display_name 逐字源 + 六 Schema 全字段。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "基础格式化三要素语法正确")
-def test_basic_formatting_three_elements() -> None:
-    """S5: AC-3 标题/列表/表格格式化。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "归档行部分缺失时章节降级标注")
-def test_partial_missing_degradation() -> None:
-    """S6: AC-4 部分缺失降级（跳六子步构造）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "数据源全缺时抛出 490 异常")
-def test_total_missing_raises_490() -> None:
-    """S7: AC-4 全缺 490 异常路径。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "latest 快照缺失时附录 A 省略")
-def test_snapshot_missing_omits_appendix_a() -> None:
-    """S8: AC-4 快照缺失容错。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "ReportGenerated 事件经 outbox 落行")
-def test_report_generated_outbox_row() -> None:
-    """S9: AC-5 事件 outbox 落行三键值级断言。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "读侧消费面契约键集全等")
-def test_read_side_contract_key_sets() -> None:
-    """S10: AC-6 读侧消费面契约（chain 五键 + payload 键族全等）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "性能 P95 与成功率采样（单一数据源 20 轮）")
-def test_performance_p95_and_success_rate() -> None:
-    """S11: AC-7 性能 P95 + 成功率（OD-8 口径）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "并发生成 3 个报告互不串扰")
-def test_concurrent_three_reports() -> None:
-    """S12: AC-7 并发 3（gather 形态锚）。"""
-    pass
-
-
-@scenario("test_acceptance_markdown_report.feature", "Story 交付件存在性收尾验收")
-def test_story_deliverables_existence() -> None:
-    """S13: 收尾交付件存在性逐项断言。"""
-    pass
-
-
-# ======================================================================
-
-
 async def _probe_and_assemble(ctx: dict[str, Any]) -> None:
     """四服务探测（PG/Redis/Qdrant/MinIO）+ 基础资源装配（探测失败动态 skip）。
 
@@ -1303,7 +1217,8 @@ def _query_chain_records(ctx: dict[str, Any], plan_id: str) -> list[dict[str, An
     return list(view.records)
 
 
-# Given 步骤（服务门控 + 数据面构造）
+# ======================================================================
+# Background Steps
 # ======================================================================
 
 
@@ -1313,6 +1228,29 @@ def report_chain_services_available(context: dict[str, Any]) -> None:
     _run_async(context["_loop"], _probe_and_assemble(context))
 
 
+# ======================================================================
+# AC-1: 报告生成主链（双源聚合 → 渲染 → 持久化 → 事件）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "报告生成主链五段编排全落位",
+)
+def test_report_generation_main_chain() -> None:
+    """S1: AC-1 主链五段编排（聚合→渲染→持久化→事件）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "同 plan_id 重复生成产生新报告",
+)
+def test_repeat_generation_new_report() -> None:
+    """S2: AC-1 幂等锚=report_id（跨秒间隔断言件数）。"""
+    pass
+
+
 @given("BLM 前两阶段已完成（八步思维链归档在位）")
 def blm_eight_steps_archived(context: dict[str, Any]) -> None:
     """完整 8 步 BLM run（Fake LLM/Embedding 双豁免 + 四真实存储）→ 归档行 + latest 快照在位。"""
@@ -1320,66 +1258,6 @@ def blm_eight_steps_archived(context: dict[str, Any]) -> None:
         _assemble_full_flow(context)
     result = _run_full_flow(context)
     assert result is not None
-
-
-@given("目标六子步骤归档缺席（其余七步归档在位）")
-def target_insight_step_archived_missing(context: dict[str, Any]) -> None:
-    """逐 stage 归档七步跳过目标六子步（AC-4 钦定构造——禁跑后删行）。"""
-    if "report_use_case" not in context:
-        _assemble_archive_only(context)
-    plan_id = str(uuid.uuid4())
-    context["plan_id"] = plan_id
-    context["_plan_ids"].append(plan_id)
-    records = _run_async(
-        context["_loop"],
-        _archive_steps(context, plan_id, skip_stages=frozenset({"market_insight_trend"})),
-    )
-    assert len(records) == 7
-
-
-@given("从未归档的独立 plan_id")
-def never_archived_plan_id(context: dict[str, Any]) -> None:
-    """天然 total==0 的独立 plan_id（无需清空构造）。"""
-    if "report_use_case" not in context:
-        _assemble_archive_only(context)
-    context["plan_id"] = str(uuid.uuid4())
-    context["_plan_ids"].append(context["plan_id"])
-
-
-@given("八步归档在位且 latest 快照缺失")
-def eight_steps_archived_without_snapshot(context: dict[str, Any]) -> None:
-    """逐 stage 八步归档（不经完整 run——latest 快照天然缺失）。"""
-    if "report_use_case" not in context:
-        _assemble_archive_only(context)
-    plan_id = str(uuid.uuid4())
-    context["plan_id"] = plan_id
-    context["_plan_ids"].append(plan_id)
-    records = _run_async(context["_loop"], _archive_steps(context, plan_id))
-    assert len(records) == 8
-
-
-@given("三个独立 plan_id 各自八步归档在位")
-def three_plans_eight_steps_archived(context: dict[str, Any]) -> None:
-    """三独立 plan_id 各自逐 stage 八步归档（并发场景数据面）。"""
-    if "report_use_case" not in context:
-        _assemble_archive_only(context)
-    context["concurrent_plan_ids"] = []
-    for _ in range(3):
-        plan_id = str(uuid.uuid4())
-        context["concurrent_plan_ids"].append(plan_id)
-        context["_plan_ids"].append(plan_id)
-        records = _run_async(context["_loop"], _archive_steps(context, plan_id))
-        assert len(records) == 8
-
-
-@given("开发实施完成")
-def development_completed() -> None:
-    """S13 收尾场景前置（静态断言无服务依赖）。"""
-
-
-# ======================================================================
-# When 步骤（报告生成调用）
-# ======================================================================
 
 
 @when("调用报告生成用例（plan_id）")
@@ -1402,41 +1280,6 @@ def invoke_twice_with_gap(context: dict[str, Any]) -> None:
     _time.sleep(_REPEAT_GENERATION_GAP_SECONDS)
     second = _generate_report(context, context["plan_id"])
     context["repeat_reports"] = [first, second]
-
-
-@when("单一数据源连续 20 次生成报告")
-def invoke_twenty_rounds(context: dict[str, Any]) -> None:
-    """单一 plan_id × 20 次生成（OD-10 幂等锚合法采样形态）。"""
-    import time as _time
-
-    durations: list[float] = []
-    report_ids: list[str] = []
-    for _ in range(_PERF_SAMPLE_ROUNDS):
-        started = _time.monotonic()
-        report = _generate_report(context, context["plan_id"])
-        durations.append(_time.monotonic() - started)
-        report_ids.append(str(report.report_id))
-    context["perf_durations"] = durations
-    context["perf_report_ids"] = report_ids
-
-
-@when("asyncio gather 并发生成 3 个报告")
-def gather_three_concurrent_reports(context: dict[str, Any]) -> None:
-    """gather 3（async 辅助函数体内 await + _run_async 驱动——6-4 形态锚）。"""
-    plan_ids = context["concurrent_plan_ids"]
-
-    async def _gather() -> list[Any]:
-        return await asyncio.gather(*(context["report_use_case"].execute(plan_id=pid) for pid in plan_ids))
-
-    reports = _run_async(context["_loop"], _gather())
-    context["concurrent_reports"] = reports
-    for report in reports:
-        context["_report_ids"].append(str(report.report_id))
-
-
-# ======================================================================
-# Then 步骤（断言面）
-# ======================================================================
 
 
 @then("报告生成五段编排全部落位")
@@ -1528,6 +1371,29 @@ def assert_l2_rows_and_l0_files(context: dict[str, Any]) -> None:
     assert rows == 2
     files = list((context["_report_tmp_path"] / "reports").glob(f"{context['plan_id']}_*.md"))
     assert len(files) == 2
+
+
+# ======================================================================
+# AC-2: 结构化章节（章节结构冻结）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "冻结章节结构全量输出",
+)
+def test_frozen_section_structure() -> None:
+    """S3: AC-2 章节结构冻结全量断言。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "章节标题与要素字段逐字对齐配置源",
+)
+def test_display_name_literal_alignment() -> None:
+    """S4: AC-2 display_name 逐字源 + 六 Schema 全字段。"""
+    pass
 
 
 @then("Markdown 章节标题序列与冻结结构全等")
@@ -1671,6 +1537,20 @@ def assert_synthesis_lists(context: dict[str, Any]) -> None:
     assert "- 综合结论二：把握海外机会窗口" in text
 
 
+# ======================================================================
+# AC-3: 基础格式化（标题/列表/表格）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "基础格式化三要素语法正确",
+)
+def test_basic_formatting_three_elements() -> None:
+    """S5: AC-3 标题/列表/表格格式化。"""
+    pass
+
+
 @then("ATX 标题层级严格递进不跳级")
 def assert_atx_heading_levels(context: dict[str, Any]) -> None:
     """逐行 # 计数 ∈ {1,2,3} + 相邻层级差 ≤ +1（首行 H1——CR2-F5 递进补强）。"""
@@ -1705,6 +1585,74 @@ def assert_bullet_lists_and_chinese(context: dict[str, Any]) -> None:
     for item in ("价格竞争侵蚀毛利", "供应链成本上升", "组织响应迟缓"):
         assert f"- {item}" in text
     assert "\\u" not in text
+
+
+# ======================================================================
+# AC-4: 数据源降级与缺失语义
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "归档行部分缺失时章节降级标注",
+)
+def test_partial_missing_degradation() -> None:
+    """S6: AC-4 部分缺失降级（跳六子步构造）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "数据源全缺时抛出 490 异常",
+)
+def test_total_missing_raises_490() -> None:
+    """S7: AC-4 全缺 490 异常路径。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "latest 快照缺失时附录 A 省略",
+)
+def test_snapshot_missing_omits_appendix_a() -> None:
+    """S8: AC-4 快照缺失容错。"""
+    pass
+
+
+@given("目标六子步骤归档缺席（其余七步归档在位）")
+def target_insight_step_archived_missing(context: dict[str, Any]) -> None:
+    """逐 stage 归档七步跳过目标六子步（AC-4 钦定构造——禁跑后删行）。"""
+    if "report_use_case" not in context:
+        _assemble_archive_only(context)
+    plan_id = str(uuid.uuid4())
+    context["plan_id"] = plan_id
+    context["_plan_ids"].append(plan_id)
+    records = _run_async(
+        context["_loop"],
+        _archive_steps(context, plan_id, skip_stages=frozenset({"market_insight_trend"})),
+    )
+    assert len(records) == 7
+
+
+@given("从未归档的独立 plan_id")
+def never_archived_plan_id(context: dict[str, Any]) -> None:
+    """天然 total==0 的独立 plan_id（无需清空构造）。"""
+    if "report_use_case" not in context:
+        _assemble_archive_only(context)
+    context["plan_id"] = str(uuid.uuid4())
+    context["_plan_ids"].append(context["plan_id"])
+
+
+@given("八步归档在位且 latest 快照缺失")
+def eight_steps_archived_without_snapshot(context: dict[str, Any]) -> None:
+    """逐 stage 八步归档（不经完整 run——latest 快照天然缺失）。"""
+    if "report_use_case" not in context:
+        _assemble_archive_only(context)
+    plan_id = str(uuid.uuid4())
+    context["plan_id"] = plan_id
+    context["_plan_ids"].append(plan_id)
+    records = _run_async(context["_loop"], _archive_steps(context, plan_id))
+    assert len(records) == 8
 
 
 @then("缺席步骤章节渲染 H3 骨架加数据缺失标注")
@@ -1758,6 +1706,20 @@ def assert_timeline_unavailable(context: dict[str, Any]) -> None:
     assert value == "false"
 
 
+# ======================================================================
+# AC-5: ReportGenerated 事件首激活
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "ReportGenerated 事件经 outbox 落行",
+)
+def test_report_generated_outbox_row() -> None:
+    """S9: AC-5 事件 outbox 落行三键值级断言。"""
+    pass
+
+
 @then("outbox 落行且事件三键值级匹配")
 def assert_outbox_three_keys(context: dict[str, Any]) -> None:
     """event_type/report_id/file_path 三键值级断言（两级路径查询）。"""
@@ -1767,6 +1729,20 @@ def assert_outbox_three_keys(context: dict[str, Any]) -> None:
     assert rows[0][0] == str(report.report_id)
     assert rows[0][1] == "markdown"
     assert rows[0][2] == report.file_path
+
+
+# ======================================================================
+# AC-6: 契约零破坏（读侧消费面契约）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "读侧消费面契约键集全等",
+)
+def test_read_side_contract_key_sets() -> None:
+    """S10: AC-6 读侧消费面契约（chain 五键 + payload 键族全等）。"""
+    pass
 
 
 @then("chain 读侧 records 五键结构与冻结面全等")
@@ -1796,6 +1772,73 @@ def assert_event_payload_key_family(context: dict[str, Any]) -> None:
     assert payload["event_type"] == "ReportGenerated"
     assert payload["aggregate_id"] == str(report.report_id)
     assert payload["aggregate_type"] == "Report"
+
+
+# ======================================================================
+# AC-7: 性能与持久化成功率
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "性能 P95 与成功率采样（单一数据源 20 轮）",
+)
+def test_performance_p95_and_success_rate() -> None:
+    """S11: AC-7 性能 P95 + 成功率（OD-8 口径）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "并发生成 3 个报告互不串扰",
+)
+def test_concurrent_three_reports() -> None:
+    """S12: AC-7 并发 3（gather 形态锚）。"""
+    pass
+
+
+@given("三个独立 plan_id 各自八步归档在位")
+def three_plans_eight_steps_archived(context: dict[str, Any]) -> None:
+    """三独立 plan_id 各自逐 stage 八步归档（并发场景数据面）。"""
+    if "report_use_case" not in context:
+        _assemble_archive_only(context)
+    context["concurrent_plan_ids"] = []
+    for _ in range(3):
+        plan_id = str(uuid.uuid4())
+        context["concurrent_plan_ids"].append(plan_id)
+        context["_plan_ids"].append(plan_id)
+        records = _run_async(context["_loop"], _archive_steps(context, plan_id))
+        assert len(records) == 8
+
+
+@when("单一数据源连续 20 次生成报告")
+def invoke_twenty_rounds(context: dict[str, Any]) -> None:
+    """单一 plan_id × 20 次生成（OD-10 幂等锚合法采样形态）。"""
+    import time as _time
+
+    durations: list[float] = []
+    report_ids: list[str] = []
+    for _ in range(_PERF_SAMPLE_ROUNDS):
+        started = _time.monotonic()
+        report = _generate_report(context, context["plan_id"])
+        durations.append(_time.monotonic() - started)
+        report_ids.append(str(report.report_id))
+    context["perf_durations"] = durations
+    context["perf_report_ids"] = report_ids
+
+
+@when("asyncio gather 并发生成 3 个报告")
+def gather_three_concurrent_reports(context: dict[str, Any]) -> None:
+    """gather 3（async 辅助函数体内 await + _run_async 驱动——6-4 形态锚）。"""
+    plan_ids = context["concurrent_plan_ids"]
+
+    async def _gather() -> list[Any]:
+        return await asyncio.gather(*(context["report_use_case"].execute(plan_id=pid) for pid in plan_ids))
+
+    reports = _run_async(context["_loop"], _gather())
+    context["concurrent_reports"] = reports
+    for report in reports:
+        context["_report_ids"].append(str(report.report_id))
 
 
 @then("每轮新 report_id 且 L2 行数累计 20")
@@ -1828,6 +1871,25 @@ def assert_three_reports_isolated(context: dict[str, Any]) -> None:
         rows = _run_async(context["_loop"], _count_report_rows(context, plan_id))
         assert rows == 1, f"并发三元串扰: plan={plan_id} rows={rows}"
         assert report.plan_id == plan_id
+
+
+# ======================================================================
+# 收尾: 交付件存在性验收
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_markdown_report.feature",
+    "Story 交付件存在性收尾验收",
+)
+def test_story_deliverables_existence() -> None:
+    """S13: 收尾交付件存在性逐项断言。"""
+    pass
+
+
+@given("开发实施完成")
+def development_completed() -> None:
+    """S13 收尾场景前置（静态断言无服务依赖）。"""
 
 
 @then("src 交付件（实体/VO/渲染器/异常/端口/服务/用例/仓储/ORM/migration/CLI）逐项存在")

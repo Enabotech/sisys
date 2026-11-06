@@ -760,6 +760,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - [x] 质量门禁全过：ruff 双目录 All checks passed / mypy 756 source files 零错误（基线 753+3 新文件零回退）/ 三红线 grep 零输出 / application 覆盖率 91%（≥85%——树服务 93%/用例 100%）/ 集成交付面覆盖率 82%（≥75%）/ 整体覆盖率 93%（≥80%）
 - [x] 验收 12 场景全绿×6 轮稳定（S1~S12 含收尾存在性断言）+ 集成四场景双轮 + 四目录全量回归双轮（14977 passed ×2——第二轮数字见下）零失败
 - [x] 全仓 mypy 口径清零（`mypy .` 1924 文件——tests 面类型修复 12 处×4 文件，全根因修复零抑制）：is_dataclass TypeIs 窄化（vo_class Any 注解+helper 签名放宽）/typing.Protocol 特殊形态不可作 issubclass 第二参（改 `_is_protocol` 标记断言——运行时等价语义）/payload dict 首分支 list 值窄化（显式 dict[str, Any] 注解）/getsource 实参联合含 str（callable 窄化局部变量）/Redis `aclose()`→`close()` ×2（对齐仓内 6-5b 探测先例形态）/验收包装 cast 契约面收窄（组合根 _SessionScopedDocumentRepository 同款注记）；修复后 mypy . 1924 零错误+ruff 全绿+受影响四文件 56 passed 零行为变
+- [x] R6 模板合规修正（用户指摘违规——对齐 R6 模板与 6-6 最新验收基准三处）：①场景名去「S1~S12 」编号前缀（业务语义命名——R6「数据库引擎懒初始化」/6-6「清单全量列出与 sync 状态推导」均无编号，S 编号是故事场景分化维度表内部编号禁泄入 Gherkin）；②测试函数名去 s 编号（`test_s1_full_tree_four_layers`→`test_full_tree_four_layers`——S 编号归 docstring 首部 `S1/AC-1` 斜杠形态，6-6 惯例）；③@scenario 单行改多行字面量形态（R6 :212/6-6 :790 同款）；修正后 12 场景复跑全绿+ruff 全绿
 
 ### 文件清单 File List
 

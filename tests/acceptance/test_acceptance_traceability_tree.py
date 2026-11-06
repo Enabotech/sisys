@@ -1,4 +1,11 @@
-"""Acceptance tests for Story 6-7 - 溯源树展示（四层追溯聚合查询）.
+"""Story 6-7 溯源树展示（四层追溯聚合查询）——BDD 验收步骤实现。
+
+模板基准: tests/acceptance/test_acceptance_postgresql_relational_layer.feature/.py
+（R6——# language: zh-CN 中文 Gherkin + AC 横幅注释分组（# === 分隔）+
+@scenario 多行字面量路径绑定 + 12 场景全绑定；R6 自身 py 仅绑定部分场景且缺
+pytestmark/context dict/_run_async 属旧模板欠账——本文件 12 场景全绑定，三件套
+由 6-x 基建承载）。装配形态对齐 6-5b（真实服务链 + 验收面零 LLM 零 Embedding
++ 延迟 import 纪律 + 场景三属性分档表 docstring + teardown 三步链）。
 
 真实服务验收（零 mock——归档行直交 + Qdrant 点预置 + PG documents 行预置三通道装配；
 本 Story 验收装配面零 LLM 零 Embedding——纯读侧聚合，与 6-3~6-6 创建链前置的根本差异）。
@@ -54,6 +61,7 @@ pytestmark = [
     pytest.mark.xdist_group("blm-planning-perf"),
 ]
 
+
 # ===================================================================
 # Paths & Constants（模块级期望常量独立构造——性能采样纪律）
 # ===================================================================
@@ -98,17 +106,10 @@ _COMPLETION_TEST_FILES: dict[str, str] = {
     "验收 BDD 步骤实现": "tests/acceptance/test_acceptance_traceability_tree.py",
 }
 
-# ===================================================================
-# 三件套（event_loop fixture + _run_async + context dict——6-x 样板）
-# ===================================================================
 
-
-@pytest.fixture
-def event_loop() -> Any:
-    """模块级事件循环（BDD 步骤禁 @pytest.mark.asyncio——context 数据丢失防线）。"""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# ===================================================================
+# 共享基建：三件套（context fixture / 模块级 event_loop / _run_async）
+# ===================================================================
 
 
 def _run_async(coro: Any, loop: Any) -> Any:
@@ -147,7 +148,7 @@ def context(event_loop: Any, capsys: pytest.CaptureFixture[str], monkeypatch: py
 
 
 # ===================================================================
-# 服务探测与 collection 准备（Background——不可达环境 pytest.skip 动态跳过）
+# 服务探测与 collection 准备（Background 门控——不可达环境 pytest.skip 动态跳过）
 # ===================================================================
 
 
@@ -255,8 +256,23 @@ async def _ensure_collection() -> None:
         await client.close()
 
 
+@given("溯源树依赖服务可用")
+def traceability_services_available(context: dict[str, Any], capsys: pytest.CaptureFixture[str]) -> None:
+    """Background：PG/Qdrant/Redis 三服务探测（不可达 pytest.skip 动态跳过）."""
+    context["_capsys_ref"] = capsys
+    _probe_pg_available()
+    _probe_qdrant_available()
+    _probe_redis_available()
+
+
+@given("溯源树测试租户与隔离 collection 已准备")
+def tenant_and_collection_ready(context: dict[str, Any]) -> None:
+    """Background：独立测试 collection 幂等创建."""
+    _run_async(_ensure_collection(), context["_loop"])
+
+
 # ===================================================================
-# 数据面三预置通道（归档行直交 + Qdrant 点预置 + PG documents 行原生 SQL）
+# 数据面三预置通道（归档直交 + Qdrant 点 + PG documents 行原生 SQL——共享装配）
 # ===================================================================
 
 
@@ -591,88 +607,104 @@ def _preset_common_stages(ctx: dict[str, Any], plan_id: str, stages: list[str], 
 # ===================================================================
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S1 全树四层落位与键集值级断言")
-def test_s1_full_tree_four_layers() -> None:
-    """S1: AC-1 全树四层落位（epics 溯源树结构测试落位——L2366）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "全树四层落位与键集值级断言",
+)
+def test_full_tree_four_layers() -> None:
+    """S1/AC-1 全树四层落位（epics 溯源树结构测试落位——L2366）."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S2 结论层双形态")
-def test_s2_conclusion_dual_forms() -> None:
-    """S2: AC-1 结论层双形态（epics 溯源树结构测试落位——L2366）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "结论层双形态",
+)
+def test_conclusion_dual_forms() -> None:
+    """S2/AC-1 结论层双形态（epics 溯源树结构测试落位——L2366）."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S3 depth 懒加载三档树形断言")
-def test_s3_depth_lazy_loading() -> None:
-    """S3: AC-2 depth 懒加载（epics 交互式展开测试落位——L2367）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "depth 懒加载三档树形断言",
+)
+def test_depth_lazy_loading() -> None:
+    """S3/AC-2 depth 懒加载（epics 交互式展开测试落位——L2367）."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S4 页码级跳转载荷与脏形态降级")
-def test_s4_jump_payload_and_dirty_chunk() -> None:
-    """S4: AC-3 跳转载荷（epics Bounding Box 跳转测试落位——L2368，跳转载荷组装口径）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "页码级跳转载荷与脏形态降级",
+)
+def test_jump_payload_and_dirty_chunk() -> None:
+    """S4/AC-3 跳转载荷（epics Bounding Box 跳转测试落位——L2368，跳转载荷组装口径）."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S5 多 run 叠加 last-write-wins 判别")
-def test_s5_multi_run_last_write_wins() -> None:
-    """S5: AC-4 多 run 叠加判别（6.4-DF3 清偿）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "多 run 叠加 last-write-wins 判别",
+)
+def test_multi_run_last_write_wins() -> None:
+    """S5/AC-4 多 run 叠加判别（6.4-DF3 清偿）."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S6 非思维链行 kind 过滤")
-def test_s6_kind_filter() -> None:
-    """S6: AC-4 kind 过滤."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "非思维链行 kind 过滤",
+)
+def test_kind_filter() -> None:
+    """S6/AC-4 kind 过滤."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S7 降级链路三态两层承载")
-def test_s7_degraded_chain_two_layers() -> None:
-    """S7: AC-5 降级链路三态两层承载."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "降级链路三态两层承载",
+)
+def test_degraded_chain_two_layers() -> None:
+    """S7/AC-5 降级链路三态两层承载."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S8 空计划幂等读与畸形 plan_id 242")
-def test_s8_empty_plan_and_malformed_242() -> None:
-    """S8: AC-5 空计划幂等读 + 畸形 plan_id 242."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "空计划幂等读与畸形 plan_id 242",
+)
+def test_empty_plan_and_malformed_242() -> None:
+    """S8/AC-5 空计划幂等读 + 畸形 plan_id 242."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S9 CLI 树形输出")
-def test_s9_cli_tree_output() -> None:
-    """S9: AC-6 CLI 树形输出."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "CLI 树形输出",
+)
+def test_cli_tree_output() -> None:
+    """S9/AC-6 CLI 树形输出."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S10 CLI stage 过滤与畸形 plan_id stderr")
-def test_s10_cli_stage_filter_and_stderr() -> None:
-    """S10: AC-6 CLI --stage 过滤 + 242 stderr 形态."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "CLI stage 过滤与畸形 plan_id stderr",
+)
+def test_cli_stage_filter_and_stderr() -> None:
+    """S10/AC-6 CLI --stage 过滤 + 242 stderr 形态."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S11 性能采样与解析成功率")
-def test_s11_performance_sampling() -> None:
-    """S11: AC-7 性能采样（P95<300ms）+ 解析成功率 100%."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "性能采样与解析成功率",
+)
+def test_performance_sampling() -> None:
+    """S11/AC-7 性能采样（P95<300ms）+ 解析成功率 100%."""
 
 
-@scenario("test_acceptance_traceability_tree.feature", "S12 src 与四测试目录完成清单")
-def test_s12_completion_checklist() -> None:
-    """S12: 收尾完成清单存在性断言（6-6 S14 形态先例）."""
+@scenario(
+    "test_acceptance_traceability_tree.feature",
+    "开发完成清单收尾（src 与四测试目录交付件存在性）",
+)
+def test_development_completion_checklist() -> None:
+    """S12/收尾 完成清单存在性断言（6-6 S14 形态先例——When 骨架+单 then）。"""
 
 
 # ===================================================================
-# Background Steps
-# ===================================================================
-
-
-@given("溯源树依赖服务可用")
-def traceability_services_available(context: dict[str, Any], capsys: pytest.CaptureFixture[str]) -> None:
-    """Background：PG/Qdrant/Redis 三服务探测（不可达 pytest.skip 动态跳过）."""
-    context["_capsys_ref"] = capsys
-    _probe_pg_available()
-    _probe_qdrant_available()
-    _probe_redis_available()
-
-
-@given("溯源树测试租户与隔离 collection 已准备")
-def tenant_and_collection_ready(context: dict[str, Any]) -> None:
-    """Background：独立测试 collection 幂等创建."""
-    _run_async(_ensure_collection(), context["_loop"])
-
-
-# ===================================================================
-# Given Steps（数据面预置——真实服务三通道）
+# AC-1: 四层溯源树结构（S1 全树落位 / S2 结论层双形态）
 # ===================================================================
 
 
@@ -740,165 +772,6 @@ def preset_gap_only(context: dict[str, Any]) -> None:
     context["_active_plan"] = plan_id
 
 
-@given("预置 1 个 stage 2 个 chunk 一干净一脏的归档链")
-def preset_one_stage_two_chunks(context: dict[str, Any]) -> None:
-    """S4 预置：market_insight_trend 2 chunk（1 干净+1 脏——脏 chunk 不在 PG metadata.chunks）."""
-    plan_id = str(uuid.uuid4())
-    document_id = str(uuid.uuid4())
-    _run_async(
-        _archive_row(
-            context,
-            plan_id,
-            stage=_TREND_STAGE,
-            evidence_refs=("chunk-s4-clean", "chunk-s4-dirty"),
-            plan_tag=plan_id[:8],
-        ),
-        context["_loop"],
-    )
-    context["_chunk_specs"].append(_spec_chunk("chunk-s4-clean", document_id=document_id, page_start=3, page_end=4))
-    context["_chunk_specs"].append(
-        _spec_chunk("chunk-s4-dirty", document_id=document_id, page_start=7, page_end=8, pg_chunks_include=False)
-    )
-    context["_active_plan"] = plan_id
-
-
-@given("预置同 stage 连续两次直交的叠加归档链")
-def preset_multi_run_overlay(context: dict[str, Any]) -> None:
-    """S5 预置：3 stage 各一行 + 第 4 行为 performance_gap 旧行（连续两次直交）.
-
-    行型钦定 gap 型（input_summary 判别链最短——DR3-11）；新旧行以 index 区分
-    chunk_id 判别锚（DR1-4——archived_at 服务自动生成不可外传）。
-    """
-    plan_id = str(uuid.uuid4())
-    document_id = str(uuid.uuid4())
-    for stage, index in ((_GAP_STAGE, 0), (_TREND_STAGE, 0), (_COMPETITION_STAGE, 0), (_GAP_STAGE, 1)):
-        _run_async(
-            _archive_row(
-                context,
-                plan_id,
-                stage=stage,
-                evidence_refs=(f"chunk-s5-{stage}-{index}",),
-                index=index,
-                plan_tag=plan_id[:8],
-            ),
-            context["_loop"],
-        )
-        context["_chunk_specs"].append(
-            _spec_chunk(f"chunk-s5-{stage}-{index}", document_id=document_id, page_start=2, page_end=2)
-        )
-    context["_active_plan"] = plan_id
-
-
-@given("预置混入非思维链归档行的三 stage 归档链")
-def preset_kind_filter_chain(context: dict[str, Any]) -> None:
-    """S6 预置：3 思维链行 + 1 非思维链行（EVIDENCE_PACKAGE 且 kind≠CHAIN_ARCHIVE_KIND）."""
-    plan_id = str(uuid.uuid4())
-    document_id = str(uuid.uuid4())
-    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
-        _run_async(
-            _archive_row(
-                context,
-                plan_id,
-                stage=stage,
-                evidence_refs=(f"chunk-s6-{stage}",),
-                plan_tag=plan_id[:8],
-            ),
-            context["_loop"],
-        )
-        context["_chunk_specs"].append(_spec_chunk(f"chunk-s6-{stage}", document_id=document_id, page_start=4, page_end=4))
-    _run_async(
-        _archive_row(
-            context,
-            plan_id,
-            stage=_TREND_STAGE,
-            evidence_refs=("chunk-s6-nonchain",),
-            index=9,
-            kind="manual_annotation",
-            plan_tag=plan_id[:8],
-        ),
-        context["_loop"],
-    )
-    context["_active_plan"] = plan_id
-
-
-@given("预置两 stage 各带一失效引用的归档链")
-def preset_degraded_chain(context: dict[str, Any]) -> None:
-    """S7 预置：单 plan 两 stage——competition 点删（point_missing）+ trend 文档删（document_missing）."""
-    plan_id = str(uuid.uuid4())
-    trend_document_id = str(uuid.uuid4())
-    _run_async(
-        _archive_row(
-            context,
-            plan_id,
-            stage=_COMPETITION_STAGE,
-            evidence_refs=("chunk-s7-comp",),
-            plan_tag=plan_id[:8],
-        ),
-        context["_loop"],
-    )
-    _run_async(
-        _archive_row(
-            context,
-            plan_id,
-            stage=_TREND_STAGE,
-            evidence_refs=("chunk-s7-trend",),
-            plan_tag=plan_id[:8],
-        ),
-        context["_loop"],
-    )
-    # competition chunk：不预置 Qdrant 点（点已删——真实删除形态非 mock）
-    context["_chunk_specs"].append(
-        _spec_chunk("chunk-s7-comp", document_id=str(uuid.uuid4()), page_start=2, page_end=2, upsert_qdrant=False)
-    )
-    # trend chunk：Qdrant 点在而 PG 文档行不预置（文档已删——真实删除形态非 mock）
-    context["_chunk_specs"].append(
-        _spec_chunk("chunk-s7-trend", document_id=trend_document_id, page_start=5, page_end=5, insert_pg=False)
-    )
-    context["_active_plan"] = plan_id
-
-
-@given("预置零归档行的空 plan")
-def preset_empty_plan(context: dict[str, Any]) -> None:
-    """S8 腿1：空 plan（零归档行——幂等读语义）."""
-    context["_empty_plan"] = str(uuid.uuid4())
-    context["_active_plan"] = context["_empty_plan"]
-
-
-@given("预置多 stage 多 chunk 归档链且服务已预热")
-def preset_performance_fixture(context: dict[str, Any]) -> None:
-    """S11 预置：3 stage 各 2 chunk（同一 document_id——find 去重后 1 次）+ 首次构建预热."""
-    plan_id = str(uuid.uuid4())
-    document_id = str(uuid.uuid4())
-    refs: tuple[str, ...] = ()
-    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
-        for i in (1, 2):
-            refs += (f"chunk-s11-{stage}-{i}",)
-            context["_chunk_specs"].append(
-                _spec_chunk(f"chunk-s11-{stage}-{i}", document_id=document_id, page_start=1 + i, page_end=1 + i)
-            )
-    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
-        _run_async(
-            _archive_row(
-                context,
-                plan_id,
-                stage=stage,
-                evidence_refs=tuple(ref for ref in refs if ref.startswith(f"chunk-s11-{stage}-")),
-                plan_tag=plan_id[:8],
-            ),
-            context["_loop"],
-        )
-    context["_active_plan"] = plan_id
-    _run_async(_preset_qdrant_points_and_pg_rows(context), context["_loop"])
-    # 预热含首次真实 load（连接池建立——R8-F5 注记继承）
-    for _ in range(_WARMUP_ROUNDS):
-        _run_async(_build_tree_service(context).build_trace_tree(plan_id=plan_id, depth=4), context["_loop"])
-
-
-# ===================================================================
-# When Steps（构建/CLI/采样——编程面与 CLI 面调用面矩阵）
-# ===================================================================
-
-
 def _build_tree_at_depth(context: dict[str, Any], depth: int) -> None:
     """编程面构建（服务直调——红锚：TraceabilityTreeService 缺失即 ImportError）."""
     service = _build_tree_service(context)
@@ -918,92 +791,6 @@ def build_tree_depth_4(context: dict[str, Any]) -> None:
 def build_tree_depth_2(context: dict[str, Any]) -> None:
     """depth=2 构建（S2 双腿/S3 第一档）."""
     _build_tree_at_depth(context, 2)
-
-
-@when("以 depth=3 构建溯源树")
-def build_tree_depth_3(context: dict[str, Any]) -> None:
-    """depth=3 构建（S3 第二档）."""
-    _build_tree_at_depth(context, 3)
-
-
-@when("构建空 plan 的溯源树")
-def build_empty_plan_tree(context: dict[str, Any]) -> None:
-    """空 plan 构建（S8 腿1——幂等读）."""
-    _build_tree_at_depth(context, 4)
-
-
-@when("以畸形 plan_id 请求溯源树")
-def request_with_malformed_plan_id(context: dict[str, Any]) -> None:
-    """S8 腿2：畸形 plan_id（编程面用例守卫——242 单源；import 在 try 外保证红阶段可达）."""
-    from src.application.use_cases.get_traceability_tree import GetTraceabilityTreeUseCase
-
-    use_case = GetTraceabilityTreeUseCase(tree_service=_build_tree_service(context))
-    try:
-        _run_async(use_case.execute(plan_id="not-a-uuid"), context["_loop"])
-        context["malformed_error"] = None
-    except Exception as error:  # 异常记录供断言步（242 守卫形态验证——绿阶段为 EntityValidationError）
-        context["malformed_error"] = error
-
-
-def _run_cli_trace_tree(context: dict[str, Any], *, depth: str, stage: str | None = None) -> None:
-    """CLI in-process 直调（双清钦定 + monkeypatch BLM_SEARCH_COLLECTION 桥接——DR1-6）."""
-    from src.entrypoints import agent_cli
-
-    monkeypatch: pytest.MonkeyPatch = context["_monkeypatch_ref"]
-    monkeypatch.setenv("BLM_SEARCH_COLLECTION", context["_collection"])
-    _clear_resolver_caches()
-    argv = ["trace-tree", "--plan-id", context["_active_plan"], "--depth", depth]
-    if stage is not None:
-        argv += ["--stage", stage]
-    exit_code = 0
-    try:
-        exit_code = agent_cli.main(argv)
-    except SystemExit as error:  # 红阶段命令未注册 → argparse invalid choice exit 2
-        exit_code = int(error.code or 0)
-    captured = context["_capsys_ref"].readouterr()
-    _clear_resolver_caches()
-    context["cli_exit_code"] = exit_code
-    context["cli_stdout"] = captured.out
-    context["cli_stderr"] = captured.err
-
-
-@when("CLI 直调 trace-tree 全树输出")
-def cli_trace_tree_full(context: dict[str, Any]) -> None:
-    """S9：CLI 全树输出（--depth 4）."""
-    _run_cli_trace_tree(context, depth="4")
-
-
-@when("CLI 直调 trace-tree 指定 stage 过滤")
-def cli_trace_tree_stage_filter(context: dict[str, Any]) -> None:
-    """S10 腿1：--stage 过滤（保留结论层行——DR3-7）."""
-    _run_cli_trace_tree(context, depth="4", stage=_TREND_STAGE)
-
-
-@when("CLI 直调 trace-tree 传入畸形 plan_id")
-def cli_trace_tree_malformed(context: dict[str, Any]) -> None:
-    """S10 腿2：畸形 plan_id → [EXCEPTION_242] stderr + exit 1."""
-    context["_active_plan"] = "not-a-uuid"
-    _run_cli_trace_tree(context, depth="4")
-
-
-@when("采样 20 轮树构建计时")
-def sample_tree_build_timing(context: dict[str, Any]) -> None:
-    """S11：20 轮采样（perf_counter 毫秒窗口——预热已在预置步完成）."""
-    service = _build_tree_service(context)
-    durations: list[float] = []
-    for _ in range(_SAMPLE_ROUNDS):
-        start = time.perf_counter()
-        context["tree"] = _run_async(
-            service.build_trace_tree(plan_id=context["_active_plan"], depth=4),
-            context["_loop"],
-        )
-        durations.append((time.perf_counter() - start) * 1000.0)
-    context["durations"] = durations
-
-
-# ===================================================================
-# Then Steps（断言——值级/键集/序三类形态）
-# ===================================================================
 
 
 def _collect_nodes(tree: Any) -> dict[str, list[Any]]:
@@ -1140,6 +927,17 @@ def verify_stage_count_one_tree_ok(context: dict[str, Any]) -> None:
     assert [n.stage for n in tree.root.children] == [_GAP_STAGE]
 
 
+# ===================================================================
+# AC-2: 交互式展开（S3 depth 懒加载三档）
+# ===================================================================
+
+
+@when("以 depth=3 构建溯源树")
+def build_tree_depth_3(context: dict[str, Any]) -> None:
+    """depth=3 构建（S3 第二档）."""
+    _build_tree_at_depth(context, 3)
+
+
 @then("depth=2 时树仅含结论层与分析层")
 def verify_depth2_no_chunks(context: dict[str, Any]) -> None:
     """S3 第一档：StageNode.children 恒空元组（切片层零解析）."""
@@ -1165,6 +963,33 @@ def verify_depth4_full_tree(context: dict[str, Any]) -> None:
     assert len(nodes["stages"]) == 2
     assert len(nodes["chunks"]) == 2
     assert len(nodes["documents"]) == 2
+
+
+# ===================================================================
+# AC-3: 页码级跳转载荷与 bbox 透传（S4）
+# ===================================================================
+
+
+@given("预置 1 个 stage 2 个 chunk 一干净一脏的归档链")
+def preset_one_stage_two_chunks(context: dict[str, Any]) -> None:
+    """S4 预置：market_insight_trend 2 chunk（1 干净+1 脏——脏 chunk 不在 PG metadata.chunks）."""
+    plan_id = str(uuid.uuid4())
+    document_id = str(uuid.uuid4())
+    _run_async(
+        _archive_row(
+            context,
+            plan_id,
+            stage=_TREND_STAGE,
+            evidence_refs=("chunk-s4-clean", "chunk-s4-dirty"),
+            plan_tag=plan_id[:8],
+        ),
+        context["_loop"],
+    )
+    context["_chunk_specs"].append(_spec_chunk("chunk-s4-clean", document_id=document_id, page_start=3, page_end=4))
+    context["_chunk_specs"].append(
+        _spec_chunk("chunk-s4-dirty", document_id=document_id, page_start=7, page_end=8, pg_chunks_include=False)
+    )
+    context["_active_plan"] = plan_id
 
 
 @then("DocumentNode 跳转载荷六键值级正确")
@@ -1205,6 +1030,38 @@ def verify_dirty_chunk_page_none(context: dict[str, Any]) -> None:
     assert dirty_docs[0].jump_ready is False, "page=None 时 jump_ready 应 False"
 
 
+# ===================================================================
+# AC-4: 多 run 叠加判别与截断对照（S5/S6）
+# ===================================================================
+
+
+@given("预置同 stage 连续两次直交的叠加归档链")
+def preset_multi_run_overlay(context: dict[str, Any]) -> None:
+    """S5 预置：3 stage 各一行 + 第 4 行为 performance_gap 旧行（连续两次直交）.
+
+    行型钦定 gap 型（input_summary 判别链最短——DR3-11）；新旧行以 index 区分
+    chunk_id 判别锚（DR1-4——archived_at 服务自动生成不可外传）。
+    """
+    plan_id = str(uuid.uuid4())
+    document_id = str(uuid.uuid4())
+    for stage, index in ((_GAP_STAGE, 0), (_TREND_STAGE, 0), (_COMPETITION_STAGE, 0), (_GAP_STAGE, 1)):
+        _run_async(
+            _archive_row(
+                context,
+                plan_id,
+                stage=stage,
+                evidence_refs=(f"chunk-s5-{stage}-{index}",),
+                index=index,
+                plan_tag=plan_id[:8],
+            ),
+            context["_loop"],
+        )
+        context["_chunk_specs"].append(
+            _spec_chunk(f"chunk-s5-{stage}-{index}", document_id=document_id, page_start=2, page_end=2)
+        )
+    context["_active_plan"] = plan_id
+
+
 @then("叠加 stage 恰一节点且取最新行值")
 def verify_overlay_last_write_wins(context: dict[str, Any]) -> None:
     """S5：stage 分组 last-write-wins（summary/tools_used 取 index=1 新行——判别锚）."""
@@ -1226,6 +1083,38 @@ def verify_adopted_total(context: dict[str, Any]) -> None:
     assert tree.total_archives == 4, f"total 应 4（kind 过滤后 4 行全思维链），实际 {tree.total_archives}"
 
 
+@given("预置混入非思维链归档行的三 stage 归档链")
+def preset_kind_filter_chain(context: dict[str, Any]) -> None:
+    """S6 预置：3 思维链行 + 1 非思维链行（EVIDENCE_PACKAGE 且 kind≠CHAIN_ARCHIVE_KIND）."""
+    plan_id = str(uuid.uuid4())
+    document_id = str(uuid.uuid4())
+    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
+        _run_async(
+            _archive_row(
+                context,
+                plan_id,
+                stage=stage,
+                evidence_refs=(f"chunk-s6-{stage}",),
+                plan_tag=plan_id[:8],
+            ),
+            context["_loop"],
+        )
+        context["_chunk_specs"].append(_spec_chunk(f"chunk-s6-{stage}", document_id=document_id, page_start=4, page_end=4))
+    _run_async(
+        _archive_row(
+            context,
+            plan_id,
+            stage=_TREND_STAGE,
+            evidence_refs=("chunk-s6-nonchain",),
+            index=9,
+            kind="manual_annotation",
+            plan_tag=plan_id[:8],
+        ),
+        context["_loop"],
+    )
+    context["_active_plan"] = plan_id
+
+
 @then("非思维链行不进树且不计 total")
 def verify_kind_filter_excluded(context: dict[str, Any]) -> None:
     """S6：kind≠CHAIN_ARCHIVE_KIND 的 EVIDENCE_PACKAGE 行不进树（kind 过滤）."""
@@ -1241,6 +1130,47 @@ def verify_total_three(context: dict[str, Any]) -> None:
     """S6：total==3（kind 口径值级断言——DR1-12）."""
     tree = context["tree"]
     assert tree.total_archives == 3, f"kind 过滤后 total 应 3，实际 {tree.total_archives}"
+
+
+# ===================================================================
+# AC-5: 降级链路三态两层承载与空计划幂等读（S7/S8）
+# ===================================================================
+
+
+@given("预置两 stage 各带一失效引用的归档链")
+def preset_degraded_chain(context: dict[str, Any]) -> None:
+    """S7 预置：单 plan 两 stage——competition 点删（point_missing）+ trend 文档删（document_missing）."""
+    plan_id = str(uuid.uuid4())
+    trend_document_id = str(uuid.uuid4())
+    _run_async(
+        _archive_row(
+            context,
+            plan_id,
+            stage=_COMPETITION_STAGE,
+            evidence_refs=("chunk-s7-comp",),
+            plan_tag=plan_id[:8],
+        ),
+        context["_loop"],
+    )
+    _run_async(
+        _archive_row(
+            context,
+            plan_id,
+            stage=_TREND_STAGE,
+            evidence_refs=("chunk-s7-trend",),
+            plan_tag=plan_id[:8],
+        ),
+        context["_loop"],
+    )
+    # competition chunk：不预置 Qdrant 点（点已删——真实删除形态非 mock）
+    context["_chunk_specs"].append(
+        _spec_chunk("chunk-s7-comp", document_id=str(uuid.uuid4()), page_start=2, page_end=2, upsert_qdrant=False)
+    )
+    # trend chunk：Qdrant 点在而 PG 文档行不预置（文档已删——真实删除形态非 mock）
+    context["_chunk_specs"].append(
+        _spec_chunk("chunk-s7-trend", document_id=trend_document_id, page_start=5, page_end=5, insert_pg=False)
+    )
+    context["_active_plan"] = plan_id
 
 
 @then("point_missing 与 document_missing 两态各一专属断言段")
@@ -1279,6 +1209,19 @@ def verify_resolved_missing_counts(context: dict[str, Any]) -> None:
     assert len(missing) == 2, f"missing 节点应 2（comp chunk + trend doc），实际 {len(missing)}"
 
 
+@given("预置零归档行的空 plan")
+def preset_empty_plan(context: dict[str, Any]) -> None:
+    """S8 腿1：空 plan（零归档行——幂等读语义）."""
+    context["_empty_plan"] = str(uuid.uuid4())
+    context["_active_plan"] = context["_empty_plan"]
+
+
+@when("构建空 plan 的溯源树")
+def build_empty_plan_tree(context: dict[str, Any]) -> None:
+    """空 plan 构建（S8 腿1——幂等读）."""
+    _build_tree_at_depth(context, 4)
+
+
 @then("仅根节点空树且零异常")
 def verify_empty_tree(context: dict[str, Any]) -> None:
     """S8 腿1：空计划幂等读（键恒在——6-2 R1-6 七键契约同族）."""
@@ -1295,6 +1238,19 @@ def verify_build_not_degraded(context: dict[str, Any]) -> None:
     assert context["tree"].build_degraded is False
 
 
+@when("以畸形 plan_id 请求溯源树")
+def request_with_malformed_plan_id(context: dict[str, Any]) -> None:
+    """S8 腿2：畸形 plan_id（编程面用例守卫——242 单源；import 在 try 外保证红阶段可达）."""
+    from src.application.use_cases.get_traceability_tree import GetTraceabilityTreeUseCase
+
+    use_case = GetTraceabilityTreeUseCase(tree_service=_build_tree_service(context))
+    try:
+        _run_async(use_case.execute(plan_id="not-a-uuid"), context["_loop"])
+        context["malformed_error"] = None
+    except Exception as error:  # 异常记录供断言步（242 守卫形态验证——绿阶段为 EntityValidationError）
+        context["malformed_error"] = error
+
+
 @then("抛出 EntityValidationError 且 code 为 242")
 def verify_malformed_242(context: dict[str, Any]) -> None:
     """S8 腿2：用例层 UUID 守卫（GetBlmChainTraceUseCase 直系先例）."""
@@ -1303,6 +1259,39 @@ def verify_malformed_242(context: dict[str, Any]) -> None:
     error = context.get("malformed_error")
     assert isinstance(error, EntityValidationError), f"应抛 EntityValidationError，实际 {error!r}"
     assert error.code == "EXCEPTION_242", f"code 应 EXCEPTION_242，实际 {error.code}"
+
+
+# ===================================================================
+# AC-6: CLI trace-tree 命令（S9/S10——in-process 直调双清）
+# ===================================================================
+
+
+def _run_cli_trace_tree(context: dict[str, Any], *, depth: str, stage: str | None = None) -> None:
+    """CLI in-process 直调（双清钦定 + monkeypatch BLM_SEARCH_COLLECTION 桥接——DR1-6）."""
+    from src.entrypoints import agent_cli
+
+    monkeypatch: pytest.MonkeyPatch = context["_monkeypatch_ref"]
+    monkeypatch.setenv("BLM_SEARCH_COLLECTION", context["_collection"])
+    _clear_resolver_caches()
+    argv = ["trace-tree", "--plan-id", context["_active_plan"], "--depth", depth]
+    if stage is not None:
+        argv += ["--stage", stage]
+    exit_code = 0
+    try:
+        exit_code = agent_cli.main(argv)
+    except SystemExit as error:  # 红阶段命令未注册 → argparse invalid choice exit 2
+        exit_code = int(error.code or 0)
+    captured = context["_capsys_ref"].readouterr()
+    _clear_resolver_caches()
+    context["cli_exit_code"] = exit_code
+    context["cli_stdout"] = captured.out
+    context["cli_stderr"] = captured.err
+
+
+@when("CLI 直调 trace-tree 全树输出")
+def cli_trace_tree_full(context: dict[str, Any]) -> None:
+    """S9：CLI 全树输出（--depth 4）."""
+    _run_cli_trace_tree(context, depth="4")
 
 
 @then("输出含四层层级标签")
@@ -1332,6 +1321,12 @@ def verify_cli_value_level_lines(context: dict[str, Any]) -> None:
     assert "溯源树预置文档-" in stdout, "输出应含预置 filename"
 
 
+@when("CLI 直调 trace-tree 指定 stage 过滤")
+def cli_trace_tree_stage_filter(context: dict[str, Any]) -> None:
+    """S10 腿1：--stage 过滤（保留结论层行——DR3-7）."""
+    _run_cli_trace_tree(context, depth="4", stage=_TREND_STAGE)
+
+
 @then("仅展示指定 stage 层且保留结论层行")
 def verify_cli_stage_filter(context: dict[str, Any]) -> None:
     """S10 腿1：--stage 过滤（其余 stage 零输出——仅指分析层以下；结论层行保留，DR3-7）."""
@@ -1343,11 +1338,68 @@ def verify_cli_stage_filter(context: dict[str, Any]) -> None:
     assert "chunk-s1-gap" not in stdout, "未指定 stage 的切片行应零输出"
 
 
+@when("CLI 直调 trace-tree 传入畸形 plan_id")
+def cli_trace_tree_malformed(context: dict[str, Any]) -> None:
+    """S10 腿2：畸形 plan_id → [EXCEPTION_242] stderr + exit 1."""
+    context["_active_plan"] = "not-a-uuid"
+    _run_cli_trace_tree(context, depth="4")
+
+
 @then("stderr 含 EXCEPTION_242 且 exit code 为 1")
 def verify_cli_stderr_242(context: dict[str, Any]) -> None:
     """S10 腿2：畸形 plan_id CLI 形态（[EXCEPTION_242] stderr + exit 1）."""
     assert context["cli_exit_code"] == 1, f"畸形 plan_id 应 exit 1，实际 {context['cli_exit_code']}"
     assert "[EXCEPTION_242]" in context["cli_stderr"], f"stderr 应含 [EXCEPTION_242]，实际 {context['cli_stderr']!r}"
+
+
+# ===================================================================
+# AC-7: 性能与解析成功率（S11——三段口径）
+# ===================================================================
+
+
+@given("预置多 stage 多 chunk 归档链且服务已预热")
+def preset_performance_fixture(context: dict[str, Any]) -> None:
+    """S11 预置：3 stage 各 2 chunk（同一 document_id——find 去重后 1 次）+ 首次构建预热."""
+    plan_id = str(uuid.uuid4())
+    document_id = str(uuid.uuid4())
+    refs: tuple[str, ...] = ()
+    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
+        for i in (1, 2):
+            refs += (f"chunk-s11-{stage}-{i}",)
+            context["_chunk_specs"].append(
+                _spec_chunk(f"chunk-s11-{stage}-{i}", document_id=document_id, page_start=1 + i, page_end=1 + i)
+            )
+    for stage in (_GAP_STAGE, _TREND_STAGE, _COMPETITION_STAGE):
+        _run_async(
+            _archive_row(
+                context,
+                plan_id,
+                stage=stage,
+                evidence_refs=tuple(ref for ref in refs if ref.startswith(f"chunk-s11-{stage}-")),
+                plan_tag=plan_id[:8],
+            ),
+            context["_loop"],
+        )
+    context["_active_plan"] = plan_id
+    _run_async(_preset_qdrant_points_and_pg_rows(context), context["_loop"])
+    # 预热含首次真实 load（连接池建立——R8-F5 注记继承）
+    for _ in range(_WARMUP_ROUNDS):
+        _run_async(_build_tree_service(context).build_trace_tree(plan_id=plan_id, depth=4), context["_loop"])
+
+
+@when("采样 20 轮树构建计时")
+def sample_tree_build_timing(context: dict[str, Any]) -> None:
+    """S11：20 轮采样（perf_counter 毫秒窗口——预热已在预置步完成）."""
+    service = _build_tree_service(context)
+    durations: list[float] = []
+    for _ in range(_SAMPLE_ROUNDS):
+        start = time.perf_counter()
+        context["tree"] = _run_async(
+            service.build_trace_tree(plan_id=context["_active_plan"], depth=4),
+            context["_loop"],
+        )
+        durations.append((time.perf_counter() - start) * 1000.0)
+    context["durations"] = durations
 
 
 @then("P95 小于 300ms")
@@ -1368,17 +1420,22 @@ def verify_resolved_ratio_100(context: dict[str, Any]) -> None:
     assert len(resolved) == len(status_nodes), f"全可解析场景 resolved 占比应 100%，实际 {len(resolved)}/{len(status_nodes)}"
 
 
-@then("src 新增与修改文件存在")
-def verify_completion_src_files() -> None:
-    """S12：src 六项存在性（File List 为准——DR3-10）."""
-    for label, relative in _COMPLETION_SRC_FILES.items():
-        path = ROOT / relative
-        assert path.is_file(), f"完成清单缺 {label}: {relative}"
+# ===================================================================
+# 收尾: 完成清单存在性断言（S12）
+# ===================================================================
 
 
-@then("四测试目录新增与修改文件存在")
-def verify_completion_test_files() -> None:
-    """S12：四测试目录九项存在性."""
-    for label, relative in _COMPLETION_TEST_FILES.items():
-        path = ROOT / relative
-        assert path.is_file(), f"完成清单缺 {label}: {relative}"
+@when("检查 src 与四测试目录交付件")
+def check_completion_files(context: dict[str, Any]) -> None:
+    """S12/收尾 收集交付件缺失清单（存在性检查动作——6-6 S14 同款骨架）."""
+    missing: list[str] = []
+    for label, relative in {**_COMPLETION_SRC_FILES, **_COMPLETION_TEST_FILES}.items():
+        if not (ROOT / relative).is_file():
+            missing.append(f"{label}: {relative}")
+    context["completion_missing"] = missing
+
+
+@then("完成清单逐项存在")
+def verify_completion_files(context: dict[str, Any]) -> None:
+    """S12/收尾 完成清单逐项存在（src 六项 + 四测试目录九项——File List 为准 DR3-10）."""
+    assert not context["completion_missing"], f"完成清单缺项: {context['completion_missing']}"

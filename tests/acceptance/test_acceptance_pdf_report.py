@@ -462,94 +462,6 @@ def _resolve_archive_bucket_name() -> str:
     return str(l4._repository._resolve_bucket_name(_EVIDENCE_BUCKET_TYPE))
 
 
-# ======================================================================
-# 场景绑定（13 场景全绑定）
-# ======================================================================
-
-
-@scenario("test_acceptance_pdf_report.feature", "PDF 报告生成主链六段编排全落位")
-def test_pdf_main_chain_six_stages() -> None:
-    """S1: AC-1 主链六段编排（聚合→快照→引文→渲染→L4+L2→事件）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "数据源全缺时抛出 490 异常")
-def test_total_missing_raises_490() -> None:
-    """S2: AC-1 全缺 490 异常路径（PDF 链同判复用）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "双格式同源一致")
-def test_dual_format_same_source() -> None:
-    """S3: AC-2 同源双渲染（section_count 恒等+标题族文本层可寻）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "引文索引正常解析")
-def test_citation_index_resolved() -> None:
-    """S4: AC-3 真实引文链（预置点+文档行→附录 C 值级）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "引文去重保序")
-def test_citation_dedup_order() -> None:
-    """S5: AC-3 去重保序（两步骤共享 chunk_id→索引唯一+首现次序）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "引文解析降级与全空引文")
-def test_citation_degraded_and_empty() -> None:
-    """S6: AC-3 降级三态真实缺失构造 + 全空单行说明。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "书签 outline 层级结构")
-def test_outline_hierarchy() -> None:
-    """S7: AC-4 书签 outline 层级（display_name 源独立构造期望）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "目录内链与引文锚点")
-def test_toc_links_and_citation_anchors() -> None:
-    """S8: AC-4 目录 link 注释 + 引文锚点附录 C 页独占。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "ReportGenerated 事件经 outbox 落行")
-def test_report_generated_outbox_row() -> None:
-    """S9: AC-5 事件 outbox 落行四键值级（report_type=pdf）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "读侧消费面契约键集全等")
-def test_read_side_contract_key_sets() -> None:
-    """S10: AC-6 读侧消费面契约（chain 五键 + payload 键族全等）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "性能 P95 与成功率采样（单一数据源 20 轮）")
-def test_performance_p95_and_success_rate() -> None:
-    """S11: AC-7 性能 P95<60s + L4 对象数 20（OD-8 口径）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "并发生成 3 个 PDF 报告互不串扰")
-def test_concurrent_three_pdf_reports() -> None:
-    """S12: AC-7 并发 3（gather 形态锚）。"""
-    pass
-
-
-@scenario("test_acceptance_pdf_report.feature", "Story 交付件存在性收尾验收")
-def test_story_deliverables_existence() -> None:
-    """S13: 收尾交付件存在性逐项断言。"""
-    pass
-
-
-# ======================================================================
-# 服务探测与装配（四真实服务门控 + 归档轻装配 + PDF 服务挂接）
-# ======================================================================
-
-
 async def _probe_and_assemble(ctx: dict[str, Any]) -> None:
     """四服务探测（PG/Redis/Qdrant/MinIO）+ WORM 桶自愈（探测失败动态 skip）。"""
     import pytest as _pytest
@@ -672,11 +584,6 @@ async def _ensure_citation_collection(env: Any) -> None:
         await qdrant.close()
 
 
-# ======================================================================
-# Fake/替身工厂（外部 SaaS 豁免面——轻装配仅 embedding；LLM 不进链路）
-# ======================================================================
-
-
 def _make_fake_embedding() -> Any:
     """Fake Embedding 工厂（外部 SaaS 豁免——固定 1024 维，6-4/6-5a 同款）。"""
     from unittest.mock import AsyncMock
@@ -688,11 +595,6 @@ def _make_fake_embedding() -> Any:
     fake.embed_documents = AsyncMock(return_value=[[0.1] * 1024])
     fake.close = AsyncMock()
     return fake
-
-
-# ======================================================================
-# 归档轻装配 + 双格式服务挂接（PDF 九依赖 + Markdown 五依赖——S3 对照）
-# ======================================================================
 
 
 def _assemble_archive_only(ctx: dict[str, Any]) -> None:
@@ -932,11 +834,6 @@ async def _preset_citation_fixture(ctx: dict[str, Any], count: int) -> list[dict
     return presets
 
 
-# ======================================================================
-# PDF 读回与结构断言辅助（pypdf——R3 实证口径：/Dest 数组 + extract_text 中文可用）
-# ======================================================================
-
-
 async def _retrieve_pdf_bytes(ctx: dict[str, Any], object_key: str) -> bytes:
     """L4 对象流式读回收 bytes（retrieve 同步返回 AsyncIterator——AC-1 读回口径）。"""
     from src.domain.ports.resolver import resolve
@@ -1008,11 +905,6 @@ def _pdf_link_targets(reader: Any) -> list[tuple[int, int]]:
                     links.append((page_index, target_index))
                     break
     return links
-
-
-# ======================================================================
-# 生成执行辅助（多场景共享形态）
-# ======================================================================
 
 
 def _generate_pdf_report(ctx: dict[str, Any], plan_id: str) -> Any:
@@ -1130,7 +1022,7 @@ def _query_chain_records(ctx: dict[str, Any], plan_id: str) -> list[dict[str, An
 
 
 # ======================================================================
-# Given 步骤（服务门控 + 数据面构造）
+# Background Steps
 # ======================================================================
 
 
@@ -1138,6 +1030,29 @@ def _query_chain_records(ctx: dict[str, Any], plan_id: str) -> list[dict[str, An
 def pdf_report_chain_services_available(context: dict[str, Any]) -> None:
     """四真实服务门控探测（不可达动态 skip——禁写死 skip 标记）+ WORM 桶自愈。"""
     _run_async(context["_loop"], _probe_and_assemble(context))
+
+
+# ======================================================================
+# AC-1: PDF 生成主链（聚合复用 → 快照辅源 → 引文聚合 → 渲染 → L4 WORM + L2 → 事件）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "PDF 报告生成主链六段编排全落位",
+)
+def test_pdf_main_chain_six_stages() -> None:
+    """S1: AC-1 主链六段编排（聚合→快照→引文→渲染→L4+L2→事件）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "数据源全缺时抛出 490 异常",
+)
+def test_total_missing_raises_490() -> None:
+    """S2: AC-1 全缺 490 异常路径（PDF 链同判复用）。"""
+    pass
 
 
 @given("BLM 前两阶段已完成（八步思维链归档在位）")
@@ -1150,99 +1065,12 @@ def blm_eight_steps_archived(context: dict[str, Any]) -> None:
     assert len(records) == 8
 
 
-@given("引文预置在位（Qdrant 点与文档行）且八步归档含该引文")
-def citation_preset_and_archived(context: dict[str, Any]) -> None:
-    """预置 1 条引文（Qdrant 点 + documents 行）+ 八步归档全部喂该 chunk_id（去重后 1 条 resolved）。"""
-    if "pdf_use_case" not in context:
-        _assemble_archive_only(context)
-    presets = _run_async(context["_loop"], _preset_citation_fixture(context, count=1))
-    context["citation_presets"] = presets
-    plan_id = _register_plan(context)
-    chunk_id = presets[0]["chunk_id"]
-
-    def _refs(stage: str, index: int) -> tuple[str, ...]:
-        return () if stage == "market_insight_synthesis" else (chunk_id,)
-
-    records = _run_async(context["_loop"], _archive_steps(context, plan_id, refs_factory=_refs))
-    assert len(records) == 8
-
-
-@given("两步骤共享同一引文标识的八步归档在位")
-def two_steps_share_citation(context: dict[str, Any]) -> None:
-    """预置 2 条引文：trend 喂 A、competition 喂 (A, B)——A 跨步骤共享（首现 trend）。"""
-    if "pdf_use_case" not in context:
-        _assemble_archive_only(context)
-    presets = _run_async(context["_loop"], _preset_citation_fixture(context, count=2))
-    context["citation_presets"] = presets
-    plan_id = _register_plan(context)
-    first, second = presets[0]["chunk_id"], presets[1]["chunk_id"]
-
-    def _refs(stage: str, index: int) -> tuple[str, ...]:
-        if stage == "market_insight_trend":
-            return (first,)
-        if stage == "market_insight_competition":
-            return (first, second)
-        return () if stage == "market_insight_synthesis" else (f"chunk-{index}-001",)
-
-    records = _run_async(context["_loop"], _archive_steps(context, plan_id, refs_factory=_refs))
-    assert len(records) == 8
-
-
-@given("降级与全空两个独立 plan 各自八步归档在位")
-def degraded_and_empty_plans_archived(context: dict[str, Any]) -> None:
-    """降级 plan（八步全喂同一不存在 chunk_id）+ 全空 plan（evidence_refs 全空）两态。"""
-    if "pdf_use_case" not in context:
-        _assemble_archive_only(context)
-    missing_chunk = str(uuid.uuid4())
-    context["missing_chunk_id"] = missing_chunk
-    # 降级 plan
-    degraded_plan = str(uuid.uuid4())
-    context["degraded_plan_id"] = degraded_plan
-    context["_plan_ids"].append(degraded_plan)
-
-    def _refs_missing(stage: str, index: int) -> tuple[str, ...]:
-        return () if stage == "market_insight_synthesis" else (missing_chunk,)
-
-    records = _run_async(context["_loop"], _archive_steps(context, degraded_plan, refs_factory=_refs_missing))
-    assert len(records) == 8
-    # 全空 plan
-    empty_plan = str(uuid.uuid4())
-    context["empty_plan_id"] = empty_plan
-    context["_plan_ids"].append(empty_plan)
-    records = _run_async(context["_loop"], _archive_steps(context, empty_plan, refs_factory=lambda stage, index: ()))
-    assert len(records) == 8
-
-
 @given("从未归档的独立 plan_id")
 def never_archived_plan_id(context: dict[str, Any]) -> None:
     """天然 total==0 的独立 plan_id（无需清空构造）。"""
     if "pdf_use_case" not in context:
         _assemble_archive_only(context)
     _register_plan(context)
-
-
-@given("三个独立 plan_id 各自八步归档在位")
-def three_plans_eight_steps_archived(context: dict[str, Any]) -> None:
-    """三独立 plan_id 各自逐 stage 八步归档（并发场景数据面）。"""
-    if "pdf_use_case" not in context:
-        _assemble_archive_only(context)
-    context["concurrent_plan_ids"] = []
-    for _ in range(3):
-        plan_id = str(uuid.uuid4())
-        context["concurrent_plan_ids"].append(plan_id)
-        context["_plan_ids"].append(plan_id)
-        records = _run_async(context["_loop"], _archive_steps(context, plan_id))
-        assert len(records) == 8
-
-
-@given("开发实施完成")
-def development_completed() -> None:
-    """S13 收尾场景前置（静态断言无服务依赖）。"""
-
-
-# ======================================================================
-# When 步骤（PDF 生成调用）
-# ======================================================================
 
 
 @when("调用 PDF 报告生成用例（plan_id）")
@@ -1254,71 +1082,6 @@ def invoke_pdf_report_generation(context: dict[str, Any]) -> None:
         _generate_pdf_report(context, context["plan_id"])
     except DomainError as error:
         context["caught_error"] = error
-
-
-@when("分别生成 Markdown 与 PDF 报告（同 plan_id）")
-def invoke_dual_format_generation(context: dict[str, Any]) -> None:
-    """同 plan_id 先 Markdown 后 PDF（同一聚合产物双渲染——OD-3 同源双渲染）。"""
-    context["markdown_report"] = _run_async(context["_loop"], context["markdown_use_case"].execute(plan_id=context["plan_id"]))
-    context["_report_ids"].append(str(context["markdown_report"].report_id))
-    _generate_pdf_report(context, context["plan_id"])
-
-
-@when("分别生成降级与全空两份 PDF 报告")
-def invoke_degraded_and_empty_generation(context: dict[str, Any]) -> None:
-    """降级 plan 与全空 plan 各生成一份（两态断言数据面）。"""
-    _generate_pdf_report(context, context["degraded_plan_id"])
-    context["degraded_report"] = context["report"]
-    context["degraded_pdf_bytes"] = context["pdf_bytes"]
-    context["degraded_metadata"] = _run_async(
-        context["_loop"], _query_report_metadata(context, str(context["degraded_report"].report_id))
-    )
-    _generate_pdf_report(context, context["empty_plan_id"])
-    context["empty_report"] = context["report"]
-    context["empty_pdf_bytes"] = context["pdf_bytes"]
-    context["empty_metadata"] = _run_async(
-        context["_loop"], _query_report_metadata(context, str(context["empty_report"].report_id))
-    )
-
-
-@when("单一数据源连续 20 次生成 PDF 报告")
-def invoke_twenty_rounds(context: dict[str, Any]) -> None:
-    """单一 plan_id × 20 次生成（OD-8 采样形态——每轮 L4 对象键锚 report_id 天然互异）。"""
-    import time as _time
-
-    durations: list[float] = []
-    report_ids: list[str] = []
-    for _ in range(_PERF_SAMPLE_ROUNDS):
-        started = _time.monotonic()
-        report = _generate_pdf_report(context, context["plan_id"])
-        durations.append(_time.monotonic() - started)
-        report_ids.append(str(report.report_id))
-    context["perf_durations"] = durations
-    context["perf_report_ids"] = report_ids
-
-
-@when("asyncio gather 并发生成 3 个 PDF 报告")
-def gather_three_concurrent_reports(context: dict[str, Any]) -> None:
-    """gather 3（async 辅助函数体内 await + _run_async 驱动——6-4 形态锚）。
-
-    会话由装配层 find 包装承担（每 find 调用独立 session_context——并发
-    任务各持独立会话，AsyncSession 非并发安全的分任务防线）。
-    """
-    plan_ids = context["concurrent_plan_ids"]
-
-    async def _gather() -> list[Any]:
-        return await asyncio.gather(*(context["pdf_use_case"].execute(plan_id=pid) for pid in plan_ids))
-
-    reports = _run_async(context["_loop"], _gather())
-    context["concurrent_reports"] = reports
-    for report in reports:
-        context["_report_ids"].append(str(report.report_id))
-        context["_pdf_object_keys"].append(report.file_path)
-
-
-# ======================================================================
-# Then 步骤（断言面——值级独立构造期望）
-# ======================================================================
 
 
 @then("PDF 生成六段编排全部落位")
@@ -1407,6 +1170,28 @@ def assert_zero_persistence(context: dict[str, Any]) -> None:
     assert outbox == 0, "490 前置守卫路径不应产生事件落行"
 
 
+# ======================================================================
+# AC-2: 格式一致性（同源文档模型——与 Markdown 报告结构同源）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "双格式同源一致",
+)
+def test_dual_format_same_source() -> None:
+    """S3: AC-2 同源双渲染（section_count 恒等+标题族文本层可寻）。"""
+    pass
+
+
+@when("分别生成 Markdown 与 PDF 报告（同 plan_id）")
+def invoke_dual_format_generation(context: dict[str, Any]) -> None:
+    """同 plan_id 先 Markdown 后 PDF（同一聚合产物双渲染——OD-3 同源双渲染）。"""
+    context["markdown_report"] = _run_async(context["_loop"], context["markdown_use_case"].execute(plan_id=context["plan_id"]))
+    context["_report_ids"].append(str(context["markdown_report"].report_id))
+    _generate_pdf_report(context, context["plan_id"])
+
+
 @then("双格式 section_count 恒等且章节标题族 PDF 文本层可寻")
 def assert_dual_format_consistency(context: dict[str, Any]) -> None:
     """同聚合同计数单位恒等 + Markdown 标题族在 PDF 文本层可寻（display_name 源独立构造）。"""
@@ -1441,6 +1226,118 @@ def assert_appendix_b_count_linkage(context: dict[str, Any]) -> None:
     assert pdf_report.degraded_section_count == markdown_report.degraded_section_count == 0  # 轻装配零降级
     metadata = _run_async(context["_loop"], _query_report_metadata(context, str(pdf_report.report_id)))
     assert metadata.get("degraded_stages") == []
+
+
+# ======================================================================
+# AC-3: 引文索引（evidence_refs 首消费 → 附录 C）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "引文索引正常解析",
+)
+def test_citation_index_resolved() -> None:
+    """S4: AC-3 真实引文链（预置点+文档行→附录 C 值级）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "引文去重保序",
+)
+def test_citation_dedup_order() -> None:
+    """S5: AC-3 去重保序（两步骤共享 chunk_id→索引唯一+首现次序）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "引文解析降级与全空引文",
+)
+def test_citation_degraded_and_empty() -> None:
+    """S6: AC-3 降级三态真实缺失构造 + 全空单行说明。"""
+    pass
+
+
+@given("引文预置在位（Qdrant 点与文档行）且八步归档含该引文")
+def citation_preset_and_archived(context: dict[str, Any]) -> None:
+    """预置 1 条引文（Qdrant 点 + documents 行）+ 八步归档全部喂该 chunk_id（去重后 1 条 resolved）。"""
+    if "pdf_use_case" not in context:
+        _assemble_archive_only(context)
+    presets = _run_async(context["_loop"], _preset_citation_fixture(context, count=1))
+    context["citation_presets"] = presets
+    plan_id = _register_plan(context)
+    chunk_id = presets[0]["chunk_id"]
+
+    def _refs(stage: str, index: int) -> tuple[str, ...]:
+        return () if stage == "market_insight_synthesis" else (chunk_id,)
+
+    records = _run_async(context["_loop"], _archive_steps(context, plan_id, refs_factory=_refs))
+    assert len(records) == 8
+
+
+@given("两步骤共享同一引文标识的八步归档在位")
+def two_steps_share_citation(context: dict[str, Any]) -> None:
+    """预置 2 条引文：trend 喂 A、competition 喂 (A, B)——A 跨步骤共享（首现 trend）。"""
+    if "pdf_use_case" not in context:
+        _assemble_archive_only(context)
+    presets = _run_async(context["_loop"], _preset_citation_fixture(context, count=2))
+    context["citation_presets"] = presets
+    plan_id = _register_plan(context)
+    first, second = presets[0]["chunk_id"], presets[1]["chunk_id"]
+
+    def _refs(stage: str, index: int) -> tuple[str, ...]:
+        if stage == "market_insight_trend":
+            return (first,)
+        if stage == "market_insight_competition":
+            return (first, second)
+        return () if stage == "market_insight_synthesis" else (f"chunk-{index}-001",)
+
+    records = _run_async(context["_loop"], _archive_steps(context, plan_id, refs_factory=_refs))
+    assert len(records) == 8
+
+
+@given("降级与全空两个独立 plan 各自八步归档在位")
+def degraded_and_empty_plans_archived(context: dict[str, Any]) -> None:
+    """降级 plan（八步全喂同一不存在 chunk_id）+ 全空 plan（evidence_refs 全空）两态。"""
+    if "pdf_use_case" not in context:
+        _assemble_archive_only(context)
+    missing_chunk = str(uuid.uuid4())
+    context["missing_chunk_id"] = missing_chunk
+    # 降级 plan
+    degraded_plan = str(uuid.uuid4())
+    context["degraded_plan_id"] = degraded_plan
+    context["_plan_ids"].append(degraded_plan)
+
+    def _refs_missing(stage: str, index: int) -> tuple[str, ...]:
+        return () if stage == "market_insight_synthesis" else (missing_chunk,)
+
+    records = _run_async(context["_loop"], _archive_steps(context, degraded_plan, refs_factory=_refs_missing))
+    assert len(records) == 8
+    # 全空 plan
+    empty_plan = str(uuid.uuid4())
+    context["empty_plan_id"] = empty_plan
+    context["_plan_ids"].append(empty_plan)
+    records = _run_async(context["_loop"], _archive_steps(context, empty_plan, refs_factory=lambda stage, index: ()))
+    assert len(records) == 8
+
+
+@when("分别生成降级与全空两份 PDF 报告")
+def invoke_degraded_and_empty_generation(context: dict[str, Any]) -> None:
+    """降级 plan 与全空 plan 各生成一份（两态断言数据面）。"""
+    _generate_pdf_report(context, context["degraded_plan_id"])
+    context["degraded_report"] = context["report"]
+    context["degraded_pdf_bytes"] = context["pdf_bytes"]
+    context["degraded_metadata"] = _run_async(
+        context["_loop"], _query_report_metadata(context, str(context["degraded_report"].report_id))
+    )
+    _generate_pdf_report(context, context["empty_plan_id"])
+    context["empty_report"] = context["report"]
+    context["empty_pdf_bytes"] = context["pdf_bytes"]
+    context["empty_metadata"] = _run_async(
+        context["_loop"], _query_report_metadata(context, str(context["empty_report"].report_id))
+    )
 
 
 @then("附录 C 引文条目值级匹配（文档名页码切片标识）")
@@ -1535,6 +1432,29 @@ def assert_empty_citation_note(context: dict[str, Any]) -> None:
     assert metadata["unresolvable_citation_count"] == 0
 
 
+# ======================================================================
+# AC-4: PDF 内部可点击导航（目录/书签/引文锚点）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "书签 outline 层级结构",
+)
+def test_outline_hierarchy() -> None:
+    """S7: AC-4 书签 outline 层级（display_name 源独立构造期望）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "目录内链与引文锚点",
+)
+def test_toc_links_and_citation_anchors() -> None:
+    """S8: AC-4 目录 link 注释 + 引文锚点附录 C 页独占。"""
+    pass
+
+
 @then("PDF 书签 outline 层级与冻结章节结构一致")
 def assert_outline_hierarchy(context: dict[str, Any]) -> None:
     """outline 层级序列全等（display_name 配置源独立构造期望——含 H1 题级与附录 B/C）。"""
@@ -1600,6 +1520,20 @@ def assert_citation_anchors_appendix_only(context: dict[str, Any]) -> None:
         assert _APPENDIX_C_TITLE in page_texts[page]  # 锚定附录 C 页
 
 
+# ======================================================================
+# AC-5: ReportGenerated 事件零新增复用（report_type=pdf）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "ReportGenerated 事件经 outbox 落行",
+)
+def test_report_generated_outbox_row() -> None:
+    """S9: AC-5 事件 outbox 落行四键值级（report_type=pdf）。"""
+    pass
+
+
 @then("outbox 落行且事件四键值级匹配（report_type 为 pdf）")
 def assert_outbox_four_keys(context: dict[str, Any]) -> None:
     """event_type/report_id/report_type/file_path 四键值级断言（非仅存在性）。"""
@@ -1609,6 +1543,20 @@ def assert_outbox_four_keys(context: dict[str, Any]) -> None:
     assert rows[0][0] == str(report.report_id)
     assert rows[0][1] == "pdf"
     assert rows[0][2] == report.file_path
+
+
+# ======================================================================
+# AC-6: 契约零破坏（6-5a/6-x 冻结面零触碰）
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "读侧消费面契约键集全等",
+)
+def test_read_side_contract_key_sets() -> None:
+    """S10: AC-6 读侧消费面契约（chain 五键 + payload 键族全等）。"""
+    pass
 
 
 @then("chain 读侧 records 五键结构与冻结面全等")
@@ -1632,6 +1580,78 @@ def assert_event_payload_key_family(context: dict[str, Any]) -> None:
     assert payload["event_type"] == "ReportGenerated"
     assert payload["aggregate_id"] == str(report.report_id)
     assert payload["aggregate_type"] == "Report"
+
+
+# ======================================================================
+# AC-7: 性能与持久化成功率
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "性能 P95 与成功率采样（单一数据源 20 轮）",
+)
+def test_performance_p95_and_success_rate() -> None:
+    """S11: AC-7 性能 P95<60s + L4 对象数 20（OD-8 口径）。"""
+    pass
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "并发生成 3 个 PDF 报告互不串扰",
+)
+def test_concurrent_three_pdf_reports() -> None:
+    """S12: AC-7 并发 3（gather 形态锚）。"""
+    pass
+
+
+@given("三个独立 plan_id 各自八步归档在位")
+def three_plans_eight_steps_archived(context: dict[str, Any]) -> None:
+    """三独立 plan_id 各自逐 stage 八步归档（并发场景数据面）。"""
+    if "pdf_use_case" not in context:
+        _assemble_archive_only(context)
+    context["concurrent_plan_ids"] = []
+    for _ in range(3):
+        plan_id = str(uuid.uuid4())
+        context["concurrent_plan_ids"].append(plan_id)
+        context["_plan_ids"].append(plan_id)
+        records = _run_async(context["_loop"], _archive_steps(context, plan_id))
+        assert len(records) == 8
+
+
+@when("单一数据源连续 20 次生成 PDF 报告")
+def invoke_twenty_rounds(context: dict[str, Any]) -> None:
+    """单一 plan_id × 20 次生成（OD-8 采样形态——每轮 L4 对象键锚 report_id 天然互异）。"""
+    import time as _time
+
+    durations: list[float] = []
+    report_ids: list[str] = []
+    for _ in range(_PERF_SAMPLE_ROUNDS):
+        started = _time.monotonic()
+        report = _generate_pdf_report(context, context["plan_id"])
+        durations.append(_time.monotonic() - started)
+        report_ids.append(str(report.report_id))
+    context["perf_durations"] = durations
+    context["perf_report_ids"] = report_ids
+
+
+@when("asyncio gather 并发生成 3 个 PDF 报告")
+def gather_three_concurrent_reports(context: dict[str, Any]) -> None:
+    """gather 3（async 辅助函数体内 await + _run_async 驱动——6-4 形态锚）。
+
+    会话由装配层 find 包装承担（每 find 调用独立 session_context——并发
+    任务各持独立会话，AsyncSession 非并发安全的分任务防线）。
+    """
+    plan_ids = context["concurrent_plan_ids"]
+
+    async def _gather() -> list[Any]:
+        return await asyncio.gather(*(context["pdf_use_case"].execute(plan_id=pid) for pid in plan_ids))
+
+    reports = _run_async(context["_loop"], _gather())
+    context["concurrent_reports"] = reports
+    for report in reports:
+        context["_report_ids"].append(str(report.report_id))
+        context["_pdf_object_keys"].append(report.file_path)
 
 
 @then("每轮新 report_id 且 L2 行数、L4 对象数与 outbox 行数累计 20")
@@ -1670,6 +1690,25 @@ def assert_three_reports_isolated(context: dict[str, Any]) -> None:
         assert rows == 1, f"并发三元串扰: plan={plan_id} rows={rows}"
         outbox = _run_async(context["_loop"], _query_outbox_report_rows(context, str(report.report_id)))
         assert len(outbox) == 1  # 事件三元——每 report 恰一行
+
+
+# ======================================================================
+# 收尾: 交付件存在性验收
+# ======================================================================
+
+
+@scenario(
+    "test_acceptance_pdf_report.feature",
+    "Story 交付件存在性收尾验收",
+)
+def test_story_deliverables_existence() -> None:
+    """S13: 收尾交付件存在性逐项断言。"""
+    pass
+
+
+@given("开发实施完成")
+def development_completed() -> None:
+    """S13 收尾场景前置（静态断言无服务依赖）。"""
 
 
 @then("src 交付件（VO/异常/端口/服务/用例/渲染器/CLI/组合根）逐项存在")
