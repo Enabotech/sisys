@@ -641,6 +641,25 @@ class TestSectionFaultTolerance:
         assert view.planning.available is False
         assert view.planning.completed_steps == 0
 
+    async def test_numeric_string_state_data_leniently_accepted(self) -> None:
+        """字符串数字形态经 int() 宽容采用（AC-5 第三形态——R3-F1 行为锁定）.
+
+        「宽容-严格」分界钦定（R3 注记：缺键且有单源常量→默认 / 值现且可强转→采用 /
+        值现且不可用→降级）：int("8")==8 静默成功不降级——本格钉死该宽容采用是**预期
+        行为**（与 current_step 错型穿透 R1 注记同族），防未来被误「修复」为严格形态。
+        """
+        plan_id = _full_fixture_plan()
+        state = _make_latest_state(plan_id, completed=3, degraded_steps=[])
+        state["completed_steps"] = "3"
+        state["total_steps"] = "8"
+        service = _make_service(snapshot_repo=_make_snapshot_repo(load_return=_make_snapshot(state)))
+        view = await service.build_executive_view(plan_id=plan_id)
+        assert view.planning.degraded is False
+        assert view.planning.available is True
+        assert view.planning.completed_steps == 3
+        assert view.planning.total_steps == 8
+        assert view.planning.progress_percent == 37
+
     async def test_recovery_record_corrupted_degrades_trace_keys(self) -> None:
         """恢复记录损坏（state_data 畸形）→ 留痕三键降 None 不抛（AsyncMock 面单测承载——R1-F2）."""
         plan_id = _full_fixture_plan()

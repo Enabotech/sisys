@@ -111,7 +111,7 @@
 **Then** **段级独立容错**（6-7 节点级降级的段级版）：四源各自 try 包裹——单源异常仅该段 `degraded=True`（段内计数/标识降默认值），**其余段照常聚合，视图整体不抛**（「某段拿不到不得炸整体」——聚合面容错哲学；对照 6-7「树是唯一产物顶层空树」——本 Story 四段独立产物，顶层哨兵 `build_degraded = 任一段 degraded` 聚合）；**真实链路异常面注记（R1-F2）**：snapshot 源的 `RedisSnapshotStore.load` 捕获一切异常归一 None（`redis_snapshot_store.py:179-181`——连接失败/键缺失/JSON 损坏三态归一，6-6 `ports/checkpoint.py:60-67` 退化语义自注在案），故「损坏 vs 缺失」分立在真实 Redis 链路**不可达**（均落空态）；段 degraded 的异常面真实链路仅 **PG 两源**（audit search/report 查询的 session 异常）可触发，snapshot 源容错分支归单测 AsyncMock 面承载（6-7 DR1-5 同族裁定——「真实端口不可写断言归单测」原则转述）
 **And** 空 plan 幂等读：视图正常返回 8 键（planning.available==False/approval.available==False/report.available==False/audit 空态**差值断言**——AC-4 差值体系）、`build_degraded==False`（「没有数据」非「拿不到数据」——6-7 空树分立语义延续）、health==AMBER（AC-2 规则 3）、**不抛异常**（6-4 `ChainOfThoughtTraceView`「空档案返回 total=0 不抛异常」+ 6-6 空清单+ 6-7 空树三先例族——枚举聚合面语义）
 **And** 畸形 plan_id（非 UUID）→ 用例层 242 `EntityValidationError`（`GetTraceabilityTreeUseCase`/`GetBlmChainTraceUseCase` UUID 守卫直系先例——服务层不守卫，分工钦定同 6-7 OD-3）；编程面 `pytest.raises` 形态、CLI stderr 形态分立（AC-6）
-**And** 快照在位但 state_data 畸形（缺键/类型错）→ planning 段降级（`degraded=True` + available==False + 计数降 0），不抛（读侧脏数据守卫——6-5b 脏形态守卫同款形态；归单测矩阵承载畸形形态枚举）
+**And** 快照在位但 state_data 畸形（缺键/类型错）→ planning 段降级（`degraded=True` + available==False + 计数降 0），不抛（读侧脏数据守卫——6-5b 脏形态守卫同款形态；归单测矩阵承载畸形形态枚举；**第三形态注记（代码审查 R3-F1）**：「字符串数字」形态（`"8"`/bool）经 `int()` 宽容采用不降级——「宽容-严格」分界钦定：缺键且有单源常量→默认 / 值现且可强转→采用 / 值现且不可用→降级；单测 `test_numeric_string_state_data_leniently_accepted` 钉死该预期行为——与 current_step 错型穿透 R1 注记同族）
 
 **验证标准/Validation Criteria:**
 - [x] 空 plan 幂等读三断言（8 键恒在+build_degraded==False+health==AMBER）
@@ -982,8 +982,8 @@ def derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 2026-11-06（Round 1 + Round 2）
-**审查模式:** full（R1：四视角并行调研【A 实现正确性/B 测试判别力/C 架构接线/D 运行实测】+ 双评审员【数学等价性/传播面回归面】+主会话亲验四项；R2：回归核查+组合交互面双 Agent——R1 修复传播完备性 9/9+四交点推演零互拆+证伪留痕 7 条）
+**审查日期:** 2026-11-06（Round 1 + Round 2 + Round 3）
+**审查模式:** full（R1：四视角并行调研【A 实现正确性/B 测试判别力/C 架构接线/D 运行实测】+ 双评审员【数学等价性/传播面回归面】+主会话亲验四项；R2：回归核查+组合交互面双 Agent——R1 修复传播完备性 9/9+四交点推演零互拆+证伪留痕 7 条；R3：单深度推演——前轮修复历史路径闭合推演+五性快扫+运行面抽验 47 passed）
 
 #### 需决策 Decision Needed
 
@@ -1003,6 +1003,7 @@ def derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth
 - [x] **R2-F1（P3——双 Agent 交叉发现）**：`test_malformed_state_data_bad_type`/`test_malformed_state_data_zero_total` 补 `available is False`+`completed_steps == 0`（AC-5 三腿契约对称——zero_total 是 F1 早退分支唯一守护，原只断 degraded 使「早退改 available=True」突变存活）
 - [x] **R2-F2（P3）**：排除集「不可收缩」反论证注记四处回写（验收/集成常量区+AC-7+OD-7——单锚后 window 与 generated_at 同路恒等≠跨路可比，各路 now 互异，防未来「优化」收缩排除集致 S11 假红）
 - [x] **R2-F3（P3——成本趋零裁量）**：CLI stub `window_end` 同锚改值（与 generated_at 同值+window_start 保持 7 天跨度——消灭 F2 恒等式矛盾的模板毒性，防未来复制踩坑）
+- [x] **R3-F1（P3）**：AC-5 第三形态「字符串数字经 int() 宽容采用」注记+行为锁定测试 `test_numeric_string_state_data_leniently_accepted`（「宽容-严格」分界钦定入 AC-5——缺键且常量→默认/值现可强转→采用/值现不可用→降级；钉死宽容采用是预期行为防误修复——R3 单深度推演发现，四格矩阵未注记格）
 
 #### 已推迟 Defer
 
@@ -1028,6 +1029,13 @@ def derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth
 - pre-existing 观察：`total_steps` 缺键宽容默认 8 不降级 vs `<=0` 降级——两形态处置不对称（v1.4.0 既有非 R1 引入，AC-5 畸形枚举钦定形态外注记）
 - pre-existing 观察：架构验证器 `_imports_of` docstring 称「模块级」实现为全树 ast.walk（更严方向——双保险形态）
 
+#### R3 未落码注记（P3 记录级——呈现/产品语义面，挂 Epic 21 锚）
+
+- **CLI 降级段与真实空态同形**（R3 轴二发现）：report 段降级（PG 查询失败）时 CLI 输出「最新报告: 无（可先执行 report-generate）」——报告可能存在仅查询失败，操作提示误导（对存在的报告重生成）；planning/audit 降级计数 0 与空态段行级不可区分——唯一信号是健康行「（部分数据降级）」后缀。AC-6 冻结文案即此形态（实现与 spec 一致），文案修订会破坏 CLI 精确匹配断言面——**挂 Epic 21 呈现面消歧锚**（届时段行降级后缀或降级时抑制操作提示）
+- **审计行系统级语义的 CLI 呈现歧义**：「近 7 天事件: {total}」在 plan 头部下易误读为本 plan 事件量（OD-10 开发者面注记在案，高管呈现层无「全系统」限定语）——数据正确仅呈现歧义，**挂 Epic 21 仪表盘设计锚**（文案消歧与 KPI 设计一并评估）
+- **derive_health 审批侧严重度天花板是 amber**（spec-frozen 产品语义）：「checkpoint 全 invalidated 零 in_sync」（数据完整性全损）落规则 2 破坏④→amber，审批侧单独不可达 red——实现与 Task 0.2 冻结规则表逐字一致，是否给审批侧加 red 判据是范围权威问题，**挂 Epic 21 KPI 设计锚**评估（MVP「关注」兜底可辩护）
+- 证伪留痕 4 条：F2 单锚「as-of T 一致快照」语义闭合（期间新事件按定义不含——非缺陷）/R2-F2 排除集注记两类理由未混同（µs 括注是经验性一般化非承重墙）/F3 docstring 斜杠映射 12/12 与维度表一致（S6=AC-1·AC-5 对表）/D6-8-R1-1 在 docker/k8s 部署形态下非真实影响（env 由编排系统注入——登记定界准确）
+
 ---
 
 ### 下一步 Next Steps
@@ -1040,10 +1048,11 @@ def derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth
 
 ---
 
-**故事版本/Story Version:** v1.5.1
+**故事版本/Story Version:** v1.5.2
 **创建日期/Created:** 2026-11-06
 **最后更新/Last Updated:** 2026-11-06
 **更新说明/Description:**
+- v1.5.2: **代码审查 Round 3 单深度推演**（前轮修复历史路径闭合推演——R1/R2 全部 11 项落码语义闭合「修复的修复」零新缺陷+五性快扫+运行面抽验 47 passed；**零 P0/P1/P2，P3 落码 1+注记 3+证伪留痕 4**——R3-F1 AC-5 第三形态「字符串数字 int() 宽容采用」注记+行为锁定测试（四格矩阵补格：「宽容-严格」分界钦定）/CLI 降级段与空态同形+audit 呈现歧义+审批侧 amber 天花板三项呈现面注记挂 Epic 21 锚/证伪留痕：F2 单锚 as-of T 快照语义闭合+排除集注记成立+F3 映射一致+D6-8-R1-1 部署形态无影响）
 - v1.5.1: **代码审查 Round 2**（回归核查+组合交互面双 Agent——R1 修复传播完备性 9/9 核验+F3 三元组 12/12/12 三方闭合收集实证+F2 语义面 S1/S10/S11 真实链实跑绿+文档对账「落码 8+登记 2+注记 9」计数属实；四交点推演【F2×F3 恒等断言同源性/F2×S11 排除集/F1×AC-5 语义/F3×S12 File List】零互拆+证伪留痕 7 条；**零 P0/P1/P2，P3 落码 3+注记 4**——R2-F1 两畸形测试补 AC-5 三腿对称断言（双 Agent 交叉发现，封死早退分支 available 突变存活面）/R2-F2 排除集不可收缩反论证四处回写（同路恒等≠跨路可比）/R2-F3 CLI stub 同锚改值；外部联动面实测 21+61+12 passed 全绿）
 - v1.5.0: **代码审查 Round 1**（四视角并行调研【A 实现正确性/B 测试判别力/C 架构接线/D 运行实测——dev 声明全部实证为真：单测 238/契约 12/集成 4 零 skip/验收 12/12/ruff+mypy 全绿/回归联动 38】+双评审员【数学等价性——MRO 运行时验证排除 F1 险点/传播面回归面——F3 锁步三元组×12 坐标闭合】+主会话亲验四项：**P1×1+P2×4+P3×12，落码 8 项+登记 2 项+注记 9 项**——R1-F1 KeyError 控制流改早退+warning/R1-F2 单锚派生（AC-4 恒等式严格成立+验收 S1 严格断言）/R1-F3 R6 模板对齐（12 场景名+12 函数名去 S 编号——同暂存集口径分裂消解）/R1-F4 规则 1 available 合取项判别格/R1-F5 corrupted 测试钉 degraded 旗标/P3 三清偿（import 上移/CLI red 标签/单测恒等断言）；**突变实证 3 处**（F2 脱锚→红/F4 删合取项→红/F5 get→下标→红）；D6-8-R1-1（CLI python -m .env 存量缺口）+D6-8-R1-2（json_chain_of_thought S 残留）deferred-work 登记；暂存区三个非核心验收文件大改动甄别=6-7 R6 模板合规修正（已记录 6-7 md，非游离改动）
 - v1.4.0: **dev-story 实施完成**（in-progress→review——Task 0~7 全 Subtask 勾选：SDD 规范冻结（六 VO 键契约/规则表/红锚符号表/deferred-work 六条处置落档/三 Agent 调研锚点零漂移复核）+六 VO+ExecutiveHealth 三值枚举+ExecutiveViewPort v1.0.0+四段编排服务（derive_health 七合取规则+段级容错+顶层 build_degraded 哨兵）+GetExecutiveViewUseCase 242 守卫+CLI executive-view（五步定式+四段打印+空态行恒在）+组合根双注册+**audit search session_factory fallback**（OD-12 唯一 infra 增量——CLI 消费面激活缺口修复）；**12/12 验收场景全绿**（S1 四段键集值级/S2 三色规则表四断言段/S3 审批分布+留痕/S4 审计时间窗递减微秒+5 条样本/S5 零新增差值/S6 段缺席/S7 空态幂等+畸形 242/S8 CLI GREEN 精确行/S9 CLI 空态+stderr/S10 P95<500ms/S11 并发 20 路六键排除集对照/S12 完成清单）+集成四场景（真实链 round-trip 含 get_latest_by_plan 首消费激活/P95/并发）+架构四验证器（白名单结构断言——禁 git diff 形态）+契约五断言族；**门禁实跑**：四目录全量 15077 passed×2 轮零失败（no-cov 轮+覆盖率轮）+覆盖率 93.22%≥80%（application 94%≥85%/domain 97%≥90%/新增三 src 文件 100%≥95%）+mypy 759 文件零错误（756 基线零新增）+ruff 全绿+`_FROZEN_EVENT_COUNT=56` 守护通过+三红线 grep 零输出+openapi.yaml 零 diff；**变异实证 12 锚**（Task1×2/Task2×5/Task3×2/Task5×2/Task6×1——含并发等价性变异被排除集正确剔除的意外实证）；实施攻坚六项留痕（S2 第四腿自足化/S7 then 文本统一/S9 stdout 子串判定/CLI 变异语法合法化重做/audit 实现类名分立确认/register_use_case 不存在确认）；改动面 11 新建+5 扩展与 File List/项目结构树三方对账一致）
