@@ -64,6 +64,8 @@ _STEP_SEQUENCE: tuple[str, ...] = (
     "market_insight_synthesis",
 )
 
+# 并发对照排除集六键（不可收缩注记——代码审查 R2-F2：单锚后 window 键与 generated_at
+# 同路恒等但各路 now 互异——同路恒等≠跨路可比，收缩会使两两相等假红）
 _EXCLUDED_TOP_KEYS: tuple[str, ...] = ("generated_at",)
 _EXCLUDED_AUDIT_KEYS: tuple[str, ...] = (
     "window_start",

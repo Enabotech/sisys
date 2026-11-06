@@ -620,22 +620,26 @@ class TestSectionFaultTolerance:
         assert view.planning.completed_steps == 0
 
     async def test_malformed_state_data_bad_type(self) -> None:
-        """state_data 畸形（completed_steps 非 int 形态）→ planning 降级不抛."""
+        """state_data 畸形（completed_steps 非 int 形态）→ planning 降级不抛（AC-5 三腿全断——R2-F1）."""
         plan_id = _full_fixture_plan()
         state = _make_latest_state(plan_id, completed=3, degraded_steps=[])
         malformed = _make_snapshot({**state, "completed_steps": "not-a-number"})
         service = _make_service(snapshot_repo=_make_snapshot_repo(load_return=malformed))
         view = await service.build_executive_view(plan_id=plan_id)
         assert view.planning.degraded is True
+        assert view.planning.available is False
+        assert view.planning.completed_steps == 0
 
     async def test_malformed_state_data_zero_total(self) -> None:
-        """state_data 畸形（total_steps=0 除零形态）→ planning 降级不抛."""
+        """state_data 畸形（total_steps=0 除零形态）→ planning 降级不抛（AC-5 三腿全断——R2-F1）."""
         plan_id = _full_fixture_plan()
         state = _make_latest_state(plan_id, completed=0, degraded_steps=[])
         state["total_steps"] = 0
         service = _make_service(snapshot_repo=_make_snapshot_repo(load_return=_make_snapshot(state)))
         view = await service.build_executive_view(plan_id=plan_id)
         assert view.planning.degraded is True
+        assert view.planning.available is False
+        assert view.planning.completed_steps == 0
 
     async def test_recovery_record_corrupted_degrades_trace_keys(self) -> None:
         """恢复记录损坏（state_data 畸形）→ 留痕三键降 None 不抛（AsyncMock 面单测承载——R1-F2）."""

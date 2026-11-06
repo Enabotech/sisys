@@ -3148,8 +3148,8 @@ def _make_stub_view_sections(
     audit = SimpleNamespace(
         degraded=False,
         window_days=window_days,
-        window_start="2026-10-30T10:00:00+00:00",
-        window_end="2026-11-06T10:00:00+00:00",
+        window_start="2026-10-30T10:00:01+00:00",
+        window_end="2026-11-06T10:00:01+00:00",
         total_events=audit_total,
         recent_events=recent_events,
         last_event_at=last_event,

@@ -84,7 +84,9 @@ _WARMUP_ROUNDS: int = 2
 _CONCURRENCY: int = 20
 _WINDOW_DAYS: int = 7
 
-# 并发对照排除集六键（R1-F5/R2-F4——OD-7 ②口径）
+# 并发对照排除集六键（R1-F5/R2-F4——OD-7 ②口径；**不可收缩注记（代码审查 R2-F2）**：
+# 单锚派生后 window 键与 generated_at 同路恒等（同一 now——service 单锚），但 20 路各路
+# 入口 now 互异（µs 分辨率）——同路恒等≠跨路可比，收缩为只排 generated_at 会使两两相等假红）
 _EXCLUDED_TOP_KEYS: tuple[str, ...] = ("generated_at",)
 _EXCLUDED_AUDIT_KEYS: tuple[str, ...] = (
     "window_start",
