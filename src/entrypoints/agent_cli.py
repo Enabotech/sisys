@@ -1369,10 +1369,11 @@ def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> N
     total==0 打「该 plan 无思维链归档行」（total 是 kind 过滤后口径——R3-F3 精确化）/
     total>0 无分析层节点打归档对照行+成因提示（depth 折叠或 stage 越域——空结果自我
     解释是「没有数据」「拿不到数据」还是「有数据未展开」）。降级状态呈现（R3-F1——
-    与 R1-F3 同族诚实性）：切片行 status≠resolved 追加「[点失效]」、文档行
-    document_missing 追加「[文档缺失]」、degraded_stages 非空时对照行后打降级 stage
-    行——解析降级对分析视用户可见。getattr 形态零 VO import 依赖（6-3
-    _print_checkpoint_result 先例）。
+    与 R1-F3 同族诚实性）：切片行 status≠resolved 追加 `[status 原值]` 标记
+    （如 [point_missing]）、文档行 document_missing 追加 [document_missing]、
+    degraded_stages 非空时对照行后打降级 stage 行——解析降级对分析视用户可见
+    （标记用 status 原值非中文别名——零翻译层+值域直连 VO 契约）。getattr 形态零
+    VO import 依赖（6-3 _print_checkpoint_result 先例）。
     """
     root = getattr(tree, "root", None)
     adopted = getattr(tree, "adopted_archives", 0)

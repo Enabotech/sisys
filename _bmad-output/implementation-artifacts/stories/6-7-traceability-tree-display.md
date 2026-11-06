@@ -1,6 +1,6 @@
 # Story 6-7: 溯源树展示（四层追溯聚合查询——结论→分析→数据切片→原始文档 + 页码级跳转载荷 + ingestion payload 扩键半边清偿）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -889,6 +889,8 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 
 - [x] R1-保留-1：架构 A :84「application in path.parts」/C :148 同源断言——调研报恒真微瑕，主会话复核**改判保留**：对常量漂移有防呆判别力（常量被误改指向他层时红），非遗漏（对视角C P3-5 部分改判——仅契约 :36 死断言删除）
 
+**Round 1 汇总：P0:0 / P1:0 / P2×2 / P3×9（另含非编号顺带工作 1 项——并行会话 tests 面 mypy 类型清零 12 处×4 文件随 R1 提交入库，效果经 mypy 门禁全绿在位实证——R5 终审 TF-2 补注记）**
+
 #### 已修复 Patch
 
 - [x] R1-F1（P2·视角A）：服务六处 `(x or {})`/isinstance 混用守卫统一为 `_as_dict()`（非 dict 脏形态降空 dict）——消除 decision_basis/assumptions 为 truthy 非 dict（JSONB 外部可写面）时 AttributeError 逃逸（违反端口「本方法不抛业务异常」+「树整体不因单点失效失败」）；+2 单测（非 dict decision_basis 排除出 total 不炸/非 dict assumptions 降 evidence_count=0 不炸——变异①实证红）；+1 升格锚（payload 缺 document_id → chunk 保持 resolved 无文档子节点+find 零调用——评审员②建议）；+4 docstring 注记（哨兵复用/version 双口径/payload 无 document_id/空串 summary 回退）+ `_empty_tree` docstring 失实修正（「共用」→顶层降级专责——真空树走正常构造路径）
@@ -923,6 +925,19 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - [x] R3-F5（P3·推演Agent）：集成失败路径残留——场景④ delete_points+闭环断言在 try 内（断言失败 2 点残留共享 "documents" 永久泄漏）→ delete 入 finally（容错包裹防掩蔽）+闭环断言移块后（happy path 保留+finally 容错时兜底网）；场景② shared_document_id 行删在 try 中段（finally 清单缺口+注释失败路径失实）→ 入清理清单（DELETE no-op 安全）
 - [x] R3-登记-1（P3·推演Agent·登记不落码）：`--stage` 过滤零命中无提示——与 R2-F3 同项复现（第五格），维持 YAGNI 裁定（归档对照行计数已给自判材料）；R3-F1 落码后 CLI 降级呈现面已增强，零命中提示仍无契约要求
 
+**Round 4（纯验证，2026-11-06）：零发现零提交**——四目录全量回归 14984 passed/0 failed（14981+R3 净增 3 测试算术自洽）+R1~R3 修复存续抽验全在位（_as_dict×6/pkgutil 53/CLI 标记/manager 四元组）+三红线终扫零代码命中+application 覆盖率 91%≥85% 门禁。
+
+**Round 5（独立终审——新鲜上下文不轻信自报，2026-11-06）：五节全过，收敛通过**
+
+- [x] 节 1 周期闭合：三提交 22c598f9→5d8719cb→0dd91ee3 链连续零游离（R1 提交为「dev 实现首入库+R1 修订」合体形态——基线 89888b5d 无本 Story 源文件）；工作区干净
+- [x] 节 2 关键修复双向取证 10/10（R1-F1/F2/F3/F5+R2-F1+R3-F1/F2/F3/F4/F5 全部台账↔代码双向在位；R2-F1 全集 53 与 re-export 面 47 双口径独立复测精确一致）
+- [x] 节 3 独立快扫：服务 405 行+CLI 段全读零逻辑缺陷；变异锚判别力推演 3/3 真实（bbox is None/depth 零调用/降级标记双向）
+- [x] 节 4 门禁独立实跑全绿：ruff pass+mypy 756 零错误+三核心测试文件 200 passed+三红线 grep 零命中
+- [x] 节 5 收敛判据四项通过（零 P0/P1 残留——P2 链 2→0→1→0 且 R3-F1 已闭合/门禁绿/台账 20 条 F 编号全处置/模式日期轮次与提交一致）——**Status review→done 流转，版本 v1.4.0→v1.5.0**
+- [x] 特权发现 TF-1（P3·清偿）：agent_cli.py docstring 中文别名「[点失效]/[文档缺失]」与实现 status 原值标记不一致——docstring 同步原值口径（本提交清偿）
+- [x] 特权发现 TF-2（P3·注记）：R1 提交信息「P3×10」vs 台账 P3×9 差额=顺带 mypy 工作（见 R1 汇总行注记）
+- [x] 特权发现 TF-3（P3·清偿）：R1 节缺汇总行——已补（对齐 R2/R3 形态）
+
 ---
 
 ### 下一步 Next Steps
@@ -930,15 +945,17 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 五条处置注记+�
 - [x] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-6 五轮形态——R1~R5 五轮收敛定稿 v1.4.0：57 项累计修复+证伪留痕 26 组+严重度递减链 P1 10→4→1→0+零 P0/P1 残留）+ story-template 合规人工核对（R4 三轴/R5 六节终审承载——人工按模板清单最终核对仍建议在 dev-story 前过目一遍）
 - [x] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] 运行 `code-review` 进行代码审查（五轮循环 C1~C5——R1 四视角+双评审/R2 回归核查/R3 深度推演/R4 纯验证/R5 独立终审收敛 v1.5.0）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-11-05
-**最后更新/Last Updated:** 2026-11-05
+**最后更新/Last Updated:** 2026-11-06
 **更新说明/Description:**
+- v1.5.0: 代码审查周期五轮收敛 review→done——R1 四视角并行调研（A 树服务编排/B 接线层/C 测试质量/D payload 传播红线）+主会话逐条定谳+双评审员方案评审（非优秀不落码——R1-F5 后缀启发式 ~15% 覆盖被证伪、R1-F6 count>=2 被 3 处字面量证伪，两方案证伪修订后落码）；R2 回归核查双 Agent（Agent E 修复的修复+Agent F 传播完备性/组合交互）+单快评；R3 单深度推演 Agent+C3 单评审（两处修订——注记事实性与 not-in 永真化）；R4 纯验证零发现零提交；R5 独立终审（新鲜上下文五节取证）。
+  **收敛声明**：①周期形态=提交链 22c598f9→5d8719cb→0dd91ee3 三提交+R4 纯验证零提交，零游离提交；R1 提交为「dev 实现首入库+R1 修订」合体形态（基线 89888b5d 无本 Story 源文件——dev-story 产出随 R1 入库）。②累计发现处置 21 条目=落码修复 18（R1×11+R2×2+R3×5）+登记不落码 2（R2-F3/R3-登记-1 同项 YAGNI 留痕）+零动作 1（R2-F4 行号快照惯例）+保留改判 1（R1-保留-1）；另含非编号顺带工作 1 项（并行会话 tests 面 mypy 类型清零 12 处×4 文件随 R1 入库——R5 TF-2 注记）。③严重度分布与递减链：P0×0/P1×0 全程零；P2×3（R1-F1/F2/R3-F1）链 2→0→1→0；P3×18 链 9→4→5→0。④证伪留痕 5 组（R1-F5/R1-F6/R2-F1 对 R1-F5「全集」声称的再证伪 47→53/R3-F2/R3-F3 两处 C3 对主会话论证的证伪修订）——零事实性错误存留。⑤R5 独立终审五节全过：周期闭合零游离/关键修复双向取证 10/10/独立快扫零逻辑缺陷+变异锚 3/3 真实/门禁四项独立实跑全绿（ruff+mypy 756 零错误+200 passed+三红线零命中）/收敛判据四项通过。⑥终审特权发现 3 项 P3 随本提交清偿（TF-1 docstring 原值口径同步/TF-2 计数口径注记/TF-3 R1 汇总行补齐）。⑦验证底座：四目录全量 14984 passed 双轮（R1 后 14981+R4 后 14984）+变异实证 5 组（_as_dict 还原/bbox 合成/RAGIndexed 注入/ToolChainExecuted 注入/CLI 标记删除）+application 覆盖率 91%。⑧**放行结论：Status review→done，代码与实施规范面零 P0/P1/P2 残留，Story 6-7 代码审查周期闭合**。
 - v1.4.0: 文档审查 Round 4 纯验证 + Round 5 独立终审**五轮收敛定稿**——R4 三轴全过（epics 需求覆盖 6/6 零遗漏零未声明超范围+锚点存续 24/24 精确命中当前 HEAD 零漂移+门禁结构 7/7）+DR4-1（P3：sprint-status 注记旧数字——本提交清偿）；R5 独立终审（新鲜上下文不轻信自报）六节全过（周期闭合零游离/关键修复双向取证 12/12 正文在位/残留 13 词根扫描 10 零残留+3 P3 就地清扫 DR5-1~3/红线零残留/收敛判据通过/R4 留项处置核验）。
   **收敛声明**：①周期形态=create-story（四 Agent 调研+主会话亲验 9 组锚点+独立终审 13 项）+文档审查修订循环五轮——R1 四调研×三审查/R2 回归+组合双 Agent/R3 单深度推演/R4 纯验证/R5 独立终审；提交链 c1fc8092→0b5abdc9→2f42ff7e+本收敛提交，故事变更零游离。②累计修复 57 项=创建期 13（P1×1+P2×4+P3×8）+修订循环 44（DR1×23 簇【P1×10+P2×9+P3×4 簇】/DR2×10【P1×4+P2×4+P3×2 簇】/DR3×11【P1×1+P2×4+P3×6】+DR4×1/DR5×3），Docs Review Fixes 表 57 行双向对码全在位。③严重度递减链成立：P1 10→4→1→0、P2 9→4→4→0、P0 全程零——实施规范面零 P0/P1 残留。④证伪留痕 26 组（R2 8+R3 18）——零事实性错误存留。⑤锚点精度 24/24（含并行会话期零漂移）+基准 HEAD@420c8cdc+Task 0.8 实施期复核双保险。⑥红线零残留（三红线声明/noqa 禁令/AI 署名禁令+周期提交逐条核验）。⑦DR4-1 清偿随本提交落地（sprint-status 注记刷新 7 键/12 处/57 项+两旧口径词）。⑧**放行结论：Status ready-for-dev、12 场景全绑定、键契约三处一致（7/5/9/6/9）、命令字面量在位——dev-story 放行判据通过，可进实施**。
 - v1.3.0: 文档审查 Round 3（单 Agent 深度推演——12 场景期望唯一性三轴推演+三条长链路时间线全推演+Task 0→7 依赖干跑+VO 构造终态）——DR3-1~DR3-11 共 11 项：P1×1【root.children 挂接顺序未定义（仓储 archived_at DESC 透传则 CLI 输出即契约行序颠倒——钉死流程规范序+服务必重排+乱序输入单测锚）】+P2×4【synthesis 多行决胜+adopted 计数（入同一分组+计入 adopted——全 run 8/8/7）/AC-7 占比断言孤儿落位 S7/stage 越七值域链行 KeyError 面（读侧过滤+chain 三键 .get 兜底）/S7 双腿组织形态与 degraded_stages 期望钉死】+P3×6【S1/S2/S4 预置形态钉死（同文档嵌套重复断言锚收编/腿型指派/1 干净+1 脏）/CLI runner 签名+page 取源+--stage 保留结论层/conclusions 联展格式 "\n".join+结论层解析失败分支/AC-5 异常路径测试锚（side_effect 两分支）/S12 断言口径 15 项/S5 判别锚 chain 派生键+gap 型钦定】；**推演排除留痕 18 组**（S3 树形断言可写/S5 旧行无需预置点/S6 非链行自由构造/S8/S11 口径齐备/Task 0→7 依赖闭合/提交批次缺席属仓惯例/VO 构造面完整/archived_at 非并列成立/tiebreak 不受 DESC 序影响等——零事实性错误，基础事实层经 44 项修复后高度可信）
