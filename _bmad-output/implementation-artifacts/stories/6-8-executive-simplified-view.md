@@ -393,7 +393,7 @@
 
 **关联 AC:** AC-1
 
-> **六边形落位：** 全部应用层（`src/application/ports/`）——零 domain 零 infra（OD-12）。
+> **六边形落位：** 全部应用层（`src/application/ports/`）——零 domain；Task 1 交付面自身零 infra（OD-12 准三零——全 Story 唯一 infra 增量 audit search fallback 在 Task 2 循环 D，R5 引用收紧）。
 
 #### TDD 循环 A：六 VO + 枚举
 
@@ -596,7 +596,7 @@
 
 **来源:** [`architecture.md`](../../docs/architecture/architecture.md)
 
-- **架构模式:** 六边形架构严格分层（本 Story 纯应用层+组装层扩展——零 domain/零 infra/零 migration）；读侧聚合 CQRS 投影形态（聚合视图=多源读模型）
+- **架构模式:** 六边形架构严格分层（本 Story 纯应用层+组装层扩展——零 domain/零 migration+**单点 infra 增量**（audit search fallback——OD-12 准三零，R5 终修订正）；读侧聚合 CQRS 投影形态（聚合视图=多源读模型）
 - **设计约束:** 领域层零依赖（本 Story 零 domain 改动天然满足）；读侧 DTO 归应用层（六 VO+枚举 ports 文件承载）；查询不发布事件（architecture.md:1293）
 - **接口治理:** 统一端口注册（新端口 v1.0.0 一次到位）、Registry/Resolver、组合根唯一装配、契约优先、禁同义接口重复（聚合视图 vs 单域查询 vs 报告生成——三语义正交）；`get_latest_by_plan` 经既有 `report_repository` 消费不新开端口
 - **技术栈:** Python 3.11+ / Redis（快照+恢复记录点查）/ PostgreSQL（strategic_reports 单行查+audit_log 窗口查）/ pytest-bdd；**零 Qdrant/零 MinIO 业务依赖**（装配链依赖除外）
@@ -723,7 +723,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 
 ### 其他约束速查
 
-- **风险集中登记**：①口径风险=三色规则表（Task 0.2 冻结唯一版本+单测矩阵全枚举——实现禁散落 if 链）；②契约风险=六 VO 键契约（Task 0.1 冻结——实现禁增删键）；③清理风险=PG 面 B/C 面定向 DELETE（R2-F3 三分面后：A 编程面回滚式零 DELETE 零风险；B/C 面 DELETE 可行性=owner 身态（无 FORCE RLS 表 owner 绕过策略）+**行数断言防静默 0 行假绿**；快照/恢复记录 Redis 三键族定向 DEL 均有 6-x 先例）；④判别风险=审计窗口并行互扰（xdist 同组串行+窗口判别锚=预置行数差值形态+预置行微秒递减 best-effort 占头——R1-F6/R2-F1 残余风险注记）；⑤性能风险=audit total 全行取回（MVP 百行级远小于门禁——万行级触发分组计数端口立项锚 Epic 7/21，docstring 注记）；⑥装配风险=四依赖注册名漂移（lambda resolve 以 grep 为准——Task 0.8 复核）；⑦通道风险=CLI/并发面 session 供给（OD-12 search fallback 新增+reset_session/clear_session 陷阱+禁 set_session 并发——R2-F2/F3 三个实现陷阱注记在预置纪律节）
+- **风险集中登记**：①口径风险=三色规则表（Task 0.2 冻结唯一版本+单测矩阵全枚举——实现禁散落 if 链）；②契约风险=六 VO 键契约（Task 0.1 冻结——实现禁增删键）；③清理风险=PG 面 B/C 面定向 DELETE（R2-F3 三分面后：A 编程面回滚式零 DELETE 零风险；B/C 面 DELETE 可行性=owner 身态（无 FORCE RLS 表 owner 绕过策略）+**行数断言防静默 0 行假绿**；快照/恢复记录 Redis 三键族定向 DEL 均有 6-x 先例）；④判别风险=审计窗口并行互扰（xdist 同组串行+窗口判别锚=预置行数差值形态+预置行微秒递减 best-effort 占头——R1-F6/R2-F1 残余风险注记）；⑤性能风险=audit total 全行取回（MVP 百行级远小于门禁——万行级触发分组计数端口立项锚 Epic 7/21，docstring 注记）；⑥装配风险=四依赖注册名漂移（lambda resolve 以 grep 为准——Task 0.8 复核）；⑦通道风险=CLI/并发面 session 供给（OD-12 search fallback 新增+session API 选择陷阱（reset→clear 已订正 R3-N12）+禁 set_session 并发——R2-F2/F3 三个实现陷阱注记在预置纪律节，R5 措辞收敛）
 - **三条红线**：禁 `raise ValueError` / 手动 HTTPException / 继承内置 Exception（提交前三条 grep 自查零输出）；禁 noqa/type: ignore/pylint disable；提交信息禁 AI 署名
 - **覆盖率**：整体 ≥80% / application ≥85%（主改动层——epics L2419 对齐）/ domain ≥90% 维持（零改动不降）/ 集成 ≥75%（epics L2420 对齐）
 - **验收零 mock 全真实**（pytest.skip() 动态跳过；四通道真实服务——快照/CP/恢复/报告/审计；段级异常容错归单测 AsyncMock——验收面无故障注入通道，6-7 DR1-5 分立同款）
@@ -810,10 +810,10 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 
 1. [x] All tasks defined 所有任务定义完成（Task 0~7 含 TDD 循环+变异锚）
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-7+12 场景钉死）
-3. [x] Architecture constraints extracted 架构约束已提取（三零 Story+依赖方向矩阵）
+3. [x] Architecture constraints extracted 架构约束已提取（准三零 Story+依赖方向矩阵——R5 终修）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（8 学习点+7 应用项）
 5. [x] Sprint status synced to `ready-for-dev`
-6. [x] OD-1~OD-12 十二裁定落档（范围收窄/零事件/零异常/键契约/三色规则/审批口径/性能三段/锚定义务/命名/审计口径/组合根/三零）
+6. [x] OD-1~OD-13 十三裁定落档（范围收窄/零事件/零异常/键契约/三色规则/审批口径/性能三段/锚定义务/命名/审计口径/组合根/准三零/UUID 转换——R5 终修口径）
 7. [x] deferred-work 六条锚定义务处置预案落档（Task 0.7——四条 6-8 锚定+两条例行顺延，R1 口径统一）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
@@ -860,7 +860,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 | R1-F35 | 引用形态四项——architecture.md:1293 语义升格（记忆子系统单行）/DR1-5 借名（6-7 无「故障注入」字样）/traceability 372-379 依据链（设计文档无该段）/L2415 自注扩展适用（Lighthouse 是等价推理） | P3 | 四处补转述/依据链/等价推理注记 |
 | R1-F36 | 「7 Task」vs Task 0~7 两口径+审计窗口闭区间（end_time <= 含端点）未注记 | P3 | 完成清单改「Task 0~7 共 8 Task」；OD-10/AC-4 补闭区间 |
 
-**R1 修复对码**：36 项全部落码于本 v1.1.0 修订（P1×8 簇：F1/F2/F3/F4/F5/F6/F12/F22——F6 近 P0；P2×13；P3×15）；证伪留痕：S1 快照直写 484 触发疑点（checkpoint_no 空不触发——亲验 :78-84）/P-green 必须先恢复疑点（None→全量 in_sync 退化语义实证 :526/:535）/execute_recovery 改写规划快照疑点（只写恢复记录）/checkpoint 通道自动写 audit 疑点（StrategicArchiveService 无 audit 依赖+6-6 audit_service=None）/limit clamp 疑点（透传实证）/12 场景计数疑点（求和恰 12）/SCOPED 并发缺陷疑点（session_factory 每调用独立会话）——7 条推演排除防重推。
+**R1 修复对码**：36 项全部落码于本 v1.1.0 修订（P1×8 簇：F1/F2/F3/F4/F5/F6/F12/F22——F6 近 P0；P2×14；P3×14——R5 终审订正分档计数：原记 P2×13/P3×15 各偏 1，总数 36 无误）；证伪留痕：S1 快照直写 484 触发疑点（checkpoint_no 空不触发——亲验 :78-84）/P-green 必须先恢复疑点（None→全量 in_sync 退化语义实证 :526/:535）/execute_recovery 改写规划快照疑点（只写恢复记录）/checkpoint 通道自动写 audit 疑点（StrategicArchiveService 无 audit 依赖+6-6 audit_service=None）/limit clamp 疑点（透传实证）/12 场景计数疑点（求和恰 12）/SCOPED 并发缺陷疑点（session_factory 每调用独立会话）——7 条推演排除防重推。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -892,6 +892,10 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 
 **R3 修复对码**：12 项（P1×1/P2×5/P3×6）全部落码于 v1.3.0；四推演点定谳（A 双清不触发二次 bootstrap——判据是 registry 成员非实例缓存 agent_cli.py:101-112 vs resolver.py:253-259；B session_factory SINGLETON 注册链双清后可达 composition_root.py:225-237；C S10 审计预置必要=AC-1 形态 Given 合规；D pool 5+10 上限 15<20 并发=QueuePool 等待制毫秒级排队不报错——全成功成立）；证伪留痕 8 条（双清 ConflictError/session_factory 不可达/pool 报错/S9 需预置/第八隐藏条件/fallback 新 import/teardown 不可达/五读口径需改）——S8 GREEN 全链推演可达（唯一硬前置=OD-12 fallback 落地）。
 
+### 📛 文档审查收敛声明（R1~R5 终审——v1.3.1 定稿）
+
+> **收敛声明（独立终审六节全过）**：修订周期 R1×36+R2×8+R3×12 共 **56 项全登记**（R4 纯验证零提交），提交链三笔零游离（每笔恰 Story+sprint-status 两文件：004277be→6eba5658→2d03b058）；R5 独立终审 10 项关键修复文档+代码**双向取证全属实**（递减微秒偏移在窗数学复算成立/search 无 fallback 缺口为真/白名单守护/progress_percent 口径分立/8 字段/差值断言/六键排除集/clear_session API/UUID 签名/24 值枚举独立数数）；13+ 词根残留扫描活性位零残留；红线零违（无抑制语/提交零 AI 署名/验收零 mock 口径一致）。**严重度递减链 P1 8→4→1→0，零 P0/P1/P2 残留**。R4 验证三轴全过（32 词根终扫/20 组锚点存续零漂移/epics L2391-2432 全承载零超范围+门禁结构全一致）；R5 终修 P3×6（三零词簇三处/R1 分档计数订正 P2×14+P3×14/L396·L726·sprint-status 措辞——零实施影响）。**定稿 v1.3.1，零 P0/P1/P2/P3 残留，可进 dev-story。**
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -916,18 +920,19 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 ### 下一步 Next Steps
 
 - [ ] Story created with `ready-for-dev` status
-- [ ] 运行文档审查修订循环（参照 6-6/6-7 五轮形态）
+- [x] 运行文档审查修订循环（参照 6-6/6-7 五轮形态——**已完成 R1~R5 五轮收敛 v1.3.1**：R1 四调研+双评审 36 项/R2 回归+组合 8 项/R3 深度推演 12 项/R4 纯验证零提交/R5 独立终审六节全过+P3×6 终修——收敛声明入档，零 P0/P1/P2/P3 残留）
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-06
 **最后更新/Last Updated:** 2026-11-06
 **更新说明/Description:**
+- v1.3.1: 文档审查 Round 4 纯验证+Round 5 独立终审**五轮收敛定稿**（R4 三轴纯验证零提交：32 词根终扫 29 零活性残留+20 组修复锚点存续零漂移+epics 全承载零超范围+递减链 8→4→1→0+门禁结构全一致；R5 独立终审六节全过：周期闭合零游离/10 项关键修复文档+代码双向取证全属实（24 值独立数数/search 缺口实证/数学复算）/残留活性位零/红线零违/收敛判据通过；终修 P3×6：三零词簇三处+R1 分档计数订正 P2×14/P3×14+措辞三处——收敛声明入档；**零 P0/P1/P2/P3 残留，可进 dev-story**；审查周期累计 56 项修复全登记，12 Agent 并行投入【R1×6/R2×2/R3×1/R4×1/R5×1】+主会话预登记亲验）
 - v1.3.0: 文档审查 Round 3 单深度推演修订（终态推演——四推演点定谳全无破口：双清不触发二次 bootstrap/session_factory 双清后可达/S10 审计预置必要/pool 15<20 等待制不报错；S8 GREEN 全链可达——唯一硬前置=OD-12 fallback 落地；**12 项修复**（P1×1/P2×5/P3×6）：N1 架构守护白名单化（「零 infra 命中」×OD-12 硬互斥消解——src/infrastructure 白名单恰 {audit_repository_impl.py}）/N2 search fallback 补 TDD 载体（Task 2 循环 D+test_audit_repository 扩展+计数 11 新建+5 扩展）/N3 回归面三扩展/N4 OD-7 六键联动/N5 回滚式残留簇三处（Task 5 同 Task 红绿互斥消解）/N6 sprint-status 6-8 行同步/三零词簇×5/Status 括注/:3434/「最近: 无」可达面注记/矩阵扩展行/reset_session→clear_session API 订正；8 条证伪留痕）
 - v1.2.0: 文档审查 Round 2 修订（回归核查+组合交互面双 Agent——R1 修复的传播完备性 28/36 落地+8 处残留清扫；**三处组合互拆定谳**：① S4 未来秒级 timestamp×闭区间出窗（P1 近 P0）→ 递减微秒偏移体系；② **CLI 面审计段恒降级**（search 无 fallback——AC-6 生产可用性缺陷）→ **OD-12 重开为准三零 Story**（search session_factory fallback 唯一 infra 增量 ~6 行）；③ S11 共享回滚 session×20 路并发（AsyncSession 非并发安全）→ **PG 面三分面通道体系**（A 编程面回滚式/B CLI 面 reset+commit+DELETE 行数断言/C 并发面禁 set_session 每路独立会话）；S11 排除集三键→六键（audit 值级三键 flake 消解）；to_dict 15 键订正/取舍钦定/编号错标勘误——8 项修复（P1×4 簇/P2×2/P3×2）+8 条证伪留痕）
-- v1.1.0: 文档审查 Round 1 修订（四视角调研 Agent【四源数据面/审计面与清理通道/CLI 与测试样板/文档权威面】+双评审员【场景三轴推演/一致性交叉】+主会话预登记 12 疑点与亲验 6 项——36 项修复落码：P1×8 簇/P2×13/P3×15；核心裁定：**审计段断言体系改差值形态**（全局窗无 plan 维度，绝对空断言共享库下必红——R1-F6 近 P0）/**预置通道体系修订**（CP 快照+恢复记录全直写+PG 面事务回滚式清理——消解「零 LLM 声明×create_checkpoint 重通道」互斥与五类编排副产物+RLS 四态漂移风险——R1-F12/F9）/progress_percent 钦定 int 截断与实体 float 口径分立（R1-F3）/ReportSection.generated_at=created_at.isoformat() 派生映射+8 字段订正（R1-F4）/S11 并发对照排除集三键（R1-F5）/snapshot load 异常归一 None 退化语义注记（R1-F2）/OD-13 新增（get_latest_by_plan UUID 转换钦定）；事实订正：Redis 点查 ×11/AuditActionType 24 值/组合根 :3434/CLI 样板实名/三色措辞锚 UX L1250-1252/锚定义务六条口径；结构补齐：R1~R4 落点节/Modified Files 节/Task 6.6 变异/矩阵编号语义注记；Status 三口径统一 ready-for-dev）
+- v1.1.0: 文档审查 Round 1 修订（四视角调研 Agent【四源数据面/审计面与清理通道/CLI 与测试样板/文档权威面】+双评审员【场景三轴推演/一致性交叉】+主会话预登记 12 疑点与亲验 6 项——36 项修复落码：P1×8 簇/P2×14/P3×14（R5 终审订正分档）；核心裁定：**审计段断言体系改差值形态**（全局窗无 plan 维度，绝对空断言共享库下必红——R1-F6 近 P0）/**预置通道体系修订**（CP 快照+恢复记录全直写+PG 面事务回滚式清理——消解「零 LLM 声明×create_checkpoint 重通道」互斥与五类编排副产物+RLS 四态漂移风险——R1-F12/F9）/progress_percent 钦定 int 截断与实体 float 口径分立（R1-F3）/ReportSection.generated_at=created_at.isoformat() 派生映射+8 字段订正（R1-F4）/S11 并发对照排除集三键（R1-F5）/snapshot load 异常归一 None 退化语义注记（R1-F2）/OD-13 新增（get_latest_by_plan UUID 转换钦定）；事实订正：Redis 点查 ×11/AuditActionType 24 值/组合根 :3434/CLI 样板实名/三色措辞锚 UX L1250-1252/锚定义务六条口径；结构补齐：R1~R4 落点节/Modified Files 节/Task 6.6 变异/矩阵编号语义注记；Status 三口径统一 ready-for-dev）
 - v1.0.0: 创建故事文件（四 Agent 并行调研【报告链路/Checkpoint 审批/审计与状态先例/测试样板与契约治理】+主会话亲验 12 组关键锚点；OD-1~OD-12 十二裁定：范围收窄 CLI-only 第七连（epics L2391 取代注记钦定——UI 归 Epic 21，本 Story 后端聚合口径+CLI 呈现）/零新增事件（查询型第七连+_FROZEN_EVENT_COUNT=56 零变化）/零新增异常（242 复用+空态幂等读+480 语义分立）/六 VO+ExecutiveHealth 三值枚举（全仓首个三值分级枚举——8/8/10/7/8/4 键契约）/RAG 三色确定性短路规则表（red>green>amber）/审批中心聚合口径（CheckpointStatus 零审批态实证——completed+sync 三态分布+恢复留痕三键合成）/性能三段口径（P95<500ms 服务面+并发 20 单数据源读面+前端指标后端不定义）/锚定义务四条处置（6.5a-DF1 顺延 Epic 7/6.5a-DF2 触发未至顺延/6.7-DF2 重锚 Epic 21-22/data_pipeline 维持）/命名词族 executive_view（对 epics dashboard 钦定名显式偏离）/审计摘要口径（7 天窗+total+5 条样本——分布分桶 defer 伪精确禁令）/组合根双注册+四既有依赖复用+get_latest_by_plan 首激活/三零 Story（零 infra/零 migration/零 domain）；12 验收场景钉死（S1~S12——epics 架构测试三项落位对账+性能三项口径声明在位）；deferred-work 六条处置预案（含 L170/L17 顺延）
