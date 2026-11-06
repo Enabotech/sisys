@@ -1,6 +1,6 @@
 # Story 6-8: 高管简化视图（四段聚合查询——规划态势/审批中心/审计摘要/报告可得性 + RAG 三色健康状态 + CLI `executive-view`）
 
-**Status:** `ready-for-dev`（R1~R3 修订维持——6-7 R2-4 三口径复发已于 R1 清扫）
+**Status:** `review`（dev-story 实施完成 2026-11-06——Task 0~7 全勾：12/12 验收场景全绿+集成四场景+四目录全量 15077 passed×2 轮零失败+覆盖率 93.22%（application 94%/domain 97%/新增文件 100%）+mypy 759 文件零错误+ruff 全绿+变异实证 12 锚；待代码审查周期）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -50,14 +50,14 @@
 - **规划态势段** `PlanningSection` **8 键**：`available`（快照在位 bool）/`degraded`（数据源异常 bool——段级降级哨兵）/`completed_steps`/`total_steps`（期望 8——`BLM_TOTAL_STEPS` 常量单源）/`progress_percent`（int 0-100——`int(completed_steps / total_steps * 100)` 向下取整，**与 `BlmPlanningStatus.progress_percent`（round-2 float，`blm_phases.py:174-176`）口径有意分立**——同源分母分子、VO 侧 int 截断为高管视图整数口径钦定，R1-F3 裁定）/`current_step`/`degraded_step_count`（降级步计数——**派生自 state_data `degraded_steps`（`list[str]` 步骤标识清单）的 `len()`**，非直读计数键）/`last_activity_at`（timeline 末位条目 `completed_at` 键——timeline 条目六键 step/started_at/completed_at/status/summary_excerpt/degraded、ISO 字符串形态 `blm_planning.py:12-13`；无 timeline 降 None）
 - **审批中心段** `ApprovalSection` **10 键**：`available`（probe 到 ≥1 checkpoint）/`degraded`/`total_checkpoints`/`completed_count`/`in_sync_count`/`pending_sync_count`/`invalidated_count`（sync_status 三态分布）/`last_recovery_mode`/`last_recovery_confirmed_by`/`last_recovered_at`（恢复记录 12 键直读留痕三键——无恢复记录降 None）
 - **审计摘要段** `AuditSection` **7 键**：`degraded`/`window_days`（默认 7——服务常量 `DEFAULT_AUDIT_WINDOW_DAYS`）/`window_start`/`window_end`（ISO 字符串）/`total_events`（时间窗内总数——`AuditSearchResult.total` 单源）/`recent_events`（最近 5 条 `AuditEventSummary` **4 键** 元组：action_type/actor/target_resource/timestamp）/`last_event_at`（无事件降 None）——审计段**无 available 键**（窗口零事件是合法空态非不可得，与规划/审批/报告三段的 available 语义分立——OD-4）
-- **报告可得性段** `ReportSection` **8 键**：`available`（`get_latest_by_plan` 非 None）/`degraded`/`report_id`（`str(StrategicReport.report_id)`——实体为 `uuid.UUID` 类型，str 化钦定）/`report_type`（"markdown"/"pdf"——`ReportType` 值域透传）/`file_path`/`section_count`/`degraded_section_count`/`generated_at`（**派生映射 = `StrategicReport.created_at.isoformat()`**——实体无 generated_at 字段（8 字段清单见范围边界表），R1-F4 裁定；ISO 字符串与 audit 段 window 键同型；`generation_ms` 是实体毫秒耗时字段**非**本 VO 键）；顶层 `ExecutiveView.generated_at` 同钦定 ISO 字符串（`datetime.now(UTC).isoformat()`——服务生成时刻，三时间键同型）；无报告时 report_id/file_path 等降 None、计数降 0——键恒在纪律，6-2 R1-6 七键契约同族）
+- **报告可得性段** `ReportSection` **8 键**：`available`（`get_latest_by_plan` 非 None）/`degraded`/`report_id`（`str(StrategicReport.report_id)`——实体为 `uuid.UUID` 类型，str 化钦定）/`report_type`（"markdown"/"pdf"——`ReportType` 值域透传）/`file_path`/`section_count`/`degraded_section_count`/`generated_at`（**派生映射 = `StrategicReport.created_at.isoformat()`**——实体无 generated_at 字段（8 字段清单见范围边界表），R1-F4 裁定；ISO 字符串与 audit 段 window 键同型；`generation_ms` 是实体毫秒耗时字段**非**本 VO 键）；顶层 `ExecutiveView.generated_at` 同钦定 ISO 字符串（`datetime.now(UTC).isoformat()`——服务生成时刻，三时间键同型；**代码审查 R1-F2 单锚派生**：`build_executive_view` 入口取一次 now——generated_at 与 audit.window_end 同锚，AC-4 恒等式严格成立）；无报告时 report_id/file_path 等降 None、计数降 0——键恒在纪律，6-2 R1-6 七键契约同族）
 
 **And** 段内计数均派生自既有单源（`total_steps` 快照 state_data 直读+`BLM_TOTAL_STEPS` 对照注记；sync 三态计数派生 `CheckpointSummaryView.sync_status`；报告计数派生 `StrategicReport` 实体字段）——**服务不新算任何跨源复合指标**（复合判定仅 health 一处——AC-2）
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据预置场景：8 键 exact set（`{f.name for f in fields(ExecutiveView)}`——6-6 R1-F10 激活先例）+ 四段嵌套键集各自 exact set + 值级断言（completed_steps/total_checkpoints/section_count 与预置一致；**total_events 为差值断言**——预置前后两次查询差值==预置窗内行数，全局窗背景行不进断言，R1-F6）
-- [ ] progress_percent 整数口径断言（`int(completed_steps / total_steps * 100)` 向下取整——3/8 完成 → 37 非 37.5；**与 `BlmPlanningStatus.progress_percent`（`round(x,2)` float——`blm_phases.py:174-176`）口径分立注记**：同源分母分子、VO 侧 int 截断为高管视图钦定，单点查询面 float 口径归该 property——两口径并存有意不互斥，R1-F3 裁定）
-- [ ] recent_events 恰 5 条上限（预置 ≥5 条时取 5；<5 条时如数）+ 每条 4 键 exact set
+- [x] 全数据预置场景：8 键 exact set（`{f.name for f in fields(ExecutiveView)}`——6-6 R1-F10 激活先例）+ 四段嵌套键集各自 exact set + 值级断言（completed_steps/total_checkpoints/section_count 与预置一致；**total_events 为差值断言**——预置前后两次查询差值==预置窗内行数，全局窗背景行不进断言，R1-F6）
+- [x] progress_percent 整数口径断言（`int(completed_steps / total_steps * 100)` 向下取整——3/8 完成 → 37 非 37.5；**与 `BlmPlanningStatus.progress_percent`（`round(x,2)` float——`blm_phases.py:174-176`）口径分立注记**：同源分母分子、VO 侧 int 截断为高管视图钦定，单点查询面 float 口径归该 property——两口径并存有意不互斥，R1-F3 裁定）
+- [x] recent_events 恰 5 条上限（预置 ≥5 条时取 5；<5 条时如数）+ 每条 4 键 exact set
 
 ### AC-2: RAG 三色健康状态推导（规则表三色判别）
 
@@ -71,9 +71,9 @@
 **And** `build_degraded == True`（任一数据源顶层异常——AC-5）时 health 恒非 green（规则 2 显式含 `build_degraded == False` 条件——「拿不到数据不得报绿」读模型诚实性，6-7 build_degraded 哲学延续）
 
 **验证标准/Validation Criteria:**
-- [ ] 三 plan 三色值级断言（P-green→GREEN/P-amber→AMBER/P-red→RED——三场景数据形态互斥可判别：amber 形态钦定「3/8 完成+1 降级」组合；**P-green 构造路径钦定** = 8/8 快照+**零 checkpoint**（green 规则 `total_checkpoints == 0` 支路——最简构造不触恢复）+报告在位零降级，R1-F15；in_sync 退化语义注记：恢复记录 None→全量 in_sync（`checkpoint_service.py:526/:535` 实证），故「≥1 checkpoint+无恢复记录」亦全 in_sync 为 P-green 备选路径——钦定主路径零 checkpoint 防构造歧义）
-- [ ] 空数据 plan（零快照零 checkpoint 零报告）→ health==AMBER + **三段 available 全 False（planning/approval/report——审计段无 available 键，AC-1/OD-4 三处钦定一致）+ 审计空态差值断言**（total_events 与场景基线一致——AC-4 差值体系，R1-F6；空态幂等读——AC-5 联动）
-- [ ] 规则表单测矩阵全覆盖（Task 2 承载：三色×数据形态全枚举 ≥9 格——每格独立断言；验收面三 plan 是抽样锚）
+- [x] 三 plan 三色值级断言（P-green→GREEN/P-amber→AMBER/P-red→RED——三场景数据形态互斥可判别：amber 形态钦定「3/8 完成+1 降级」组合；**P-green 构造路径钦定** = 8/8 快照+**零 checkpoint**（green 规则 `total_checkpoints == 0` 支路——最简构造不触恢复）+报告在位零降级，R1-F15；in_sync 退化语义注记：恢复记录 None→全量 in_sync（`checkpoint_service.py:526/:535` 实证），故「≥1 checkpoint+无恢复记录」亦全 in_sync 为 P-green 备选路径——钦定主路径零 checkpoint 防构造歧义）
+- [x] 空数据 plan（零快照零 checkpoint 零报告）→ health==AMBER + **三段 available 全 False（planning/approval/report——审计段无 available 键，AC-1/OD-4 三处钦定一致）+ 审计空态差值断言**（total_events 与场景基线一致——AC-4 差值体系，R1-F6；空态幂等读——AC-5 联动）
+- [x] 规则表单测矩阵全覆盖（Task 2 承载：三色×数据形态全枚举 ≥9 格——每格独立断言；验收面三 plan 是抽样锚）
 
 ### AC-3: 审批中心段聚合（分布+恢复留痕）
 
@@ -84,25 +84,25 @@
 **And** 无恢复记录（未执行过恢复）→ 留痕三键恒在值 None（键恒在纪律；**真实仓储退化语义注记 R1-F2**：`RedisSnapshotStore.load` 吞一切异常归一 None（`:179-181`），「从无恢复」与「恢复记录损坏」在真实链路**同归空态三键 None**不可分立——「损坏→段降级」语义仅单测 AsyncMock 面承载，AC-5 注记同源）
 
 **验证标准/Validation Criteria:**
-- [ ] 混合分布值级断言（预置 2 completed + 1 非 completed → total==3/completed_count==2——计数与预置锚一致）
-- [ ] 三态分布完备恒等式断言（和==total；三态判定链 invalidated > pending_sync > in_sync 清单命中制+None→全量 in_sync 退化语义——`checkpoint_service.py:535-556`，分布具体值与预置恢复记录清单直推）
-- [ ] 恢复留痕三键值级断言（confirmed_by 值与预置恢复记录一致——值可判别非默认空串；recovered_at ISO 字符串值级相等——`:708` `datetime.now(UTC).isoformat()` 同源）
-- [ ] 无恢复记录 plan → 三键 is None（对照腿）
+- [x] 混合分布值级断言（预置 2 completed + 1 非 completed → total==3/completed_count==2——计数与预置锚一致）
+- [x] 三态分布完备恒等式断言（和==total；三态判定链 invalidated > pending_sync > in_sync 清单命中制+None→全量 in_sync 退化语义——`checkpoint_service.py:535-556`，分布具体值与预置恢复记录清单直推）
+- [x] 恢复留痕三键值级断言（confirmed_by 值与预置恢复记录一致——值可判别非默认空串；recovered_at ISO 字符串值级相等——`:708` `datetime.now(UTC).isoformat()` 同源）
+- [x] 无恢复记录 plan → 三键 is None（对照腿）
 
 ### AC-4: 审计摘要段聚合（时间窗+最近样本）
 
 **Given** 审计日志表内已预置时间窗内行（**6 条钉死**——3 种 action_type 各 2 条，`timestamp` 钦定 **`now() − i×100µs 递减微秒偏移**（i=1..6）**——R2-F1 修正原「+i 秒未来偏移」：窗口 end_time=服务调用时刻且边界**闭区间含端点**（impl `:143` `<=`），未来秒级偏移会使预置行出窗（差值==6 恒 0 红）；递减微秒偏移三性质兼得：全部 ≤ end_time 在窗内 ✓ + 严格互异去并列（PG timestamptz 微秒精度承载 ✓——impl 无次级排序键 R1-F5）+ 新于一切已存在背景行（**best-effort 占头**——xdist 同组串行下成立，他组并行写入不免疫——残余风险注记非「背景免疫」），经 `AuditRepositoryPort.save(audit_data)` 真实通道——**dict 必填双键 `log_id`（str UUID）+`timestamp`（ISO 字符串）**（impl `:62-63` 下标取值缺则抛——R1-F1），可选键 actor/action_type/target_resource/old_value/new_value）与窗口外行（1 条——`timestamp = now()-8 天`），时间窗默认 7 天（`DEFAULT_AUDIT_WINDOW_DAYS=7` 服务常量）
 **When** 构建简化视图
-**Then** **total_events 差值断言**（全局窗无 plan 维度——审计摘要聚合系统级事件 OD-10 语义注记；断言 = 预置前基线查询 total 与预置后查询 total 的**差值==6**，窗口外行不进差值——`AuditSearchCriteria(start_time=window_start, end_time=window_end)` 构造查询，total 单源；**窗口边界双端闭区间**（`>=`/`<=`——impl `:141/:143` 亲验，R1-F7）；`window_start == generated_at - timedelta(days=7)` 时间锚一致性——generated_at ISO 字符串解析对照）
+**Then** **total_events 差值断言**（全局窗无 plan 维度——审计摘要聚合系统级事件 OD-10 语义注记；断言 = 预置前基线查询 total 与预置后查询 total 的**差值==6**，窗口外行不进差值——`AuditSearchCriteria(start_time=window_start, end_time=window_end)` 构造查询，total 单源；**窗口边界双端闭区间**（`>=`/`<=`——impl `:141/:143` 亲验，R1-F7）；`window_start == generated_at - timedelta(days=7)` 时间锚一致性——generated_at ISO 字符串解析对照；**R1-F2 单锚派生后恒等式严格成立**——断言承载位=S1 verify_section_counts（`window_end == generated_at` + `window_start == generated_at − 7d` 严格断言，R1 代码审查钦定落位））
 **And** `recent_events` 为最近 5 条（`AuditSearchCriteria` 实现按 timestamp 降序——`audit_repository_impl.py:167` 亲验，**无次级排序键——timestamp 并列序不稳定**，故预置行微秒递减去并列为断言前置（R1-F5/R2-F1）；**6 条预置取 5 的取舍钦定 = 丢弃最旧 1 条（i=6 行）——断言序列为预置 i=1..5 行降序**（R2-F7）；每条 4 键：action_type/actor/target_resource/timestamp——从 items dict 挑键投影，**禁透传整行 dict**——`to_dict()` 实为 **15 键**（id/log_id/timestamp/actor/action_type/target_resource/old_value/new_value/correction_level/checksum/created_at/archived/archived_at/correlation_id/integrity_verified——R2 订正，R1 曾误 14 键漏 correction_level）不得进高管视图——安全面注记：投影白名单四键）
 **And** `last_event_at == 预置行 max(timestamp)`（**同组串行前提下预置行占头**——best-effort 注记 R2-F1；与 recent_events[0].timestamp 同源一致性断言恒可写）；**本场景零新增**（合法空态）→ total_events 差值==0 + 段不降级不抛异常 + 键恒在（**「窗口内零事件」的字面绝对空断言在共享测试库全局窗下不可写**——背景行必在，R1-F6 改差值语义；recent_events/last_event_at 放弃绝对空断言改「与基线视图一致」）
 **And** 审计段查询样本 limit 钦定 `limit=5`（只需最近 5 条样本——total 由 `AuditSearchResult.total` 独立承载不经 items 计数；**禁大 limit 拉全量样本客户端计数**——total 全行取回实现形态下 items 拉大 limit 是双重浪费，OD-10 口径）
 
 **验证标准/Validation Criteria:**
-- [ ] 窗口边界判别：差值形态（预置前后 total 差值==6，窗口外行不进差值——内外行数可判别）
-- [ ] recent_events 5 条上限 + 4 键 exact set + 值级（action_type 与预置一致——预置行占降序头部背景免疫）+ 降序断言（recent_events[0].timestamp >= recent_events[-1].timestamp）
-- [ ] last_event_at 与 recent_events[0].timestamp 值级相等
-- [ ] 零新增空态（独立 plan_id 视图）→ 差值==0+不降级+键恒在（合法空态注记——审计段无 available 键的语义落位；**「独立极窄窗构造」不可行已删除**——7 天服务常量+零可选参数自锁，R1-F6）
+- [x] 窗口边界判别：差值形态（预置前后 total 差值==6，窗口外行不进差值——内外行数可判别）
+- [x] recent_events 5 条上限 + 4 键 exact set + 值级（action_type 与预置一致——预置行占降序头部背景免疫）+ 降序断言（recent_events[0].timestamp >= recent_events[-1].timestamp）
+- [x] last_event_at 与 recent_events[0].timestamp 值级相等
+- [x] 零新增空态（独立 plan_id 视图）→ 差值==0+不降级+键恒在（合法空态注记——审计段无 available 键的语义落位；**「独立极窄窗构造」不可行已删除**——7 天服务常量+零可选参数自锁，R1-F6）
 
 ### AC-5: 段级容错与空 plan 幂等读
 
@@ -114,10 +114,10 @@
 **And** 快照在位但 state_data 畸形（缺键/类型错）→ planning 段降级（`degraded=True` + available==False + 计数降 0），不抛（读侧脏数据守卫——6-5b 脏形态守卫同款形态；归单测矩阵承载畸形形态枚举）
 
 **验证标准/Validation Criteria:**
-- [ ] 空 plan 幂等读三断言（8 键恒在+build_degraded==False+health==AMBER）
-- [ ] 畸形 plan_id → 242（code 值级断言——编程面）
-- [ ] 段级容错归单测（四源×AsyncMock 抛异常 → 各段 degraded=True+其余段正常+build_degraded==True——Task 2 矩阵；验收面零 mock 红线不承载异常注入，6-7 DR1-5 分立同款）
-- [ ] state_data 畸形守卫归单测（缺 completed_steps 键/非 int 形态 → 段降级不抛）
+- [x] 空 plan 幂等读三断言（8 键恒在+build_degraded==False+health==AMBER）
+- [x] 畸形 plan_id → 242（code 值级断言——编程面）
+- [x] 段级容错归单测（四源×AsyncMock 抛异常 → 各段 degraded=True+其余段正常+build_degraded==True——Task 2 矩阵；验收面零 mock 红线不承载异常注入，6-7 DR1-5 分立同款）
+- [x] state_data 畸形守卫归单测（缺 completed_steps 键/非 int 形态 → 段降级不抛）
 
 ### AC-6: CLI `executive-view` 命令（高管速览入口）
 
@@ -132,9 +132,9 @@
 **And** 本 Story CLI 面无角色门槛（「CEO/高管」是 UX 语义——3-8/6-6/6-7 查询命令先例均无角色检查；RBAC 门槛归 7-2 REST 入口立项时评估——6-7 AC-6 同款注记落档）；参数面仅 `--plan-id` 必填单参数（**零可选参数**——YAGNI：无 --window-days/--format 需求来源，审计窗/输出形态均服务常量钉死）
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据输出断言：健康行精确匹配 + 四段分隔行 + 至少各一段值级行（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-6 S2/6-7 S9 双清先例）
-- [ ] 空 plan 输出断言（四段空态行齐备+exit 0）
-- [ ] 242 stderr 形态（`[EXCEPTION_242]` in stderr + exit 1）
+- [x] 全数据输出断言：健康行精确匹配 + 四段分隔行 + 至少各一段值级行（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-6 S2/6-7 S9 双清先例）
+- [x] 空 plan 输出断言（四段空态行齐备+exit 0）
+- [x] 242 stderr 形态（`[EXCEPTION_242]` in stderr + exit 1）
 
 ### AC-7: 性能与并发（三段口径——OD-7）
 
@@ -145,9 +145,9 @@
 **And** **「信息密度达标（Lighthouse 评分≥90）」与「状态指示器实时更新」为前端指标后端不定义**（epics L2415 自注「前端指标，后端不定义」原文钦定——口径差声明落验收 docstring；Web 面指标归 Epic 21 Story 21.1 届时验收——OD-7 第三段声明）
 
 **验证标准/Validation Criteria:**
-- [ ] 20 轮采样 P95<500ms（预检服务可达 + 预热含首次 load——R8-F5 注记继承）
-- [ ] 并发 20 路全部成功 + 两两相等（对照排除集六键 {generated_at, window_start, window_end, total_events, recent_events, last_event_at}——tuple 序列化剔除后逐路相等，R1-F5/R2-F4）
-- [ ] 前端指标口径差声明落 docstring（Lighthouse/实时更新两项）
+- [x] 20 轮采样 P95<500ms（预检服务可达 + 预热含首次 load——R8-F5 注记继承）
+- [x] 并发 20 路全部成功 + 两两相等（对照排除集六键 {generated_at, window_start, window_end, total_events, recent_events, last_event_at}——tuple 序列化剔除后逐路相等，R1-F5/R2-F4）
+- [x] 前端指标口径差声明落 docstring（Lighthouse/实时更新两项）
 
 ---
 
@@ -161,41 +161,41 @@
 
 #### 领域事件 Schema (Domain Events)
 
-- [ ] **零新增领域事件、零事件发布调用、零事件订阅**（本 Story 钦定——OD-2）：纯查询聚合面零状态变更——「查询不发布事件」architecture.md:1293 成文 + 6-7 OD-2 零事件先例族延续（6-4 OD-6/6-5a OD-6/6-6 OD-2）——**查询型故事零事件第七连**；`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` **零 diff**；`_FROZEN_EVENT_COUNT=56` 冻结键数基线零变化（`tests/contracts/test_event_channel_mapping_pdf_report.py:23-24`——Task 4 守护复跑）；蓝图无高管视图事件定义（epics 6.8 无事件载体要求——读侧聚合非状态变更；`CorrectionApproved` 无生产者现状维持不激活——Agent B 亲验 src 零生产者，6-6 已裁定不激活）
-- [ ] 守护承载：Task 4 复跑 `_FROZEN_EVENT_COUNT=56` 断言（零新增=登记数不变）；架构验证器 B 含「视图服务零 publish 调用」源码断言（6-7 树服务零发布守护的同款变体——`test_traceability_tree.py:111-155` 样板）
+- [x] **零新增领域事件、零事件发布调用、零事件订阅**（本 Story 钦定——OD-2）：纯查询聚合面零状态变更——「查询不发布事件」architecture.md:1293 成文 + 6-7 OD-2 零事件先例族延续（6-4 OD-6/6-5a OD-6/6-6 OD-2）——**查询型故事零事件第七连**；`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` **零 diff**；`_FROZEN_EVENT_COUNT=56` 冻结键数基线零变化（`tests/contracts/test_event_channel_mapping_pdf_report.py:23-24`——Task 4 守护复跑）；蓝图无高管视图事件定义（epics 6.8 无事件载体要求——读侧聚合非状态变更；`CorrectionApproved` 无生产者现状维持不激活——Agent B 亲验 src 零生产者，6-6 已裁定不激活）
+- [x] 守护承载：Task 4 复跑 `_FROZEN_EVENT_COUNT=56` 断言（零新增=登记数不变）；架构验证器 B 含「视图服务零 publish 调用」源码断言（6-7 树服务零发布守护的同款变体——`test_traceability_tree.py:111-155` 样板）
 
 #### 数据模型 (Data Models)
 
-- [ ] **零 domain 改动**（OD-12 准三零 Story）：`src/domain/` 零 diff——四段 VO+枚举全部落**应用层** `src/application/ports/executive_view.py`（读侧 DTO 归应用层——6-6 `CheckpointSummaryView`/6-7 五 VO 先例族；对照 6-5b `CitationEntry` 入 domain 是报告域特例非先例强制——6-7 OD-4 论证沿用）
-- [ ] `ExecutiveHealth`（str-Enum 三值 GREEN/AMBER/RED）——**全仓首个三值分级枚举**（对照先例族全两值：`ValidityStatus`/staleness/树节点 status——OD-4 显式注记）；值域对齐 UX v2.1「绿色=健康/琥珀=关注/红色=危险」（prd L1938 三色状态分类）
-- [ ] 六 VO frozen dataclass 键契约（Task 0.1 冻结唯一版本——实现禁增删键）：`ExecutiveView` **8 键**（plan_id/generated_at/health/build_degraded/planning/approval/audit/report）+ `PlanningSection` **8 键** + `ApprovalSection` **10 键** + `AuditSection` **7 键** + `ReportSection` **8 键** + `AuditEventSummary` **4 键**（全键定义见 AC-1；`recent_events: tuple[AuditEventSummary, ...]` 恒元组——frozen 纪律；可变 dict/None 逃逸口**不需要**——本 Story 无 dict 字段（对照 6-7 DocumentNode bbox MappingProxyType 特例——无此形态））
-- [ ] 构造守卫：`__post_init__` 校验 plan_id 非空字符串 + health 枚举成员校验（裸 str 拒绝——`ArchiveType` validate 同款形态）+ 计数非负（**四段计数 ≥0**——planning（completed/total/degraded_step_count）/approval（total_checkpoints 与三态计数）/report（section 双计数）/audit（total_events）——R1 订正「三段」漏 audit；`recent_events` 元组不适用此守卫注记；`StrategicReport` 五查先例）；违例抛 `EntityValidationError`（242 复用——实体不变量场景钦定）
-- [ ] **不动既有冻结面**：`StrategicReport` 实体（6-5a 冻结）/`CheckpointSummaryView` 8 键（6-6 冻结）/`BlmPlanningStatus`（6-1 冻结）/`CheckpointStatus` 4 值枚举/`ReportType` 两值枚举——全零 diff（服务只读消费）
+- [x] **零 domain 改动**（OD-12 准三零 Story）：`src/domain/` 零 diff——四段 VO+枚举全部落**应用层** `src/application/ports/executive_view.py`（读侧 DTO 归应用层——6-6 `CheckpointSummaryView`/6-7 五 VO 先例族；对照 6-5b `CitationEntry` 入 domain 是报告域特例非先例强制——6-7 OD-4 论证沿用）
+- [x] `ExecutiveHealth`（str-Enum 三值 GREEN/AMBER/RED）——**全仓首个三值分级枚举**（对照先例族全两值：`ValidityStatus`/staleness/树节点 status——OD-4 显式注记）；值域对齐 UX v2.1「绿色=健康/琥珀=关注/红色=危险」（prd L1938 三色状态分类）
+- [x] 六 VO frozen dataclass 键契约（Task 0.1 冻结唯一版本——实现禁增删键）：`ExecutiveView` **8 键**（plan_id/generated_at/health/build_degraded/planning/approval/audit/report）+ `PlanningSection` **8 键** + `ApprovalSection` **10 键** + `AuditSection` **7 键** + `ReportSection` **8 键** + `AuditEventSummary` **4 键**（全键定义见 AC-1；`recent_events: tuple[AuditEventSummary, ...]` 恒元组——frozen 纪律；可变 dict/None 逃逸口**不需要**——本 Story 无 dict 字段（对照 6-7 DocumentNode bbox MappingProxyType 特例——无此形态））
+- [x] 构造守卫：`__post_init__` 校验 plan_id 非空字符串 + health 枚举成员校验（裸 str 拒绝——`ArchiveType` validate 同款形态）+ 计数非负（**四段计数 ≥0**——planning（completed/total/degraded_step_count）/approval（total_checkpoints 与三态计数）/report（section 双计数）/audit（total_events）——R1 订正「三段」漏 audit；`recent_events` 元组不适用此守卫注记；`StrategicReport` 五查先例）；违例抛 `EntityValidationError`（242 复用——实体不变量场景钦定）
+- [x] **不动既有冻结面**：`StrategicReport` 实体（6-5a 冻结）/`CheckpointSummaryView` 8 键（6-6 冻结）/`BlmPlanningStatus`（6-1 冻结）/`CheckpointStatus` 4 值枚举/`ReportType` 两值枚举——全零 diff（服务只读消费）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] 新端口 `ExecutiveViewPort`（应用层 `src/application/ports/executive_view.py`，`@runtime_checkable Protocol`，docstring 版本注记「（v1.0.0）」——`TraceabilityTreePort` :148 样板）：单 async 方法 `async def build_executive_view(self, *, plan_id: str) -> ExecutiveView`（keyword-only——6-7 签名风格）
-- [ ] 端口注册中心登记：`register_port`（PortSpec：name=`executive_view_service`/version="v1.0.0"/interface=ExecutiveViewPort/impl=lambda/SINGLETON/tags=("executive","view","application")/owner）+ 用例注册 `executive_view_use_case`——组合根 `composition_root.py:2012-2060`（6-7 traceability 双注册块）邻近落位
-- [ ] 端口契约测试：`tests/contracts/test_port_contract_executive_view.py`（五断言族——注册可达/spec 元数据/lambda 注入链 getsource/resolve 可达/方法签名——`test_port_contract_traceability_tree.py` 样板直系复刻）
-- [ ] **复用四既有注册名**（组合根 lambda resolve 目标，主会话亲验）：`snapshot_repository`（:950）/`checkpoint_service`（:2347，v1.1.0）/`report_repository`（:3434）/`audit_repo`（:487）——**零新 infra 依赖、零新仓储成员**（6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造——OD-11）；**服务报告段编排钦定 `uuid.UUID(plan_id)` 显式转换**（`get_latest_by_plan` 参数为 `uuid.UUID` 类型——`report_repository.py:38`，畸形已在用例层 242 拦截故转换安全，R1-F7）
+- [x] 新端口 `ExecutiveViewPort`（应用层 `src/application/ports/executive_view.py`，`@runtime_checkable Protocol`，docstring 版本注记「（v1.0.0）」——`TraceabilityTreePort` :148 样板）：单 async 方法 `async def build_executive_view(self, *, plan_id: str) -> ExecutiveView`（keyword-only——6-7 签名风格）
+- [x] 端口注册中心登记：`register_port`（PortSpec：name=`executive_view_service`/version="v1.0.0"/interface=ExecutiveViewPort/impl=lambda/SINGLETON/tags=("executive","view","application")/owner）+ 用例注册 `executive_view_use_case`——组合根 `composition_root.py:2012-2060`（6-7 traceability 双注册块）邻近落位
+- [x] 端口契约测试：`tests/contracts/test_port_contract_executive_view.py`（五断言族——注册可达/spec 元数据/lambda 注入链 getsource/resolve 可达/方法签名——`test_port_contract_traceability_tree.py` 样板直系复刻）
+- [x] **复用四既有注册名**（组合根 lambda resolve 目标，主会话亲验）：`snapshot_repository`（:950）/`checkpoint_service`（:2347，v1.1.0）/`report_repository`（:3434）/`audit_repo`（:487）——**零新 infra 依赖、零新仓储成员**（6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造——OD-11）；**服务报告段编排钦定 `uuid.UUID(plan_id)` 显式转换**（`get_latest_by_plan` 参数为 `uuid.UUID` 类型——`report_repository.py:38`，畸形已在用例层 242 拦截故转换安全，R1-F7）
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
-- [ ] 禁止新增未登记端口，禁止语义重复端口（`ExecutiveViewPort` 聚合视图 vs `ReportGenerationServicePort` 生成语义 vs `CheckpointServicePort` 单域查询——语义正交非同义重复；`get_latest_by_plan` 经 `report_repository` 消费而非新开报告查询端口——单方法消费不构成端口重复）
-- [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
-- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
+- [x] 本模板中的端口清单是唯一事实源（Single Source of Truth）
+- [x] 禁止新增未登记端口，禁止语义重复端口（`ExecutiveViewPort` 聚合视图 vs `ReportGenerationServicePort` 生成语义 vs `CheckpointServicePort` 单域查询——语义正交非同义重复；`get_latest_by_plan` 经 `report_repository` 消费而非新开报告查询端口——单方法消费不构成端口重复）
+- [x] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
+- [x] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
 
-- [ ] **零新增领域异常、零既有异常改动**（OD-3）：242 复用（畸形 plan_id——用例层 UUID 守卫+VO 构造守卫两消费面）；空 plan 幂等读不抛（三先例族——6-4/6-6/6-7）；段级容错走 degraded 键承载（非异常路径——6-5b「引文是增强面非阻断面」聚合版+6-7 节点降级树形版之后的段级版）；480 **不消费不复现**（`GetBlmPlanningStatusUseCase` load None 抛 480 是单点查询面语义——本 Story 聚合枚举面空态不抛，语义分立钦定；planning 段 load None → available=False 非异常）；planning 段 480-489/report 段 490-499/traceability 段 372-379 三段预留维持零触碰（R1 依据链订正：traceability 段权威源是 `_code_ranges.py:61-62`（traceability (370,379) 段现仅占 370/371）+6-7 注记——异常设计文档 §3.3.2 无该段落，按设计文档对表会查无此段）
-- [ ] **否决备选**：开新码（如 `ExecutiveViewError` 500+）——四段全降级+畸形 242 后无真实 raise 触发面（YAGNI）；开码即引入「空 plan 误报」反语义面（6-7 OD-3 否决论证同构）
-- [ ] 提交前三条 grep 自查零输出（`raise ValueError`/`HTTPException`/`Exception(` 继承——三红线）
+- [x] **零新增领域异常、零既有异常改动**（OD-3）：242 复用（畸形 plan_id——用例层 UUID 守卫+VO 构造守卫两消费面）；空 plan 幂等读不抛（三先例族——6-4/6-6/6-7）；段级容错走 degraded 键承载（非异常路径——6-5b「引文是增强面非阻断面」聚合版+6-7 节点降级树形版之后的段级版）；480 **不消费不复现**（`GetBlmPlanningStatusUseCase` load None 抛 480 是单点查询面语义——本 Story 聚合枚举面空态不抛，语义分立钦定；planning 段 load None → available=False 非异常）；planning 段 480-489/report 段 490-499/traceability 段 372-379 三段预留维持零触碰（R1 依据链订正：traceability 段权威源是 `_code_ranges.py:61-62`（traceability (370,379) 段现仅占 370/371）+6-7 注记——异常设计文档 §3.3.2 无该段落，按设计文档对表会查无此段）
+- [x] **否决备选**：开新码（如 `ExecutiveViewError` 500+）——四段全降级+畸形 242 后无真实 raise 触发面（YAGNI）；开码即引入「空 plan 误报」反语义面（6-7 OD-3 否决论证同构）
+- [x] 提交前三条 grep 自查零输出（`raise ValueError`/`HTTPException`/`Exception(` 继承——三红线）
 
 #### API 契约 (API Contract)
 
-- [ ] **零 REST 面**（CLI-only 第七连——OD-1）：`docs/api/openapi.yaml` 零 diff（契约测试守护——`test_api_contract_*` 既有族零破坏）；6.5a-DF1（`/plans/{id}/export` REST 导出面）顺延 Epic 7 注记落档（Task 0.7）
-- [ ] CLI 契约：`sisys-agent executive-view --plan-id <uuid>`（argparse 扁平子命令——`build_parser` add_parser 族 :525 trace-tree 邻位；单必填参数；退出码 0/1 语义见 AC-6）
+- [x] **零 REST 面**（CLI-only 第七连——OD-1）：`docs/api/openapi.yaml` 零 diff（契约测试守护——`test_api_contract_*` 既有族零破坏）；6.5a-DF1（`/plans/{id}/export` REST 导出面）顺延 Epic 7 注记落档（Task 0.7）
+- [x] CLI 契约：`sisys-agent executive-view --plan-id <uuid>`（argparse 扁平子命令——`build_parser` add_parser 族 :525 trace-tree 邻位；单必填参数；退出码 0/1 语义见 AC-6）
 
 #### 六边形架构约束（必须遵守）
 
@@ -228,10 +228,10 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_executive_view.feature`（OD-9 命名——executive_view 功能名族，禁故事编号后缀；对 epics L2428 钦定名 `test_executive_dashboard.py` 的显式偏离——词族统一 executive_view：dashboard 词面向 UI 仪表盘（Epic 21 取代面），view 词对齐 CLI 查询形态；6-7 OD-9 对 provenance 偏离同款拆分声明）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_executive_view.py`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_executive_view.feature`（OD-9 命名——executive_view 功能名族，禁故事编号后缀；对 epics L2428 钦定名 `test_executive_dashboard.py` 的显式偏离——词族统一 executive_view：dashboard 词面向 UI 仪表盘（Epic 21 取代面），view 词对齐 CLI 查询形态；6-7 OD-9 对 provenance 偏离同款拆分声明）
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_executive_view.py`
 - [ ] 业务方评审通过
-- [ ] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **12 场景**（AC-1×2 / AC-2×1 / AC-3×1 / AC-4×2 / AC-5×1 / AC-6×2 / AC-7×2 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）；**epics 架构测试三项落位对账**（epics L2409-2411）：仪表盘显示测试（10 项 KPI+状态指示器）→S1/S2（**四段聚合+三色即 KPI 面的 MVP 口径对账**——10 项财务 KPI 归 Epic 21 范围注记 OD-1；状态指示器=health 三色 S2 承载）/信息密度测试→AC-7 前端指标口径差声明（Lighthouse 后端不定义——epics L2415 自注原文）/审批中心测试→S3——功能等价重分布（6-6 OD-5/6-7 OD-6 先例）
+- [x] 所有场景覆盖（Happy Path + Edge Cases）——钉死 **12 场景**（AC-1×2 / AC-2×1 / AC-3×1 / AC-4×2 / AC-5×1 / AC-6×2 / AC-7×2 / 收尾×1，Task 0.4 定稿钉死确定值并全文同步，禁范围值进入后续 Task）；**epics 架构测试三项落位对账**（epics L2409-2411）：仪表盘显示测试（10 项 KPI+状态指示器）→S1/S2（**四段聚合+三色即 KPI 面的 MVP 口径对账**——10 项财务 KPI 归 Epic 21 范围注记 OD-1；状态指示器=health 三色 S2 承载）/信息密度测试→AC-7 前端指标口径差声明（Lighthouse 后端不定义——epics L2415 自注原文）/审批中心测试→S3——功能等价重分布（6-6 OD-5/6-7 OD-6 先例）
 
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试（模块级 `event_loop` fixture + `_run_async` helper——6-x 三件套）
@@ -239,18 +239,18 @@
 - 不要使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
 - **Edge Cases 必须包含异常路径**——本 Story 异常面窄化（242 单码——OD-3）：畸形 plan_id 242 入 S7（编程面腿）；CLI 242 stderr 形态入 S9；段级容错归单测（验收面真实服务无故障注入通道——「真实端口不可写断言归单测」同族裁定，6-7 DR1-5 为原则转述非逐字——R1 注记）；**epics 模板「404/403/409」资源端点三例外码注记**：本 Story 无 REST 资源端点（CLI-only——OD-1），空态走幂等读（AC-5）非 404；403/409 无触发面（无角色门槛无状态变更——注记落 Task 0.4）
 - **R6 模板合规**：feature/py 组织结构对齐 `tests/acceptance/test_acceptance_postgresql_relational_layer.feature`/`.py`——`# language: zh-CN` 中文 Gherkin + AC 横幅注释分组（`# ===` 分隔）+ `@scenario(...)` 多行字面量路径绑定 + **12 场景全绑定**（R6 自身仅绑定 30 场景中 17 个属旧模板欠账，新文件禁沿用）；pytestmark/context dict/`_run_async` 三件套基建承载；**断言必须真实**（禁 then-pass 占位）；装配形态对齐 6-7（验收装配面零 LLM 零 Embedding——纯读侧聚合无生成调用）
-- **场景分化维度表（Task 0.4 钉死输入——含收尾共 12 场景全枚举 S1~S12；S 编号为 6-8 自有编号，跨故事引用一律带故事号前缀）**：S1（AC-1）= 四段全落位（快照+checkpoint 混合直写+恢复记录直写+报告+审计窗内行全预置→8 键/四段键集 exact set+值级断言（**total_events 差值形态**）+progress_percent 整数口径）；S2（AC-2）= 三色规则表（三 plan 三形态：P-green **钦定「8/8 快照+零 checkpoint+报告在位零降级」**（green total==0 支路最简构造，R1-F15）/P-amber「3/8 完成+1 降级」/P-red「已完成步全降级」→三色值级+空数据第四腿 health==AMBER——四断言段单场景）；S3（AC-3）= 审批中心分布+留痕（直写 3 CP 混合 completed 分布计数+三态完备恒等式+恢复留痕三键值级）；S4（AC-4）= 审计时间窗+样本（6 窗内（3 种 action_type 各 2 条，**timestamp=now−i×100µs 递减微秒偏移去并列**——R2-F1）+1 窗外行（now-8d）→**total 差值==6**+recent 5 条 4 键（**断言序列=预置 i=1..5 行降序**）+降序+last_event_at 一致性（同组串行占头前提）——钉死值 R1/R2 修订）；S5（AC-4）= 审计零新增空态（独立 plan_id 视图差值==0+不降级+键恒在——**绝对空断言不可写已改差值语义**，R1-F6；独立场景保判别力）；S6（AC-1/AC-5）= 段缺席形态（有快照无报告无恢复记录——部分可得：report.available==False+留痕三键 None+planning 正常聚合——「部分数据」与「零数据」分立锚）；S7（AC-5）= 空 plan 幂等读+畸形 242（空 plan 三断言（审计腿差值）+畸形腿 pytest.raises 两段）；S8（AC-6）= CLI 全数据输出（**期望 health 钦定 GREEN**——预置 8/8 快照+2 CP 直写（completed）+恢复记录直写空清单（→全 in_sync）+报告零降级，R1-F15；健康行精确匹配+四段分隔行+值级行——in-process 直调）；S9（AC-6）= CLI 空态+242 stderr（空态四段行齐备 exit 0——审计行 total 为全局窗动态值用 in 判定，R1-F6/F16+畸形 exit 1 stderr——两腿）；S10（AC-7）= 性能采样（20 轮 P95<500ms+预热；**C 面禁 set_session 走 fallback**——R2-F3 性能口径含 fallback 连接开销更保守真实）；S11（AC-7）= 并发 20 路（gather 20 路全成功+两两相等——**排除集六键** R1-F5/R2-F4+**禁 set_session** R2-F2e）；S12（收尾）= src 与四测试目录完成清单存在性断言（**断言对象=File List 的 src/测试项存在性；两 md 台账（deferred-work/sprint-status）与故事文件不入断言面**——6-7 S12/DR3-10 同款）
+- **场景分化维度表（Task 0.4 钉死输入——含收尾共 12 场景全枚举 S1~S12；S 编号为 6-8 自有编号，跨故事引用一律带故事号前缀；**R6 模板对齐注记（R1 代码审查 F3）**：S 编号是本表内部编号**禁泄入 Gherkin**——代码层 feature 场景名/绑定函数名不带编号（`test_full_view_four_sections` 形态，S 编号归绑定函数 docstring「S1/AC-1」斜杠形态——6-7 R6 修正同款口径，文档内 S 编号引用口径不变））**：S1（AC-1）= 四段全落位（快照+checkpoint 混合直写+恢复记录直写+报告+审计窗内行全预置→8 键/四段键集 exact set+值级断言（**total_events 差值形态**）+progress_percent 整数口径）；S2（AC-2）= 三色规则表（三 plan 三形态：P-green **钦定「8/8 快照+零 checkpoint+报告在位零降级」**（green total==0 支路最简构造，R1-F15）/P-amber「3/8 完成+1 降级」/P-red「已完成步全降级」→三色值级+空数据第四腿 health==AMBER——四断言段单场景）；S3（AC-3）= 审批中心分布+留痕（直写 3 CP 混合 completed 分布计数+三态完备恒等式+恢复留痕三键值级）；S4（AC-4）= 审计时间窗+样本（6 窗内（3 种 action_type 各 2 条，**timestamp=now−i×100µs 递减微秒偏移去并列**——R2-F1）+1 窗外行（now-8d）→**total 差值==6**+recent 5 条 4 键（**断言序列=预置 i=1..5 行降序**）+降序+last_event_at 一致性（同组串行占头前提）——钉死值 R1/R2 修订）；S5（AC-4）= 审计零新增空态（独立 plan_id 视图差值==0+不降级+键恒在——**绝对空断言不可写已改差值语义**，R1-F6；独立场景保判别力）；S6（AC-1/AC-5）= 段缺席形态（有快照无报告无恢复记录——部分可得：report.available==False+留痕三键 None+planning 正常聚合——「部分数据」与「零数据」分立锚）；S7（AC-5）= 空 plan 幂等读+畸形 242（空 plan 三断言（审计腿差值）+畸形腿 pytest.raises 两段）；S8（AC-6）= CLI 全数据输出（**期望 health 钦定 GREEN**——预置 8/8 快照+2 CP 直写（completed）+恢复记录直写空清单（→全 in_sync）+报告零降级，R1-F15；健康行精确匹配+四段分隔行+值级行——in-process 直调）；S9（AC-6）= CLI 空态+242 stderr（空态四段行齐备 exit 0——审计行 total 为全局窗动态值用 in 判定，R1-F6/F16+畸形 exit 1 stderr——两腿）；S10（AC-7）= 性能采样（20 轮 P95<500ms+预热；**C 面禁 set_session 走 fallback**——R2-F3 性能口径含 fallback 连接开销更保守真实）；S11（AC-7）= 并发 20 路（gather 20 路全成功+两两相等——**排除集六键** R1-F5/R2-F4+**禁 set_session** R2-F2e）；S12（收尾）= src 与四测试目录完成清单存在性断言（**断言对象=File List 的 src/测试项存在性；两 md 台账（deferred-work/sprint-status）与故事文件不入断言面**——6-7 S12/DR3-10 同款）
 - **逐场景调用面矩阵（Task 0.5 钦定）**：S1~S7 = **编程面 A 组**（服务/用例直调+**sync 层 set_session 回滚式**——R2-F3；断言锚 VO 在编程面单源可达；S7 畸形腿经用例）；S10/S11 = **编程面 C 组**（服务直调**禁 set_session**——每路 fallback 独立会话+commit 式预置+定向 DELETE——R2-F2e/F3）；S8/S9 = **CLI 面 in-process 直调 B 组**（`agent_cli.main(argv)` + SystemExit 捕获——6-7 `_run_cli_trace_tree` :948-967 样板：**每次 CLI 直调前 `get_resolver().clear_singleton()` + `clear_scoped()` 双清钦定**——6-6 R3-1 纪律+6-7 先例+**`clear_session()` 清 ContextVar**（R3-N12 API 订正：`reset_session(token)` 需 token 而自管预置 token 不在手，`clear_session()` 是无参防御复位 API——`session_context.py:99-112`；R2-F3 陷阱：asyncio.run 新循环继承上下文的 fixture session 会「Future attached to a different loop」——必清使服务走 fallback）；**禁重新 bootstrap**——`_ensure_bootstrapped` 自动短路；本 Story 服务依赖四注册名全在默认 bootstrap 装配链——无 env 桥接面（对照 6-7 BLM_SEARCH_COLLECTION monkeypatch——本 Story 零新 env 依赖，双清后 resolve 全可达）；B 组 PG 预置 commit 式+teardown 定向 DELETE 行数断言；**CLI 交互面的完整参数/输出覆盖由 `tests/unit/interfaces/cli/test_agent_cli.py` 承载**）；S12 收尾=文件存在性断言，无服务调用面
 - **pytestmark**：显式 `pytestmark = [pytest.mark.acceptance, pytest.mark.database, pytest.mark.redis, pytest.mark.qdrant, pytest.mark.xdist_group("blm-planning-perf")]`（**qdrant marker 保留理由**：bootstrap/组合根 resolve 装配链含 Qdrant 适配器（`tests/conftest.py` `_bootstrap_once` session autouse——6-7 同款注记：装配链依赖非业务依赖）；**无 minio marker**——零 MinIO 依赖（读侧不触 L4）；服务不可达环境 `pytest.skip()` 动态跳过（禁 `@pytest.mark.skip` 写死）；xdist_group 整模块——与 6-x 验收+集成同组串行）
 - **数据面预置纪律**：四通道全真实服务（零 mock 红线）——**R1-F11/F12 通道体系修订+R2-F3 PG 面三分面钦定（直写+按调用面分通道）**：① BLM latest 快照：经 `snapshot_repository.save(CheckpointSnapshot)` 直写（session_id=`blm-planning-{plan_id}`、state_data 七键、`BLM_PLANNING_SESSION_PREFIX` 常量构造——构造形态参照 6-1 timeline 条目六键；`CheckpointSnapshot` 构造守卫注记：`checkpoint_no and not persistent_note_ref` 双条件才抛 484——**空 checkpoint_no legacy 形态不触发**（`checkpoint_snapshot.py:78-84` 亲验），预置钦定空 checkpoint_no）；② Checkpoint 快照族+恢复记录：**全部直写**（CP 快照 session_id=`{CHECKPOINT_SESSION_PREFIX}{plan_id}:{cp_no}`、state_data 含 `plan_id/step/summary/structured_output/degraded/degrade_reason/completed_steps`（6-3 per-step 契约七键）+`stage_id/completed/created_via`（`list_checkpoints` 读取面 `.get` 键——`checkpoint_service.py:560-564`）；恢复记录 12 键直写与 `checkpoint_service.py:693-714` 构造键面同源、`pending_sync_checkpoints`/`invalidated_checkpoints` 钦定空清单→全量 in_sync 退化语义、`recovery_mode` 小写 str、`recovered_at` ISO 字符串）——**不走 `create_checkpoint`/`execute_recovery` 编排通道**（前者五步编排触 Fake LLM/Embedding/L3/L4 写与「装配面零 LLM 零 Embedding」声明互斥且产五类编排副产物（L2 归档行/L3 向量/L4 WORM 对象/outbox 行/note+compressed 缓存键），后者事件发布产 outbox 行——直写零副产物免五类清理面，6-7 归档直写同精神；CP 快照构造同样钦定空 checkpoint_no（:78-84 守卫——R2-F7 重申②面））；③ 报告行：经 `report_repository.save(StrategicReport, metadata)` 真实写（实体构造**八字段**+守卫——`test_acceptance_markdown_report` 报告构造先例）④ 审计行：经 `audit_repo.save(audit_data dict)` 真实写（**必填双键 log_id（str UUID）+timestamp（ISO 字符串）**——impl `:62-63` 下标取值缺则抛，R1-F1；可选键 actor/action_type/target_resource/old_value/new_value——键面已实证免 Task 0.5 复核）；**PG 面（③④）按调用面三分（R2-F3）**——**A. 编程面回滚组（S1~S7）**：`set_session` 注入 fixture session（**必须在 sync 层调用**——unified_audit_log `:143-149` 先例：sync fixture 内 set_session 传播进每个 `run_until_complete` task 上下文，async fixture 内 set 不外泄到步骤 task——R2-F5 实现陷阱注记；行号订正：R1 曾引 :126-140 实为 pg_session fixture，set_session 在 :143-149 audit_repository fixture）→ 预置 flush 不 commit → 服务读同 session 同事务可见（audit search 经 `get_session()` ContextVar impl `:48-50`；report 同路径）→ teardown `rollback` 整体回收（**零 DELETE 通道**——R1-F9 裁定对该面维持：RLS 四策略+无 FORCE RLS+create_all 兜底不建 RLS+deny 静默 0 行四态漂移下 DELETE 不可靠）；**B. CLI 面（S8/S9）**：**`clear_session()` 清 ContextVar**（R3-N12 API 订正：`reset_session(token)` 需 token 而自管预置 token 不在手，`clear_session()` 是无参防御复位 API——`session_context.py:99-112`；R2-F3 陷阱：ContextVar 进程级——CLI 五步定式 `asyncio.run` 新循环继承当前上下文的 session，但 fixture session 连接绑定模块 event_loop，新 loop 内使用触发「Future attached to a different loop」——必须先清使服务走 fallback 独立会话）→ 预置经 `async with session_context(session_factory)` **commit 式**（fallback 会话读已提交行——report get_latest fallback `:153-161` 先例；audit search fallback 为 OD-12 新增）→ teardown **定向 DELETE**（按预置 log_id 集/report_id——**owner 身态注记**：无 FORCE RLS 下表 owner 绕过 RLS，测试建表用户即 owner 时 DELETE 可行；**行数断言防静默 0 行假绿**——DELETE 后按 log_id 计数==0 复核）；**C. 并发/性能面（S10/S11）**：**场景内禁 set_session**（20 路 gather 共享单一 AsyncSession 非并发安全——asyncpg「another operation in progress」，R2-F2e 定谳）→ 每路各自走 fallback 独立会话（ContextVar 无 session 时 impl 层自建——天然 per-task 隔离）→ 预置 commit 式+teardown 定向 DELETE（同 B 形态）；**Redis 面（①②）teardown 定向清理**：latest/CP 键族/恢复记录按 session_id 定向 DEL（uuid plan_id 天然隔离；CP 键族按预置 cp_no 清单删）；键计数净增 0 纪律——6-3 R1-F1（B/C 面 DELETE 行数断言承载）
 - **回归面（强制）**：本 Story 纯新增（零既有源文件改动除 agent_cli.py/composition_root.py/**audit_repository_impl.py（search fallback）三扩展**——R3-N3 订正）——回归验证=四目录全量零失败+6-6 checkpoint 验收/6-5a 报告验收零破坏（新增端口/命令不触既有断言面）；`_FROZEN_EVENT_COUNT=56` 复跑（Task 4.2）
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕（六 VO+枚举键契约/端口签名/derive_health 规则表/零事件零异常裁定/CLI 命令/OD 裁定落档）
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证——预期失败形态 = 步骤函数运行期失败：延迟 import 抛 `ImportError`（缺失 `executive_view` 模块/类）或断言步 `AssertionError`；收集期零错误本身即延迟 import 纪律的自证——6-2/6-3/6-6/6-7 先例）
-- [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：① 组合根新注册 resolve 可达（`executive_view_service`/`executive_view_use_case`——注入链非 None + 四依赖 resolve 真实可达）② CLI `executive-view` 入口接线（单测用例承载）③ 视图服务零事件发布守护（架构验证器 B）④ `get_latest_by_plan` 首消费激活接线（聚合→报告段 round-trip——集成场景承载）；「已实现未接线」组件登记 deferred-work（本 Story 无新未接线件——get_latest_by_plan 由本 Story 接线终结零消费方状态）
-- [ ] **锚定义务六条处置落档**（Task 0.7——deferred-work 台账更新；**四条 6-8 锚定+两条例行顺延**，R1 口径统一）：6.5a-DF1（REST 导出面顺延 Epic 7）/6.5a-DF2（L0 撕裂顺延——触发条件不变注记）/6.7-DF2（bbox 四元组重锚 Epic 21/22——Web 高亮消费方裁定）/L129 data_pipeline 轨（读侧聚合非批量管线维持注记）/L170 事件消费基建（顺延 Epic 8）/L17 langgraph retry（不触发顺延）
+- [x] 上述规范项全部定义完毕（六 VO+枚举键契约/端口签名/derive_health 规则表/零事件零异常裁定/CLI 命令/OD 裁定落档）
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证——预期失败形态 = 步骤函数运行期失败：延迟 import 抛 `ImportError`（缺失 `executive_view` 模块/类）或断言步 `AssertionError`；收集期零错误本身即延迟 import 纪律的自证——6-2/6-3/6-6/6-7 先例）
+- [x] 规范文档通过人工评审或自动化校验
+- [x] **链路接线断言清单**已定义（Epic 4 回顾行动项 7.1-1）：① 组合根新注册 resolve 可达（`executive_view_service`/`executive_view_use_case`——注入链非 None + 四依赖 resolve 真实可达）② CLI `executive-view` 入口接线（单测用例承载）③ 视图服务零事件发布守护（架构验证器 B）④ `get_latest_by_plan` 首消费激活接线（聚合→报告段 round-trip——集成场景承载）；「已实现未接线」组件登记 deferred-work（本 Story 无新未接线件——get_latest_by_plan 由本 Story 接线终结零消费方状态）
+- [x] **锚定义务六条处置落档**（Task 0.7——deferred-work 台账更新；**四条 6-8 锚定+两条例行顺延**，R1 口径统一）：6.5a-DF1（REST 导出面顺延 Epic 7）/6.5a-DF2（L0 撕裂顺延——触发条件不变注记）/6.7-DF2（bbox 四元组重锚 Epic 21/22——Web 高亮消费方裁定）/L129 data_pipeline 轨（读侧聚合非批量管线维持注记）/L170 事件消费基建（顺延 Epic 8）/L17 langgraph retry（不触发顺延）
 
 ---
 
@@ -296,15 +296,15 @@
 
 #### 覆盖率要求
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**（本 Story 主改动层——epics L2419「应用层覆盖率≥85%」对齐）
-- [ ] **领域层 ≥90% 维持**（本 Story 零 domain 改动——既有覆盖率不降）
-- [ ] **集成测试覆盖 ≥75%**（epics L2420「集成测试覆盖率≥75%」对齐）
-- [ ] **关键路径覆盖率 100%**（derive_health 规则表三分支/四段聚合路径/段级容错路径——Task 2 矩阵承载）
+- [x] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [x] **应用层覆盖率 ≥85%**（`pytest --cov=src/application`）- **P1 阻断门禁**（本 Story 主改动层——epics L2419「应用层覆盖率≥85%」对齐）
+- [x] **领域层 ≥90% 维持**（本 Story 零 domain 改动——既有覆盖率不降）
+- [x] **集成测试覆盖 ≥75%**（epics L2420「集成测试覆盖率≥75%」对齐）
+- [x] **关键路径覆盖率 100%**（derive_health 规则表三分支/四段聚合路径/段级容错路径——Task 2 矩阵承载）
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
-- [ ] **MyPy 类型检查通过**（`poetry run mypy src/`——基线 756 零新增错误）
+- [x] **Ruff 检查通过**（`poetry run ruff check src/ tests/`）
+- [x] **MyPy 类型检查通过**（`poetry run mypy src/`——基线 756 零新增错误）
 - [ ] **无 P0/P1 级别问题**（代码审查）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`——命令环境拒绝时提交时钩子承载）
 
@@ -333,10 +333,10 @@
 - ❌ 验收/集成测试 mock 端口（真实服务四通道）
 
 **验证要求：**
-- [ ] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`（显式四目录，裸 `tests/` 挂起）通过
-- [ ] 连续 2 轮全量零失败（6-7 双轮标准）
-- [ ] `poetry run ruff check` 通过
-- [ ] `poetry run mypy` 通过（756 基线零新增）
+- [x] 并行测试 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`（显式四目录，裸 `tests/` 挂起）通过
+- [x] 连续 2 轮全量零失败（6-7 双轮标准）
+- [x] `poetry run ruff check` 通过
+- [x] `poetry run mypy` 通过（756 基线零新增）
 
 ---
 
@@ -374,18 +374,18 @@
 
 > **目的：** 在进入代码实现前，明确 VO 键契约、端口契约、health 规则表、验收场景与六边形架构边界，并处置 deferred-work 六条锚定义务（四条 6-8 锚定+两条例行顺延）。
 
-- [ ] Subtask 0.1: 冻结六 VO+枚举键契约（Task 0.1 冻结表落 Dev Agent Record——8/8/10/7/8/4 键 + ExecutiveHealth 三值 + 构造守卫清单——实现禁增删键）
-- [ ] Subtask 0.2: 冻结 derive_health 规则表（red>green>amber 短路链三条件原文——AC-2 规则 1/2/3 逐字冻结；实现为纯函数 `derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth`——四参显式入参禁读全局）
-- [ ] Subtask 0.3: 定义端口契约（ExecutiveViewPort v1.0.0 签名+四依赖注册名+组合根落位邻近锚）+ 契约测试文件骨架
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_executive_view.feature`（12 场景 S1~S12 钉死+epics 架构测试三项落位对账）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_executive_view.py`（三件套+四通道预置函数+PG 面三分面通道落地（A 编程面 sync 层 set_session 回滚式/B CLI 面 clear_session+commit 式+定向 DELETE 行数断言/C 并发面禁 set_session——R2-F3）+审计窗口差值判别形态）；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
-- [ ] Subtask 0.6: 定义逐场景红锚符号表（S1~S12 每场景的预期红形态：ImportError/AssertionError/exit code——S7/S9 畸形腿天然绿路由纠正注记——6-6 Task 0.6 先例）
-- [ ] Subtask 0.7: deferred-work 六条锚定义务处置落档（四条 6-8 锚定：6.5a-DF1 顺延 Epic 7/6.5a-DF2 顺延/6.7-DF2 重锚 Epic 21-22/data_pipeline 维持——OD-8；两条例行顺延：L170/L17——R1 口径统一）
-- [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表以 HEAD 为基准实施前复核）
+- [x] Subtask 0.1: 冻结六 VO+枚举键契约（Task 0.1 冻结表落 Dev Agent Record——8/8/10/7/8/4 键 + ExecutiveHealth 三值 + 构造守卫清单——实现禁增删键）
+- [x] Subtask 0.2: 冻结 derive_health 规则表（red>green>amber 短路链三条件原文——AC-2 规则 1/2/3 逐字冻结；实现为纯函数 `derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth`——四参显式入参禁读全局）
+- [x] Subtask 0.3: 定义端口契约（ExecutiveViewPort v1.0.0 签名+四依赖注册名+组合根落位邻近锚）+ 契约测试文件骨架
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_executive_view.feature`（12 场景 S1~S12 钉死+epics 架构测试三项落位对账）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_executive_view.py`（三件套+四通道预置函数+PG 面三分面通道落地（A 编程面 sync 层 set_session 回滚式/B CLI 面 clear_session+commit 式+定向 DELETE 行数断言/C 并发面禁 set_session——R2-F3）+审计窗口差值判别形态）；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [x] Subtask 0.6: 定义逐场景红锚符号表（S1~S12 每场景的预期红形态：ImportError/AssertionError/exit code——S7/S9 畸形腿天然绿路由纠正注记——6-6 Task 0.6 先例）
+- [x] Subtask 0.7: deferred-work 六条锚定义务处置落档（四条 6-8 锚定：6.5a-DF1 顺延 Epic 7/6.5a-DF2 顺延/6.7-DF2 重锚 Epic 21-22/data_pipeline 维持——OD-8；两条例行顺延：L170/L17——R1 口径统一）
+- [x] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表以 HEAD 为基准实施前复核）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（键契约/规则表/端口/场景钉死/锚定义务）
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕（键契约/规则表/端口/场景钉死/锚定义务）
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -403,15 +403,15 @@
 | 🟢 绿 | 实现 `src/application/ports/executive_view.py`（ExecutiveHealth str-Enum+六 frozen dataclass+`__post_init__` 守卫+ExecutiveViewPort Protocol v1.0.0） |
 | 🔄 重构 | docstring 全中文 Google 风格+类型注解收口，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 VO 键集/守卫失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现六 VO+枚举+端口最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化 VO 代码（默认值语义注记：无报告/无恢复/无活动各降级键的 None 语义 docstring 化）
-- [ ] Subtask 1.4: 🟡 变异 — 键集断言突变实证（删 AuditSection 一键 → exact set 红 → 还原绿；守卫断言突变——去负计数校验 → 构造负值红）
+- [x] Subtask 1.1: 🔴 红 — 编写 VO 键集/守卫失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现六 VO+枚举+端口最小代码
+- [x] Subtask 1.3: 🔄 重构 — 优化 VO 代码（默认值语义注记：无报告/无恢复/无活动各降级键的 None 语义 docstring 化）
+- [x] Subtask 1.4: 🟡 变异 — 键集断言突变实证（删 AuditSection 一键 → exact set 红 → 还原绿；守卫断言突变——去负计数校验 → 构造负值红）
 
 **完成标准/Definition of Done:**
-- [ ] 六 VO+枚举+端口实现完成，键契约与 Task 0.1 冻结表逐键一致
-- [ ] TDD 循环全部通过（红绿变异三态留痕）
-- [ ] 覆盖率：新增文件 ≥95%
+- [x] 六 VO+枚举+端口实现完成，键契约与 Task 0.1 冻结表逐键一致
+- [x] TDD 循环全部通过（红绿变异三态留痕）
+- [x] 覆盖率：新增文件 ≥95%
 
 ---
 
@@ -445,10 +445,10 @@
 | 🟢 绿 | 实现段级 try 包裹+畸形守卫降级 |
 | 🔄 重构 | 降级 warning 日志统一（`logger.warning` 段名+异常摘要——6-5b 降级日志同款） |
 
-- [ ] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 四段编排+规则函数+容错实现
-- [ ] Subtask 2.3: 🔄 重构 — 服务代码优化（投影白名单四键常量化/`BLM_TOTAL_STEPS`/`CHECKPOINT_RECOVERY_SESSION_PREFIX`/`DEFAULT_AUDIT_WINDOW_DAYS` 常量单源引用——禁字面量）
-- [ ] Subtask 2.4: 🟡 变异 — 规则表断言突变实证（red 条件 `==` 改 `>=` → 边界格红；green 漏 build_degraded 条件 → 容错格红；投影白名单加一键 → exact set 红）
+- [x] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 四段编排+规则函数+容错实现
+- [x] Subtask 2.3: 🔄 重构 — 服务代码优化（投影白名单四键常量化/`BLM_TOTAL_STEPS`/`CHECKPOINT_RECOVERY_SESSION_PREFIX`/`DEFAULT_AUDIT_WINDOW_DAYS` 常量单源引用——禁字面量）
+- [x] Subtask 2.4: 🟡 变异 — 规则表断言突变实证（red 条件 `==` 改 `>=` → 边界格红；green 漏 build_degraded 条件 → 容错格红；投影白名单加一键 → exact set 红）
 
 #### TDD 循环 D：audit search session_factory fallback（OD-12 R2 重开唯一 infra 增量——R3-N2 补载体）
 
@@ -458,12 +458,12 @@
 | 🟢 绿 | 实现 search fallback（`get_session()` RuntimeError → `async with session_context(self._session_factory)` 包裹查询——镜像同文件 save 双模式 `:93-107` 与 report get_latest `:153-161` 先例，~6 行零新 import） |
 | 🔄 重构 | fallback 注释与 save 面注释对齐（「CLI 可达面」注释块 `:93-96` 措辞更新含本 Story 消费面） |
 
-- [ ] Subtask 2.5: 🔴🟢🔄 — search fallback TDD 循环（红→绿→重构——**先红后绿纪律**：无 fallback 时新用例红，实现后绿）
+- [x] Subtask 2.5: 🔴🟢🔄 — search fallback TDD 循环（红→绿→重构——**先红后绿纪律**：无 fallback 时新用例红，实现后绿）
 
 **完成标准/Definition of Done:**
-- [ ] 四段编排+规则表+容错实现+search fallback 完成
-- [ ] TDD 循环全部通过（变异锚 ≥5 处：规则表×2/投影×1/容错×1/留痕×1）
-- [ ] 覆盖率：服务文件 ≥95%（规则表三分支 100%；audit_repository_impl fallback 分支入既有单测覆盖）
+- [x] 四段编排+规则表+容错实现+search fallback 完成
+- [x] TDD 循环全部通过（变异锚 ≥5 处：规则表×2/投影×1/容错×1/留痕×1）
+- [x] 覆盖率：服务文件 ≥95%（规则表三分支 100%；audit_repository_impl fallback 分支入既有单测覆盖）
 
 ---
 
@@ -489,15 +489,15 @@
 | 🟢 绿 | 实现 CLI：`build_parser` 注册（`--plan-id` required）+分发分支+`_run_executive_view_cli` 五步定式（UUID 守卫→ensure_bootstrapped→asyncio.run+resolve→打印→DomainError exit 1）+`_run_executive_view` async 壳（finally `_close_connection_pools`）+`_print_executive_view` 四段打印 |
 | 🔄 重构 | 输出行格式统一（「输出即契约」——空态行恒在与三分化对齐 6-7 空树三分化先例） |
 
-- [ ] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
-- [ ] Subtask 3.3: 🔄 重构 — CLI 打印面优化
-- [ ] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（健康行文案改一字 → 精确匹配红；242 stderr 前缀去 `[` → 断言红）
+- [x] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
+- [x] Subtask 3.3: 🔄 重构 — CLI 打印面优化
+- [x] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（健康行文案改一字 → 精确匹配红；242 stderr 前缀去 `[` → 断言红）
 
 **完成标准/Definition of Done:**
-- [ ] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
-- [ ] TDD 循环全部通过（变异锚 ≥2 处——R1 订正：与 Lessons「Task3×2」口径一致，原「≥3」为多口径漂移）
-- [ ] 覆盖率：用例 100%/CLI 新增面 ≥90%
+- [x] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
+- [x] TDD 循环全部通过（变异锚 ≥2 处——R1 订正：与 Lessons「Task3×2」口径一致，原「≥3」为多口径漂移）
+- [x] 覆盖率：用例 100%/CLI 新增面 ≥90%
 
 ---
 
@@ -507,14 +507,14 @@
 
 > **性质说明：** 契约级守护复跑+新增端口契约测试定稿——非功能实现 Task。
 
-- [ ] Subtask 4.1: 端口契约测试五断言族定稿（注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 四 resolve 锚/resolve 可达 isinstance/方法签名 keyword-only——`test_port_contract_traceability_tree.py` 逐段对齐；**R1 注记：剔除样板 :55 `assert "BLM_SEARCH_COLLECTION" in source` env 专用锚**——本 Story 零 env 依赖，注入链锚改四依赖注册名）
-- [ ] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` `_FROZEN_EVENT_COUNT=56` 通过——event_channels.yaml/DEFAULT_MAPPINGS 零 diff 实证）
-- [ ] Subtask 4.3: 回归面验证（四目录全量 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance` 零失败——6-6 checkpoint/6-5a 报告既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配预期（纯新增子命令/注册块）+**audit_repository_impl 既有单测面全绿**（search fallback 为增量分支不改既有行为——test_audit_repository.py 既有用例零适配，R3-N3））
-- [ ] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出）
+- [x] Subtask 4.1: 端口契约测试五断言族定稿（注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 四 resolve 锚/resolve 可达 isinstance/方法签名 keyword-only——`test_port_contract_traceability_tree.py` 逐段对齐；**R1 注记：剔除样板 :55 `assert "BLM_SEARCH_COLLECTION" in source` env 专用锚**——本 Story 零 env 依赖，注入链锚改四依赖注册名）
+- [x] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` `_FROZEN_EVENT_COUNT=56` 通过——event_channels.yaml/DEFAULT_MAPPINGS 零 diff 实证）
+- [x] Subtask 4.3: 回归面验证（四目录全量 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance` 零失败——6-6 checkpoint/6-5a 报告既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配预期（纯新增子命令/注册块）+**audit_repository_impl 既有单测面全绿**（search fallback 为增量分支不改既有行为——test_audit_repository.py 既有用例零适配，R3-N3））
+- [x] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出）
 
 **完成标准/Definition of Done:**
-- [ ] 契约测试全绿+冻结键数基线零变化
-- [ ] 四目录全量零失败
+- [x] 契约测试全绿+冻结键数基线零变化
+- [x] 四目录全量零失败
 
 ---
 
@@ -532,15 +532,15 @@
 | 🟢 绿 | 预置/清理通道落地（Redis 三键族直写+定向 DEL；PG 面按场景分组：场景①② A 面 sync set_session 回滚式、场景③④ C 面禁 set_session+commit 式预置+定向 DELETE 行数断言——R2-F3 三分面/R3-N5 订正）+断言通过 |
 | 🔄 重构 | 预置工厂函数收口（`_make_snapshot_state/_make_checkpoint_material/_make_report_row/_make_audit_row` 四工厂——6-5b `_make_material` 先例） |
 
-- [ ] Subtask 5.1: 🔴 红 — 四场景失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
-- [ ] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-7）
-- [ ] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 ≥2 处：报告段 report_id 断言改常量 → 值级红；并发两两相等改单路 → 等价性红——6-7 集成验证型先例）
+- [x] Subtask 5.1: 🔴 红 — 四场景失败测试
+- [x] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
+- [x] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-7）
+- [x] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 ≥2 处：报告段 report_id 断言改常量 → 值级红；并发两两相等改单路 → 等价性红——6-7 集成验证型先例）
 
 **完成标准/Definition of Done:**
-- [ ] 四场景全绿（真实服务零 mock）
-- [ ] 性能 P95 断言通过+口径声明落档
-- [ ] 覆盖率：集成新增面 ≥75%
+- [x] 四场景全绿（真实服务零 mock）
+- [x] 性能 P95 断言通过+口径声明落档
+- [x] 覆盖率：集成新增面 ≥75%
 
 ---
 
@@ -552,16 +552,16 @@
 
 #### 架构验证测试实现（四验证器——`test_traceability_tree.py` 样板）
 
-- [ ] Subtask 6.1: 验证器 A 落位守护（交付文件在 application 层/六 VO 定义于 ports 文件非服务本地/服务与用例禁本地 Protocol——AST 扫 ClassDef bases）
-- [ ] Subtask 6.2: 验证器 B 零 publish 守护（服务源码 token grep `publish`/`event_publisher` 零出现+AST 零事件构造——pkgutil 强制导入 events 全子模块后 DomainEvent 子类名全集比对 Call 节点）
-- [ ] Subtask 6.3: 验证器 C 零 domain 改动+infra 白名单+依赖方向（`SERVICE_ALLOWED_PREFIXES` 白名单逐 import startswith 断言+三方禁 import frozenset+本 Story diff 面核验——`git diff --name-only` 对 **src/domain 零命中+src/infrastructure 白名单命中集恰为 {audit_repository_impl.py} 单文件**——R3-N1 订正：原「src/domain|src/infrastructure 零命中」与 OD-12 R2 重开硬互斥（audit_repository_impl 是钦定改动），白名单守护形态防扩散）
-- [ ] Subtask 6.4: 验证器 D CLI 接线（源码含 `add_parser("executive-view"` 精确锚+`args.command == "executive-view"` 分发+`resolve("executive_view_use_case")` 调用锚；**缩进敏感注记**：6-7 样板锚为 `add_parser(\n        "trace-tree"` 8 空格缩进逐字匹配形态（:213）——本 Story 断言字符串与注册代码格式必须完全一致否则恒红）
-- [ ] Subtask 6.5: 运行完整测试套件并生成报告（ruff E/I 循环依赖检测——不引入 pylint）
-- [ ] Subtask 6.6: 🟡 变异 — 架构断言突变实证（验证器 B token grep 断言：源码临时注入 `publish` token → 测试红 → 还原绿——R1 补齐：Lessons 变异锚 Task 6×1 的正文落位）
+- [x] Subtask 6.1: 验证器 A 落位守护（交付文件在 application 层/六 VO 定义于 ports 文件非服务本地/服务与用例禁本地 Protocol——AST 扫 ClassDef bases）
+- [x] Subtask 6.2: 验证器 B 零 publish 守护（服务源码 token grep `publish`/`event_publisher` 零出现+AST 零事件构造——pkgutil 强制导入 events 全子模块后 DomainEvent 子类名全集比对 Call 节点）
+- [x] Subtask 6.3: 验证器 C 零 domain 改动+infra 白名单+依赖方向（`SERVICE_ALLOWED_PREFIXES` 白名单逐 import startswith 断言+三方禁 import frozenset+本 Story diff 面核验——`git diff --name-only` 对 **src/domain 零命中+src/infrastructure 白名单命中集恰为 {audit_repository_impl.py} 单文件**——R3-N1 订正：原「src/domain|src/infrastructure 零命中」与 OD-12 R2 重开硬互斥（audit_repository_impl 是钦定改动），白名单守护形态防扩散）
+- [x] Subtask 6.4: 验证器 D CLI 接线（源码含 `add_parser("executive-view"` 精确锚+`args.command == "executive-view"` 分发+`resolve("executive_view_use_case")` 调用锚；**缩进敏感注记**：6-7 样板锚为 `add_parser(\n        "trace-tree"` 8 空格缩进逐字匹配形态（:213）——本 Story 断言字符串与注册代码格式必须完全一致否则恒红）
+- [x] Subtask 6.5: 运行完整测试套件并生成报告（ruff E/I 循环依赖检测——不引入 pylint）
+- [x] Subtask 6.6: 🟡 变异 — 架构断言突变实证（验证器 B token grep 断言：源码临时注入 `publish` token → 测试红 → 还原绿——R1 补齐：Lessons 变异锚 Task 6×1 的正文落位）
 
 **完成标准/Definition of Done:**
-- [ ] 四验证器全绿（任何违规即测试失败）
-- [ ] 循环依赖检测用 ruff/isort
+- [x] 四验证器全绿（任何违规即测试失败）
+- [x] 循环依赖检测用 ruff/isort
 
 ---
 
@@ -577,16 +577,16 @@
 | 🟢 绿 | 编写 `test_acceptance_executive_view.py` 收尾 BDD 步骤（`_COMPLETION_SRC_FILES`/`_COMPLETION_TEST_FILES` dict 常量+`path.is_file()` 断言——6-7 S12 形态） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 7.1: 场景 S12 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 7.2: 场景 S12 — 验证四测试目录完成清单的逐项确认
-- [ ] Subtask 7.3: 运行开发结束验收测试并确认通过（12/12 场景全绿）
-- [ ] Subtask 7.4: 运行 `pytest`（四目录）、`ruff check`、`mypy` 进行收尾校验+deferred-work 台账六条处置注记核对（R2 残留订正）
+- [x] Subtask 7.1: 场景 S12 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 7.2: 场景 S12 — 验证四测试目录完成清单的逐项确认
+- [x] Subtask 7.3: 运行开发结束验收测试并确认通过（12/12 场景全绿）
+- [x] Subtask 7.4: 运行 `pytest`（四目录）、`ruff check`、`mypy` 进行收尾校验+deferred-work 台账六条处置注记核对（R2 残留订正）
 
 **完成标准/Definition of Done:**
-- [ ] `src` 完成清单已逐项验证确认
-- [ ] 四测试目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过
-- [ ] Story 可进入 `done`
+- [x] `src` 完成清单已逐项验证确认
+- [x] 四测试目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过
+- [x] Story 可进入 `done`（本轮为 review——done 待代码审查周期）
 
 ---
 
@@ -609,7 +609,7 @@
 | **OD-1** | **范围边界——MVP = 四段聚合查询面（ExecutiveViewPort+ExecutiveViewService+GetExecutiveViewUseCase+CLI `executive-view`）。不含**：Web 仪表盘/前端（epics L2391 取代注记钦定——UI 面归 Epic 21 Story 21.1 决策舱；本 Story CLI 呈现即 MVP fallback 形态）/REST 端点（6.1-DF5 第七连 CLI-only 先例；openapi.yaml 零 diff；6.5a-DF1 顺延）/bbox 四元组（6.7-DF2 重锚——Web PDF.js 高亮是真实消费方且在 Epic 21/22 Web 面，本 Story CLI-only 无高亮面）/审批动作（6-6 已交付 recover/apply_correction/confirmed_by——本 Story 只聚合不操作，零写路径）/KPI 财务指标（FR-UI-04 十项经营 KPI 的数据源不在 BLM MVP 依赖链——本 Story「核心经营指标」=规划态势指标聚合口径：进度/降级/审批分布/审计量/报告降级五族；财务 KPI 归 Epic 21+数据接入）/审计分组计数端口（无 GROUP BY 端口实证——读侧消费冻结面纪律；分布分桶 defer Epic 7/21）/`StrategicPlan.PlanStatus` 接线（draft/in_review/approved/archived 骨架与 BLM 运行态零接线现状维持——不碰，接线归 Epic 10 规划文档生命周期立项）/`ReportType` 扩值（exec 视图非报告类型——查询面产物不入报告域枚举）/执行摘要文本面（简化视图是指标态非内容态——conclusions/摘要文本消费归报告与 Epic 21 阅读面） | epics L2391-2432 范围权威+取代注记 + 6.1-DF5 六连 CLI-only 先例 + 6-7 OD-1 边界先例 + YAGNI |
 | **OD-2** | **零新增领域事件、零发布、零订阅**（查询型故事第七连）：纯查询聚合面零状态变更——architecture.md:1293 查询零事件先例（引用形态注记见 Dev Notes）+6-4 OD-6/6-5a OD-6/6-6 OD-2/6-7 OD-2 零事件先例族；event_channels.yaml/DEFAULT_MAPPINGS 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化（Task 4.2 守护复跑）；`CorrectionApproved` 无生产者现状维持不激活（Agent B 亲验 src 零生产者——6-6 已裁定不激活，本 Story 不消费该事件）；蓝图无高管视图事件载体；架构验证器 B 零 publish 守护 | 查询语义纯度+先例族+零 yaml/router diff 红利 |
 | **OD-3** | **零新增领域异常、零既有异常改动**：242 复用（畸形 plan_id 用例层 UUID 守卫+VO 构造守卫两消费面——`GetTraceabilityTreeUseCase` 直系先例）；空 plan 幂等读不抛（6-4 ChainOfThoughtTraceView/6-6 空清单/6-7 空树三先例族——聚合枚举面语义）；480 **不消费不复现**（`GetBlmPlanningStatusUseCase` load None 抛 480 是单点查询面语义——本 Story 聚合枚举面 load None→planning.available=False 非异常，语义分立钦定——同 6-6 AC-1「空清单不抛 480」分立先例）；段级容错走 degraded 键（非异常路径——6-5b 降级哲学/6-7 节点降级之后的段级版）；planning 480-489/report 490-499/traceability 372-379 三段预留维持零触碰（traceability 段权威源 `_code_ranges.py:61-62`——异常契约节同款依据链注记）。**否决备选**：开 500+ 新码（ExecutiveViewError）——四段降级+242 后无真实 raise 触发面，开码即引入「空 plan 误报」反语义面（6-7 OD-3 否决论证同构） | 异常语义纯度+三先例+空态幂等读语义 |
-| **OD-4** | **六 VO 键契约+全仓首个三值分级枚举**（Task 0.1 冻结）：`ExecutiveView` 8 键（含 `build_degraded` 顶层降级哨兵——「拿不到数据不得报绿」读模型诚实性，6-7 哲学延续；`generated_at` 视图生成锚——**ISO 字符串**（`datetime.now(UTC).isoformat()`），审计窗一致性锚）/`PlanningSection` 8/`ApprovalSection` 10/`AuditSection` 7（**无 available 键**——窗口零事件是合法空态非不可得，与三段 available 语义分立）/`ReportSection` 8（`generated_at = StrategicReport.created_at.isoformat()` 派生映射钦定+`report_id = str(...)` str 化——R1-F4；实体 8 字段无 generated_at 名）/`AuditEventSummary` 4——全应用层 frozen dataclass（ports 文件——6-6 CheckpointSummaryView/6-7 五 VO 先例族；**零 domain VO**——OD-12）；`ExecutiveHealth` 三值 str-Enum（green/amber/red——**全仓首个三值分级枚举**：对照先例族全两值（ValidityStatus/staleness/树节点 status）；值域对齐 **UX v2.1 L1250-1252**「绿色（健康）/琥珀（关注）/红色（危险）」与 **prd L1938** 三色状态分类中文语义（R1 订正：三色措辞锚 UX L1250-1252 非引言行 L1246；KPI 十项清单锚 prd L1938——两文件同行号系巧合分置注记）；amber 不用 yellow——**英文词取通行 RAG 用语 amber**（注记：UX RAG 表全中文无英文词、epics L2403 原文用「红/黄/绿」——本 Story 以 prd/UX「琥珀」语义覆盖 epics「黄」用词，权威间冲突显式声明 R1-F18；UX 内 scoreYellow（评分条 0.6-0.75 关注区间）与 scoreAmber（0.4-0.6 警告区间）是另一套色值体系非 RAG 状态色，不受此选词影响））；audit 段 recent_events **投影白名单四键**（action_type/actor/target_resource/timestamp——审计行 `to_dict()` 实为 **15 键**（id/log_id/old_value/new_value/correction_level/checksum/created_at/archived/archived_at/correlation_id/integrity_verified 等内部载荷——R2 订正主会话亲验 models/audit.py:166-182）禁入高管视图——安全面 R1 实证强化）；键恒在纪律（None/0/() 降级值——6-2 R1-6 七键契约同族） | 键恒在纪律+读侧 DTO 层位先例+三色中文语义单源（prd/UX）+审计载荷安全面 |
+| **OD-4** | **六 VO 键契约+全仓首个三值分级枚举**（Task 0.1 冻结）：`ExecutiveView` 8 键（含 `build_degraded` 顶层降级哨兵——「拿不到数据不得报绿」读模型诚实性，6-7 哲学延续；`generated_at` 视图生成锚——**ISO 字符串**（`datetime.now(UTC).isoformat()`，审计窗一致性锚；R1-F2 单锚派生——入口一次 now 与 audit.window_end 同锚）/`PlanningSection` 8/`ApprovalSection` 10/`AuditSection` 7（**无 available 键**——窗口零事件是合法空态非不可得，与三段 available 语义分立）/`ReportSection` 8（`generated_at = StrategicReport.created_at.isoformat()` 派生映射钦定+`report_id = str(...)` str 化——R1-F4；实体 8 字段无 generated_at 名）/`AuditEventSummary` 4——全应用层 frozen dataclass（ports 文件——6-6 CheckpointSummaryView/6-7 五 VO 先例族；**零 domain VO**——OD-12）；`ExecutiveHealth` 三值 str-Enum（green/amber/red——**全仓首个三值分级枚举**：对照先例族全两值（ValidityStatus/staleness/树节点 status）；值域对齐 **UX v2.1 L1250-1252**「绿色（健康）/琥珀（关注）/红色（危险）」与 **prd L1938** 三色状态分类中文语义（R1 订正：三色措辞锚 UX L1250-1252 非引言行 L1246；KPI 十项清单锚 prd L1938——两文件同行号系巧合分置注记）；amber 不用 yellow——**英文词取通行 RAG 用语 amber**（注记：UX RAG 表全中文无英文词、epics L2403 原文用「红/黄/绿」——本 Story 以 prd/UX「琥珀」语义覆盖 epics「黄」用词，权威间冲突显式声明 R1-F18；UX 内 scoreYellow（评分条 0.6-0.75 关注区间）与 scoreAmber（0.4-0.6 警告区间）是另一套色值体系非 RAG 状态色，不受此选词影响））；audit 段 recent_events **投影白名单四键**（action_type/actor/target_resource/timestamp——审计行 `to_dict()` 实为 **15 键**（id/log_id/old_value/new_value/correction_level/checksum/created_at/archived/archived_at/correlation_id/integrity_verified 等内部载荷——R2 订正主会话亲验 models/audit.py:166-182）禁入高管视图——安全面 R1 实证强化）；键恒在纪律（None/0/() 降级值——6-2 R1-6 七键契约同族） | 键恒在纪律+读侧 DTO 层位先例+三色中文语义单源（prd/UX）+审计载荷安全面 |
 | **OD-5** | **RAG 三色推导规则表（确定性短路链 red>green>amber，Task 0.2 冻结）**：red=快照在位且已完成步全部降级（`degraded_step_count == completed_steps > 0`——产出可信度危险）；green=**七合取全满足**（R1 订正「八条件」——and 链原子条件数 7，其一含两原子析取：①planning.available ②completed==total ③degraded_step_count==0 ④(approval.total==0 or in_sync==total) ⑤report.available ⑥report.degraded_section_count==0 ⑦build_degraded==False）；amber=其余一切（含未完成/部分降级/sync 异常/无报告/段降级/**空 plan 零数据**——空态 amber 是「无可判绿红的中间态」语义注记非错误态）。实现为纯函数 `derive_health` 四参显式入参（禁读全局/禁散落 if 链——单测矩阵 ≥9 格全枚举承载；主会话 9 格数学推演零矛盾格零不可达格留痕）；**「状态指示器实时更新」前端指标后端不定义**（epics L2415 自注原文——静态查询面无实时语义，Web 联动归 Epic 21） | epics AC「红/黄/绿状态指示器」+ UX RAG 语义映射 + 确定性无参数规则（6-7 OD-5 last-write-wins 全序同款确定性论证）+ 6-7 OD-7 口径差声明纪律 |
 | **OD-6** | **审批中心聚合口径——无审批状态机事实下的合成面**：`CheckpointStatus` 仅 4 值（pending/in_progress/completed/recovered——**零审批态**，主会话+Agent B 双亲验 checkpoint.py:52-58）；MVP 审批语义=CheckpointReached.user_feedback_request 事件+execute_recovery(confirmed_by) 留痕+CorrectionRecord（6-6 裁定延续）；本 Story 聚合=**completed 分布+sync_status 三态分布+恢复记录留痕三键**（恢复记录 12 键经 `snapshot_repository.load(CHECKPOINT_RECOVERY_SESSION_PREFIX+plan_id)` 直读——前缀常量单源 :90 禁硬编码）；`user_feedback_request` 事件不消费（outbox 溯源面归 6-6 checkpoint-show——本视图聚合当前态投影非事件回放）；三态分布和==total 完备恒等式断言（缺行/重复计数即红） | CheckpointStatus 零审批态实证 + 6-6 审批语义裁定 + 当前态投影语义 |
 | **OD-7** | **性能三段口径声明**：① 视图加载 P95<500ms = `build_executive_view` 服务面窗口（五读串行：**Redis 点查×11**（latest 1 + list_checkpoints 内部 9[恢复记录 join load 1+CP probe 8] + 审批段恢复记录第二次直读 1——R1-F10 订正 ×9 失实；恢复记录同键双载事实：`CheckpointSummaryView` 不含恢复记录内容故审批段直读必要）+PG 单行查+audit 窗口查——20 轮 `sorted[ceil(0.95*n)-1]` 数学口径；**audit total 全行取回实现形态**（impl :159-164）MVP 百行级远小于门禁——审计量万行级触发分组计数端口立项锚 Epic 7/21，docstring 注记）；② 并发 20 = 单一数据源 plan_id×20 路并发读（asyncio.gather+服务无状态约束+两两相等断言——**对照排除集六键 {generated_at, window_start, window_end, total_events, recent_events, last_event_at}**（三时间键每次调用新生成+audit 值级三键受全局窗并发写入抖动——R1-F5/R2-F4/R3-N4 订正）**不入对照**，audit 段并发对照仅 degraded/window_days 两稳定键+预置行 timestamp 微秒递减去并列；**禁 set_session 每路 fallback 独立会话**——R2-F2e；读面幂等无副作用，并发安全证明充分；「20 独立 plan」写面变体不采——构造成本与证明目标不成比例，6-5a OD-8 同构裁定）；③ Lighthouse 信息密度/状态指示器实时更新=前端指标后端不定义（epics L2415 自注原文逐字注「实时更新」一项、Lighthouse 为等价推理扩展——R1 注记；Web 面指标归 Epic 21 届时验收）——三口径落验收/集成 docstring | epics L2414-2416 性能行与 CLI 交付面口径对齐（6-3 OD-6/6-6 OD-8/6-7 OD-7 四连口径差声明纪律）+ 构造成本工程评估（6-5a 先例） |
@@ -754,6 +754,88 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/6-7-traceability-tree-display.md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 
+### 实现计划与规范冻结 Implementation Plan & Frozen Specs（Task 0——dev-story 2026-11-06）
+
+#### Task 0.1 六 VO+枚举键契约冻结表（实现禁增删键）
+
+| VO/枚举 | 键数 | 键清单（序=字段序） |
+|---|---|---|
+| `ExecutiveView` | 8 | plan_id: str / generated_at: str / health: ExecutiveHealth / build_degraded: bool / planning: PlanningSection / approval: ApprovalSection / audit: AuditSection / report: ReportSection |
+| `PlanningSection` | 8 | available: bool / degraded: bool / completed_steps: int / total_steps: int / progress_percent: int / current_step: str \| None / degraded_step_count: int / last_activity_at: str \| None |
+| `ApprovalSection` | 10 | available: bool / degraded: bool / total_checkpoints: int / completed_count: int / in_sync_count: int / pending_sync_count: int / invalidated_count: int / last_recovery_mode: str \| None / last_recovery_confirmed_by: str \| None / last_recovered_at: str \| None |
+| `AuditSection` | 7 | degraded: bool / window_days: int / window_start: str / window_end: str / total_events: int / recent_events: tuple[AuditEventSummary, ...] / last_event_at: str \| None（**无 available 键**——OD-4） |
+| `ReportSection` | 8 | available: bool / degraded: bool / report_id: str \| None / report_type: str \| None / file_path: str \| None / section_count: int / degraded_section_count: int / generated_at: str \| None |
+| `AuditEventSummary` | 4 | action_type: str / actor: str / target_resource: str / timestamp: str |
+| `ExecutiveHealth` | 3 值 | GREEN="green" / AMBER="amber" / RED="red"（str-Enum，全仓首个三值分级枚举） |
+
+构造守卫（`__post_init__` 抛 242）：plan_id 非空字符串；health 枚举成员校验（裸 str 拒绝）；四段计数 ≥0（planning 三计数/approval 四计数/report 双计数/audit.total_events）。
+
+#### Task 0.2 derive_health 规则表冻结（red > green > amber 短路链）
+
+```python
+def derive_health(planning, approval, report, build_degraded) -> ExecutiveHealth:
+    # 规则 1（red）：已完成产出全部降级——可信度危险
+    if planning.available and planning.completed_steps > 0 and planning.degraded_step_count == planning.completed_steps:
+        return ExecutiveHealth.RED
+    # 规则 2（green）：七合取全满足——全链健康（含 build_degraded==False「拿不到数据不得报绿」）
+    if (
+        planning.available
+        and planning.completed_steps == planning.total_steps
+        and planning.degraded_step_count == 0
+        and (approval.total_checkpoints == 0 or approval.in_sync_count == approval.total_checkpoints)
+        and report.available
+        and report.degraded_section_count == 0
+        and build_degraded is False
+    ):
+        return ExecutiveHealth.GREEN
+    # 规则 3（amber）：其余一切（含空 plan 零数据——「无可判绿红的中间态」）
+    return ExecutiveHealth.AMBER
+```
+
+#### Task 0.3 端口契约定义
+
+- `ExecutiveViewPort`（应用层 `src/application/ports/executive_view.py`，`@runtime_checkable Protocol` v1.0.0）：`async def build_executive_view(self, *, plan_id: str) -> ExecutiveView`（keyword-only）
+- 四依赖注册名（组合根既有——Agent A 调研亲验行号）：`snapshot_repository`（:949-963 SCOPED）/ `checkpoint_service`（:2346-2361 SINGLETON v1.1.0）/ `report_repository`（:3433-3442 SCOPED）/ `audit_repo`（:486-496 SCOPED）
+- 组合根双注册：`executive_view_service`（SINGLETON，tags=("executive","view","application")）+ `executive_view_use_case`（SINGLETON，tags=("executive","use_case","application")）——落位 :2012-2060 6-7 块之后
+- 契约测试：`tests/contracts/test_port_contract_executive_view.py`（五断言族）
+
+#### Task 0.6 逐场景红锚符号表
+
+| 场景 | 红阶段形态（Task 0.5 运行实测） |
+|---|---|
+| S1~S7 | 运行期 ImportError（`executive_view` 模块缺失——预置/构建步骤延迟 import 抛出） |
+| S8/S9 | CLI 未注册 → argparse invalid choice exit 2 → 断言步红（`cli_exit_code == 0` 断言失败） |
+| S10/S11 | 运行期 ImportError（同 S1） |
+| S12 | Then 文件不存在 AssertionError（`_COMPLETION_SRC_FILES` 路径缺失） |
+
+#### Task 0.8 锚点行号复核结论（dev-story 三 Agent 并行调研 2026-11-06）
+
+`git diff d3f0d335..HEAD -- src/` 零输出——故事基准到当前 HEAD 期间 src/ 零变更，故事锚点表全部行号**零漂移**（数据面/组装层两组调研交叉核对全部命中）。补充事实订正：`get_traceability_tree.py:48-58` UUID 守卫对非 UUID 与空串走同一 ValueError 分支（`uuid.UUID("")` 亦抛 ValueError）——故事「两边界」实为同一分支两输入形态。
+
+#### dev-story 实施完成记录（2026-11-06——Task 0~7 全勾）
+
+**TDD 循环留痕**（红→绿→重构→变异全链，变异锚累计 12 处对齐 Lessons 钦定量级）：
+
+| Task | 红 | 绿 | 变异锚 |
+|---|---|---|---|
+| 0 | 12/12 场景红（S1~S7/S10/S11 ImportError/S8/S9 exit 2→断言红/S12 文件缺失） | —（规范 Task） | — |
+| 1 | 18 用例收集 ImportError | 18 passed（mypy 零错） | ×2：删 AuditSection 键→exact set 红；去负计数守卫→构造负值红（合计 8 failed 实证） |
+| 2 循环 A/B/C | 28 用例 ImportError | 28 passed | ×5：green 七合取破坏②⑦（completed>0 改写+build_degraded 条件剔除）/容错 raise 变异/留痕 hacked 常量/投影加键（VO 4 键 exact set 红）——注入后 8+1 failed |
+| 2 循环 D | fallback 用例 RuntimeError 红（fail-loud 腿天然绿） | TestSearchFallbackPath 2 passed | （变异由循环 D 红锚承载——无 fallback 红即断言活体证明） |
+| 3 | 7 failed（命令未注册）+1 天然绿（argparse exit 2 腿） | CLI 8+用例 4+契约 6 全绿 | ×2：健康行文案改一字→精确匹配红；stderr 去 `[` 前缀→断言红（4 failed 实证） |
+| 5 | —（服务已实现，红锚由 S12 完成清单承载） | 集成 4/4 全绿 | ×2：report_id 断言常量化→值级红；report 段注入调用漂移态→两两相等红（2 种形态实证——服务无状态约束的断言活体） |
+| 6 | —（结构断言） | 11/11 全绿 | ×1：服务源码注入 publish token→验证器 B 红 |
+
+**实施攻坚记录**：
+- S2 第四腿 `_empty_plan` 未预设→现场生成自足化修复（原 242 误炸）；S7 feature then 文本与 S2 统一共用步骤（StepDefinitionNotFound 修复）；S9 空态行断言 lines→stdout 子串判定（行非完整匹配）
+- CLI 变异首版 sed 模式未命中（引号转义）——改行号定向注入；stderr 前缀变异 SyntaxError 形态重做为语法合法形态
+- 并发等价性变异首版（audit total 漂移）被排除集正确剔除——意外实证排除集设计正确性后改 report 段（非排除键）达成红
+- audit 实现类名 `AuditRepository`（非 AuditRepositoryImpl——文件名与类名分立，调研交叉确认）
+- 组合根无 register_use_case——用例注册同用 register_port 全参形态（调研确认）
+- **R6 模板合规修正（用户审查发现）**：验收 py 初版三处形态偏差对齐 R6 模板——① `@scenario` 单行改**多行字面量**路径绑定（两参各占一行——R6 :212-218 形态）② 绑定函数体补 `pass`（R6 docstring+pass 形态）③ 组织结构从「集中绑定+Given/When/Then 类型三节」重组为 **AC 横幅分节内联**（九节：Background/AC-1~AC-7/收尾——每节内绑定函数+该 AC 场景步骤函数，与 feature 侧 AC 横幅逐节对齐；awk 分块路由+bash 按序拼接，函数集合 diff 校验无重复无丢失，重组后 12/12 复跑全绿+ruff 全过）
+
+**门禁实跑**：ruff check src/ tests/ 全过+mypy 759 文件零错误（756 基线零新增）+`_FROZEN_EVENT_COUNT=56` 守护 6 passed+三红线 grep 零输出+抑制注释零输出。
+
 ### 完成清单 Completion Notes List
 
 - [x] 故事需求从 `epics_v1.0.md` 提取（L2391-2432 含取代注记范围收窄）
@@ -773,23 +855,23 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 - `_bmad-output/implementation-artifacts/deferred-work.md` - 六条锚定义务处置注记（Task 0.7/7.4）
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 6-8 状态流转与周期注记
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/application/ports/executive_view.py` - ExecutiveHealth 枚举+六 VO+ExecutiveViewPort
-- `src/application/services/executive_view_service.py` - 四段编排+derive_health
-- `src/application/use_cases/get_executive_view.py` - 用例（UUID 守卫+透传）
-- `src/entrypoints/agent_cli.py` - executive-view 子命令（扩展）
-- `src/composition_root.py` - 双注册块（扩展）
-- `src/infrastructure/security/audit_repository_impl.py` - search session_factory fallback（扩展——OD-12 R2 重开唯一 infra 增量，CLI 消费面激活缺口修复）
-- `tests/unit/application/test_executive_view_vos.py` - VO 单测
-- `tests/unit/application/test_executive_view_service.py` - 服务单测（规则表+容错矩阵）
-- `tests/unit/application/use_cases/test_executive_view_use_case.py` - 用例单测
-- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 单测（扩展）
-- `tests/unit/infrastructure/security/test_audit_repository.py` - search fallback 用例扩展（Task 2 循环 D——R3-N2 TDD 先行载体）
-- `tests/unit/architecture/test_executive_view.py` - 架构验证（四验证器）
-- `tests/integration/test_integration_executive_view.py` - 集成测试（四场景）
-- `tests/contracts/test_port_contract_executive_view.py` - 端口契约测试
-- `tests/acceptance/test_acceptance_executive_view.feature` - Gherkin 场景（12 场景）
-- `tests/acceptance/test_acceptance_executive_view.py` - BDD 步骤实现
+**待创建的文件/To Be Created (Dev Story 实施)——已全部交付（dev-story 2026-11-06）:**
+- [x] `src/application/ports/executive_view.py` - ExecutiveHealth 枚举+六 VO+ExecutiveViewPort（18 单测全绿）
+- [x] `src/application/services/executive_view_service.py` - 四段编排+derive_health（28 单测全绿+变异 5 锚）
+- [x] `src/application/use_cases/get_executive_view.py` - 用例（UUID 守卫+透传）（4 单测全绿）
+- [x] `src/entrypoints/agent_cli.py` - executive-view 子命令（扩展——8 CLI 单测+变异 2 锚）
+- [x] `src/composition_root.py` - 双注册块（扩展——五断言族契约测试全绿）
+- [x] `src/infrastructure/security/audit_repository_impl.py` - search session_factory fallback（扩展——OD-12 R2 重开唯一 infra 增量，TestSearchFallbackPath 2 用例）
+- [x] `tests/unit/application/test_executive_view_vos.py` - VO 单测
+- [x] `tests/unit/application/test_executive_view_service.py` - 服务单测（规则表 12 格+容错矩阵+畸形守卫）
+- [x] `tests/unit/application/use_cases/test_executive_view_use_case.py` - 用例单测
+- [x] `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 单测（扩展——Parser 3+Execution 5）
+- [x] `tests/unit/infrastructure/security/test_audit_repository.py` - search fallback 用例扩展（Task 2 循环 D——R3-N2 TDD 先行载体）
+- [x] `tests/unit/architecture/test_executive_view.py` - 架构验证（四验证器 11 用例+变异 1 锚）
+- [x] `tests/integration/test_integration_executive_view.py` - 集成测试（四场景全绿+变异 2 锚）
+- [x] `tests/contracts/test_port_contract_executive_view.py` - 端口契约测试（五断言族 6 用例）
+- [x] `tests/acceptance/test_acceptance_executive_view.feature` - Gherkin 场景（12 场景）
+- [x] `tests/acceptance/test_acceptance_executive_view.py` - BDD 步骤实现（12/12 全绿）
 
 ---
 
@@ -900,20 +982,41 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 待代码审查周期
-**审查模式:** 待定（full：Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-11-06（Round 1）
+**审查模式:** full（四视角并行调研【A 实现正确性/B 测试判别力/C 架构接线/D 运行实测】+ 双评审员【数学等价性/传播面回归面】+主会话亲验四项）
 
 #### 需决策 Decision Needed
 
-- [ ] （待代码审查周期填写）
+- [x] R1 恒等断言落位裁决：S1（verify_section_counts）vs S4 二选一 → **钦定 S1**（VO 级键关系断言与 S4 差值判别正交；与单测层恒等断言构成纵深——评审①推荐+②对齐）
+- [x] R1 存量缺口定界：CLI `python -m` 形态 .env 不加载（litellm import 副作用+dotenv 交互判定怪癖+embedding 急切装配链三层叠加）→ **非 6-8 引入**（波及 checkpoint 服务族全命令），deferred-work 登记（D6-8-R1-1）
 
 #### 已修复 Patch
 
-- [ ] （待代码审查周期填写）
+- [x] **R1-F1（P1）**：`raise KeyError` 内置异常作段内控制流（全 application/services 唯一内置 raise，异常契约红线擦边且冗余）→ 改显式早退降级+同格式 logger.warning（评审①修订：与同族缺键/类型错两形态可观测性一致；MRO 运行时验证 242 确入段级容错）
+- [x] **R1-F2（P2）**：双时间锚致 AC-4 恒等式仅近似成立 → 单锚派生（入口一次 now，generated_at 与 window_end 同锚）；验收 S1 补严格恒等断言两行（`window_end == generated_at` + `window_start == generated_at − 7d`）；**突变实证**：脱锚→恒等断言红→还原绿
+- [x] **R1-F3（P2）**：6-8 验收文件 12 场景名/绑定函数名带 S 编号——与同暂存集 R6 定谳口径分裂（R6 批触及 6-8 py 修三处形态漏此项）→ feature 12 场景名+py 12 名串+12 函数名去编号（docstring 改「S1/AC-1」斜杠形态——6-7 基准），Story :242 表头补对齐注记
+- [x] **R1-F4（P2）**：derive_health 矩阵缺规则 1 `planning.available` 合取项判别格（纸面突变全测试面存活——B 视角实证）→ 补 `test_red_requires_planning_available`（available=False+3/3→AMBER）；**突变实证**：删合取项→新格红
+- [x] **R1-F5（P2）**：`test_recovery_record_corrupted` 未钉 degraded 旗标（损坏语义突变存活）→ 补 `degraded is False` 断言（钉死「isinstance 守卫不得改为降级」）；**突变实证**：get→下标（缺键抛→段降级）→断言红
+- [x] **R1-P3①**：`BLM_PLANNING_SESSION_PREFIX` 延迟 import 上移模块级（sibling 三服务同款形态对齐；评审②核验无循环依赖+架构验证器 ast.walk 兼容）
+- [x] **R1-P3⑩**：CLI 单测补 red 标签分支（`健康状态: red（危险）` 精确匹配——三色标签全覆盖）
+- [x] **R1-P3⑥**：单测层补窗口恒等断言（criteria.start_time == fromisoformat(generated_at) − 7d + end_time.isoformat() == generated_at——本次缺陷本可在单测层拦住，评审①推荐采纳）
 
 #### 已推迟 Defer
 
-- [ ] （待代码审查周期填写）
+- [x] **D6-8-R1-1**：CLI `python -m` 入口 .env 不加载存量缺口（三层根因：全仓无显式 load_dotenv+litellm import 副作用+dotenv `_is_interactive` 判定怪癖；env 就位时行为与声明逐字吻合——D 视角对照实验证实）→ deferred-work 登记，触发=CLI 入口标准化/部署形态立项（波及 checkpoint 服务族全命令，非本 Story 修复面）
+- [x] **D6-8-R1-2**：`test_acceptance_json_chain_of_thought.py/.feature`（6-5b）S 编号命名残留——R6 清偿面外的最后一处（本暂存集 6-7/6-5a/6-5b/6-8 已全对齐）→ deferred-work 登记，触发=下次触及该文件或 R6 批量清偿
+
+#### R1 未落码注记（P3 记录级——不构成缺陷）
+
+- VO 默认值字面量双轨（`total_steps=8`/`window_days=7` vs 常量单源——运行时值恒由服务注入，默认值面是第二份字面量；两处值同源注记在 docstring）
+- ApprovalSection 守卫超集（五计数含 completed_count，超出冻结表四计数枚举——更严的超集守卫无害）
+- 错型穿透面（current_step=5 等不抛错型穿透 frozen VO——AC-5 VC 钦定两形态外注记）
+- progress_percent 无 0-100 钳位（completed>total 脏数据可达 112——快照自洽破坏前置，注记）
+- S1 三处 not-None 弱断言（值级由单测/S3/S4 承载——分工注记）
+- delta==0 腿并发背景写入 flake 面（xdist 同组串行+差值形态已最大化缓解——docstring 注记）
+- `assert all(view is not None)` 近恒真（gather 异常传播已保证——无害保留）
+- recent_events 1~4 条中段形态无专测（0 条与 ≥5 两端已覆盖——切片行为低风险）
+- 契约测试私有属性耦合（`service._snapshot_repository`——6-7 同款先例，记录）
 
 ---
 
@@ -921,16 +1024,18 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 六条处置注记�
 
 - [ ] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-6/6-7 五轮形态——**已完成 R1~R5 五轮收敛 v1.3.1**：R1 四调研+双评审 36 项/R2 回归+组合 8 项/R3 深度推演 12 项/R4 纯验证零提交/R5 独立终审六节全过+P3×6 终修——收敛声明入档，零 P0/P1/P2/P3 残留）
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施（已完成——2026-11-06 Task 0~7 全勾+12/12 场景全绿+两轮全量 15077×2 零失败）
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-11-06
 **最后更新/Last Updated:** 2026-11-06
 **更新说明/Description:**
+- v1.5.0: **代码审查 Round 1**（四视角并行调研【A 实现正确性/B 测试判别力/C 架构接线/D 运行实测——dev 声明全部实证为真：单测 238/契约 12/集成 4 零 skip/验收 12/12/ruff+mypy 全绿/回归联动 38】+双评审员【数学等价性——MRO 运行时验证排除 F1 险点/传播面回归面——F3 锁步三元组×12 坐标闭合】+主会话亲验四项：**P1×1+P2×4+P3×12，落码 8 项+登记 2 项+注记 9 项**——R1-F1 KeyError 控制流改早退+warning/R1-F2 单锚派生（AC-4 恒等式严格成立+验收 S1 严格断言）/R1-F3 R6 模板对齐（12 场景名+12 函数名去 S 编号——同暂存集口径分裂消解）/R1-F4 规则 1 available 合取项判别格/R1-F5 corrupted 测试钉 degraded 旗标/P3 三清偿（import 上移/CLI red 标签/单测恒等断言）；**突变实证 3 处**（F2 脱锚→红/F4 删合取项→红/F5 get→下标→红）；D6-8-R1-1（CLI python -m .env 存量缺口）+D6-8-R1-2（json_chain_of_thought S 残留）deferred-work 登记；暂存区三个非核心验收文件大改动甄别=6-7 R6 模板合规修正（已记录 6-7 md，非游离改动）
+- v1.4.0: **dev-story 实施完成**（in-progress→review——Task 0~7 全 Subtask 勾选：SDD 规范冻结（六 VO 键契约/规则表/红锚符号表/deferred-work 六条处置落档/三 Agent 调研锚点零漂移复核）+六 VO+ExecutiveHealth 三值枚举+ExecutiveViewPort v1.0.0+四段编排服务（derive_health 七合取规则+段级容错+顶层 build_degraded 哨兵）+GetExecutiveViewUseCase 242 守卫+CLI executive-view（五步定式+四段打印+空态行恒在）+组合根双注册+**audit search session_factory fallback**（OD-12 唯一 infra 增量——CLI 消费面激活缺口修复）；**12/12 验收场景全绿**（S1 四段键集值级/S2 三色规则表四断言段/S3 审批分布+留痕/S4 审计时间窗递减微秒+5 条样本/S5 零新增差值/S6 段缺席/S7 空态幂等+畸形 242/S8 CLI GREEN 精确行/S9 CLI 空态+stderr/S10 P95<500ms/S11 并发 20 路六键排除集对照/S12 完成清单）+集成四场景（真实链 round-trip 含 get_latest_by_plan 首消费激活/P95/并发）+架构四验证器（白名单结构断言——禁 git diff 形态）+契约五断言族；**门禁实跑**：四目录全量 15077 passed×2 轮零失败（no-cov 轮+覆盖率轮）+覆盖率 93.22%≥80%（application 94%≥85%/domain 97%≥90%/新增三 src 文件 100%≥95%）+mypy 759 文件零错误（756 基线零新增）+ruff 全绿+`_FROZEN_EVENT_COUNT=56` 守护通过+三红线 grep 零输出+openapi.yaml 零 diff；**变异实证 12 锚**（Task1×2/Task2×5/Task3×2/Task5×2/Task6×1——含并发等价性变异被排除集正确剔除的意外实证）；实施攻坚六项留痕（S2 第四腿自足化/S7 then 文本统一/S9 stdout 子串判定/CLI 变异语法合法化重做/audit 实现类名分立确认/register_use_case 不存在确认）；改动面 11 新建+5 扩展与 File List/项目结构树三方对账一致）
 - v1.3.1: 文档审查 Round 4 纯验证+Round 5 独立终审**五轮收敛定稿**（R4 三轴纯验证零提交：32 词根终扫 29 零活性残留+20 组修复锚点存续零漂移+epics 全承载零超范围+递减链 8→4→1→0+门禁结构全一致；R5 独立终审六节全过：周期闭合零游离/10 项关键修复文档+代码双向取证全属实（24 值独立数数/search 缺口实证/数学复算）/残留活性位零/红线零违/收敛判据通过；终修 P3×6：三零词簇三处+R1 分档计数订正 P2×14/P3×14+措辞三处——收敛声明入档；**零 P0/P1/P2/P3 残留，可进 dev-story**；审查周期累计 56 项修复全登记，12 Agent 并行投入【R1×6/R2×2/R3×1/R4×1/R5×1】+主会话预登记亲验）
 - v1.3.0: 文档审查 Round 3 单深度推演修订（终态推演——四推演点定谳全无破口：双清不触发二次 bootstrap/session_factory 双清后可达/S10 审计预置必要/pool 15<20 等待制不报错；S8 GREEN 全链可达——唯一硬前置=OD-12 fallback 落地；**12 项修复**（P1×1/P2×5/P3×6）：N1 架构守护白名单化（「零 infra 命中」×OD-12 硬互斥消解——src/infrastructure 白名单恰 {audit_repository_impl.py}）/N2 search fallback 补 TDD 载体（Task 2 循环 D+test_audit_repository 扩展+计数 11 新建+5 扩展）/N3 回归面三扩展/N4 OD-7 六键联动/N5 回滚式残留簇三处（Task 5 同 Task 红绿互斥消解）/N6 sprint-status 6-8 行同步/三零词簇×5/Status 括注/:3434/「最近: 无」可达面注记/矩阵扩展行/reset_session→clear_session API 订正；8 条证伪留痕）
 - v1.2.0: 文档审查 Round 2 修订（回归核查+组合交互面双 Agent——R1 修复的传播完备性 28/36 落地+8 处残留清扫；**三处组合互拆定谳**：① S4 未来秒级 timestamp×闭区间出窗（P1 近 P0）→ 递减微秒偏移体系；② **CLI 面审计段恒降级**（search 无 fallback——AC-6 生产可用性缺陷）→ **OD-12 重开为准三零 Story**（search session_factory fallback 唯一 infra 增量 ~6 行）；③ S11 共享回滚 session×20 路并发（AsyncSession 非并发安全）→ **PG 面三分面通道体系**（A 编程面回滚式/B CLI 面 reset+commit+DELETE 行数断言/C 并发面禁 set_session 每路独立会话）；S11 排除集三键→六键（audit 值级三键 flake 消解）；to_dict 15 键订正/取舍钦定/编号错标勘误——8 项修复（P1×4 簇/P2×2/P3×2）+8 条证伪留痕）

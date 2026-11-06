@@ -3085,3 +3085,279 @@ class TestTraceTreeExecution:
         assert "[document_missing]" in out, f"文档缺失行应携带状态标记（实测={out!r}）"
         assert "降级 stage: market_insight_trend" in out, f"degraded_stages 非空应打顶层降级行（实测={out!r}）"
         assert "[resolved]" not in out, "resolved 正常态不打标记（标记仅降级态）"
+
+
+# ===================================================================
+# === Story 6-8: executive-view 子命令（高管速览入口——四段聚合+RAG 三色）===
+# ===================================================================
+
+
+def _make_stub_view_sections(
+    *,
+    planning_available: bool = True,
+    completed: int = 8,
+    total: int = 8,
+    percent: int = 100,
+    degraded_steps: int = 0,
+    current_step: str | None = "market_insight_synthesis",
+    last_activity: str | None = "2026-11-06T10:00:00+00:00",
+    cp_total: int = 2,
+    cp_completed: int = 2,
+    in_sync: int = 2,
+    pending_sync: int = 0,
+    invalidated: int = 0,
+    recovery_mode: str | None = "replay",
+    recovery_by: str | None = "ceo-cli-s8",
+    recovered_at: str | None = "2026-11-06T10:00:00+00:00",
+    window_days: int = 7,
+    audit_total: int = 42,
+    recent_events: tuple = (),
+    last_event: str | None = None,
+    report_available: bool = True,
+    report_type: str | None = "markdown",
+    file_path: str | None = "/tmp/sisys-reports/plan.md",
+    section_count: int = 11,
+    degraded_sections: int = 0,
+    report_generated_at: str | None = "2026-11-06T10:00:00+00:00",
+) -> Any:
+    """executive-view 视图替身工厂（getattr 零 VO import——6-3 先例形态）."""
+    from types import SimpleNamespace
+
+    planning = SimpleNamespace(
+        available=planning_available,
+        degraded=False,
+        completed_steps=completed,
+        total_steps=total,
+        progress_percent=percent,
+        current_step=current_step,
+        degraded_step_count=degraded_steps,
+        last_activity_at=last_activity,
+    )
+    approval = SimpleNamespace(
+        available=cp_total > 0,
+        degraded=False,
+        total_checkpoints=cp_total,
+        completed_count=cp_completed,
+        in_sync_count=in_sync,
+        pending_sync_count=pending_sync,
+        invalidated_count=invalidated,
+        last_recovery_mode=recovery_mode,
+        last_recovery_confirmed_by=recovery_by,
+        last_recovered_at=recovered_at,
+    )
+    audit = SimpleNamespace(
+        degraded=False,
+        window_days=window_days,
+        window_start="2026-10-30T10:00:00+00:00",
+        window_end="2026-11-06T10:00:00+00:00",
+        total_events=audit_total,
+        recent_events=recent_events,
+        last_event_at=last_event,
+    )
+    report = SimpleNamespace(
+        available=report_available,
+        degraded=False,
+        report_id="0f0e0d0c-0b0a-0908-0706-050403020100" if report_available else None,
+        report_type=report_type,
+        file_path=file_path,
+        section_count=section_count,
+        degraded_section_count=degraded_sections,
+        generated_at=report_generated_at,
+    )
+    return SimpleNamespace(
+        plan_id=str(uuid.uuid4()),
+        generated_at="2026-11-06T10:00:01+00:00",
+        health=SimpleNamespace(value="green"),
+        build_degraded=False,
+        planning=planning,
+        approval=approval,
+        audit=audit,
+        report=report,
+    )
+
+
+class _StubExecutiveViewUseCase:
+    """executive-view 用例替身（记录调用参数/可编程视图或异常——_StubTreeUseCase 同款形态）."""
+
+    def __init__(self, view: Any = None, error: Exception | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._view = view
+        self._error = error
+
+    async def execute(self, *, plan_id: str) -> Any:
+        self.calls.append({"plan_id": plan_id})
+        if self._error is not None:
+            raise self._error
+        return self._view
+
+
+def _patch_executive_view_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubExecutiveViewUseCase) -> None:
+    """monkeypatch agent_cli 模块级 bootstrap/resolve（trace-tree 族注入器同款——每命令族专用 patcher纪律）."""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+class TestExecutiveViewParser:
+    """executive-view 参数解析（--plan-id 必填单参数——零可选参数 YAGNI）."""
+
+    def test_parses_command_and_plan_id(self) -> None:
+        """注册锚：build_parser 识别 executive-view 子命令与 --plan-id."""
+        args = agent_cli.build_parser().parse_args(["executive-view", "--plan-id", "123e4567-e89b-12d3-a456-426614174000"])
+        assert args.command == "executive-view"
+        assert args.plan_id == "123e4567-e89b-12d3-a456-426614174000"
+
+    def test_missing_plan_id_exits_2(self) -> None:
+        """缺 --plan-id → argparse SystemExit 2（argparse 原生用法错误承载）."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["executive-view"])
+        assert exc_info.value.code == 2
+
+    def test_no_optional_arguments(self) -> None:
+        """零可选参数（无 --window-days/--format——YAGNI 钦定）."""
+        import inspect
+
+        source = inspect.getsource(agent_cli.build_parser)
+        executive_block = source.split('add_parser(\n        "executive-view"')[1].split("add_parser(")[0]
+        assert "--window-days" not in executive_block
+        assert "--format" not in executive_block
+
+
+class TestExecutiveViewExecution:
+    """executive-view 执行（五步定式：守卫→bootstrap→resolve→打印→异常退码）."""
+
+    def test_full_data_green_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """全数据 GREEN：健康行精确+四段分隔行+值级行+exit 0."""
+        from types import SimpleNamespace
+
+        view = _make_stub_view_sections(
+            recent_events=(
+                SimpleNamespace(
+                    action_type="exec-view:probe",
+                    actor="ceo",
+                    target_resource="plan",
+                    timestamp="2026-11-06T09:59:59+00:00",
+                ),
+            ),
+            last_event="2026-11-06T09:59:59+00:00",
+        )
+        stub = _StubExecutiveViewUseCase(view)
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["plan_id"] == view.plan_id
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert f"高管简化视图（plan: {view.plan_id}）" in lines, f"首行应精确匹配（实测={out!r}）"
+        assert "健康状态: green（健康）" in lines, f"健康行精确匹配（实测={out!r}）"
+        for separator in ("── 规划态势 ──", "── 审批中心 ──", "── 审计摘要 ──", "── 报告 ──"):
+            assert separator in lines, f"四段分隔行缺失 {separator}（实测={out!r}）"
+        assert "进度: 8/8（100%）" in out
+        assert "降级: 0 步" in out
+        assert "Checkpoint: 共 2 | 已完成 2 | in_sync 2 | pending_sync 0 | invalidated 0" in out
+        assert "最近恢复: replay by ceo-cli-s8 at 2026-11-06T10:00:00+00:00" in out
+        assert "近 7 天事件: 42 | 最近: exec-view:probe by ceo at 2026-11-06T09:59:59+00:00" in out
+        assert "最新报告: markdown /tmp/sisys-reports/plan.md | 章节 11（降级 0）" in out
+
+    def test_red_health_label_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """RED 标签分支：red →「健康状态: red（危险）」精确匹配（R1-P3⑩ 补测——三色标签全覆盖）."""
+        from types import SimpleNamespace
+
+        view = _make_stub_view_sections(
+            completed=3,
+            percent=37,
+            degraded_steps=3,
+        )
+        view.health = SimpleNamespace(value="red")
+        stub = _StubExecutiveViewUseCase(view)
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "健康状态: red（危险）" in out.splitlines(), f"red 标签行精确匹配（实测={out!r}）"
+
+    def test_empty_plan_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空 plan 空态：四段空态行齐备+exit 0（空态是正常态——AC-5/AC-6）."""
+        view = _make_stub_view_sections(
+            planning_available=False,
+            completed=0,
+            percent=0,
+            current_step=None,
+            last_activity=None,
+            cp_total=0,
+            cp_completed=0,
+            in_sync=0,
+            recovery_mode=None,
+            recovery_by=None,
+            recovered_at=None,
+            window_days=7,
+            audit_total=5,
+            recent_events=(),
+            last_event=None,
+            report_available=False,
+            report_type=None,
+            file_path=None,
+            section_count=0,
+            degraded_sections=0,
+            report_generated_at=None,
+        )
+        from types import SimpleNamespace
+
+        view.health = SimpleNamespace(value="amber")
+        stub = _StubExecutiveViewUseCase(view)
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert "健康状态: amber（关注）" in lines
+        assert "进度: 0/8（0%） | 当前: 无 | 降级: 0 步 | 最近活动: 无" in lines, f"规划空态行（实测={out!r}）"
+        assert "Checkpoint: 共 0 | 已完成 0 | in_sync 0 | pending_sync 0 | invalidated 0" in lines
+        assert "最近恢复: 无" in lines
+        assert "近 7 天事件: 5 | 最近: 无" in lines, "审计空态半行（最近: 无——仅 stub 面可达形态）"
+        assert "最新报告: 无（可先执行 report-generate）" in lines
+
+    def test_malformed_plan_id_stderr_242(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """畸形 plan_id：CLI 守卫 242 → stderr [EXCEPTION_242] + exit 1 + 不触达用例."""
+        stub = _StubExecutiveViewUseCase(_make_stub_view_sections())
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", "not-a-uuid"])
+
+        assert exit_code == 1
+        assert not stub.calls, "守卫失败后不得触达用例"
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+    def test_domain_error_stderr_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """用例抛 DomainError → stderr [code] message + exit 1."""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        stub = _StubExecutiveViewUseCase(error=PlanningNotFoundError(plan_id="123e4567-e89b-12d3-a456-426614174000"))
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", "123e4567-e89b-12d3-a456-426614174000"])
+
+        assert exit_code == 1
+        assert "[EXCEPTION_480]" in capsys.readouterr().err
+
+    def test_build_degraded_mark_on_health_line(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """build_degraded=True → 健康行追加「（部分数据降级）」标记（AC-6）."""
+        from types import SimpleNamespace
+
+        view = _make_stub_view_sections()
+        view.build_degraded = True
+        view.health = SimpleNamespace(value="amber")
+        stub = _StubExecutiveViewUseCase(view)
+        _patch_executive_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["executive-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        assert "健康状态: amber（关注）（部分数据降级）" in capsys.readouterr().out.splitlines()

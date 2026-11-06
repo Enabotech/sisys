@@ -549,6 +549,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="客户端按 stage 过滤展示（按 --depth 构建后过滤；保留结论层行）",
     )
 
+    # Story 6-8: executive-view 扁平子命令（高管简化视图四段聚合+RAG 三色——
+    # CLI 高管速览入口；--plan-id 必填单参数零可选（YAGNI：审计窗/输出形态均
+    # 服务常量钉死——AC-6 钦定）
+    executive_view = subparsers.add_parser(
+        "executive-view",
+        help="高管简化视图（规划态势/审批中心/审计摘要/报告可得性四段+三色健康——Story 6-8）",
+    )
+    executive_view.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -1458,6 +1473,133 @@ def _run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int:
         return 1
 
 
+# ===================================================================
+# Story 6-8: executive-view 子命令（高管速览入口——五步定式+_print 四段打印）
+# ===================================================================
+
+
+async def _run_executive_view(plan_id: str) -> Any:
+    """executive-view 异步执行壳（resolve executive_view_use_case——Story 6-8）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_trace_tree 注记）。
+    """
+    try:
+        use_case = resolve("executive_view_use_case")
+        return await use_case.execute(plan_id=plan_id)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_executive_view(view: Any) -> None:
+    """高管简化视图打印（四段分隔行+键值行——输出即契约，纯标准库 print）。
+
+    空态行恒在纪律（6-7 空树三分化同族）：三段 available 缺席时输出空态行
+    （进度 0/8/Checkpoint 共 0/最新报告无+操作提示——「指向既有命令」非新功能）；
+    审计段无 available 键——total 为全局窗动态值，最近事件按样本降序头部呈现
+    （无样本降「最近: 无」半行——R1-F16 钦定形态）。build_degraded 时健康行
+    追加「（部分数据降级）」标记（AC-6——「拿不到数据不得报绿」的呈现面）。
+    getattr 形态零 VO import 依赖（6-3 _print_checkpoint_result 先例）。
+    """
+    health = getattr(view, "health", None)
+    health_value = getattr(health, "value", str(health))
+    health_labels = {"green": "健康", "amber": "关注", "red": "危险"}
+    degraded_mark = "（部分数据降级）" if getattr(view, "build_degraded", False) else ""
+    print(f"高管简化视图（plan: {getattr(view, 'plan_id', '')}）")
+    print(f"健康状态: {health_value}（{health_labels.get(health_value, '未知')}）{degraded_mark}")
+
+    planning = getattr(view, "planning", None)
+    print("── 规划态势 ──")
+    current_step = getattr(planning, "current_step", None)
+    last_activity = getattr(planning, "last_activity_at", None)
+    print(
+        f"进度: {getattr(planning, 'completed_steps', 0)}/{getattr(planning, 'total_steps', 8)}"
+        f"（{getattr(planning, 'progress_percent', 0)}%）"
+        f" | 当前: {current_step if current_step else '无'}"
+        f" | 降级: {getattr(planning, 'degraded_step_count', 0)} 步"
+        f" | 最近活动: {last_activity if last_activity else '无'}"
+    )
+
+    approval = getattr(view, "approval", None)
+    print("── 审批中心 ──")
+    print(
+        f"Checkpoint: 共 {getattr(approval, 'total_checkpoints', 0)}"
+        f" | 已完成 {getattr(approval, 'completed_count', 0)}"
+        f" | in_sync {getattr(approval, 'in_sync_count', 0)}"
+        f" | pending_sync {getattr(approval, 'pending_sync_count', 0)}"
+        f" | invalidated {getattr(approval, 'invalidated_count', 0)}"
+    )
+    recovery_mode = getattr(approval, "last_recovery_mode", None)
+    if recovery_mode:
+        print(
+            f"最近恢复: {recovery_mode}"
+            f" by {getattr(approval, 'last_recovery_confirmed_by', '')}"
+            f" at {getattr(approval, 'last_recovered_at', '')}"
+        )
+    else:
+        print("最近恢复: 无")
+
+    audit = getattr(view, "audit", None)
+    print("── 审计摘要 ──")
+    recent_events = getattr(audit, "recent_events", None) or ()
+    if recent_events:
+        latest_event = recent_events[0]
+        print(
+            f"近 {getattr(audit, 'window_days', 7)} 天事件: {getattr(audit, 'total_events', 0)}"
+            f" | 最近: {getattr(latest_event, 'action_type', '')}"
+            f" by {getattr(latest_event, 'actor', '')}"
+            f" at {getattr(latest_event, 'timestamp', '')}"
+        )
+    else:
+        print(f"近 {getattr(audit, 'window_days', 7)} 天事件: {getattr(audit, 'total_events', 0)} | 最近: 无")
+
+    report = getattr(view, "report", None)
+    print("── 报告 ──")
+    if getattr(report, "available", False):
+        print(
+            f"最新报告: {getattr(report, 'report_type', '')} {getattr(report, 'file_path', '')}"
+            f" | 章节 {getattr(report, 'section_count', 0)}"
+            f"（降级 {getattr(report, 'degraded_section_count', 0)}）"
+        )
+    else:
+        print("最新报告: 无（可先执行 report-generate）")
+
+
+def _run_executive_view_cli(plan_id: str) -> int:
+    """executive-view 子命令执行（五步定式——_run_trace_tree_cli 直系样板）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+
+    Returns:
+        退出码（0=视图构建完成含空态——空态是正常态；1=业务异常；2=argparse
+        用法错误由 argparse 原生承载）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "executive-view", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("高管简化视图查询失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        view = asyncio.run(_run_executive_view(plan_id))
+        _print_executive_view(view)
+        logger.info("高管简化视图查询完成: plan_id=%s", plan_id)
+        return 0
+    except DomainError as error:
+        logger.error("高管简化视图查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("高管简化视图查询异常: %s", error, exc_info=True)
+        return 1
+
+
 async def _run_checkpoint_recovery_view(plan_id: str, checkpoint_no: str) -> Any:
     """dry-run 评估数据面（resolve 既有恢复视图用例——仅取②步视图零执行）。
 
@@ -2048,6 +2190,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_chain_query_cli(args.plan_id, args.include_blob)
     if args.command == "trace-tree":
         return _run_trace_tree_cli(args.plan_id, args.depth, args.stage)
+    if args.command == "executive-view":
+        return _run_executive_view_cli(args.plan_id)
     if args.command == "report-generate":
         return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
     if args.command == "isolation-status":

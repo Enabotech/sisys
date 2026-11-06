@@ -339,3 +339,48 @@ class TestSaveFallbackPath:
             context_session.flush.assert_awaited_once()
         finally:
             reset_session(token)
+
+
+class TestSearchFallbackPath:
+    """search 双模式分派——fallback 路径（Story 6-8 OD-12 R2 重开唯一 infra 增量）.
+
+    CLI executive-view 消费面是 search 的首个非 HTTP 消费方（无 middleware 恒定
+    session 供给）——无 fallback 则 CLI 面审计段恒降级（AC-6 交付物生产可用性缺陷，
+    R2-F2d 定谳）；镜像 save 双模式先例（同文件）与 report get_latest fallback
+    （report_repository.py :153-161）同款形态。
+    """
+
+    def test_search_via_factory_session_succeeds(self) -> None:
+        """无 ContextVar session: factory 独立会话查询成功（session_context 编排）."""
+        import asyncio
+        from unittest import mock
+
+        from src.infrastructure.storage.postgresql.session_context import clear_session
+
+        clear_session()
+        factory_session = mock.AsyncMock(spec=AsyncSession)
+        mock_result = mock.Mock()
+        mock_result.scalars.return_value.all.return_value = []
+        factory_session.execute.return_value = mock_result
+        repo_with_factory = AuditRepository(session_factory=mock.MagicMock(return_value=factory_session))
+
+        result = asyncio.new_event_loop().run_until_complete(repo_with_factory.search(AuditSearchCriteria()))
+
+        assert isinstance(result, AuditSearchResult)
+        assert result.total == 0
+        assert result.items == ()
+        factory_session.execute.assert_awaited()  # 查询经 fallback 独立会话执行
+
+    def test_search_without_factory_reraises_runtime_error(self) -> None:
+        """无 ContextVar 且无 factory: RuntimeError 上抛（fail-loud——不吞为空结果）."""
+        import asyncio
+
+        from src.infrastructure.storage.postgresql.session_context import clear_session
+
+        clear_session()
+        repo_bare = AuditRepository()
+        try:
+            asyncio.new_event_loop().run_until_complete(repo_bare.search(AuditSearchCriteria()))
+            raise AssertionError("预期 RuntimeError 上抛")
+        except RuntimeError:
+            pass  # 无请求 session 且无工厂——显式失败（吞为空结果是误导形态）

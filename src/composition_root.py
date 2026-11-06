@@ -2059,6 +2059,46 @@ def bootstrap() -> None:
         tags=("traceability", "use_case", "application"),
     )
 
+    # === Story 6-8: Executive View（高管简化视图四段聚合——纯读侧零事件）===
+    # SINGLETON 捕获 SCOPED 三依赖声明（OD-11）：snapshot_repository/report_repository/
+    # audit_repo 三 SCOPED + checkpoint_service 一 SINGLETON 的混态捕获——CLI 一次性
+    # 进程 + 测试双清下无故障面（6-6/6-7 双先例已跑通）；未来 7-2 长驻 REST 面改
+    # SCOPED 触发器注记。get_latest_by_plan 经 report_repository 既有注册名消费
+    # （首消费方激活——零新仓储成员，OD-11/OD-12）。
+    from src.application.ports.executive_view import ExecutiveViewPort
+    from src.application.services.executive_view_service import ExecutiveViewService
+
+    register_port(
+        name="executive_view_service",
+        version="v1.0.0",
+        interface=ExecutiveViewPort,
+        impl=lambda resolver: ExecutiveViewService(
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+            checkpoint_service=resolver.resolve("checkpoint_service"),
+            report_repository=resolver.resolve("report_repository"),
+            audit_repository=resolver.resolve("audit_repo"),
+        ),
+        module="src.application.services.executive_view_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("executive", "view", "application"),
+    )
+
+    from src.application.use_cases.get_executive_view import GetExecutiveViewUseCase
+
+    register_port(
+        name="executive_view_use_case",
+        version="v1.0.0",
+        interface=GetExecutiveViewUseCase,
+        impl=lambda resolver: GetExecutiveViewUseCase(
+            view_service=resolver.resolve("executive_view_service"),
+        ),
+        module="src.application.use_cases.get_executive_view",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("executive", "use_case", "application"),
+    )
+
     # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 

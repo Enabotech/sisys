@@ -92,8 +92,10 @@ class AuditRepository(AuditRepositoryPort):
 
         # 双模式写入（核销 R2 批 K10——isolation_switch_log_repository DC-5 模板）：
         # 请求路径（ContextVar session）add+flush 随主事务；CLI/后台路径无请求
-        # session 时经注入工厂走独立会话 commit。只修 save（CLI 可达面——其余
-        # 四方法消费方均为 HTTP 路由，middleware 恒有 session）。
+        # session 时经注入工厂走独立会话 commit。save 与 search 两面均带 fallback
+        # （search 的 fallback 为 Story 6-8 新增——executive-view CLI 消费面是
+        # search 的首个非 HTTP 消费方；get_by_id/update/get_archive 三方法消费方
+        # 均为 HTTP 路由，middleware 恒有 session，维持请求路径单模式）。
         try:
             session = get_session()
         except RuntimeError:
@@ -126,7 +128,32 @@ class AuditRepository(AuditRepositoryPort):
         return audit_log.to_dict()
 
     async def search(self, criteria: AuditSearchCriteria) -> AuditSearchResult:
-        """搜索审计日志.
+        """搜索审计日志（双模式分派——Story 6-8 executive-view CLI 消费面激活）.
+
+        请求路径（ContextVar session）经 self._session 查询；CLI/后台路径无请求
+        session 时经注入工厂走独立会话（镜像 save 双模式与 report get_latest
+        fallback 先例——无 fallback 则 CLI 面审计段恒降级，AC-6 生产可用性）.
+
+        Args:
+            criteria: 搜索条件
+
+        Returns:
+            AuditSearchResult 包含 items, total, offset, limit
+
+        Raises:
+            RuntimeError: 无请求 session 且无注入工厂（fail-loud——不吞为空结果）.
+        """
+        try:
+            get_session()
+        except RuntimeError:
+            if self._session_factory is None:
+                raise
+            async with session_context(self._session_factory):
+                return await self._do_search(criteria)
+        return await self._do_search(criteria)
+
+    async def _do_search(self, criteria: AuditSearchCriteria) -> AuditSearchResult:
+        """搜索查询体（session 无关——search 双模式共用的单实现）.
 
         Args:
             criteria: 搜索条件
