@@ -81,6 +81,10 @@ services:
     image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.1
     container_name: sisys-qdrant
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     ports:
       - "${QDRANT_PORT:-6333}:6333"
       - "${QDRANT_GRPC_PORT:-6334}:6334"
@@ -296,6 +300,10 @@ services:
     container_name: sisys-test-qdrant
     profiles: ["test"]
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     ports:
       - "6335:6333"
       - "6336:6334"
