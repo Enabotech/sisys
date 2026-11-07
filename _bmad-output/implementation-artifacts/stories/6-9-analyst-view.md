@@ -922,6 +922,8 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 #### 已修复 Patch
 
+> 注记（R2 补）：表内行号=各轮发现时的 HEAD 历史锚（勘误表语义），后续提交自然漂移属预期（F2 :207-213→现 :205-207/F8 :3557→:3555 等——R2-A 逐项核验，关键锚 F5 :3583/:3590、F7 :530/:785/:812 仍精确）。
+
 | # | 问题 | 严重度 | 修复方案 |
 |---|---|---|---|
 | R1-F1 | docker-compose.yml +8 行游离变更（两处 qdrant ulimits nofile 65535——Story File List 零记录/全文 grep 零命中/与 6-9 零技术因果；Task 7.4 纯三零取证范围仅限 src 三目录，掩盖 deploy 面游离变更——三方汇合[调研 A+C+主会话]定谳） | P1 | 剥离独立提交 `b7f2235e build(deploy): qdrant 服务补充 ulimits nofile 65535 文件描述符上限加固`（评审①约束：措辞用运维加固——「qdrant 官方建议」现行官方文档未证实禁用；e1d5a066/c7ed56bb 独立 build(deploy) 先例）；6-9 提交面与 File List 对齐 |
@@ -932,6 +934,8 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 | R1-F6 | 集成测试 setenv worker 级环境泄漏（:141 `os.environ["BLM_SEARCH_COLLECTION"] = _COLLECTION` 直写不恢复——组合根 lambda 在 resolve 时刻读 env[composition_root :1592/:2038]，teardown 删 collection 后同 xdist worker 后续模块[6-2/6-4 planning 族同组]resolve 链读残留 env 指向已删 collection 毒化 404；伴生注释「集成面无 monkeypatch」是泄漏自我合理化——验收面 :708/:727 monkeypatch.setenv 先例在案） | P2 | setenv 折入既有 `_fresh_resolver_per_test` autouse fixture（fixture 加 monkeypatch 参数+1 行 setenv——per-test 注入+测试退出自动恢复 env，与后置双清同点原子收尾[评审①形态 c：3 触点最小，优于 9 触点参数化形态]）；删 `_build_service` 内 os.environ 行+clear_singleton 冗余行+`import os`+注释改写（评审①②独立定谳：缓存面已被既有 autouse fixture 每测试双清闭合，方案原拟「新增模块级 teardown」为冗余防线违反 Simplicity First——已裁撤）；集成 4 场景真实服务复验全绿 |
 | R1-F7 | 用例单测计数失实三处（「7 用例」——:530 Task 7.4 收尾实录「26 VO+35 服务+7 用例…」/:785 TDD 全循环「7+12+6」/:812 File List；`--collect-only` 实测 6 个测试函数；调研 B 报两处漏 :530——主会话亲验补全[「同源锚点全出现位」纪律]） | P2 | 三处勘误 7→6（其余计数逐一复核全对：VO 26/服务 35/CLI 12/架构 13/契约 6/验收 12/集成 4） |
 | R1-F8 | CLI 单测 :3557 运算符优先级脆弱写法（`"[" in line and "█" in line or "[" in line and "░" in line`——and 先于 or 当前语义正确，无括号纯可读性脆弱） | P3 | 括号化（零行为变化，6-9 新增面自有代码） |
+| R1-F9 | pre-commit mypy 钩子暴露 dev 遗留类型错误①：test_all_vos_frozen 直赋值形态（frozen dataclass 属性被 mypy 视为 read-only property 写入 `[misc]`×3——dev 变更未提交故首次过钩才暴露） | P3 | frozen 突变断言改 `setattr(obj, "attr", value)` 动态形态（test_citation_entry.py:97 仓内先例——运行时同样触发 FrozenInstanceError 且类型干净）；**R2 补录**（33f2719f 提交链承载，R2-A 对账发现台账缺条目） |
+| R1-F10 | pre-commit mypy 钩子暴露 dev 遗留类型错误②：Redis 探针 `await client.aclose()`（redis 5.3.1 运行时 aclose 存在，但类型存根仅认 close） | P3 | 改 `await client.close()` 对齐仓内验收先例（traceability_tree :207/:232/:256 六处统一 close 形态）；**R2 补录**（同上——全变更集 aclose 活性调用零残留亲验） |
 
 **Round 1 落码后回归**：服务 35+架构 13（48 passed）/CLI 172 passed/集成 4 场景（SISYS_USE_TEST_PORTS=1 真实服务）全绿；ruff format --check 归零。
 
@@ -948,6 +952,11 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 - arch:66 路径常量断言——弱守护（is_file 是真锚），零成本留
 - 派生矩阵三空集格同调用（格 2/5/7 均 `derive_stage_status(set())`）——单集合签名纯函数层无法判别阶段维（三阶段值域两两不相交依据），阶段维由服务层 `_derive_stages` 测试承载——矩阵覆盖声明按此口径理解，冗余非缺陷
 - progress_percent 脏快照 >100 无读侧钳制——6-8 executive_view_service :187 同款忠实复刻（R1-F6 复刻钦定），两 Story 共享形态，如修属 6-8 联动面非 6-9 单独面
+- 集成场景②（空 plan）在场景① teardown 整删 collection 后运行、env 指向已删 collection（R2-B 注记）——当前绿依赖 build_trace_tree 对零归档 plan 短路（PG 空结果→零 Qdrant 点查）；若树服务未来加 collection 存在性预检会翻转为 tree_build_degraded，但该翻转被 `build_degraded is False` 断言大声捕获（自守卫远期耦合，非缺陷）
+
+#### Round 2 修复（回归核查+组合交互面——双 Agent 并行·v1.5.1 补录轮）
+
+**零代码修复**。R2-A 回归核查：R1 修复台账 11 项（F1-F8+伴生×2+登记×1）对账全在位、修复自身零新破口（F5 判别力/F6 fixture 语义边界与同进程 env 残留探针/F3·F4 零残留/伴生×2 形态统一）、274 passed 零失败（unit 86+CLI 172+集成 4+验收 12）+mypy 762 零错+lint-imports 5 kept+提交链 18 文件零遗漏零游离；两项 P3 文档级（伴生无表条目→本轮补录 R1-F9/F10；行号漂移→表头注记）。R2-B 组合交互面：四轴全过（R1×R1 四组合零互拆/×dev 面双 monkeypatch 双保险+xdist 同组串行/×既有资产 6-8 getsource 边界实测 5 passed+计数无断言/语义深查三推演定谳——F6 per-test setenv 合理默认·F5 any 零误命中面运行面实证·回归口径数字诚实）；一项 P3 注记登记（场景②远期耦合）。
 
 ---
 
@@ -961,10 +970,11 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.5.1
 **创建日期/Created:** 2026-11-07
 **最后更新/Last Updated:** 2026-11-07
 **更新说明/Description:**
+- v1.5.1: 代码审查 Round 2 补录轮（回归核查+组合交互面双 Agent：零 P0/P1/P2 零代码修复——R1 台账 11 项对账全在位+修复零新破口+274 passed 零失败；四轴交互面全过[R1×R1 四组合零互拆/双 monkeypatch 双保险/6-8 getsource 边界实测 5 passed/三推演定谳]；补录 R1-F9/F10 伴生 mypy 修正进 Patch 表+行号易腐表头注记+场景②远期耦合未落码注记）
 - v1.5.0: 代码审查 Round 1 修订（四视角并行调研[契约一致性/测试判别力/架构红线/运行面实测]+双评审员 C3 门禁+主会话亲验三组：P1×2[docker-compose +8 行游离变更剥离独立提交 b7f2235e/CLI 单测 capsys 双读恒真断言——评审①证伪原拟 not-in-list 形态改 not any 子串扫描+突变实证留痕]+P2×3[ruff format 压行/集成 setenv worker 级泄漏——折入既有 _fresh_resolver_per_test fixture 形态 c 三触点/用例计数 7→6 三处勘误含主会话补全 :530]+P3×3[_TOOL_SUMMARY_FIELDS 死常量删除——SSOT 第二源清除+Subtask 2.3 行内勘误/架构测试恒真断言+孤儿常量删除/运算符括号化]——落码 8+deferred 登记 1[D6-9-R1-1 非 canonical UUID 命令族观察项]+未落码注记 7 条台账；契约面五轴全过+5 组真实突变全红+运行面 15 项实测零缺陷[P95=15.5ms/幂等 byte-identical]；落码后回归 48+172+4 全绿）
 - v1.4.0: dev-story 实施完成 ready-for-dev→in-progress→review（Task 0~7 全 Subtask 勾选：12/12 验收场景全绿+四目录全量两轮 15193/15192 passed[3 例既有环境负载偶发单独复跑全绿定谳，与 6-9 零交集]+覆盖率 93%[新增三 src 文件 100%]+mypy 762 零错误+ruff 全绿+变异实证 15 锚；交付面：七 VO+PhaseStatus+六阶段静态清单+值域单源+三段编排服务+242 用例+CLI analyst-view+组合根双注册；实施攻坚五项+R6 合规双文件+deferred-work 八条 11 处处置落档+纯三零 diff 实证+CLI 真实冒烟）
 - v1.3.1: 文档审查周期收敛定稿（R4 纯验证三轴零发现+R5 独立终审五节全过——周期闭合/10 项关键修复双向取证 10/10+代码组 4/4/八词根残留活位全零+15 组实锚吻合/红线零违；收敛判据达成：零 P0/P1/P2 残留——放行 dev-story；收敛声明入档）
