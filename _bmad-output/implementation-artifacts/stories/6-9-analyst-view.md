@@ -46,12 +46,12 @@
 **Then** 返回 `AnalystView` **6 键** frozen VO（`plan_id`/`generated_at`/`build_degraded`/`toolbox`/`progress`/`traceability`——全键契约见 Task 0.1 冻结表），三段各自键恒在：
 - **专业工具箱段** `ToolboxSection` **4 键**：`degraded`（段级降级哨兵）/`total_tools`（ACTIVE 工具总数——当前 23）/`tools`（tuple[`ToolSummary` **5 键**：slug/tool_name/category/description/status——L1 元数据**投影白名单五键**，`ToolMetadata` **18 字段**面其余 13 字段（input_schema/output_schema/when_to_use/when_not_to_use/capabilities/tags/version/rule_version/token_budget_l1/token_budget_l2/depends_on/triggers/data_sources）禁入视图——R1-F2 勘误）/`categories`（tuple[`ToolCategorySummary` **2 键**：category/tool_count]——按 category 分组计数，**组序钦定 slug 清单稳定序去重序**——selector 返回序派生，禁字母序重排）
 - **BLM 进度段** `ProgressSection` **9 键**：`available`（快照在位 bool）/`degraded`/`phase`（快照 phase 直读 str——值域当前 2 值；空态/段降级 None——R1 补注记）/`current_step`/`completed_steps`/`total_steps`（int 计数直读）/`progress_percent`（int 0-100——`int(completed_steps / total_steps * 100)` 向下取整，total_steps==0 服务层守卫归 0[除零形态——R1-F6]，**与 6-8 PlanningSection.progress_percent 同口径**（VO 侧 int 截断）+与实体 property float 口径分立注记——6-8 R1-F3 裁定直系延续）/`degraded_step_count`（派生自 state_data `degraded_steps`（list[str]）的 `len()`——6-8 同款派生）/`stages`（tuple[`PhaseProgress` **5 键**]——六阶段全景，见 AC-3）
-- **溯源摘要段** `TraceabilitySection` **8 键**：`available`（stage_count > 0——有分析层数据可溯源）/`degraded`（本段编排异常哨兵——与树顶层哨兵分立）/`stage_count`（分析层 StageNode 节点数==len(tree.root.children)——depth=4 下与 root.stage_count 等值）/`chunk_count`（切片层 ChunkNode 节点数）/`document_count`（文档层 DocumentNode 节点实例计数——同文档多 chunk 嵌套重复计，6-7「文档缓存仅省 find 调用、节点形态仍嵌套」注记直系）/`jump_ready_count`（jump_ready=True 文档节点数——「30 秒溯源」可达性观测锚）/`degraded_stage_count`（len(tree.degraded_stages)——stage 级降级上卷计数）/`tree_build_degraded`（透传 6-7 树顶层哨兵——「拿不到数据」vs「没有数据」两层分立，6-7 读模型诚实性在聚合面的延续）（**结论层恒单根节点**：root 即唯一 ConclusionNode[title 固定文案/summary=synthesis conclusions 联展可空]，空树同构造——统计面剔除恒定值，四层规模统计以三层有效计数+jump_ready 承载——R1-F1 修订）
+- **溯源摘要段** `TraceabilitySection` **8 键**：`available`（stage_count > 0——有分析层数据可溯源）/`degraded`（本段编排异常哨兵——与树顶层哨兵分立）/`stage_count`（分析层 StageNode 节点数==len(tree.root.children)——depth=4 下与 root.stage_count 等值）/`chunk_count`（切片层 ChunkNode **节点实例数**——跨 stage 重复引用按实例计（6-7 端口「每条 stage→chunk 路径独立」直系），同 document_count 口径——R2 补注记）/`document_count`（文档层 DocumentNode 节点实例计数——同文档多 chunk 嵌套重复计，6-7「文档缓存仅省 find 调用、节点形态仍嵌套」注记直系）/`jump_ready_count`（jump_ready=True 文档节点数——「30 秒溯源」可达性观测锚）/`degraded_stage_count`（len(tree.degraded_stages)——stage 级降级上卷计数）/`tree_build_degraded`（透传 6-7 树顶层哨兵——「拿不到数据」vs「没有数据」两层分立，6-7 读模型诚实性在聚合面的延续）（**结论层恒单根节点**：root 即唯一 ConclusionNode[title 固定文案/summary=synthesis conclusions 联展可空]，空树同构造——统计面剔除恒定值，四层规模统计以三层有效计数+jump_ready 承载——R1-F1 修订）
 
 **And** 顶层 `generated_at` 为 ISO 字符串（`datetime.now(UTC).isoformat()`——服务入口**单时间锚**取一次 now，6-8 R1-F2 单锚派生直系延续；段内不透传树 `generated_at`——并发对照排除集最小化裁定 OD-6）；段内计数均派生自既有单源（工具计数派生 selector 返回序、进度计数派生快照七键、溯源计数派生树遍历）——**服务不新算任何跨源复合指标**
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据场景：6 键 exact set（`{f.name for f in fields(AnalystView)}`——6-8 R1-F10 激活先例）+ 三段嵌套键集各自 exact set + 值级断言（total_tools==23/total_steps 与预置一致/completed_steps 与预置一致/jump_ready_count 与预置归档形态一致）
+- [ ] 全数据场景：6 键 exact set（`{f.name for f in fields(AnalystView)}`——6-8 R1-F10 激活先例）+ 三段嵌套键集各自 exact set + 值级断言（total_tools==23/total_steps 与预置一致/completed_steps 与预置一致/jump_ready_count 与预置归档形态一致；**溯源五计数值级断言归 AC-4 验证标准承载——分工指路 R2 注**）
 - [ ] `ToolSummary` 5 键 exact set（投影白名单——`ToolMetadata` 字段面防扩散断言：构造入参仅五键）
 - [ ] progress_percent 整数口径断言（3/8 完成 → 37 非 37.5——int 向下取整）
 - [ ] categories 恒等式（`sum(c.tool_count for c in categories) == total_tools`——分组计数完备性，缺组/重复计数即红）
@@ -65,7 +65,7 @@
 **And** `ToolSummary` 五键值级：slug/tool_name/category/description 均非空 str、status=="active"（投影源字段直传零变形）
 
 **验证标准/Validation Criteria:**
-- [ ] total_tools==23 + 首末 slug 锚（清单序稳定）
+- [ ] total_tools==23 + 首末 slug 锚（清单序稳定）+ **全序列断言 `tuple(t.slug for t in tools) == tuple(get_all_slugs())`（R1-F11 主锚——中段乱序判别，首末锚仅快速失败——R2 补入承载位）**
 - [ ] 5 分类各 tool_count 值级断言（3/3/6/3/8）+ 分组和恒等式 + len(categories)==5（R1 补强）
 - [ ] 每条 ToolSummary 五键 exact set + 值非空 + status=="active"
 - [ ] 抽样值级锚（≥3 工具的 tool_name/description 与 TOOLS.md 原文一致——静态真源对照）
@@ -87,7 +87,7 @@
 - 阶段1：timeline 含 "performance_gap" 条目 → completed；否则 not_started
 - 阶段2：timeline 含 "market_insight_synthesis" → completed；含任一六子步骤裸值（trend/market_customer/competition/self/opportunity/opportunity_gap）→ in_progress；否则 not_started
 - 阶段3~6：**恒 not_started**（`step_total==0` 的规划态——「未启动」非「不可用」；V1 交付注记归 phase_name 后缀呈现，不进 status 值域）
-- step_completed 派生：与 `derive_stage_status` 同一 `stage_steps` 集合的基数（服务层按阶段值域过滤**去重**后 len——R1-F3 口径钦定）：阶段1 ∈{0,1}；阶段2 ∈[0,7]（六子裸值+synthesis 值域基数）；阶段3~6 恒 0；重复 timeline 条目（写侧 `record_step` 纯 append 无幂等防护——`blm_planning_service.py:117` 亲验，六子步骤无重跑守卫）天然去重，计数恒 ≤ step_total（VO 不变量结构可满足，无需服务层钳制）
+- step_completed 派生：与 `derive_stage_status` 同一 `stage_steps` 集合的基数（服务层按阶段值域过滤**去重**后 len——R1-F3 口径钦定）：阶段1 ∈{0,1}；阶段2 ∈[0,7]（六子裸值+synthesis 值域基数）；阶段3~6 恒 0；重复 timeline 条目（写侧 `record_step` 纯 append 无幂等防护——`blm_planning_service.py:117` 亲验，六子步骤无重跑守卫）天然去重，计数恒 ≤ step_total（VO 不变量结构可满足，无需服务层钳制）。（注记——R2 补：progress 段 completed_steps/progress_percent 是快照 int 直读口径（写侧 min 钳制 ≤8），与 stages 派生计数分立——timeline 含值域外脏值时两者可不一致（如 8 条前缀脏值条目：直读 8/8 而六阶段全 not_started），属「快照计数 vs 派生计数」预期语义非 bug；derive_stage_status 单集合参数可判别三规则的依据是三阶段值域两两不相交——{performance_gap}/六子+synthesis 七值/∅）
 **And** 三 plan 形态值级：P-mid → stages[0].status==completed+stages[1].status==in_progress+stages[1].step_completed==1+stages[2..5] 全 not_started；P-full → stages[0..1] 全 completed（step_completed==step_total）+后四 not_started；P-empty → progress.available==False+六阶段全 not_started（**空 plan 六阶段框架恒在**——静态清单不依赖快照，「工具/框架恒在+数据缺席降级」语义）
 **And** `PhaseStatus` 为三值 str-Enum（`COMPLETED="completed"/IN_PROGRESS="in_progress"/NOT_STARTED="not_started"`——**进度态语义域**，与 `ExecutiveHealth`（健康分级域 green/amber/red）正交分立——6-8 OD-4「全仓首个三值分级枚举」注记不冲突：本枚举是首个三值**进度态**枚举，落应用层 ports 文件同 6-8 先例）
 
@@ -99,10 +99,10 @@
 
 ### AC-4: 溯源摘要段聚合（树统计+jump_ready 计数）
 
-**Given** 某 plan_id 下已预置 6-7 形态溯源归档族（直写思维链归档行+Qdrant 点+文档元数据——`_archive_row`/`_spec_chunk` 预置样板，6-7 验收 `test_acceptance_traceability_tree.py:319/:366` 直系复用）：≥1 结论归档行（synthesis 行——结论层呈现位）、≥2 分析 stage、≥1 切片、≥2 文档节点（其中 ≥1 个 jump_ready=True（object_key+page 齐备）、≥1 个 jump_ready=False（object_key 缺席））
+**Given** 某 plan_id 下已预置 6-7 形态溯源归档族（直写思维链归档行+Qdrant 点+文档元数据——`_archive_row`/`_spec_chunk` 预置样板，6-7 验收 `test_acceptance_traceability_tree.py:319/:366` 直系复用）：≥1 结论归档行（synthesis 行——结论层呈现位）、≥2 分析 stage、**≥2 切片实例（R2 勘误：原「≥1 切片」与混合判别联合不可满足——每 chunk 至多挂 1 个文档节点[单 payload 单 document_id，`_resolve_document` 实码钦定]，jump_ready True/False 两态必跨 chunk；预置建议使 chunk_count≠stage_count 判别计数面错接）**、≥2 文档节点（其中 ≥1 个 jump_ready=True（object_key+page 齐备）、≥1 个 jump_ready=False（object_key 缺席））
 **When** 构建分析师视图
 **Then** 溯源段计数与树单源一致：`stage_count == len(tree.root.children)`（分析层——depth=4 下与 root.stage_count 等值）/`chunk_count`（切片层计数）/`document_count`（文档层计数）/`jump_ready_count == sum(1 for d in 文档层 if d.jump_ready)`（**depth=4 钦定**——jump_ready 在文档层，depth<4 不可达；OD-6）/`degraded_stage_count == len(tree.degraded_stages)`/`tree_build_degraded == tree.build_degraded`（顶层哨兵透传零变形）；结论层恒单根节点（root 自身）不计入计数——统计面语义注记（R1-F1）
-**And** 预置形态值级断言：jump_ready_count 与预置的 jump_ready 文档节点数一致（可判别形态：预置 ≥1 True+≥1 False——计数既非全 0 亦非全量）
+**And** 预置形态值级断言：jump_ready_count 与预置的 jump_ready 文档节点数一致（可判别形态：预置 ≥1 True+≥1 False——计数既非全 0 亦非全量）；chunk_count 与预置 chunk 实例数直推（R2 补）
 **And** 无归档 plan_id（零思维链归档）→ 树幂等空树（6-7 空树语义）→ 溯源段 available==False（stage_count==0）+五计数全 0+tree_build_degraded==False+不抛异常（「没有数据」非「拿不到数据」——空树分立哨兵语义透传）；树顶层降级形态（query_archive 异常被 6-7 服务内捕获返回 build_degraded=True 空树——**Mock 面以正常返回降级树形态模拟，非抛异常**；验收面无故障注入通道，该分支归单测承载——6-8 AC-5「段级容错归单测」分立同款——R1-F5）
 
 **验证标准/Validation Criteria:**
@@ -117,7 +117,7 @@
 **Then** **段级独立容错**（6-8 段级容错直系延续）：三源各自 try 包裹——单源异常仅该段 `degraded=True`（段内计数降默认值/清单降空 tuple），其余段照常聚合，视图整体不抛；顶层 `build_degraded = 任一段 degraded`；**段降级语义三分**：toolbox 段 degraded（selector/list_active_skills 抛 SkillNotFoundError 传播被捕获——「缺档案是资产缺陷」fail-loud 语义在聚合面收敛为段降级+warning 日志）/progress 段 degraded（快照读异常——真实链路注记：`RedisSnapshotStore.load` 吞一切异常归一 None（`redis_snapshot_store.py:179-181`），「异常 vs 缺失」真实 Redis 链路不可分立均落空态，该分支仅单测 AsyncMock 面可达——6-8 R1-F2 同款注记）/traceability 段 degraded（build_trace_tree 调用异常——与树顶层 build_degraded 哨兵分立：前者是本段编排异常、后者是 6-7 服务内降级）
 **And** 空 plan 幂等读：视图正常返回 6 键（progress.available==False+六阶段 not_started 框架恒在（AC-3）/traceability.available==False+五计数 0/**toolbox 段完整 23 工具**（静态真源与 plan 正交——三段中唯一恒数据段））、`build_degraded==False`（「没有数据」非「拿不到数据」——6-7/6-8 空态分立语义第三连）、**不抛异常**（6-4/6-6/6-7/6-8 四先例族）
 **And** 畸形 plan_id（非 UUID）→ 用例层 242 `EntityValidationError`（`GetExecutiveViewUseCase`/`GetTraceabilityTreeUseCase` UUID 守卫直系先例——服务层不守卫，分工钦定同 6-8 OD-3）；编程面 `pytest.raises` 形态、CLI stderr 形态分立（AC-6）
-**And** 快照在位但 state_data 畸形（缺键/类型错）→ progress 段降级（degraded=True+available==False+计数降 0+progress_percent==0+六阶段框架恒在 not_started），不抛（读侧脏数据守卫——**逐键处置复刻 6-8 `executive_view_service.py:169-188`**——R1-F6：completed_steps 必备缺→段降级/total_steps `.get` 默认 BLM_TOTAL_STEPS 且 ≤0 显式段降级[除零形态守卫——progress_percent 归 0]/timeline、degraded_steps 缺→空列表；「宽容-严格」三分界钦定直系延续：缺键且有单源常量→默认/值现且可强转→采用/值现且不可用→降级）
+**And** 快照在位但 state_data 畸形（缺键/类型错）→ progress 段降级（degraded=True+available==False+计数降 0+progress_percent==0+六阶段框架恒在 not_started），不抛（读侧脏数据守卫——**逐键处置复刻 6-8 `executive_view_service.py:169-188`**——R1-F6：completed_steps 必备缺→段降级/total_steps `.get` 默认 BLM_TOTAL_STEPS 且 ≤0 显式段降级[除零形态守卫——progress_percent 归 0]/timeline、degraded_steps 缺→空列表/**phase、current_step `.get` 缺→None（空态同形——6-8 :188 `current_step=state_data.get(...)` 先例直系；phase 无 6-8 对应键钦定同一宽容面：值现为 str→采用、缺→None，不触发段降级——R2 补遗）**；「宽容-严格」三分界钦定直系延续：缺键且有单源常量→默认/值现且可强转→采用/值现且不可用→降级）
 
 **验证标准/Validation Criteria:**
 - [ ] 空 plan 幂等读四断言（6 键恒在+build_degraded==False+toolbox 段完整+两段空态框架）
@@ -133,13 +133,13 @@
 - 专业工具箱：`工具: 共 {total_tools} 种（ACTIVE） | 分类: {category}×{n} ...`（5 分类计数连排）+ **逐工具清单**（`  {slug} — {tool_name}（{category}）`每工具一行——23 行全量打印，专业作业面语义：工具箱是「可用的工具」清单非计数摘要；**段降级时**降 `工具清单获取失败` 单行）
 - BLM 进度：`进度: {completed}/{total}（{percent}%） | 当前: {current_step} | 降级: {n} 步` + **六阶段进度条**（每阶段一行：`  {序}. {phase_name}: [{█×k}{░×(10-k)}] {status中文}（{step_completed}/{step_total}）`——进度条 10 格字符形态（k=round(step_completed/step_total×10)，step_total==0 时恒 ░；k 表单测枚举 c=0..7 钉 [0,1,3,4,6,7,9,10]——10c/7 与 10 互质无 .5 tie 面[banker's rounding 无触发面，确定性安全]，k 公式 ±1 即红：R1 补强变异锚）+status 中文映射（completed=已完成/in_progress=进行中/not_started=未启动）+后四阶段行尾追加 `（V1 交付）`注记；快照缺席时六阶段框架行恒在（全 not_started）+首行降 `进度: 无快照`）
 - 溯源摘要：`分析: {n} | 切片: {n} | 文档: {n} | 可跳转: {n}` + 降级行（`降级 stage: {n}`——degraded_stage_count>0 时）+ 树降级标记（tree_build_degraded 时追加 `（部分树数据降级）`）+ 操作提示行（恒在：`提示: 执行 trace-tree --plan-id {plan_id} 查看完整溯源树`——指向既有命令，6-8「可先执行 report-generate」同款形态；统计行改三层计数——R1-F1）
-**And** 退出语义：正常 exit 0（含空 plan 空态——空态是正常态非错误；空态输出=首行+三段各自空态行[工具箱段照常全量 23 行]）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-8 前缀统一先例；`_run_executive_view_cli` 五步定式 :1567-1600 直系样板）
+**And** 退出语义：正常 exit 0（含空 plan 空态——空态是正常态非错误；空态输出=首行+三段各自空态行[工具箱段照常全量 23 行；progress 段首行降「进度: 无快照」+六阶段框架行恒在；**溯源段统计行恒在全 0 形态「分析: 0 | 切片: 0 | 文档: 0 | 可跳转: 0」+提示行恒在（降级行/树降级标记缺席）——R2 钉死：S9 断言可精确落笔**]；progress/traceability 段降级行形态归实现期 CLI 单测冻结——低危注记）；畸形 plan_id → exit 1 + stderr `[EXCEPTION_242]`（6-8 前缀统一先例；`_run_executive_view_cli` 五步定式 :1567-1600 直系样板）
 **And** 本 Story CLI 面无角色门槛（「分析师」是 UX 语义——查询命令族先例均无角色检查；RBAC 门槛归 7-2 REST 入口立项时评估——6-8 AC-6 同款注记）；参数面仅 `--plan-id` 必填单参数（**零可选参数**——YAGNI：无 --format/--category 过滤需求来源，输出形态服务常量钉死——6-8 同款裁定）
 **And** build_degraded 时首行后追加 `（部分数据降级）`标记（6-8 健康行降级标记同款形态——本 Story 无 health 三色，降级标记承载诚实性）
 
 **验证标准/Validation Criteria:**
 - [ ] 全数据输出断言：三段分隔行+工具箱首行精确+23 工具行计数+六阶段 6 行（status 中文映射+V1 注记后四阶段）+溯源统计行+提示行（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-8 S8/S9 双清先例）
-- [ ] 空 plan 输出断言（六阶段框架行恒在+工具箱照常+exit 0）
+- [ ] 空 plan 输出断言（六阶段框架行恒在+工具箱照常+**溯源统计行全 0 形态**+exit 0——R2 补）
 - [ ] 242 stderr 形态（`[EXCEPTION_242]` in stderr + exit 1）
 
 ### AC-7: 性能与并发（三段口径——OD-7）
@@ -322,13 +322,13 @@
 
 **关联 AC:** AC-1~AC-7（全量——规范冻结是全部实现的前置）
 
-> **目的：** 在进入代码实现前，明确 VO 键契约、阶段派生规则表、端口契约、验收场景与六边形架构边界，并处置 deferred-work 锚定义务（六条 Epic 6 锚+两条 6.7-DF 维持——OD-8）。
+> **目的：** 在进入代码实现前，明确 VO 键契约、阶段派生规则表、端口契约、验收场景与六边形架构边界，并处置 deferred-work 锚定义务（六条 Epic 6 锚+两条 6.7-DF 维持+两条 D6-8-R 维持——OD-8——R2-2 勘误：R1-F8 漏传播位）。
 
 - [ ] Subtask 0.1: 冻结七 VO+枚举键契约（Task 0.1 冻结表落 Dev Agent Record——6/4/5/2/9/5/8 键 + PhaseStatus 三值 + 六阶段静态清单六元组——实现禁增删键）
 - [ ] Subtask 0.2: 冻结阶段派生规则表（`derive_stage_status` 纯函数两规则+后四恒 not_started——AC-3 规则逐字冻结；实现为纯函数禁读全局禁散落 if 链）
 - [ ] Subtask 0.3: 定义端口契约（AnalystViewPort v1.0.0 签名+三依赖注册名+组合根落位邻近锚）+ 契约测试文件骨架
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_analyst_view.feature`（12 场景钉死+epics L2451-2453 架构测试三项落位对账——R1 行号勘误：checkbox 实际在 L2451-2453，L2450 是节标题行；显示/快捷键/溯源三要素映射声明）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_analyst_view.py`（6-8 R6 合规形态：三件套+双清+context dict+归档族预置[6-7 `_archive_row`/`_spec_chunk` 直系]+快照直写+PG 三分面通道+CLI 直调 helper；**快照 timeline step 值形态禁复刻 6-8 `_STEP_SEQUENCE`**——R1-F4：6-8 预置序列（`test_acceptance_executive_view.py:100-108` 与集成 :56 双文件）是 `market_insight_trend` 等前缀形态且子步名不符 `MarketInsightStep` 值域（strategy/org/risk/execution 非六子值），是计数面专用非 canonical step 值；本 Story 是首个 timeline step 值消费者，预置必须按写侧实值三形态构造（"performance_gap"/裸六子值/"market_insight_synthesis"——`blm_planning_service.py:309/:414/:504` 写入点实证），六子序列常量 `('performance_gap','trend','market_customer','competition','self','opportunity','opportunity_gap','market_insight_synthesis')` 期望独立构造）；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_analyst_view.py`（6-8 R6 合规形态：三件套+双清+context dict+归档族预置[6-7 `_archive_row`/`_spec_chunk` 直系]+快照直写+PG 三分面通道+CLI 直调 helper；**快照 timeline step 值形态禁复刻 6-8 `_STEP_SEQUENCE`**——R1-F4：6-8 预置序列（`test_acceptance_executive_view.py:100-108` 与集成 :56 双文件）是 `market_insight_trend` 等前缀形态且子步名不符 `MarketInsightStep` 值域（strategy/org/risk/execution 非六子值），是计数面专用非 canonical step 值；本 Story 是首个 timeline step 值消费者，预置必须按写侧实值三形态构造（"performance_gap"/裸六子值/"market_insight_synthesis"——`blm_planning_service.py:309/:414/:504` 写入点实证），八步全序列常量（R2 命名勘误：原「六子序列」易误读为六元组）`('performance_gap','trend','market_customer','competition','self','opportunity','opportunity_gap','market_insight_synthesis')` 期望独立构造）；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
 - [ ] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError——畸形腿天然绿路由纠正注记 6-6 先例）
 - [ ] Subtask 0.7: deferred-work 锚定义务八条处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持——R1-F8 口径统一）
 - [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@1a7aa345，实施前复核；**已知漂移注记**：6-8 故事锚 checkpoint_service :2347 实为 :2387/report_repository :3434 实为 :3474——本 Story 锚点表已按当前 HEAD 校正）
@@ -375,7 +375,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_analyst_view_service.py` 循环 A 用例（三段聚合：list_active_skills→ToolboxSection[投影白名单五键+categories 分组]；snapshot load→ProgressSection[state_data 解析+degraded_step_count=len() 派生+六阶段派生]；build_trace_tree→TraceabilitySection[三层有效计数（stage/chunk/document）+jump_ready 计数+哨兵透传——结论层单根节点注记（R1-F1）]——**Mock spec 形态分述**：skill_selector `AsyncMock(spec=SkillSelectorPort)`+snapshot_repository `AsyncMock(spec=SnapshotRepositoryProtocol)`+traceability_tree_service `AsyncMock(spec=TraceabilityTreePort)`（三端口 Protocol 全在册——组合根 interface 注册面，无需具体类 spec；6-8 checkpoint_service 具体类 spec 是无同名 Port 的例外形态本 Story 不适用）+ `_make_*` 工厂） |
+| 🔴 红 | 编写 `tests/unit/application/test_analyst_view_service.py` 循环 A 用例（三段聚合：list_active_skills→ToolboxSection[投影白名单五键+categories 分组]；snapshot load→ProgressSection[state_data 解析+degraded_step_count=len() 派生+六阶段派生]；build_trace_tree→TraceabilitySection[三层有效计数（stage/chunk/document）+jump_ready 计数+degraded_stage_count（len(degraded_stages)——R2 补全枚举）+哨兵透传——结论层单根节点注记（R1-F1）]——**Mock spec 形态分述**：skill_selector `AsyncMock(spec=SkillSelectorPort)`+snapshot_repository `AsyncMock(spec=SnapshotRepositoryProtocol)`+traceability_tree_service `AsyncMock(spec=TraceabilityTreePort)`（三端口 Protocol 全在册——组合根 interface 注册面，无需具体类 spec；6-8 checkpoint_service 具体类 spec 是无同名 Port 的例外形态本 Story 不适用）+ `_make_*` 工厂） |
 | 🟢 绿 | 实现 `src/application/services/analyst_view_service.py` 三段私有方法+`build_analyst_view` 编排（入口单时间锚一次 now——顶层 generated_at 唯一时间键） |
 | 🔄 重构 | 段方法职责收口（每段一方法——`_build_toolbox/_build_progress/_build_traceability`） |
 
@@ -391,7 +391,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写容错矩阵（三源各一格按语义专属异常：toolbox→SkillNotFoundError/progress→RuntimeError/traceability→通用 Exception——各格断言本段 degraded=True+其余段正常+build_degraded==True；**traceability 双分支格**——R1-F5：抛异常→段降级+tree_build_degraded==False（段降级默认值）/正常返回 build_degraded=True 的树→仅 tree_build_degraded 透传+段 degraded==False）+空 plan 幂等读+state_data 畸形守卫（**逐键处置复刻 6-8 `executive_view_service.py:169-188`**——R1-F6：completed_steps 必备缺→段降级/total_steps `.get` 默认 BLM_TOTAL_STEPS 且 ≤0 显式段降级[除零形态守卫]/timeline、degraded_steps 缺→空列表；「宽容-严格」三分界——6-8 R3-F1 直系） |
+| 🔴 红 | 编写容错矩阵（三源各一格按语义专属异常：toolbox→SkillNotFoundError/progress→RuntimeError/traceability→通用 Exception——各格断言本段 degraded=True+其余段正常+build_degraded==True；**traceability 双分支格**——R1-F5：抛异常→段降级+tree_build_degraded==False（段降级默认值）/正常返回 build_degraded=True 的树→仅 tree_build_degraded 透传+段 degraded==False）+空 plan 幂等读+state_data 畸形守卫（**逐键处置复刻 6-8 `executive_view_service.py:169-188`**——R1-F6：completed_steps 必备缺→段降级/total_steps `.get` 默认 BLM_TOTAL_STEPS 且 ≤0 显式段降级[除零形态守卫]/timeline、degraded_steps 缺→空列表/phase、current_step `.get` 缺→None[空态同形——6-8 :188 先例；R2 补遗]；「宽容-严格」三分界——6-8 R3-F1 直系） |
 | 🟢 绿 | 实现段级 try 包裹+畸形守卫降级（六阶段框架恒在——静态清单不依赖快照） |
 | 🔄 重构 | 降级 warning 日志统一（`logger.warning` 段名+异常摘要——6-8 同款） |
 
@@ -425,14 +425,14 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`_StubAnalystViewUseCase` 替身+专用 patcher（`_patch_analyst_view_entry`——`monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)` + `setattr(agent_cli, "resolve", lambda name: stub)` 形态——**每命令族新建专用 patcher 纪律**[6-8 R1-F11]）：解析/全数据输出（工具箱 23 行计数+六阶段 6 行 status 中文+V1 注记后四+溯源统计行+提示行）/空态输出（六阶段框架恒在+工具箱照常）/242 stderr+exit 1/exit 0/零可选参数 inspect.getsource 断言） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`_StubAnalystViewUseCase` 替身+专用 patcher（`_patch_analyst_view_entry`——`monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)` + `setattr(agent_cli, "resolve", lambda name: stub)` 形态——**每命令族新建专用 patcher 纪律**[6-8 R1-F11]）：解析/全数据输出（工具箱 23 行计数+六阶段 6 行 status 中文+V1 注记后四+溯源统计行+提示行+**六阶段进度条 k 表枚举（c=0..7 → [0,1,3,4,6,7,9,10] 逐格断言——AC-6 钦定值，进度条形态函数在 `_print_analyst_view`——R2 补入承载位）**）/空态输出（六阶段框架恒在+工具箱照常）/242 stderr+exit 1/exit 0/零可选参数 inspect.getsource 断言） |
 | 🟢 绿 | 实现 CLI：`build_parser` 注册（`--plan-id` required）+分发分支+`_run_analyst_view_cli` 五步定式（UUID 守卫→`_ensure_bootstrapped`→asyncio.run+resolve→打印→DomainError exit 1——R1 勘误：实际函数名带下划线前缀）+`_run_analyst_view` async 壳（finally `_close_connection_pools`）+`_print_analyst_view` 三段打印 |
 | 🔄 重构 | 输出行格式统一（「输出即契约」——空态行恒在+进度条 10 格字符形态函数化） |
 
 - [ ] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
 - [ ] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
 - [ ] Subtask 3.3: 🔄 重构 — CLI 打印面优化
-- [ ] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（工具箱首行文案改一字 → 精确匹配红；242 stderr 前缀去 `[` → 断言红；六阶段 V1 注记删除 → 注记行断言红）
+- [ ] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（工具箱首行文案改一字 → 精确匹配红；242 stderr 前缀去 `[` → 断言红；六阶段 V1 注记删除 → 注记行断言红；**k 公式 round 改 int 截断（k[2] 3→2）→ k 表枚举格红——R1-F11 落位[R2 补]**）
 
 **完成标准/Definition of Done:**
 - [ ] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
@@ -549,14 +549,14 @@
 | **OD-2** | **零新增领域事件、零发布、零订阅**（查询型故事第八连）：纯查询聚合面零状态变更——architecture.md:1293 查询零事件先例（引用形态注记见 Dev Notes）+6-4/6-5a/6-5b/6-6/6-7/6-8 六连零事件先例族；event_channels.yaml/DEFAULT_MAPPINGS 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化（Task 4.2 守护复跑）；蓝图无分析师视图事件载体；架构验证器 B 零 publish 守护 | 查询语义纯度+先例族+零 yaml/router diff 红利 |
 | **OD-3** | **零新增领域异常、零既有异常改动**：242 复用（畸形 plan_id 用例层 UUID 守卫——`GetExecutiveViewUseCase` 直系先例）；`SkillNotFoundError` 既有异常**消费不新增**（selector fail-loud「缺档案是资产缺陷」语义在聚合面收敛为段降级+warning——段级容错承载非异常路径）；空 plan 幂等读不抛（6-4/6-6/6-7/6-8 四先例族）；480 **不消费不复现**（单点查询面抛 vs 聚合面空态——6-8 OD-3 语义分立直系）；planning 480-489[488/489 预留]/report 490-499[494-499 预留]/traceability 372-379 预留三段零触碰（无 view 码段亲验）。**否决备选**：开新码（AnalystViewError）——三段降级+242 后无真实 raise 触发面，开码即引入「空 plan 误报」反语义面（6-7/6-8 OD-3 否决论证同构） | 异常语义纯度+四先例+空态幂等读语义 |
 | **OD-4** | **七 VO 键契约+PhaseStatus 三值枚举**（Task 0.1 冻结）：`AnalystView` 6 键（plan_id/generated_at[ISO 单时间锚]/build_degraded[顶层降级哨兵]/三段）/`ToolboxSection` 4（degraded/total_tools/tools/categories）/`ToolSummary` 5（**投影白名单**：slug/tool_name/category/description/status——`ToolMetadata` **18 字段**面防扩散：白名单外 13 字段 input_schema/output_schema/when_to_use/when_not_to_use/capabilities/tags/version/rule_version/token_budget_l1/token_budget_l2/depends_on/triggers/data_sources 禁入视图——R1-F2 勘误）/`ToolCategorySummary` 2/`ProgressSection` 9（步级计数直读+stages 六阶段全景）/`PhaseProgress` 5/`TraceabilitySection` 8（**两层哨兵分立**：段 degraded[本段编排异常] vs tree_build_degraded[6-7 树顶层降级透传]；available==stage_count>0——结论层恒单根节点剔除统计面、conclusion_count 键位改 chunk_count 补齐切片层计数：R1-F1 修订）——全应用层 frozen dataclass；`PhaseStatus` 三值 str-Enum（completed/in_progress/not_started——**进度态语义域**与 `ExecutiveHealth` 健康分级域正交分立；全仓首个三值进度态枚举——6-8「全仓首个三值分级枚举」注记不冲突，落 ports 文件同先例）；键恒在纪律（None/0/() 降级值——6-2 R1-6 七键契约族）；**不透传树 generated_at**（并发对照排除集最小化——排除集仅顶层 {generated_at} 单键，OD-6 联动） | 键恒在纪律+读侧 DTO 层位先例+投影白名单安全面（6-8 审计 15 键投影白名单同款）+语义域正交 |
-| **OD-5** | **六阶段静态清单+派生规则表（Task 0.2 冻结）**：六元组常量 `BLM_SIX_PHASES` 落应用层 ports 文件（阶段序 or.md L379 权威原文：performance_gap 业绩差距分析/market_insight 市场洞察/strategic_intent 战略意图与目标/innovation_focus 创新焦点/business_design 业务设计/execution_design 执行设计；**零改动 `BlmPhase` 枚举**——:45-46 docstring「六阶段完整版归 Epic 10 Story 10-1（FR-SP-05）在同文件扩展——本枚举预留扩展锚」钦定不可僭越，应用层静态清单是呈现框架非流程扩展）；派生规则确定性纯函数 `derive_stage_status`（阶段1=timeline 含 "performance_gap"→completed；阶段2=含 "market_insight_synthesis"→completed/含任一六子裸值→in_progress/否则 not_started——synthesis 优先序；阶段3-6 恒 not_started——step_total==0 规划态+「V1 交付」注记归 CLI 呈现不进 status 值域）；step_completed 计数同源 timeline（阶段2=六子裸值+synthesis 条目数）；空 plan 六阶段框架恒在（静态清单不依赖快照——「框架恒在+数据缺席降级」） | or.md L379 权威+BlmPhase 扩展锚钦定+prd L454 V1 边界+确定性规则（6-8 derive_health 纯函数先例） |
+| **OD-5** | **六阶段静态清单+派生规则表（Task 0.2 冻结）**：六元组常量 `BLM_SIX_PHASES` 落应用层 ports 文件（阶段序 or.md L379 权威原文：performance_gap 业绩差距分析/market_insight 市场洞察/strategic_intent 战略意图与目标/innovation_focus 创新焦点/business_design 业务设计/execution_design 执行设计；**零改动 `BlmPhase` 枚举**——:45-46 docstring「六阶段完整版归 Epic 10 Story 10-1（FR-SP-05）在同文件扩展——本枚举预留扩展锚」钦定不可僭越，应用层静态清单是呈现框架非流程扩展）；派生规则确定性纯函数 `derive_stage_status`（阶段1=timeline 含 "performance_gap"→completed；阶段2=含 "market_insight_synthesis"→completed/含任一六子裸值→in_progress/否则 not_started——synthesis 优先序；阶段3-6 恒 not_started——step_total==0 规划态+「V1 交付」注记归 CLI 呈现不进 status 值域）；step_completed 计数同源 timeline（阶段2=六子裸值+synthesis **集合基数——去重口径**，R1-F3——R2-1 勘误：创建期「条目数」旧口径残留位）；空 plan 六阶段框架恒在（静态清单不依赖快照——「框架恒在+数据缺席降级」） | or.md L379 权威+BlmPhase 扩展锚钦定+prd L454 V1 边界+确定性规则（6-8 derive_health 纯函数先例） |
 | **OD-6** | **溯源段口径——depth=4 全树统计+纯派生**：`build_trace_tree(plan_id, depth=4)` 钦定全树（jump_ready_count 需文档层——depth<4 不可达；统计语义完整性优先）；段五计数+哨兵全派生自树对象（stage=分析层 len(root.children)/chunk=切片层/document=文档层节点实例/jump_ready=True 计数/degraded_stage=len(degraded_stages)——**结论层恒单根节点（root 自身）不计入统计面**：R1-F1）——**树构建逻辑零触碰**（6-7 交付面只消费）；两层哨兵分立（段 degraded vs tree_build_degraded 透传——「本段编排拿不到」vs「树内拿不到」语义正交）；available==stage_count>0（空树幂等非异常——6-7 空树语义在聚合面透传）；操作提示「执行 trace-tree 查看完整树」指向既有命令（6-8「可先执行 report-generate」同款——**指向既有命令的操作提示非新功能**） | 6-7 交付面只消费+jump_ready 观测锚（「30 秒溯源」节点级观测面 :24-27 docstring 钦定）+空树幂等语义 |
 | **OD-7** | **性能三段口径声明**：① 视图加载 P95<800ms = `build_analyst_view` 服务面窗口（三读串行：list_active_skills 内存遍历微秒级+snapshot load Redis 单键点查+build_trace_tree 全树[三读最重——query_archive PG+get_point/find Qdrant]；20 轮 `sorted[ceil(0.95*n)-1]` 数学口径；**风险注记**：trace_tree 全树成本随归档量增长——万行级归档触发统计端口/物化视图立项锚 Epic 7/21，docstring 注记）；② 并发 20 = 单一数据源 plan_id×20 路并发读（asyncio.gather+服务无状态+两两相等——**排除集单键 {generated_at}**：toolbox 静态真源恒稳/progress 单键读恒稳/traceability 段不透传树 generated_at[OD-4 联动设计收益]——排除集最小化；asdict 序列化剔除对照；禁 set_session 每路独立[6-8 R2-F3 C 面]；「批量操作」读面等价口径声明——本义工作台证据勾选 Web 交互归 22.1）；③ 快捷键<100ms=前端指标后端不定义（epics L2457 原文——键盘事件响应归 Epic 21 Story 21.9 届时验收）+溯源跳转<300ms=6-7 已交付口径（跳转载荷组装承载——本 Story 溯源段是统计摘要面非跳转执行面，跳转执行归 trace-tree 既有命令）——③ 两项口径差声明落验收/集成 docstring | epics L2456-2458 性能行与 CLI 交付面口径对齐（6-3/6-6/6-7/6-8 五连口径差声明纪律）+OD-4 排除集最小化联动 |
 | **OD-8** | **锚定义务八条处置**（Task 0.7 落档）：**L13**（灰度推进/per-version 统计视图——触发=产品立项）：不触发（工具箱段是 ACTIVE 状态清单非版本统计面；锚位维持）；**L17**（langgraph retry/timeout——第六轮同构不触发）：纯读侧聚合零图引擎/checkpoint_table 消费（5-10/6-1/6-6/6-7/6-8 五轮先例延续）；**L107**（B2 事件驱动摄取——触发=Epic 6 首个 Skills 消费场景定型）：**甄别声明不触发**——本 Story 消费 skill_selector 是 L1 元数据静态清单展示（TOOLS.md 打包文件内存读），非 B2 摄取桥语境的「Skills 外部数据消费场景」（crawl 产物注册文档管道+data_source 持续供给——B2 关注的是工具执行时的外部数据摄取形态），锚位不变；**L117/L170**（RabbitMQ 消费侧零接线——触发=首个消费方 Story）：顺延 Epic 8（纯查询面零事件订阅——八连零消费延续）；**L127**（unified_storage+L0/memory 12 端口——触发=Epic 6）：不触发锚位顺延（纯读侧聚合零记忆消费——6-1/6-3 同款）；**L129**（orchestration_service/data_pipeline 轨）：第四轮维持注记顺延（读侧聚合非批量报告管线——6-5a/6-5b/6-8 三轮同构；再锚定条件 6-11/Epic 7 不变）；**6.7-DF1/DF2**（finding 级引文/bbox 四元组）：锚位维持 Epic 21/22（6-8 已重锚——CLI-only 无 Web 高亮面，树读侧透传已就绪零改动）；**D6-8-R1/R2**（CLI .env 加载/json_chain S 编号残留——L402-403）：非 6-9 修复面维持（新增子命令沿用既有 agent_cli 入口形态——.env 缺口波及全命令族非本 Story 引入；json_chain 文件零触碰——表 :640 行处置；R1-F8 补登：创建期 OD-8 枚举漏此组与八条表不符） | deferred-work 原文触发条件逐条对表+六轮先例链+CLI-only 形态裁定连锁 |
 | **OD-9** | **测试文件命名（禁故事编号后缀）+ 词族统一 analyst_view**：acceptance `test_acceptance_analyst_view.feature/.py`；integration `test_integration_analyst_view.py`（**对 epics L2471 钦定名 `test_analyst_view_integration.py` 的显式偏离**——仓规 test_integration_* 前缀，6-8 OD-9 同款偏离声明）；unit/architecture `test_analyst_view.py`（**对齐 epics L2470 钦定名**——本 Story 无偏离）；`analyst` 词族 src+tests 零占用亲验（grep 命中均非视图词族：role.py:19 docstring 角色名示例+约 9 个测试文件的 agent_role/agent_id/accessor 夹具值——R1 枚举放宽）；CLI 子命令 `analyst-view` 无重名亲验（add_parser **15** 命令族 grep——本 Story 落地后 16；R1-F7 计数勘误：创建期误计 16）；service 单测 `test_analyst_view_service.py`+VO 单测 `test_analyst_view_vos.py`；契约 `test_port_contract_analyst_view.py`（五断言族） | 记忆「禁止故事编号命名文件」+仓规前缀惯例+词族零占用亲验（epics 钦定名的采纳/偏离逐处声明——6-8 OD-9 同款） |
 | **OD-10** | **工具箱口径——SkillSelectorPort 消费+ACTIVE 清单+23 事实断言**：选 `list_active_skills()`（async——与服务编排签名一致；ACTIVE 纯过滤语义正确；L1 元数据贴合展示——description 是一句话功能描述；**Agent 系统同源口径**：LoadAgentProfileUseCase 拼 Agent 工具上下文同链——「分析师看到的工具箱=Agent 可用的工具箱」口径一致性）**不选** `ToolRegistryServicePort.list_all_tools()`（sync 签名风格不一致+Tool 实体 schema dict 是执行面载荷对展示冗余）；23 断言语义=「MVP 交付时点 23 工具全 ACTIVE 事实」（get_all_slugs 静态真源 23 slug+当前全 active 亲验——未来工具转 deprecated 断言红是**预期退化信号**非 flake，防清单静默缩水）；分类分组序=slug 清单稳定序去重序（selector 返回序派生禁字母序重排——`registry/selector.py` docstring「返回顺序与清单一致是断言契约」）；分类计数配比 3/3/6/3/8（Story 4.1 AC-2 钦定——environment_analysis 3/competitive_analysis 3/strategic_selection 6/business_model 3/execution_management 8） | 端口选型实证（签名/语义/载荷三轴）+Story 4.1 AC-2 配比权威+防退化断言语义 |
 | **OD-11** | **组合根双注册+三既有依赖复用+零新仓储成员**：`analyst_view_service`（SINGLETON——无状态聚合读；lambda resolve 三既有注册名：`skill_selector` :3011[**SINGLETON**]/`snapshot_repository` :950[SCOPED]/`traceability_tree_service` :2021[**SINGLETON**]——**两 SINGLETON+一 SCOPED 混态的 SINGLETON 捕获声明**（6-8 OD-11 三 SCOPED+一 SINGLETON 混态同款注记先例；CLI 一次性进程+测试双清下无故障面）+`analyst_view_use_case`（SINGLETON 透传）；**零新 PG 仓储家族成员/零 infra 面**；三依赖注入端口面（AsyncMock spec=SkillSelectorPort/SnapshotRepositoryProtocol/TraceabilityTreePort——三 Protocol 全在册无需具体类 spec）；6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造/无新仓储成员——无 session_factory 缺口面（trace_tree 服务内部经组合根会话包装消费——6-7 交付形态只读复用） | 6-8 OD-11 组合根先例+端口 Protocol 在册实证+单租户口径延续 |
-| **OD-12** | **纯三零 Story：零 domain+零 migration+零 infra**（比 6-8 准三零更纯——6-8 有 audit search fallback ~6 行单点增量，本 Story 三源全既有零适配缺口）：七 VO+PhaseStatus+六阶段静态清单全应用层（ports 文件——`BlmPhase` 扩展锚归 10-1 钦定+读侧 DTO 归应用层双依据）；本 Story 改动面=**4 新建+2 扩展**（src 面 3 新建[ports/analyst_view.py+services/analyst_view_service.py+use_cases/get_analyst_view.py]+2 扩展[agent_cli.py+composition_root.py]；tests 面 8 新建+1 扩展[test_agent_cli.py 扩展；infra 测试零扩展——R1 勘误：创建期误写「2 扩展」与 File List 不符]）——**架构验证器 C 零命中断言**（src/domain+src/infrastructure 均零命中——与 6-8 白名单形态分立：彼有钦定单文件增量故白名单，此零 infra 改动故零命中） | 三源既有零缺口（工具箱内存读/快照单键读/树服务只读复用）+最小改动面形态 |
+| **OD-12** | **纯三零 Story：零 domain+零 migration+零 infra**（比 6-8 准三零更纯——6-8 有 audit search fallback ~6 行单点增量，本 Story 三源全既有零适配缺口）：七 VO+PhaseStatus+六阶段静态清单全应用层（ports 文件——`BlmPhase` 扩展锚归 10-1 钦定+读侧 DTO 归应用层双依据）；本 Story 改动面=**src 面 3 新建+2 扩展**（R2-3 勘误：创建期 headline「4 新建+2 扩展」计数失实——src 3 新建[ports/analyst_view.py+services/analyst_view_service.py+use_cases/get_analyst_view.py]+2 扩展[agent_cli.py+composition_root.py]；tests 面 8 新建+1 扩展[test_agent_cli.py 扩展；infra 测试零扩展——R1 勘误：创建期误写「2 扩展」与 File List 不符]）——**架构验证器 C 零命中断言**（src/domain+src/infrastructure 均零命中——与 6-8 白名单形态分立：彼有钦定单文件增量故白名单，此零 infra 改动故零命中） | 三源既有零缺口（工具箱内存读/快照单键读/树服务只读复用）+最小改动面形态 |
 | **OD-13** | **progress 段与 6-8 planning 段口径分立声明**：两视图服务正交非演进——6-8 `PlanningSection` 是**步级摘要**（completed/total 8 步+int percent——高管速览语义）；6-9 `ProgressSection` 是**阶段级全景**（六阶段框架+stages 逐段 status+步级计数并存——分析师作业语义「流程走到哪个阶段」）；progress_percent 公式同口径（int 向下取整——6-8 R1-F3 VO 侧整数口径钦定直系）但**两 VO 各自独立字段非共享**（禁抽象共享段 VO——两视图消费方/演进节奏不同，YAGNI；共享的是数据源[快照七键]非投影） | epics 6.9「六阶段进度可视化」vs 6.8「仪表盘」需求语义分立+读侧投影独立演进原则 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
@@ -751,12 +751,12 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 |---|---|---|
 | S1 | AC-1 | 全数据三段 6 键 exact set+嵌套键集+值级（23 工具+进度+树统计） |
 | S2 | AC-3 | 三 plan 形态六阶段派生（P-mid 进行中/P-full 完成/P-empty 框架恒在） |
-| S3 | AC-2 | 工具箱真实清单（23+5 分类配比 3/3/6/3/8+首末 slug 序锚+和恒等式） |
-| S4 | AC-4 | 溯源段统计（预置归档族+stage/chunk/document 三层计数+jump_ready True-False 混合判别+树顶层键透传——R1-F1 新键集） |
+| S3 | AC-2 | 工具箱真实清单（23+5 分类配比 3/3/6/3/8+全 slug 序==get_all_slugs() 直比[R1-F11 主锚——R2 补入]+首末 slug 序锚+和恒等式+len(categories)==5） |
+| S4 | AC-4 | 溯源段统计（预置归档族+stage/chunk/document 三层计数+degraded_stage_count 计数+jump_ready True-False 混合判别+树顶层键透传——R1-F1 新键集） |
 | S5 | AC-5 | 空 plan 幂等读（toolbox 恒 23+两段空态+框架恒在+build_degraded False） |
 | S6 | AC-1 | ToolSummary 投影白名单（5 键 exact set+值非空+status=="active"+抽样值级锚） |
 | S7 | AC-5 | 空 plan+畸形 plan_id 242（编程面 pytest.raises+分立声明） |
-| S8 | AC-6 | CLI 全数据输出（三段分隔行+23 工具行+六阶段 6 行+V1 注记+提示行——双清直调） |
+| S8 | AC-6 | CLI 全数据输出（三段分隔行+23 工具行+六阶段 6 行+V1 注记+溯源统计行「分析/切片/文档/可跳转」+提示行——双清直调——R2 补摘要） |
 | S9 | AC-6 | CLI 空态输出（六阶段框架恒在+工具箱照常+exit 0）+242 stderr 形态 |
 | S10 | AC-7 | 性能 20 轮 P95<800ms（服务面三读窗口） |
 | S11 | AC-7 | 并发 20 路全成功+两两相等（排除集单键 {generated_at}——asdict 剔除对照） |
@@ -771,7 +771,7 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 - [x] 前一个故事学习经验整合（6-8 五轮双审查收敛样板+6-7 归档预置+6-5a 并发）
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成（七 VO 键契约/派生规则表/12 场景/Task 0~7 共 8 Task）
-- [x] 项目结构对齐统一规范（纯三零 Story+4 新建+2 扩展 src 面）
+- [x] 项目结构对齐统一规范（纯三零 Story+src 面 3 新建+2 扩展——R2-3 勘误）
 - [x] 四 Agent 并行调研（工具箱数据面/BLM 进度+溯源数据面/CLI+组合根+R6 模板/治理面与词族）+ 主会话 14 组关键锚点亲验
 
 ### 文件清单 File List
@@ -829,7 +829,7 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| R1-F1 | TraceabilitySection `conclusion_count` 锚错层：`len(tree.root.children)` 实为分析层（root 即唯一 ConclusionNode 单节点，空树同构造）——恒 1 与 available==False 矛盾/与 stage_count 重复键/CLI「结论: 7」误导三方矛盾（16 传播位：范围表/AC-1/AC-4/AC-6/OD-4/OD-6/Task 0.1 冻结表/Task 2/S4） | P0 | conclusion_count→**chunk_count**（补齐切片层计数，8 键不变）+available 重锚 **stage_count>0**+CLI 统计行改「分析/切片/文档/可跳转」+结论层单根节点统计面注记（对标 CQRS 读模型「剔除恒定值」惯例） |
+| R1-F1 | TraceabilitySection `conclusion_count` 锚错层：`len(tree.root.children)` 实为分析层（root 即唯一 ConclusionNode 单节点，空树同构造）——恒 1 与 available==False 矛盾/与 stage_count 重复键/CLI「结论: 7」误导三方矛盾（16 处传播/9 个节位：范围表/AC-1/AC-4/AC-6/OD-4/OD-6/Task 0.1 冻结表/Task 2/S4——R2 口径注：处数=出现位计数、节名=承载区） | P0 | conclusion_count→**chunk_count**（补齐切片层计数，8 键不变）+available 重锚 **stage_count>0**+CLI 统计行改「分析/切片/文档/可跳转」+结论层单根节点统计面注记（对标 CQRS 读模型「剔除恒定值」惯例） |
 | R1-F2 | ToolMetadata 字段枚举失实：漏 `when_not_to_use`、`token_budget` 实为 `token_budget_l1/l2` 两字段、「12+ 字段面」实 18 字段（AC-1/OD-4/Lessons/锚表 4 处） | P1 | 统一「18 字段/白名单外 13 字段」全枚举口径（4 处传播位） |
 | R1-F3 | step_completed「条目数」口径与 Task 0.2 `set[str]` 签名分叉：record_step 纯 append 无幂等防护（:117 亲验），重复条目下条目数>step_total 触发 VO 守卫 242 崩溃违反 AC-5 不抛承诺；「服务层钳制」规则未定义 | P1 | 钦定**集合去重单源派生**：step_completed==len(stage_steps) 与 status 共用同一集合（AC-3/Task 2 绿/守卫句 3 处+派生矩阵补重复条目判别格） |
 | R1-F4 | 6-8 `_STEP_SEQUENCE`（`market_insight_trend` 前缀形态且子步名 strategy/org/risk/execution 不符 `MarketInsightStep` 值域）是计数面专用非 canonical 值——6-9 是首个 timeline step 值消费者，直系复刻必红（S2 恒红/诱导腐蚀派生规则） | P1 | 预置值形态禁复刻警告+6-9 专属裸值序列常量（写侧三形态实证 blm_planning_service :309/:414/:504）落 Task 0.5+锚表+派生矩阵值域外脏值格 |
@@ -844,6 +844,24 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 | 证伪 | 调研 A4 报「prd『前两阶段覆盖 80%』在 L453」——主会话 grep 定谳 **L454 现状正确**（B1 同判），Story 不改 | — | 证伪留痕（审查员事实冲突主会话实测定谳——记忆纪律） |
 
 **Round 1 审查形态**：四视角并行调研（工具箱数据面/BLM 进度+溯源面/CLI+组合根+模板/治理面）+双视角并行审查（正确性+一致性/科学性+可行性）+主会话亲验 5 组关键争议（树结构/ToolMetadata 字段/record_step 幂等/prd L454/_STEP_SEQUENCE）；P0×1+P1×4+P2×5+P3×2+证伪×1。
+
+### Round 2 修复（回归核查+组合交互面——双 Agent 并行）
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| R2-1 | OD-5 行内「阶段2=六子裸值+synthesis 条目数」——R1-F3 集合口径漏传播位（全文唯一「条目数」旧语义存活位，OD 是落码决策依据面） | P2 | 改「集合基数——去重口径」（:552） |
+| R2-2 | Task 0 目的行「六条 Epic 6 锚+两条 6.7-DF」——R1-F8 口径统一漏传播位（6+2=8 旧口径第四处残留） | P2 | 补「+两条 D6-8-R 维持」（:325） |
+| R2-3 | OD-12 headline「改动面=4 新建+2 扩展」与括注算术矛盾（src 实为 3 新建+2 扩展）——三处同口径（OD-12/完成清单/v1.0.0 版本注） | P2 | 统一「src 面 3 新建+2 扩展」（:559/:774/:884 内联勘误） |
+| R2-4 | R1-F11 全序列断言未达承载面：AC-2 验证标准 checkbox 与 S3 摘要均只列首末锚——中段乱序判别主锚悬空 | P2 | 全序列断言补入 :69 验证标准+S3 :754 摘要 |
+| R2-5 | k 表枚举与 ±1 变异锚无 Task 承载位（Task 3 循环 B 红格与 Subtask 3.4 均无 k 表）+归属文件未点名 | P2 | 补入 :428 红格（k 表逐格断言+`_print_analyst_view` 归属）+:435 第四变异锚 |
+| R2-6 | R1-F6 逐键处置表漏 phase/current_step 两键——6-8 :188 实码实证含 current_step `.get` 处置，phase 处置悬空（两文本三处同漏） | P2 | 两处处置表同步补「phase、current_step `.get` 缺→None（空态同形——6-8 :188 先例；不触发段降级）」（:120/:394） |
+| R2-7 | AC-6 溯源段空态行形态未钉死——S9 断言不可精确落笔（progress 与 traceability 空态钦定不对称） | P2 | 钉死「统计行恒在全 0 形态+提示行恒在（降级行/树降级标记缺席）」（:136）+:142 断言补 |
+| R2-8 | chunk_count 实例计数口径未注记（跨 stage 重复引用）+AC-4 Given「≥1 切片」与混合判别联合不可满足（每 chunk 至多 1 文档节点——`_resolve_document` 单 payload 实码亲验） | P3 | :49 补实例计数注记+Given 改「≥2 切片实例（预置使 chunk_count≠stage_count 判别计数面错接）」+:105 补直推断言 |
+| R2-9 | degraded_stage_count 在 Task 2 循环 A 与 S4 摘要枚举缺失（两处逐键点名其余键独漏此键） | P3 | 两处补全枚举 |
+| R2-10 | 「快照计数 vs 派生计数」分立注记缺失——脏值格两断言并存（直读 8/8 vs 六阶段全 not_started）易误判 bug | P3 | :90 补分立注记+derive_stage_status 单集合签名可满足性论证（三阶段值域两两不相交） |
+| R2-11 | 「六子序列常量」命名误读（实为 8 元组全序列）/S8 摘要漏溯源统计行/修复表 F1「16 传播位」双计数口径混排/AC-1 与 AC-4 五计数承载分工 | P3 | 四处就地修正（:331/:759/:832/:54） |
+
+**Round 2 审查形态**：回归核查（R1 十二项修复台账 vs 实际改动对账——9 项完全一致/2 项清单外漏传播位/1 项连带新计数矛盾，零「声称 N 实改 N-k」执行缺口）+组合交互面（键契约六面走查/派生规则组合/断言组合判别力/R1×未修复面残留）+主会话亲验 1 组（`_resolve_document` 每 chunk ≤1 文档节点）；净新增 11 项（P2×7+P3×4），无 P0/P1——R1 修复主体组合自洽。
 
 ---
 
@@ -876,9 +894,10 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-07
 **最后更新/Last Updated:** 2026-11-07
 **更新说明/Description:**
+- v1.2.0: 文档审查 Round 2 修订（回归核查+组合交互面双 Agent+主会话亲验 `_resolve_document` 基数：净新增 11 项 P2×7+P3×4 无 P0/P1——R1 修复主体组合自洽：R1-F3/F8 各漏传播 1 位[OD-5 条目数残留/Task 0 目的]/OD-12 headline 计数矛盾三处/R1-F11 全序列断言+k 表枚举补承载位[AC-2 VC+S3/Task 3 红格+变异锚]/逐键处置补 phase·current_step[6-8 :188 实码含 current_step 处置]/溯源段空态行形态钉死/chunk_count 实例口径+Given ≥2 切片[每 chunk 至多 1 文档节点实码亲验——混合判别联合不可满足消解]/degraded_stage_count 补全枚举/快照 vs 派生计数分立注记+值域互斥论证/措辞批 4 处）
 - v1.1.0: 文档审查 Round 1 修订（四视角调研+双视角审查+主会话亲验 5 组争议：P0×1[TraceabilitySection conclusion_count 锚错层→chunk_count 替换+available 重锚 stage_count>0——对标 CQRS 剔除恒定值惯例，16 传播位]+P1×4[ToolMetadata 18 字段勘误/step_completed 集合去重单源钦定——record_step 无幂等防护亲验/6-8 _STEP_SEQUENCE 前缀形态禁复刻——本 Story 首个 timeline step 值消费者/AC-4 树顶层降级两条单测分立——测试不可满足性消解]+P2×5[state_data 逐键处置表+除零守卫/16→15 命令族/锚定义务八条口径统一/行号勘误 7 处/消费方生产码限定]+P3×2[断言判别力补强：slug 全序列+len(categories)==5+k 表枚举锚/措辞级 7 处]+证伪×1[prd L454 现状正确——调研误报留痕]）
-- v1.0.0: 创建故事文件（四 Agent 并行调研【工具箱数据面/BLM 进度+溯源数据面/CLI+组合根+R6 模板/治理面与词族】+主会话亲验 14 组关键锚点；OD-1~OD-13 十三裁定：范围收窄 CLI-only 第八连（UX 三页面驾驶舱 Web 面归 Epic 21/22——快捷键 21.9/批量操作 22.1/角色自适应 22.8，本 Story 后端聚合口径+CLI 呈现）/零新增事件（查询型第八连+_FROZEN_EVENT_COUNT=56 零变化）/零新增异常（242 复用+SkillNotFoundError 消费不新增+480 语义分立第三连）/七 VO+PhaseStatus 三值枚举（6/4/5/2/9/5/8 键契约+投影白名单五键+两层哨兵分立）/六阶段静态清单应用层常量（BlmPhase 扩展锚归 Epic 10-1 钦定零 domain 改动+派生规则纯函数）/溯源段 depth=4 全树统计（jump_ready 观测锚+树顶层哨兵透传）/性能三段口径（P95<800ms 服务面+并发 20 排除集单键最小化+快捷键/溯源跳转口径差声明）/锚定义务八条处置（L13 不触发/L17 第六轮/L107 甄别声明/L117 顺延 Epic 8/L127 不触发/L129 第四轮/6.7-DF1·DF2 维持 Epic 21-22/D6-8-R1·R2 维持）/命名 analyst_view 词族（integration 前缀对 epics 钦定名显式偏离）/工具箱口径 SkillSelectorPort 消费（ACTIVE 清单+23 事实断言+配比 3/3/6/3/8 恒等式）/组合根双注册+三既有依赖复用（两 SINGLETON+一 SCOPED 捕获声明）/纯三零 Story（零 domain+零 migration+零 infra——比 6-8 准三零更纯，4 新建+2 扩展）/progress 与 6-8 planning 口径分立（阶段级全景 vs 步级摘要——两视图正交）；12 验收场景钉死（S1~S12——epics 架构测试三项对账：显示→S1/S3、快捷键→口径差声明、溯源→S4+jump_ready）；deferred-work 八条处置预案落档）
+- v1.0.0: 创建故事文件（四 Agent 并行调研【工具箱数据面/BLM 进度+溯源数据面/CLI+组合根+R6 模板/治理面与词族】+主会话亲验 14 组关键锚点；OD-1~OD-13 十三裁定：范围收窄 CLI-only 第八连（UX 三页面驾驶舱 Web 面归 Epic 21/22——快捷键 21.9/批量操作 22.1/角色自适应 22.8，本 Story 后端聚合口径+CLI 呈现）/零新增事件（查询型第八连+_FROZEN_EVENT_COUNT=56 零变化）/零新增异常（242 复用+SkillNotFoundError 消费不新增+480 语义分立第三连）/七 VO+PhaseStatus 三值枚举（6/4/5/2/9/5/8 键契约+投影白名单五键+两层哨兵分立）/六阶段静态清单应用层常量（BlmPhase 扩展锚归 Epic 10-1 钦定零 domain 改动+派生规则纯函数）/溯源段 depth=4 全树统计（jump_ready 观测锚+树顶层哨兵透传）/性能三段口径（P95<800ms 服务面+并发 20 排除集单键最小化+快捷键/溯源跳转口径差声明）/锚定义务八条处置（L13 不触发/L17 第六轮/L107 甄别声明/L117 顺延 Epic 8/L127 不触发/L129 第四轮/6.7-DF1·DF2 维持 Epic 21-22/D6-8-R1·R2 维持）/命名 analyst_view 词族（integration 前缀对 epics 钦定名显式偏离）/工具箱口径 SkillSelectorPort 消费（ACTIVE 清单+23 事实断言+配比 3/3/6/3/8 恒等式）/组合根双注册+三既有依赖复用（两 SINGLETON+一 SCOPED 捕获声明）/纯三零 Story（零 domain+零 migration+零 infra——比 6-8 准三零更纯，src 面 3 新建+2 扩展[R2-3 勘误：创建期误写「4 新建+2 扩展」]）/progress 与 6-8 planning 口径分立（阶段级全景 vs 步级摘要——两视图正交）；12 验收场景钉死（S1~S12——epics 架构测试三项对账：显示→S1/S3、快捷键→口径差声明、溯源→S4+jump_ready）；deferred-work 八条处置预案落档）
