@@ -879,6 +879,16 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 **Round 3 审查形态**：单 Agent 深度推演（六条长状态时间线逐字段终态/断言判别力穷举/Task 0→7 依赖干跑/边界数理终扫——全部以实码亲验为底座）；零 P0/P1+P2×2+P3×5+证伪留痕 7 条（重复条目可达性实证/并发窗口改写三重排除/asdict 排除集数理成立/提交批次对齐先例/phase 快照恒 market_insight/k 表无 tie/配比复核提示——勿用裸 grep 复核配比，capabilities 列含同类子串会过计）。R1/R2 修复主体在逐字段推演下全部成立且与实码一致——收敛趋势延续。
 
+### Round 4~5 纯验证+独立终审（收敛定稿）
+
+> **文档审查周期收敛声明（Round 5 独立终审——新鲜上下文独立取证，v1.3.1 定稿）**
+>
+> Story 6-9 文档审查修订循环五轮收敛：**R1** 四视角并行调研+双视角审查（P0×1+P1×4+P2×5+P3×2+证伪×1，13 项修复）→ **R2** 回归核查+组合交互面双 Agent（P2×7+P3×4，11 项修复）→ **R3** 单深度推演（P2×2+P3×5，7 项修复+证伪留痕 7 条）→ **R4** 纯验证三轴（词根终扫零残留/锚点存续 12/12/结构完整——零发现无提交）→ **R5** 独立终审五节全过。周期累计 **31 项修复+证伪留痕 8 条**；严重度递减链：P0 1→0→0→0、P1 4→0→0→0、P2 5→7→2→0——R2 起 P0/P1 双零，R4 起零新发现。提交链恰 3 笔（a1983852 v1.1.0/394ccefc v1.2.0/0c588697 v1.3.0）全部仅触 story+sprint-status 两文件、零 AI 署名、零游离提交。
+>
+> R5 五节取证结论：①**周期闭合通过**；②**10 项关键修复双向取证 10/10 全属实**（ToolMetadata 18 字段/root: ConclusionNode 单根/record_step 纯 append/_ensure_bootstrapped 下划线 4 组代码现实亲验吻合；写侧三形态 :309/:414/:504、6-8 :188 current_step 处置、`_resolve_document` 每 chunk ≤1 文档节点等实锚逐行验证）；③**独立快扫通过**——八词根残留活位全零（conclusion_count/条目数/token_budget 裸词/ensure_bootstrapped 无下划线/16 命令/L2450-2452/:2005/建议使）+9 章节结构齐备+九组数值全文一致+15 组附加实锚吻合（add_parser=15/get_all_slugs=23/_FROZEN_EVENT_COUNT=56/组合根四注册行/BlmPhase 2 值+扩展锚/SkillNotFoundError=387/loader 8 raise/redis 吞异常/epics 各行原文）；④**红线零违**（抑制注释仅禁止项形态、四目录命令/xdist 组/BDD 禁 asyncio/集成禁 delete 等纪律表述与项目规则一致）。
+>
+> **收敛判据达成：零 P0/P1/P2 残留+独立取证通过——文档定稿 v1.3.1，放行进入 dev-story。**
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -903,17 +913,18 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行文档审查修订循环（参照 6-6/6-7/6-8 五轮形态）
+- [x] 运行文档审查修订循环（参照 6-6/6-7/6-8 五轮形态——R1 四视角调研+双审查/R2 回归+组合/R3 单深度/R4 纯验证/R5 独立终审五节全过，31 项修复+证伪 8 条，零 P0/P1/P2 残留，v1.3.1 定稿收敛）
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-07
 **最后更新/Last Updated:** 2026-11-07
 **更新说明/Description:**
+- v1.3.1: 文档审查周期收敛定稿（R4 纯验证三轴零发现+R5 独立终审五节全过——周期闭合/10 项关键修复双向取证 10/10+代码组 4/4/八词根残留活位全零+15 组实锚吻合/红线零违；收敛判据达成：零 P0/P1/P2 残留——放行 dev-story；收敛声明入档）
 - v1.3.0: 文档审查 Round 3 修订（单深度推演：六条长状态时间线逐字段终态/断言判别力穷举/Task 0→7 依赖干跑/边界数理终扫——零 P0/P1+P2×2+P3×5+证伪×7；R1/R2 修复主体逐字段推演全部成立与实码一致：P2[CLI 双降级标记补断言承载位——Task 3 红格+第五变异锚/ProgressSection 空态默认值冻结——total_steps=0 与 6-8 默认 8 分立注记]+P3[phase_name 逐对全量精确匹配明示/chunk≠stage 钦定+集成场景①落实/current_step None fallback/呈现语义注记+docstring 义务/红锚演进注记+串行依赖]）
 - v1.2.0: 文档审查 Round 2 修订（回归核查+组合交互面双 Agent+主会话亲验 `_resolve_document` 基数：净新增 11 项 P2×7+P3×4 无 P0/P1——R1 修复主体组合自洽：R1-F3/F8 各漏传播 1 位[OD-5 条目数残留/Task 0 目的]/OD-12 headline 计数矛盾三处/R1-F11 全序列断言+k 表枚举补承载位[AC-2 VC+S3/Task 3 红格+变异锚]/逐键处置补 phase·current_step[6-8 :188 实码含 current_step 处置]/溯源段空态行形态钉死/chunk_count 实例口径+Given ≥2 切片[每 chunk 至多 1 文档节点实码亲验——混合判别联合不可满足消解]/degraded_stage_count 补全枚举/快照 vs 派生计数分立注记+值域互斥论证/措辞批 4 处）
 - v1.1.0: 文档审查 Round 1 修订（四视角调研+双视角审查+主会话亲验 5 组争议：P0×1[TraceabilitySection conclusion_count 锚错层→chunk_count 替换+available 重锚 stage_count>0——对标 CQRS 剔除恒定值惯例，16 传播位]+P1×4[ToolMetadata 18 字段勘误/step_completed 集合去重单源钦定——record_step 无幂等防护亲验/6-8 _STEP_SEQUENCE 前缀形态禁复刻——本 Story 首个 timeline step 值消费者/AC-4 树顶层降级两条单测分立——测试不可满足性消解]+P2×5[state_data 逐键处置表+除零守卫/16→15 命令族/锚定义务八条口径统一/行号勘误 7 处/消费方生产码限定]+P3×2[断言判别力补强：slug 全序列+len(categories)==5+k 表枚举锚/措辞级 7 处]+证伪×1[prd L454 现状正确——调研误报留痕]）
