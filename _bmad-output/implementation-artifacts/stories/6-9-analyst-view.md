@@ -953,10 +953,18 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 - 派生矩阵三空集格同调用（格 2/5/7 均 `derive_stage_status(set())`）——单集合签名纯函数层无法判别阶段维（三阶段值域两两不相交依据），阶段维由服务层 `_derive_stages` 测试承载——矩阵覆盖声明按此口径理解，冗余非缺陷
 - progress_percent 脏快照 >100 无读侧钳制——6-8 executive_view_service :187 同款忠实复刻（R1-F6 复刻钦定），两 Story 共享形态，如修属 6-8 联动面非 6-9 单独面
 - 集成场景②（空 plan）在场景① teardown 整删 collection 后运行、env 指向已删 collection（R2-B 注记）——当前绿依赖 build_trace_tree 对零归档 plan 短路（PG 空结果→零 Qdrant 点查）；若树服务未来加 collection 存在性预检会翻转为 tree_build_degraded，但该翻转被 `build_degraded is False` 断言大声捕获（自守卫远期耦合，非缺陷）
+- degraded_steps 为 str 形态时 `len()` 静默错值（R3 探针实证：`"abc"` → degraded_step_count=3 非降级非 0）——**6-8 共享形态**（executive_view_service :180 `or []`+:189 `len()` 同款无 isinstance 守卫，探针直调 6-8 同输入同为 3——复刻未缺守卫，6-8 本就没有）；写侧恒 list（blm_planning_service :135）仅 Redis 级损坏可达；不对称佐证：int 形态 `len(5)` TypeError→段降级（探针实证）——如修属 6-8 联动面
+- timeline 值现但不可用（str/dict/list[str]）不降级静默空（R3 探针实证：三形态全被 `isinstance(entry, dict)` 过滤→available=True+六阶段全 not_started 不抛不错值）——与 6-8 同输入分叉（6-8 :182 对 str 抛→段降级）；「值现且不可用→降级」三分界表述对 timeline 未裁「现但不可用」半句；呈现与已裁定脏值语义同形，冲击面仅 available 语义纯度
+- CLI 呈现面两注记（R3）：①零工具正常返回（未来全 deprecated 潮可达）输出「工具: 共 0 种（ACTIVE） | 分类: 」尾随悬空分隔符——纯呈现瑕疵留档；②CLI stub 工厂无 progress/traceability 段降级参数（2-True 降级组合零直构测试）——各段打印独立无组合分支，输出=已冻结形态并集（同形归并承载，结构保证非缺口）
+- 跳步形态联合断言微缺口（R3）：performance_gap+synthesis 缺六子 → 阶段2 COMPLETED(1/7)（Story 裁定形态——synthesis 优先序+格6 钦定）——服务级「status==COMPLETED 且 step_completed==1」联合直构格缺（格6 仅函数级+格8 全量），登记级微缺口
 
 #### Round 2 修复（回归核查+组合交互面——双 Agent 并行·v1.5.1 补录轮）
 
 **零代码修复**。R2-A 回归核查：R1 修复台账 11 项（F1-F8+伴生×2+登记×1）对账全在位、修复自身零新破口（F5 判别力/F6 fixture 语义边界与同进程 env 残留探针/F3·F4 零残留/伴生×2 形态统一）、274 passed 零失败（unit 86+CLI 172+集成 4+验收 12）+mypy 762 零错+lint-imports 5 kept+提交链 18 文件零遗漏零游离；两项 P3 文档级（伴生无表条目→本轮补录 R1-F9/F10；行号漂移→表头注记）。R2-B 组合交互面：四轴全过（R1×R1 四组合零互拆/×dev 面双 monkeypatch 双保险+xdist 同组串行/×既有资产 6-8 getsource 边界实测 5 passed+计数无断言/语义深查三推演定谳——F6 per-test setenv 合理默认·F5 any 零误命中面运行面实证·回归口径数字诚实）；一项 P3 注记登记（场景②远期耦合）。
+
+#### Round 3 修复（单深度推演——探针实证·v1.5.2 登记轮）
+
+**零代码修复（纯登记轮）**：净新增 P3×5 全部登记未落码注记（8→12 条）+证伪留痕 12 条。五轴推演（每轴探针/实测支撑）：①段降级 8 组合矩阵——or 逻辑穷举正确、单测 5/8 组合格承载（TTF/TFT/FTT 未测非缺口：三输入 OR 单调函数，single×3+FFF 反例已穷尽判别边界）、「没有数据 vs 拿不到数据」两层标记承载定谳（探针形态2：统计行默认全 0 同形+首行「（部分数据降级）」标记区分）；②六阶段×快照边界——全脏值双口径并存有服务级承载、跳步形态属裁定形态、total_steps 脏值不影响框架（结构论证+探针）；③VO 守卫边界——progress_percent>100 注记经 6-8 双向亲验（6-8 Story :50 同写「int 0-100」+:1018 自有注记，探针同输入同为 166）措辞已最精确、PhaseProgress 越界结构不可触发（trend×50 探针）、空格 plan_id 双守卫不可达；④CLI 形态穷举——零工具悬空分隔符（未来态）、status_labels 意外值不可达（VO 守卫链）、V1 注记后四行必然性（常量派生）；⑤文档终态自洽——表 10 行/注记计数/八版版本链/各处计数逐一吻合，258 passed 复跑。**证伪留痕 12 条**（防后续轮重推）：TTF/TFT/FTT 零增量·全脏值双口径结构保证·total_steps 脏值隔离·per-step 快照污染不可达（session_id `:{step}` 后缀 vs 无后缀 latest 键精确匹配）·dict/str timeline 迭代安全·progress_percent 6-8 同病实证·PhaseProgress 越界结构不可触发·空格 plan_id 双守卫·status_labels 意外值不可达·V1 注记必然性·k 表无 tie 数理（20c/7 无奇整数解）·「回归 48+172+4」与 274 口径非矛盾（窄口径显式标注，224+50=274 逐项对账；注：R2「unit 86」实为 unit 80+contracts 6 并入——标签混入一句话澄清）。
 
 ---
 
@@ -970,10 +978,11 @@ def derive_stage_status(stage_steps: set[str]) -> PhaseStatus:
 
 ---
 
-**故事版本/Story Version:** v1.5.1
+**故事版本/Story Version:** v1.5.2
 **创建日期/Created:** 2026-11-07
 **最后更新/Last Updated:** 2026-11-07
 **更新说明/Description:**
+- v1.5.2: 代码审查 Round 3 登记轮（单深度推演五轴探针实证：零 P0/P1/P2 零代码修复——净新增 P3×5 全登记[degraded_steps str len 静默错值=6-8 共享形态双向探针实证/timeline 值现不可用不降级语义注记/零工具悬空分隔符未来态/CLI 降级组合同形承载/跳步联合断言微缺口]未落码注记 8→12 条+证伪留痕 12 条[8 组合矩阵 or 单调论证/两层标记承载定谳/6-8 progress_percent 同病双向实证/per-step 快照不可达/k 表无 tie 数理等]；R1/R2 修复主体逐形态推演全部成立）
 - v1.5.1: 代码审查 Round 2 补录轮（回归核查+组合交互面双 Agent：零 P0/P1/P2 零代码修复——R1 台账 11 项对账全在位+修复零新破口+274 passed 零失败；四轴交互面全过[R1×R1 四组合零互拆/双 monkeypatch 双保险/6-8 getsource 边界实测 5 passed/三推演定谳]；补录 R1-F9/F10 伴生 mypy 修正进 Patch 表+行号易腐表头注记+场景②远期耦合未落码注记）
 - v1.5.0: 代码审查 Round 1 修订（四视角并行调研[契约一致性/测试判别力/架构红线/运行面实测]+双评审员 C3 门禁+主会话亲验三组：P1×2[docker-compose +8 行游离变更剥离独立提交 b7f2235e/CLI 单测 capsys 双读恒真断言——评审①证伪原拟 not-in-list 形态改 not any 子串扫描+突变实证留痕]+P2×3[ruff format 压行/集成 setenv worker 级泄漏——折入既有 _fresh_resolver_per_test fixture 形态 c 三触点/用例计数 7→6 三处勘误含主会话补全 :530]+P3×3[_TOOL_SUMMARY_FIELDS 死常量删除——SSOT 第二源清除+Subtask 2.3 行内勘误/架构测试恒真断言+孤儿常量删除/运算符括号化]——落码 8+deferred 登记 1[D6-9-R1-1 非 canonical UUID 命令族观察项]+未落码注记 7 条台账；契约面五轴全过+5 组真实突变全红+运行面 15 项实测零缺陷[P95=15.5ms/幂等 byte-identical]；落码后回归 48+172+4 全绿）
 - v1.4.0: dev-story 实施完成 ready-for-dev→in-progress→review（Task 0~7 全 Subtask 勾选：12/12 验收场景全绿+四目录全量两轮 15193/15192 passed[3 例既有环境负载偶发单独复跑全绿定谳，与 6-9 零交集]+覆盖率 93%[新增三 src 文件 100%]+mypy 762 零错误+ruff 全绿+变异实证 15 锚；交付面：七 VO+PhaseStatus+六阶段静态清单+值域单源+三段编排服务+242 用例+CLI analyst-view+组合根双注册；实施攻坚五项+R6 合规双文件+deferred-work 八条 11 处处置落档+纯三零 diff 实证+CLI 真实冒烟）
