@@ -2099,6 +2099,45 @@ def bootstrap() -> None:
         tags=("executive", "use_case", "application"),
     )
 
+    # === Story 6-9: Analyst View（分析师视图三段聚合——纯读侧零事件）===
+    # SINGLETON 捕获 SCOPED 三依赖声明（OD-11）：skill_selector（SINGLETON）+
+    # snapshot_repository（SCOPED）+ traceability_tree_service（SINGLETON）的
+    # 两单一 SCOPED 混态捕获——CLI 一次性进程 + 测试双清下无故障面（6-8 OD-11
+    # 同款注记先例）；未来 7-2 长驻 REST 面改 SCOPED 触发器注记。三依赖全既有
+    # 注册名消费（零新仓储成员/零 infra 面——OD-12 纯三零）。
+    from src.application.ports.analyst_view import AnalystViewPort
+    from src.application.services.analyst_view_service import AnalystViewService
+
+    register_port(
+        name="analyst_view_service",
+        version="v1.0.0",
+        interface=AnalystViewPort,
+        impl=lambda resolver: AnalystViewService(
+            skill_selector=resolver.resolve("skill_selector"),
+            snapshot_repository=resolver.resolve("snapshot_repository"),
+            traceability_tree_service=resolver.resolve("traceability_tree_service"),
+        ),
+        module="src.application.services.analyst_view_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("analyst", "view", "application"),
+    )
+
+    from src.application.use_cases.get_analyst_view import GetAnalystViewUseCase
+
+    register_port(
+        name="analyst_view_use_case",
+        version="v1.0.0",
+        interface=GetAnalystViewUseCase,
+        impl=lambda resolver: GetAnalystViewUseCase(
+            view_service=resolver.resolve("analyst_view_service"),
+        ),
+        module="src.application.use_cases.get_analyst_view",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("analyst", "use_case", "application"),
+    )
+
     # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 

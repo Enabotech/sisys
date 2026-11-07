@@ -564,6 +564,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="规划任务标识（UUID 字符串）",
     )
 
+    # Story 6-9: analyst-view 扁平子命令（分析师视图三段聚合——工具箱/进度/溯源；
+    # CLI 分析师作业入口；--plan-id 必填单参数零可选（YAGNI：无格式/分类过滤
+    # 参数需求来源，输出形态服务常量钉死——6-8 同款裁定）
+    analyst_view = subparsers.add_parser(
+        "analyst-view",
+        help="分析师视图（专业工具箱/BLM 六阶段进度/溯源摘要三段聚合——Story 6-9）",
+    )
+    analyst_view.add_argument(
+        "--plan-id",
+        type=str,
+        required=True,
+        metavar="PLAN_ID",
+        help="规划任务标识（UUID 字符串）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -1600,6 +1615,125 @@ def _run_executive_view_cli(plan_id: str) -> int:
         return 1
 
 
+# Story 6-9: analyst-view 子命令（分析师作业入口——五步定式+_print 三段打印）
+# ===================================================================
+async def _run_analyst_view(plan_id: str) -> Any:
+    """analyst-view 异步执行壳（resolve analyst_view_use_case——Story 6-9）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_executive_view 注记）。
+    """
+    try:
+        use_case = resolve("analyst_view_use_case")
+        return await use_case.execute(plan_id=plan_id)
+    finally:
+        await _close_connection_pools()
+
+
+def _print_analyst_view(view: Any) -> None:
+    """分析师视图打印（三段分隔行+逐工具清单+六阶段进度条——输出即契约，纯标准库 print）。
+
+    呈现语义注记（R3-F6——AC-3 分立注记呈现面延续）：进度行=快照 int 直读口径/
+    阶段行=timeline 派生口径，两口径可不一致（如快照 3/8 而六阶段合计 2/8——
+    timeline 含值域外脏值时），属「快照计数 vs 派生计数」预期语义非 bug。
+    进度条 10 格字符形态：k=round(step_completed/step_total*10)（10c/7 与 10
+    互质无 .5 tie 面——banker's rounding 无触发面，确定性安全）；step_total==0
+    时恒 10 格 ░（后四阶段规划态）；后四阶段行尾追加「（V1 交付）」注记（归
+    Epic 10 Story 10-1——呈现面承载不进 status 值域）。
+    段降级形态：toolbox 段降「工具清单获取失败」单行；progress 段降「进度: 无快照」
+    （快照缺席与段降级同形——CLI 面不区分两层）；溯源统计行恒在（空态全 0 形态）。
+    getattr 形态零 VO import 依赖（6-3/6-8 先例）。
+    """
+    degraded_mark = "（部分数据降级）" if getattr(view, "build_degraded", False) else ""
+    print(f"分析师视图（plan: {getattr(view, 'plan_id', '')}）{degraded_mark}")
+
+    toolbox = getattr(view, "toolbox", None)
+    print("── 专业工具箱 ──")
+    if getattr(toolbox, "degraded", False):
+        print("工具清单获取失败")
+    else:
+        categories = getattr(toolbox, "categories", None) or ()
+        category_text = " ".join(
+            f"{getattr(category, 'category', '')}×{getattr(category, 'tool_count', 0)}" for category in categories
+        )
+        print(f"工具: 共 {getattr(toolbox, 'total_tools', 0)} 种（ACTIVE） | 分类: {category_text}")
+        for tool in getattr(toolbox, "tools", None) or ():
+            print(f"  {getattr(tool, 'slug', '')} — {getattr(tool, 'tool_name', '')}（{getattr(tool, 'category', '')}）")
+
+    progress = getattr(view, "progress", None)
+    print("── BLM 进度 ──")
+    if not getattr(progress, "available", False):
+        print("进度: 无快照")
+    else:
+        current_step = getattr(progress, "current_step", None)
+        print(
+            f"进度: {getattr(progress, 'completed_steps', 0)}/{getattr(progress, 'total_steps', 0)}"
+            f"（{getattr(progress, 'progress_percent', 0)}%）"
+            f" | 当前: {current_step if current_step else '无'}"
+            f" | 降级: {getattr(progress, 'degraded_step_count', 0)} 步"
+        )
+    status_labels = {"completed": "已完成", "in_progress": "进行中", "not_started": "未启动"}
+    for index, stage in enumerate(getattr(progress, "stages", None) or (), start=1):
+        step_total = getattr(stage, "step_total", 0)
+        step_completed = getattr(stage, "step_completed", 0)
+        filled = round(step_completed / step_total * 10) if step_total > 0 else 0
+        bar = "█" * filled + "░" * (10 - filled)
+        status = getattr(stage, "status", None)
+        status_value = getattr(status, "value", str(status))
+        v1_mark = "（V1 交付）" if step_total == 0 else ""
+        print(
+            f"  {index}. {getattr(stage, 'phase_name', '')}: [{bar}]"
+            f" {status_labels.get(status_value, status_value)}（{step_completed}/{step_total}）{v1_mark}"
+        )
+
+    traceability = getattr(view, "traceability", None)
+    print("── 溯源摘要 ──")
+    tree_mark = "（部分树数据降级）" if getattr(traceability, "tree_build_degraded", False) else ""
+    print(
+        f"分析: {getattr(traceability, 'stage_count', 0)} | 切片: {getattr(traceability, 'chunk_count', 0)}"
+        f" | 文档: {getattr(traceability, 'document_count', 0)}"
+        f" | 可跳转: {getattr(traceability, 'jump_ready_count', 0)}{tree_mark}"
+    )
+    if getattr(traceability, "degraded_stage_count", 0) > 0:
+        print(f"降级 stage: {getattr(traceability, 'degraded_stage_count', 0)}")
+    print(f"提示: 执行 trace-tree --plan-id {getattr(view, 'plan_id', '')} 查看完整溯源树")
+
+
+def _run_analyst_view_cli(plan_id: str) -> int:
+    """analyst-view 子命令执行（五步定式——_run_executive_view_cli 直系样板）。
+
+    Args:
+        plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
+
+    Returns:
+        退出码（0=视图构建完成含空态——空态是正常态；1=业务异常；2=argparse
+        用法错误由 argparse 原生承载）。
+    """
+    try:
+        uuid_module.UUID(plan_id)
+    except ValueError:
+        validation_error = EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": "analyst-view", "field": "plan_id", "plan_id": plan_id},
+        )
+        logger.error("分析师视图查询失败（参数守卫）: %s", validation_error)
+        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        return 1
+
+    try:
+        _ensure_bootstrapped()
+        view = asyncio.run(_run_analyst_view(plan_id))
+        _print_analyst_view(view)
+        logger.info("分析师视图查询完成: plan_id=%s", plan_id)
+        return 0
+    except DomainError as error:
+        logger.error("分析师视图查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("分析师视图查询异常: %s", error, exc_info=True)
+        return 1
+
+
 async def _run_checkpoint_recovery_view(plan_id: str, checkpoint_no: str) -> Any:
     """dry-run 评估数据面（resolve 既有恢复视图用例——仅取②步视图零执行）。
 
@@ -2192,6 +2326,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_trace_tree_cli(args.plan_id, args.depth, args.stage)
     if args.command == "executive-view":
         return _run_executive_view_cli(args.plan_id)
+    if args.command == "analyst-view":
+        return _run_analyst_view_cli(args.plan_id)
     if args.command == "report-generate":
         return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
     if args.command == "isolation-status":

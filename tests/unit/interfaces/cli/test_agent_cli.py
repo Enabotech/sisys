@@ -3361,3 +3361,304 @@ class TestExecutiveViewExecution:
 
         assert exit_code == 0
         assert "健康状态: amber（关注）（部分数据降级）" in capsys.readouterr().out.splitlines()
+
+
+# ===================================================================
+# === Story 6-9: analyst-view 子命令（分析师作业入口——三段聚合视图）===
+# ===================================================================
+
+
+def _make_stub_analyst_view(
+    *,
+    plan_id: str | None = None,
+    toolbox_degraded: bool = False,
+    tools: tuple = (
+        ("pestel-analysis", "PESTEL 分析", "environment_analysis"),
+        ("competitor-analysis", "竞争对手分析", "competitive_analysis"),
+    ),
+    categories: tuple = (("environment_analysis", 1), ("competitive_analysis", 1)),
+    progress_available: bool = True,
+    completed: int = 3,
+    total: int = 8,
+    percent: int = 37,
+    current_step: str | None = "market_customer",
+    degraded_steps: int = 1,
+    stages: tuple = (),
+    stage_count: int = 2,
+    chunk_count: int = 3,
+    document_count: int = 3,
+    jump_ready: int = 2,
+    degraded_stage_count: int = 0,
+    tree_build_degraded: bool = False,
+    build_degraded: bool = False,
+) -> Any:
+    """analyst-view 视图替身工厂（getattr 零 VO import——6-3/6-8 先例形态）.
+
+    stages 缺省时构造六阶段全景（1/7/0/0/0/0——k 表断言与验收形态对齐）。
+    """
+    from types import SimpleNamespace
+
+    from src.application.ports.analyst_view import BLM_SIX_PHASES, PhaseStatus
+
+    if not stages:
+        stage_specs = (
+            ("业绩差距分析", PhaseStatus.COMPLETED, 1, 1),
+            ("市场洞察", PhaseStatus.IN_PROGRESS, 2, 7),
+            ("战略意图与目标", PhaseStatus.NOT_STARTED, 0, 0),
+            ("创新焦点", PhaseStatus.NOT_STARTED, 0, 0),
+            ("业务设计", PhaseStatus.NOT_STARTED, 0, 0),
+            ("执行设计", PhaseStatus.NOT_STARTED, 0, 0),
+        )
+        stages = tuple(
+            SimpleNamespace(phase_key=key, phase_name=name, status=status, step_completed=done, step_total=total_)
+            for (key, name), (_, status, done, total_) in zip(BLM_SIX_PHASES, stage_specs)
+        )
+    toolbox = SimpleNamespace(
+        degraded=toolbox_degraded,
+        total_tools=len(tools),
+        tools=tuple(
+            SimpleNamespace(slug=slug, tool_name=name, category=category, description=f"{slug} 描述", status="active")
+            for slug, name, category in tools
+        ),
+        categories=tuple(SimpleNamespace(category=category, tool_count=count) for category, count in categories),
+    )
+    progress = SimpleNamespace(
+        available=progress_available,
+        degraded=False,
+        phase="market_insight",
+        current_step=current_step,
+        completed_steps=completed,
+        total_steps=total,
+        progress_percent=percent,
+        degraded_step_count=degraded_steps,
+        stages=stages,
+    )
+    traceability = SimpleNamespace(
+        available=stage_count > 0,
+        degraded=False,
+        stage_count=stage_count,
+        chunk_count=chunk_count,
+        document_count=document_count,
+        jump_ready_count=jump_ready,
+        degraded_stage_count=degraded_stage_count,
+        tree_build_degraded=tree_build_degraded,
+    )
+    return SimpleNamespace(
+        plan_id=plan_id or str(uuid.uuid4()),
+        generated_at="2026-11-07T10:00:01+00:00",
+        build_degraded=build_degraded,
+        toolbox=toolbox,
+        progress=progress,
+        traceability=traceability,
+    )
+
+
+class _StubAnalystViewUseCase:
+    """analyst-view 用例替身（记录调用参数/可编程视图或异常——_StubExecutiveViewUseCase 同款形态）."""
+
+    def __init__(self, view: Any = None, error: Exception | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._view = view
+        self._error = error
+
+    async def execute(self, *, plan_id: str) -> Any:
+        self.calls.append({"plan_id": plan_id})
+        if self._error is not None:
+            raise self._error
+        return self._view
+
+
+def _patch_analyst_view_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubAnalystViewUseCase) -> None:
+    """monkeypatch agent_cli 模块级 bootstrap/resolve（每命令族专用 patcher 纪律——6-8 R1-F11）."""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+class TestAnalystViewParser:
+    """analyst-view 参数解析（--plan-id 必填单参数——零可选参数 YAGNI）."""
+
+    def test_parses_command_and_plan_id(self) -> None:
+        """注册锚：build_parser 识别 analyst-view 子命令与 --plan-id."""
+        args = agent_cli.build_parser().parse_args(["analyst-view", "--plan-id", "123e4567-e89b-12d3-a456-426614174000"])
+        assert args.command == "analyst-view"
+        assert args.plan_id == "123e4567-e89b-12d3-a456-426614174000"
+
+    def test_missing_plan_id_exits_2(self) -> None:
+        """缺 --plan-id → argparse SystemExit 2（argparse 原生用法错误承载）."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["analyst-view"])
+        assert exc_info.value.code == 2
+
+    def test_no_optional_arguments(self) -> None:
+        """零可选参数（无 --format/--category 过滤——YAGNI 钦定）."""
+        import inspect
+
+        source = inspect.getsource(agent_cli.build_parser)
+        analyst_block = source.split('add_parser(\n        "analyst-view"')[1].split("add_parser(")[0]
+        assert "--format" not in analyst_block
+        assert "--category" not in analyst_block
+
+
+class TestAnalystViewExecution:
+    """analyst-view 执行（五步定式：守卫→bootstrap→resolve→打印→异常退码）."""
+
+    def test_full_data_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """全数据：首行精确+三段分隔行+工具行+六阶段 6 行（status 中文+V1 注记后四）+溯源统计+提示行+exit 0."""
+        view = _make_stub_analyst_view()
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["plan_id"] == view.plan_id
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert f"分析师视图（plan: {view.plan_id}）" in lines, f"首行应精确匹配（实测={out!r}）"
+        for separator in ("── 专业工具箱 ──", "── BLM 进度 ──", "── 溯源摘要 ──"):
+            assert separator in lines, f"三段分隔行缺失 {separator}（实测={out!r}）"
+        assert "工具: 共 2 种（ACTIVE） | 分类: environment_analysis×1 competitive_analysis×1" in lines
+        assert "  pestel-analysis — PESTEL 分析（environment_analysis）" in lines
+        assert "进度: 3/8（37%） | 当前: market_customer | 降级: 1 步" in lines
+        assert "  1. 业绩差距分析: [██████████] 已完成（1/1）" in lines
+        assert "  2. 市场洞察: [███░░░░░░░] 进行中（2/7）" in lines
+        v1_lines = [line for line in lines if "（V1 交付）" in line]
+        assert len(v1_lines) == 4, f"后四阶段 V1 注记应恰 4 行（实测 {len(v1_lines)}）"
+        assert "分析: 2 | 切片: 3 | 文档: 3 | 可跳转: 2" in lines
+        assert f"提示: 执行 trace-tree --plan-id {view.plan_id} 查看完整溯源树" in lines
+
+    def test_progress_bar_k_table_enumeration(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """进度条 k 表枚举：c=0..7 → [0,1,3,4,6,7,9,10] 逐格断言（±1 即红——R1-F11）."""
+        from types import SimpleNamespace
+
+        stages = tuple(
+            SimpleNamespace(
+                phase_key=f"p{index}",
+                phase_name=f"阶段{index}",
+                status=None,
+                step_completed=completed,
+                step_total=7,
+            )
+            for index, completed in enumerate(range(8))
+        )
+        view = _make_stub_analyst_view(stages=stages, progress_available=False)
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        expected_filled = [0, 1, 3, 4, 6, 7, 9, 10]
+        bar_lines = [line for line in lines if ("[" in line and "█" in line) or ("[" in line and "░" in line)]
+        filled_actual = [line.split("[")[1].split("]")[0].count("█") for line in bar_lines]
+        assert filled_actual == expected_filled, f"k 表应 [0,1,3,4,6,7,9,10]（实测 {filled_actual}——round 公式 ±1 即红）"
+
+    def test_empty_plan_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空 plan：进度无快照行+六阶段框架行恒在+工具箱照常+溯源统计行全 0+exit 0."""
+        from types import SimpleNamespace
+
+        from src.application.ports.analyst_view import BLM_SIX_PHASES, PhaseStatus
+
+        empty_stages = tuple(
+            SimpleNamespace(phase_key=key, phase_name=name, status=PhaseStatus.NOT_STARTED, step_completed=0, step_total=total_)
+            for (key, name), total_ in zip(BLM_SIX_PHASES, (1, 7, 0, 0, 0, 0))
+        )
+        view = _make_stub_analyst_view(
+            progress_available=False,
+            stages=empty_stages,  # 空 plan 六阶段全 not_started 框架（AC-3 P-empty 语义）
+            stage_count=0,
+            chunk_count=0,
+            document_count=0,
+            jump_ready=0,
+        )
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert "进度: 无快照" in lines
+        framework_lines = [line for line in lines if "未启动" in line]
+        assert len(framework_lines) == 6, f"六阶段框架行恒在（实测 {len(framework_lines)}）"
+        assert "  pestel-analysis — PESTEL 分析（environment_analysis）" in lines, "空 plan 工具箱照常"
+        assert "分析: 0 | 切片: 0 | 文档: 0 | 可跳转: 0" in lines
+        assert f"提示: 执行 trace-tree --plan-id {view.plan_id} 查看完整溯源树" in lines
+        assert not any("降级 stage:" in line for line in lines), (
+            "空 plan 降级 stage 行应缺席（子串扫描——list 全等负断言恒真，R1-F5）"
+        )
+
+    def test_current_step_none_fallback(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """current_step=None → 「当前: 无」fallback（6-8 :1519 直系——R3-F5）."""
+        view = _make_stub_analyst_view(current_step=None)
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        assert "进度: 3/8（37%） | 当前: 无 | 降级: 1 步" in capsys.readouterr().out.splitlines()
+
+    def test_malformed_plan_id_stderr_242(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """畸形 plan_id：CLI 守卫 242 → stderr [EXCEPTION_242] + exit 1 + 不触达用例."""
+        stub = _StubAnalystViewUseCase(_make_stub_analyst_view())
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", "not-a-uuid"])
+
+        assert exit_code == 1
+        assert not stub.calls, "守卫失败后不得触达用例"
+        assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+    def test_domain_error_stderr_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """用例抛 DomainError → stderr [EXCEPTION_480] + exit 1（五步定式第四步）."""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        stub = _StubAnalystViewUseCase(error=PlanningNotFoundError(plan_id="123e4567-e89b-12d3-a456-426614174000"))
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", "123e4567-e89b-12d3-a456-426614174000"])
+
+        assert exit_code == 1
+        assert "[EXCEPTION_480]" in capsys.readouterr().err
+
+    def test_degraded_marks_double_form(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """降级标记双形态并存（R3-F1）：build_degraded+tree_build_degraded 双 True →
+        首行含「（部分数据降级）」+溯源统计行含「（部分树数据降级）」."""
+        view = _make_stub_analyst_view(build_degraded=True, tree_build_degraded=True)
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert f"分析师视图（plan: {view.plan_id}）（部分数据降级）" in lines, "首行应含顶层降级标记"
+        assert "分析: 2 | 切片: 3 | 文档: 3 | 可跳转: 2（部分树数据降级）" in lines, "溯源统计行应含树降级标记"
+
+    def test_toolbox_degraded_single_line(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """工具箱段降级 → 「工具清单获取失败」单行（段降级形态——AC-6）."""
+        view = _make_stub_analyst_view(toolbox_degraded=True)
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert "工具清单获取失败" in lines
+        assert "  pestel-analysis — PESTEL 分析（environment_analysis）" not in lines
+
+    def test_degraded_stage_count_line(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """degraded_stage_count>0 → 「降级 stage: n」行在位（仅非零时呈现）."""
+        view = _make_stub_analyst_view(degraded_stage_count=2)
+        stub = _StubAnalystViewUseCase(view)
+        _patch_analyst_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["analyst-view", "--plan-id", view.plan_id])
+
+        assert exit_code == 0
+        assert "降级 stage: 2" in capsys.readouterr().out.splitlines()
