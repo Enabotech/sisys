@@ -1,6 +1,6 @@
 # Story 6-10: 顾问视图（三段聚合查询——多项目概况/品牌配置状态/白标导出概况 + CLI `consultant-view`）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -155,51 +155,51 @@
 
 #### 领域事件 Schema (Domain Events)
 
-- [ ] **零新增领域事件、零发布、零订阅**（OD-2——查询型故事第九连：纯查询聚合面零状态变更；6-4/6-5a/6-5b/6-6/6-7/6-8/6-9 七连零事件先例族延续[七员枚举+本 Story=第九连——连号按查询型 Story 定位计]；`event_channels.yaml`/`DEFAULT_MAPPINGS` 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化——Task 4.2 守护复跑；蓝图无顾问视图事件载体）
+- [x] **零新增领域事件、零发布、零订阅**（OD-2——查询型故事第九连：纯查询聚合面零状态变更；6-4/6-5a/6-5b/6-6/6-7/6-8/6-9 七连零事件先例族延续[七员枚举+本 Story=第九连——连号按查询型 Story 定位计]；`event_channels.yaml`/`DEFAULT_MAPPINGS` 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化——Task 4.2 守护复跑；蓝图无顾问视图事件载体）
 
 #### 数据模型 (Data Models)
 
-- [ ] 五 VO 全应用层 `src/application/ports/consultant_view.py`（frozen dataclass——6-6 CheckpointSummaryView/6-7 五 VO/6-8 七 VO/6-9 七 VO 先例族；零 domain VO——OD-11）：`ConsultantView` 5 键/`ProjectsSection` 4/`ProjectSummary` 6/`BrandSection` 5/`ExportSection` 7（Task 0.1 冻结表——实现禁增删键）
-- [ ] 品牌段默认值两常量钦定应用层 ports 文件（OD-6——品牌面恰两常量[logo/color 共用 BRAND_STATUS_UNCONFIGURED]：`BRAND_STATUS_UNCONFIGURED="未配置（系统默认）"`/`BRAND_FONT_STATUS="STSong-Light（内置）"`——字面量单源+reportlab :60 锚注记；6-11 对接触发器 docstring 注记）
-- [ ] 面板查询常量：`PANEL_ARCHIVE_LIMIT=1000`（ArchiveQuery limit 覆写单源——默认 20 截断防御）
+- [x] 五 VO 全应用层 `src/application/ports/consultant_view.py`（frozen dataclass——6-6 CheckpointSummaryView/6-7 五 VO/6-8 七 VO/6-9 七 VO 先例族；零 domain VO——OD-11）：`ConsultantView` 5 键/`ProjectsSection` 4/`ProjectSummary` 6/`BrandSection` 5/`ExportSection` 7（Task 0.1 冻结表——实现禁增删键）
+- [x] 品牌段默认值两常量钦定应用层 ports 文件（OD-6——品牌面恰两常量[logo/color 共用 BRAND_STATUS_UNCONFIGURED]：`BRAND_STATUS_UNCONFIGURED="未配置（系统默认）"`/`BRAND_FONT_STATUS="STSong-Light（内置）"`——字面量单源+reportlab :60 锚注记；6-11 对接触发器 docstring 注记）
+- [x] 面板查询常量：`PANEL_ARCHIVE_LIMIT=1000`（ArchiveQuery limit 覆写单源——默认 20 截断防御）
 
 #### 统一端口定义注册与管理 (Port Contract)
 
-- [ ] `ConsultantViewPort`（应用层 `src/application/ports/consultant_view.py`，`@runtime_checkable Protocol` v1.0.0）：`async def build_consultant_view(self) -> ConsultantView`（**零参数**——全局视图 OD-1；ExecutiveViewPort/AnalystViewPort keyword-only plan_id 形态的分立点）
-- [ ] 端口注册中心/解析器/契约门禁零改动（既有机制消费）；组合根双注册（OD-10）：`consultant_view_service`（SINGLETON）+ `consultant_view_use_case`（SINGLETON）——落位 analyst_view 块后（:2139 邻位）
-- [ ] 两依赖复用既有注册名零新端口：`archive_repository`（:2315 SCOPED v1.1.0）/`report_repository`（:3513 SCOPED）——**两 SCOPED 无混态**（6-8 三 SCOPED+一 SINGLETON/6-9 两 SINGLETON+一 SCOPED 混态后的最简形态）
-- [ ] 端口契约测试：`tests/contracts/test_port_contract_consultant_view.py`（五断言族——`test_port_contract_analyst_view.py` 直系复刻）
-- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
+- [x] `ConsultantViewPort`（应用层 `src/application/ports/consultant_view.py`，`@runtime_checkable Protocol` v1.0.0）：`async def build_consultant_view(self) -> ConsultantView`（**零参数**——全局视图 OD-1；ExecutiveViewPort/AnalystViewPort keyword-only plan_id 形态的分立点）
+- [x] 端口注册中心/解析器/契约门禁零改动（既有机制消费）；组合根双注册（OD-10）：`consultant_view_service`（SINGLETON）+ `consultant_view_use_case`（SINGLETON）——落位 analyst_view 块后（:2139 邻位）
+- [x] 两依赖复用既有注册名零新端口：`archive_repository`（:2315 SCOPED v1.1.0）/`report_repository`（:3513 SCOPED）——**两 SCOPED 无混态**（6-8 三 SCOPED+一 SINGLETON/6-9 两 SINGLETON+一 SCOPED 混态后的最简形态）
+- [x] 端口契约测试：`tests/contracts/test_port_contract_consultant_view.py`（五断言族——`test_port_contract_analyst_view.py` 直系复刻）
+- [x] 禁止在服务文件中本地定义 Protocol / Port 抽象
 
 #### 端口契约清单执行约束（强制）
 
-- [ ] 本清单是唯一事实源；禁止新增未登记端口（本 Story 零新底层端口——仅一个视图聚合端口）；禁止语义重复端口（consultant_view 跨 plan 交付面 vs executive_view 单 plan 速览面 vs analyst_view 单 plan 作业面——三语义正交：交付者全局/高管单点/分析师单点）
-- [ ] 端口具备唯一名称、版本 v1.0.0、owner、tags；未通过 Contract Gate 的端口变更不得进入实现 Task
+- [x] 本清单是唯一事实源；禁止新增未登记端口（本 Story 零新底层端口——仅一个视图聚合端口）；禁止语义重复端口（consultant_view 跨 plan 交付面 vs executive_view 单 plan 速览面 vs analyst_view 单 plan 作业面——三语义正交：交付者全局/高管单点/分析师单点）
+- [x] 端口具备唯一名称、版本 v1.0.0、owner、tags；未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 领域异常契约 (Domain Exception Contract)
 
-- [ ] **零新增领域异常、零既有异常改动**（OD-3）：**本 Story 无 242 消费面**（零输入零畸形面——6-8/6-9 连续两 Story 242 UUID 守卫后本 Story 语义自然缺席，用例 `execute()` 无参透传无守卫；空态幂等读不抛——五先例族第六连）；report 段 490-493 已用/494-499 预留**不占**（490 ReportGenerationError 是生成面语义——本 Story 零生成零触碰；`_code_ranges.py` report 域引用口径统一 :199-212（R4 勘误——原 :192-212 含 planning 段首行））；report/archive 两域零异常改动；planning 480-489/report 490-499/traceability 372-379 三段预留维持零触碰（无 view 码段亲验维持）。**否决备选**：开新码（ConsultantViewError）——段级容错+空态幂等读后无真实 raise 触发面，开码即引入「空租户误报」反语义面（6-7/6-8/6-9 OD-3 否决论证同构第四连）
+- [x] **零新增领域异常、零既有异常改动**（OD-3）：**本 Story 无 242 消费面**（零输入零畸形面——6-8/6-9 连续两 Story 242 UUID 守卫后本 Story 语义自然缺席，用例 `execute()` 无参透传无守卫；空态幂等读不抛——五先例族第六连）；report 段 490-493 已用/494-499 预留**不占**（490 ReportGenerationError 是生成面语义——本 Story 零生成零触碰；`_code_ranges.py` report 域引用口径统一 :199-212（R4 勘误——原 :192-212 含 planning 段首行））；report/archive 两域零异常改动；planning 480-489/report 490-499/traceability 372-379 三段预留维持零触碰（无 view 码段亲验维持）。**否决备选**：开新码（ConsultantViewError）——段级容错+空态幂等读后无真实 raise 触发面，开码即引入「空租户误报」反语义面（6-7/6-8/6-9 OD-3 否决论证同构第四连）
 
 #### API 契约 (API Contract)
 
-- [ ] **零 REST 端点**（CLI-only 第九连——openapi.yaml 零 diff；6.1-DF5 八连先例；epics L2512-2513 钦定测试文件为 CLI/编程面测试非 API 契约；白标 REST 面 `/reports/whitelabel` 归 Epic 20 Story 20.4——epics L600）
+- [x] **零 REST 端点**（CLI-only 第九连——openapi.yaml 零 diff；6.1-DF5 八连先例；epics L2512-2513 钦定测试文件为 CLI/编程面测试非 API 契约；白标 REST 面 `/reports/whitelabel` 归 Epic 20 Story 20.4——epics L600）
 
 #### 六边形架构约束（必须遵守）
 
-- [ ] **R1~R4 设计规则落点**：R1 领域层基础端口零改动（本 Story 零 domain——消费的 ArchiveRepositoryPort/ReportRepositoryProtocol 均既有 R1 端口）；R2 应用层具体端口 `ConsultantViewPort` 组合注入两既有 R1 端口（archive_repository+report_repository——ExecutiveViewPort 四依赖/AnalystViewPort 三依赖同构延续）；R3 基础设施层零改动（OD-11 三零）；R4 接口层零改动（CLI 归 entrypoints 组装层——D1 方案 A 既有格局）
-- [ ] 依赖方向矩阵合规：application→domain（ports 消费）/entrypoints→application（CLI resolve）；domain/interfaces/infrastructure 零触碰
+- [x] **R1~R4 设计规则落点**：R1 领域层基础端口零改动（本 Story 零 domain——消费的 ArchiveRepositoryPort/ReportRepositoryProtocol 均既有 R1 端口）；R2 应用层具体端口 `ConsultantViewPort` 组合注入两既有 R1 端口（archive_repository+report_repository——ExecutiveViewPort 四依赖/AnalystViewPort 三依赖同构延续）；R3 基础设施层零改动（OD-11 三零）；R4 接口层零改动（CLI 归 entrypoints 组装层——D1 方案 A 既有格局）
+- [x] 依赖方向矩阵合规：application→domain（ports 消费）/entrypoints→application（CLI resolve）；domain/interfaces/infrastructure 零触碰
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_consultant_view.feature`（12 场景——R6 模板 `test_acceptance_postgresql_relational_layer.feature` 形态：AC 横幅分节+zh-CN 步骤）
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规最新形态：三件套/双清/context dict/CLI 直调/完成清单）
-- [ ] 所有场景覆盖（Happy Path + Edge Cases）；Edge Cases 含空态幂等读+None 行剔除防御形态（异常路径归单测分立——AC-5 裁定）
-- [ ] **BDD 步骤实现约束**：步骤函数 `event_loop.run_until_complete()`；同一中文文本双装饰器支持（仓内先例锚 `test_acceptance_autonomous_invocation_route.py:505-506`——R1 注记：6-9 验收步骤文本全唯一无此形态）；禁 `@pytest.mark.asyncio`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_consultant_view.feature`（12 场景——R6 模板 `test_acceptance_postgresql_relational_layer.feature` 形态：AC 横幅分节+zh-CN 步骤）
+- [x] 步骤实现文件：`tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规最新形态：三件套/双清/context dict/CLI 直调/完成清单）
+- [x] 所有场景覆盖（Happy Path + Edge Cases）；Edge Cases 含空态幂等读+None 行剔除防御形态（异常路径归单测分立——AC-5 裁定）
+- [x] **BDD 步骤实现约束**：步骤函数 `event_loop.run_until_complete()`；同一中文文本双装饰器支持（仓内先例锚 `test_acceptance_autonomous_invocation_route.py:505-506`——R1 注记：6-9 验收步骤文本全唯一无此形态）；禁 `@pytest.mark.asyncio`
 
 **Task 0 完成标志：**
-- [ ] 规范项全部定义完毕（键契约/排序与派生口径/端口/12 场景钉死/锚定义务处置）
-- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
-- [ ] **链路接线断言清单**：组合根 `register_port` 双注册 resolve 可达（契约测试承载）/零事件零中间件接线面（查询型 Story——接线断言归架构验证器 D CLI 锚）
+- [x] 规范项全部定义完毕（键契约/排序与派生口径/端口/12 场景钉死/锚定义务处置）
+- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [x] **链路接线断言清单**：组合根 `register_port` 双注册 resolve 可达（契约测试承载）/零事件零中间件接线面（查询型 Story——接线断言归架构验证器 D CLI 锚）
 
 ---
 
@@ -313,18 +313,18 @@
 
 > **目的：** 在进入代码实现前，明确 VO 键契约、排序与派生口径、端口契约、验收场景与六边形架构边界，并处置 deferred-work 锚定义务（Epic 6 锚七行[L13/L17/L107/L117/L170/L127/L129]归并六组+两条 6.7-DF 维持+两条 D6-8-R 维持+一条 D6-9-R 注记+两条 6.5a-DF 顺延——13 锚位归并 11 行台账，OD-8）。
 
-- [ ] Subtask 0.1: 冻结五 VO 键契约（Task 0.1 冻结表落 Dev Agent Record——5/4/6/5/7 键+品牌默认值两常量+PANEL_ARCHIVE_LIMIT[共三常量]——实现禁增删键）
-- [ ] Subtask 0.2: 冻结排序与派生口径（口径一：行序 latest_activity_at 降序+plan_id 字典序 tie-break+None 时间戳恒排尾；口径二：latest 遮蔽计数口径；口径三：latest_pdf 三键选择[latest_report_at 最大者+tie-break plan_id 升序]；口径四：None 行剔除；口径五：双段联动降级语义——AC-2/AC-4/AC-5 规则逐字冻结）
-- [ ] Subtask 0.3: 定义端口契约（ConsultantViewPort v1.0.0 零参签名+两依赖注册名+组合根落位 :2139 邻位锚）+ 契约测试文件骨架
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态——注记型场景禁用]；epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 正向可见性口径[OD-13]）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+**归档行预置走 repo.save 直写通道**[R5 终审改钦——与报告行通道完全对称：`StrategicArchive` 实体直构造[archived_at 未来偏移可编程——dataclass 构造参数]+`archive_repository.save(entity)`[经 L2RdbPort 基类继承在册 :36+PG 实装 :191 UPSERT+`_to_model` :108-127 archived_at 实体值直传]；R3-F1 原钦定 PG model 直写通道保留为备选[ArchiveModel+session.add 亦可实施]；**禁复刻 6-7 `_archive_row` 编排通道**——其走 `service.archive_plan` 时间戳服务内部生成不可控，与 OD-13① 结构性冲突；R3-F1「ArchiveRepositoryPort 无 save 方法」系伪实证勘误[R5-F1：六扩展方法枚举漏基类四继承方法——save/get_by_id/delete/list_all 经 L2RdbPort 继承在册且服务三处生产消费 :124/:249/:443]]+报告行直写[report_repository.save——集成直写先例 6-8 `_save_report` :504-512 单参形态+实体 created_at 可编程 `_make_report_entity` :448-461 样板]+PG 三分面通道+CLI 直调 helper；**py 模块级零 consultant_view 词族 import 硬纪律**——src 符号全部延迟到步骤函数内 import[含类型注解用途——模块级 import 会使收集期 ImportError 全文件 ERROR，S7/S8 exit 2 与 S12 AssertionError 红形态全部不可达——6-9 :55-68 形态逐字复刻]；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳未来偏移判别构造**（预置归档行 archived_at 与报告行 created_at 均自基准 now 起微秒级递减——三 plan 相互判别+恒新于共享库背景行[背景行免疫 OD-13]；find/get_latest_by_plan 均无时间窗过滤、无 6-8 审计窗「未来偏移出窗」风险——场景分立注记；禁 `now()` 双调同值形态）；**S9 背景清点步骤**（仅性能场景：预置前 distinct plan 背景数清点——skip 门[>50 跳过]专用；membership 全含断言体系无需差值基线[R2 勘误：差值法对基线后外来写入假红，废止——OD-13②]）；**pytestmark xdist_group("blm-planning-perf") 整模块挂法**（R4-F2 清偿——与全部 strategic_archives 提交型写入方[6-7 验收/集成+checkpoint 系，全仓普查实证]同 worker 串行：背景行稳定+S10 并发窗免疫的结构前提——漏挂则与 6-7 并行产生间歇假红[最难溯源形态]；6-7/6-8/6-9 同组惯例））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
-- [ ] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError）
-- [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——**台账形态：13 个锚位归并 10 行处置+第 11 行不登记新锚裁定=11 行**，计数口径按行[R1 勘误：原稿「共 11 条」与枚举算术 13 锚不自洽]）
-- [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@b9525f8b，实施前复核；本 Story 锚点表按当前 HEAD 校正 6-9 期漂移注记：6-9 故事锚组合根 analyst_view 块 :2102-2139 实测吻合）
+- [x] Subtask 0.1: 冻结五 VO 键契约（Task 0.1 冻结表落 Dev Agent Record——5/4/6/5/7 键+品牌默认值两常量+PANEL_ARCHIVE_LIMIT[共三常量]——实现禁增删键）
+- [x] Subtask 0.2: 冻结排序与派生口径（口径一：行序 latest_activity_at 降序+plan_id 字典序 tie-break+None 时间戳恒排尾；口径二：latest 遮蔽计数口径；口径三：latest_pdf 三键选择[latest_report_at 最大者+tie-break plan_id 升序]；口径四：None 行剔除；口径五：双段联动降级语义——AC-2/AC-4/AC-5 规则逐字冻结）
+- [x] Subtask 0.3: 定义端口契约（ConsultantViewPort v1.0.0 零参签名+两依赖注册名+组合根落位 :2139 邻位锚）+ 契约测试文件骨架
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态——注记型场景禁用]；epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 正向可见性口径[OD-13]）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+**归档行预置走 repo.save 直写通道**[R5 终审改钦——与报告行通道完全对称：`StrategicArchive` 实体直构造[archived_at 未来偏移可编程——dataclass 构造参数]+`archive_repository.save(entity)`[经 L2RdbPort 基类继承在册 :36+PG 实装 :191 UPSERT+`_to_model` :108-127 archived_at 实体值直传]；R3-F1 原钦定 PG model 直写通道保留为备选[ArchiveModel+session.add 亦可实施]；**禁复刻 6-7 `_archive_row` 编排通道**——其走 `service.archive_plan` 时间戳服务内部生成不可控，与 OD-13① 结构性冲突；R3-F1「ArchiveRepositoryPort 无 save 方法」系伪实证勘误[R5-F1：六扩展方法枚举漏基类四继承方法——save/get_by_id/delete/list_all 经 L2RdbPort 继承在册且服务三处生产消费 :124/:249/:443]]+报告行直写[report_repository.save——集成直写先例 6-8 `_save_report` :504-512 单参形态+实体 created_at 可编程 `_make_report_entity` :448-461 样板]+PG 三分面通道+CLI 直调 helper；**py 模块级零 consultant_view 词族 import 硬纪律**——src 符号全部延迟到步骤函数内 import[含类型注解用途——模块级 import 会使收集期 ImportError 全文件 ERROR，S7/S8 exit 2 与 S12 AssertionError 红形态全部不可达——6-9 :55-68 形态逐字复刻]；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳未来偏移判别构造**（预置归档行 archived_at 与报告行 created_at 均自基准 now 起微秒级递减——三 plan 相互判别+恒新于背景行[背景行免疫 OD-13]；find/get_latest_by_plan 均无时间窗过滤、无 6-8 审计窗「未来偏移出窗」风险——场景分立注记；禁 `now()` 双调同值形态）；**S9 背景清点步骤**（仅性能场景：预置前 distinct plan 背景数清点——skip 门[>50 跳过]专用；membership 全含断言体系无需差值基线[R2 勘误：差值法对基线后外来写入假红，废止——OD-13②]）；**pytestmark xdist_group("blm-planning-perf") 整模块挂法**（R4-F2 清偿——与全部 strategic_archives 提交型写入方[6-7 验收/集成+checkpoint 系，全仓普查实证]同 worker 串行：背景行稳定+S10 并发窗免疫的结构前提——漏挂则与 6-7 并行产生间歇假红[最难溯源形态]；6-7/6-8/6-9 同组惯例））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [x] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError）
+- [x] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——**台账形态：13 个锚位归并 10 行处置+第 11 行不登记新锚裁定=11 行**，计数口径按行[R1 勘误：原稿「共 11 条」与枚举算术 13 锚不自洽]）
+- [x] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@b9525f8b，实施前复核；本 Story 锚点表按当前 HEAD 校正 6-9 期漂移注记：6-9 故事锚组合根 analyst_view 块 :2102-2139 实测吻合）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（键契约/排序派生口径/端口/场景钉死/锚定义务）
-- [ ] 验收测试运行失败（预期行为，红阶段确认——12 场景全红；预期 S1~S6/S9/S10/S11 ImportError 形态/S7/S8 CLI 未注册 exit 2 红/S12 文件不存在 AssertionError——Task 0.6 符号表）
+- [x] 规范项全部定义完毕（键契约/排序派生口径/端口/场景钉死/锚定义务）
+- [x] 验收测试运行失败（预期行为，红阶段确认——12 场景全红；预期 S1~S6/S9/S10/S11 ImportError 形态/S7/S8 CLI 未注册 exit 2 红/S12 文件不存在 AssertionError——Task 0.6 符号表）
 
 ---
 
@@ -342,15 +342,15 @@
 | 🟢 绿 | 实现 `src/application/ports/consultant_view.py`（五 frozen dataclass+`__post_init__` 守卫+品牌两常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort Protocol v1.0.0 零参签名） |
 | 🔄 重构 | docstring 全中文 Google 风格+类型注解收口（品牌段 V1 事实断言语义+6-11 对接触发器+禁 import infra 锚注记+font_status 字面量 reportlab :60 单源注记落 VO docstring），运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 VO 键集/常量/守卫失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现五 VO+常量+端口最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化 VO 代码（None/0/() 降级值语义 docstring 化——空租户三段降级键注记）
-- [ ] Subtask 1.4: 🟡 变异 — 键集断言突变实证（删 BrandSection 一键 → exact set 红 → 还原绿；品牌常量改值 → 值级断言红）
+- [x] Subtask 1.1: 🔴 红 — 编写 VO 键集/常量/守卫失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现五 VO+常量+端口最小代码
+- [x] Subtask 1.3: 🔄 重构 — 优化 VO 代码（None/0/() 降级值语义 docstring 化——空租户三段降级键注记）
+- [x] Subtask 1.4: 🟡 变异 — 键集断言突变实证（删 BrandSection 一键 → exact set 红 → 还原绿；品牌常量改值 → 值级断言红）
 
 **完成标准/Definition of Done:**
-- [ ] 五 VO+常量+端口实现完成，键契约与 Task 0.1 冻结表逐键一致
-- [ ] TDD 循环全部通过（红绿变异三态留痕）
-- [ ] 覆盖率：新增文件 ≥95%
+- [x] 五 VO+常量+端口实现完成，键契约与 Task 0.1 冻结表逐键一致
+- [x] TDD 循环全部通过（红绿变异三态留痕）
+- [x] 覆盖率：新增文件 ≥95%（21 用例全绿——三常量值级/五键集 exact/守卫负例全枚举/frozen 纪律/零参签名全覆盖）
 
 ---
 
@@ -384,15 +384,15 @@
 | 🟢 绿 | 实现段级 try 包裹+双段联动降级（find 级+循环级两捕获位分立；warning 日志段名+异常摘要——6-8/6-9 同款） |
 | 🔄 重构 | 降级 warning 日志统一+降级值语义 docstring（「段值降默认」与「清单保留+报告列 None」两形态分立注记——AC-5 钦定） |
 
-- [ ] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 三段编排+排序派生+容错实现
-- [ ] Subtask 2.3: 🔄 重构 — 服务代码优化（品牌常量/PANEL_ARCHIVE_LIMIT 单源引用禁字面量——6-9 Subtask 2.3 投影白名单常量教训：值单源在 VO 文件常量，服务禁再镜像第二源）
-- [ ] Subtask 2.4: 🟡 变异 — 规则断言突变实证五锚（行序比较器反转 → 行序格红；latest 遮蔽判定改全量历史 → 遮蔽格红；**双段联动改单段置位**[循环异常只置 projects.degraded 不置 export.degraded] → 循环格联动断言红——OD-12 新容错形态的专属锚；find 容错改 raise → 容错格红；None 行剔除删除断言侧 → None 格红——还原后全绿）
+- [x] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 三段编排+排序派生+容错实现
+- [x] Subtask 2.3: 🔄 重构 — 服务代码优化（品牌常量/PANEL_ARCHIVE_LIMIT 单源引用禁字面量——6-9 Subtask 2.3 投影白名单常量教训：值单源在 VO 文件常量，服务禁再镜像第二源）
+- [x] Subtask 2.4: 🟡 变异 — 规则断言突变实证五锚（行序比较器反转 → 行序格红；latest 遮蔽判定改全量历史 → 遮蔽格红；**双段联动改单段置位**[循环异常只置 projects.degraded 不置 export.degraded] → 循环格联动断言红——OD-12 新容错形态的专属锚；find 容错改 raise → 容错格红；None 行剔除删除断言侧 → None 格红——还原后全绿）
 
 **完成标准/Definition of Done:**
-- [ ] 三段编排+排序派生+容错实现完成
-- [ ] TDD 循环全部通过（变异锚 5 处全实证红→还原绿留痕——含双段联动专属锚）
-- [ ] 覆盖率：服务文件 ≥95%（排序派生三分支+容错两捕获位 100%）
+- [x] 三段编排+排序派生+容错实现完成
+- [x] TDD 循环全部通过（变异锚 5 处全实证红→还原绿留痕——含双段联动专属锚）
+- [x] 覆盖率：服务文件 ≥95%（排序派生三分支+容错两捕获位 100%）
 
 ---
 
@@ -418,15 +418,15 @@
 | 🟢 绿 | 实现 CLI：`build_parser` 注册（**零 add_argument**）+分发分支+`_run_consultant_view_cli` 五步定式（无守卫步——四步实态：`_ensure_bootstrapped`→`asyncio.run`+resolve→打印→DomainError/Exception 双 except exit 1；五步定式名保留注记——去守卫步差异 docstring）+`_run_consultant_view` async 壳（finally `_close_connection_pools`）+`_print_consultant_view` 三段打印（getattr 零 VO import 形态——6-9 直系） |
 | 🔄 重构 | 输出行格式统一（「输出即契约」——空态行恒在+两行/项目形态+时间戳 `%Y-%m-%d %H:%M` 截断呈现注记） |
 
-- [ ] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
-- [ ] Subtask 3.3: 🔄 重构 — CLI 打印面优化（注册注释措辞注意：**禁出现 `--format`/`--plan-id` 字样于 consultant-view 注释块**——6-9 R1「注释字样污染 6-8 既有 getsource 块边界断言」教训预防性纪律：新注释块措辞自查不触既有命令族切块断言边界）
-- [ ] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（四锚：①项目段首行「共」改「总」②品牌注记行删除③导出提示行删除④降级标记置空——还原后全绿）
+- [x] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
+- [x] Subtask 3.3: 🔄 重构 — CLI 打印面优化（注册注释措辞注意：**禁出现 `--format`/`--plan-id` 字样于 consultant-view 注释块**——6-9 R1「注释字样污染 6-8 既有 getsource 块边界断言」教训预防性纪律：新注释块措辞自查不触既有命令族切块断言边界）
+- [x] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（四锚：①项目段首行「共」改「总」②品牌注记行删除③导出提示行删除④降级标记置空——还原后全绿）
 
 **完成标准/Definition of Done:**
-- [ ] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
-- [ ] TDD 循环全部通过（变异锚 4 处全实证）
-- [ ] 覆盖率：用例 100%/CLI 新增面 ≥90%
+- [x] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
+- [x] TDD 循环全部通过（变异锚 4 处全实证）
+- [x] 覆盖率：用例 100%/CLI 新增面 ≥90%
 
 ---
 
@@ -436,14 +436,14 @@
 
 > **性质说明：** 契约级守护复跑+新增端口契约测试定稿——非功能实现 Task。
 
-- [ ] Subtask 4.1: 端口契约测试五断言族复跑确认（禁改断言——改动需回 Task 3 循环重走红绿；注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 两依赖注册名锚/resolve 可达 isinstance/方法签名零参——`test_port_contract_analyst_view.py` 逐段对齐；签名断言 `build_consultant_view` == {self} 零参——与 6-8/6-9 {self, plan_id} 分立注记）
-- [ ] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` 6 passed——_FROZEN_EVENT_COUNT=56 零变化；event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 实证）
-- [ ] Subtask 4.3: 回归面验证（四目录全量零失败——6-7/6-8/6-9 既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配[纯新增子命令/注册块——**6-9 教训预防**：新注释块与既有 test_no_optional_arguments/getsource 切块断言边界复核]；archive_repository 既有生产码消费方**全景**[R2-F8 清偿——REST 两端点 /entries+/plans/{plan_id} 经 strategic_archive_service.query_archive :315-325 中继+StalenessWeightService 兜底链 :95-96+SummaryGenerationService 陈旧标记兜底链 :441-446] 零影响[find 既有方法消费无签名变化]；report_repository 既有消费方 executive_view_service+report_generation_service 零影响[get_latest_by_plan 消费无变化]）
-- [ ] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出；noqa/type: ignore/pylint disable 全部新增文件零输出）
+- [x] Subtask 4.1: 端口契约测试五断言族复跑确认（禁改断言——改动需回 Task 3 循环重走红绿；注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 两依赖注册名锚/resolve 可达 isinstance/方法签名零参——`test_port_contract_analyst_view.py` 逐段对齐；签名断言 `build_consultant_view` == {self} 零参——与 6-8/6-9 {self, plan_id} 分立注记）
+- [x] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` 6 passed——_FROZEN_EVENT_COUNT=56 零变化；event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 实证）
+- [x] Subtask 4.3: 回归面验证（四目录全量零失败——6-7/6-8/6-9 既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配[纯新增子命令/注册块——**6-9 教训预防**：新注释块与既有 test_no_optional_arguments/getsource 切块断言边界复核]；archive_repository 既有生产码消费方**全景**[R2-F8 清偿——REST 两端点 /entries+/plans/{plan_id} 经 strategic_archive_service.query_archive :315-325 中继+StalenessWeightService 兜底链 :95-96+SummaryGenerationService 陈旧标记兜底链 :441-446] 零影响[find 既有方法消费无签名变化]；report_repository 既有消费方 executive_view_service+report_generation_service 零影响[get_latest_by_plan 消费无变化]）
+- [x] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出；noqa/type: ignore/pylint disable 全部新增文件零输出）
 
 **完成标准/Definition of Done:**
-- [ ] 契约测试全绿+冻结键数基线零变化
-- [ ] 四目录全量零失败（第一轮 no-cov+第二轮覆盖率——Task 7.4 承载最终确认）
+- [x] 契约测试全绿+冻结键数基线零变化
+- [x] 四目录全量零失败（第一轮 no-cov+第二轮覆盖率——Task 7.4 承载最终确认）（第一轮实测 15260 passed——既有 15000+ 面零破坏，失败项均为本 Story 新增面当时未竟态+已修复）
 
 ---
 
@@ -461,15 +461,15 @@
 | 🟢 绿 | 预置/清理通道落地（归档行+报告行 PG 直写+定向清理[行数断言]；PG 三分面按场景分组——6-8 R2-F3/6-9 直系第三连）+断言通过 |
 | 🔄 重构 | 预置工厂函数收口（`_make_archive_row`[repo.save 直写——archived_at 实体构造参数化]/`_make_report_row`——时间戳未来偏移显式构造形态固化） |
 
-- [ ] Subtask 5.1: 🔴 红 — 四场景失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
-- [ ] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-8；N+1/截断风险注记）
-- [ ] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 2 处：membership 全含断言改期望集缺一 plan → 值级红；并发篡改一路的**预置 plan 行派生值**[archive_count+1 形态——须进 membership 过滤对照面] → 子集等价性红——还原后 4 passed）
+- [x] Subtask 5.1: 🔴 红 — 四场景失败测试
+- [x] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
+- [x] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-8；N+1/截断风险注记）
+- [x] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 2 处：membership 全含断言改期望集缺一 plan → 值级红[实施注记：期望集缺员形态被首三占位断言兜底不红——断言体系三重冗余防御实证；改用期望 count 1→2 形态直接判别「各恰一行」断言活着→红]；并发篡改一路的**预置 plan 行派生值**[archive_count+1 形态——须进 membership 过滤对照面] → 子集等价性红——还原后 4 passed）
 
 **完成标准/Definition of Done:**
-- [ ] 四场景全绿（真实服务零 mock——P95<800ms 实测通过[背景量级 skip 门]+并发 20 路 subsetting 过滤对照通过[OD-13]）
-- [ ] 性能 P95 断言通过+口径声明落档
-- [ ] 覆盖率：集成新增面 ≥75%
+- [x] 四场景全绿（真实服务零 mock——P95<800ms 实测通过[背景量级 skip 门]+并发 20 路 subsetting 过滤对照通过[OD-13]）
+- [x] 性能 P95 断言通过+口径声明落档
+- [x] 覆盖率：集成新增面 ≥75%
 
 ---
 
@@ -481,16 +481,16 @@
 
 #### 架构验证测试实现（四验证器——`test_analyst_view.py` 直系样板）
 
-- [ ] Subtask 6.1: 验证器 A 落位守护（交付文件在 application 层/五 VO+两常量+端口定义于 ports 文件非服务本地/服务与用例禁本地 Protocol——AST 扫 ClassDef bases+模块级 AnnAssign 常量形态——6-9 实施攻坚教训直系）
-- [ ] Subtask 6.2: 验证器 B 零 publish 守护（服务源码 token grep `publish`/`event_publisher` 零出现+AST 零事件构造——pkgutil 强制导入 events 全子模块后 DomainEvent 子类名全集比对 Call 节点）
-- [ ] Subtask 6.3: 验证器 C 零 domain/infra 改动+依赖方向（`SERVICE_ALLOWED_PREFIXES` 白名单逐 import startswith 断言+三方禁 import frozenset+rglob 零命中结构断言——OD-11 纯三零：src/domain+src/infrastructure 双目录 consultant 词零命中——与 6-9 零命中形态直系、与 6-8 白名单形态分立注记）
-- [ ] Subtask 6.4: 验证器 D CLI 接线（源码含 `add_parser(\n        "consultant-view"` 缩进敏感锚+`args.command == "consultant-view"` 分发+`resolve("consultant_view_use_case")` 调用锚+组合根双注册块锚+**两依赖注入锚** `'"archive_repository"'`/`'"report_repository"'`）
-- [ ] Subtask 6.5: 运行完整测试套件并生成报告（ruff E/I 循环依赖检测——不引入 pylint）
-- [ ] Subtask 6.6: 🟡 变异 — 架构断言突变实证（验证器 B token grep 断言：源码临时注入 `publish` token → 测试红 → 还原绿）
+- [x] Subtask 6.1: 验证器 A 落位守护（交付文件在 application 层/五 VO+两常量+端口定义于 ports 文件非服务本地/服务与用例禁本地 Protocol——AST 扫 ClassDef bases+模块级 AnnAssign 常量形态——6-9 实施攻坚教训直系）
+- [x] Subtask 6.2: 验证器 B 零 publish 守护（服务源码 token grep `publish`/`event_publisher` 零出现+AST 零事件构造——pkgutil 强制导入 events 全子模块后 DomainEvent 子类名全集比对 Call 节点）
+- [x] Subtask 6.3: 验证器 C 零 domain/infra 改动+依赖方向（`SERVICE_ALLOWED_PREFIXES` 白名单逐 import startswith 断言+三方禁 import frozenset+rglob 零命中结构断言——OD-11 纯三零：src/domain+src/infrastructure 双目录 consultant 词零命中——与 6-9 零命中形态直系、与 6-8 白名单形态分立注记）
+- [x] Subtask 6.4: 验证器 D CLI 接线（源码含 `add_parser(\n        "consultant-view"` 缩进敏感锚+`args.command == "consultant-view"` 分发+`resolve("consultant_view_use_case")` 调用锚+组合根双注册块锚+**两依赖注入锚** `'"archive_repository"'`/`'"report_repository"'`）
+- [x] Subtask 6.5: 运行完整测试套件并生成报告（ruff E/I 循环依赖检测——不引入 pylint）
+- [x] Subtask 6.6: 🟡 变异 — 架构断言突变实证（验证器 B token grep 断言：源码临时注入 `publish` token → 测试红 → 还原绿）
 
 **完成标准/Definition of Done:**
-- [ ] 四验证器全绿（任何违规即测试失败）
-- [ ] 循环依赖检测用 ruff/isort
+- [x] 四验证器全绿（任何违规即测试失败）
+- [x] 循环依赖检测用 ruff/isort
 
 ---
 
@@ -506,15 +506,15 @@
 | 🟢 绿 | 编写 `test_acceptance_consultant_view.py` 收尾 BDD 步骤（`_COMPLETION_SRC_FILES`/`_COMPLETION_TEST_FILES` dict 常量+`path.is_file()` 断言——6-7/6-8/6-9 S12 形态第四连） |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 7.1: 场景 12 — 验证 `src` 完成清单的逐项确认
-- [ ] Subtask 7.2: 场景 12 — 验证四测试目录完成清单的逐项确认
-- [ ] Subtask 7.3: 运行开发结束验收测试并确认通过（12/12 场景全绿）
-- [ ] Subtask 7.4: 运行 `pytest` 四目录全量、`ruff check`+`ruff format --check`、`mypy` 进行收尾校验+deferred-work 处置注记终检（Task 0.7 11 条落档确认）+纯三零 git diff 实证（src/domain+src/infrastructure+src/interfaces 三目录零 diff）
+- [x] Subtask 7.1: 场景 12 — 验证 `src` 完成清单的逐项确认
+- [x] Subtask 7.2: 场景 12 — 验证四测试目录完成清单的逐项确认
+- [x] Subtask 7.3: 运行开发结束验收测试并确认通过（12/12 场景全绿）
+- [x] Subtask 7.4: 运行 `pytest` 四目录全量、`ruff check`+`ruff format --check`、`mypy` 进行收尾校验+deferred-work 处置注记终检（Task 0.7 11 条落档确认——实测 14 锚位逐行追加=先例行内注记形态，台账 10 行归并口径+第 11 行不登记裁定在锚定义务清单表）+纯三零 git diff 实证（src/domain+src/infrastructure+src/interfaces 三目录零 diff）
 
 **完成标准/Definition of Done:**
-- [ ] `src` 与四测试目录完成清单已逐项验证确认
-- [ ] 开发结束验收测试通过（12/12 场景全绿）
-- [ ] Story 可进入 `review`
+- [x] `src` 与四测试目录完成清单已逐项验证确认
+- [x] 开发结束验收测试通过（12/12 场景全绿）
+- [x] Story 可进入 `review`
 
 ---
 
@@ -645,13 +645,13 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 - **实施攻坚预防**（6-9 五项教训前置）：注释措辞纪律（禁 `--plan-id`/`--format` 字样入新注释块——防 getsource 切块断言边界污染）/BDD 步骤文本重复绑定合并自足/时间戳显式偏移构造（6-8 出窗教训）/ruff format 提交前亲验/集成 collection 场景级生命周期幂等
 
 **应用到本故事/Applied to This Story:**
-- [ ] 18 组关键锚点主会话亲验（创建期已执行——锚点表承载）
-- [ ] 两既有端口零演进+组合消费（OD-5/OD-10）
-- [ ] 段级容错+双段联动+空态幂等读第六连（AC-5/OD-12）
-- [ ] 投影白名单/exact set/恒等式三联/行序判别/遮蔽格五类断言形态（Task 2 矩阵）
-- [ ] CLI 双清+禁二次 bootstrap（S7/S8）
-- [ ] 性能三段口径差声明（OD-8）
-- [ ] 全程禁抑制注释+提交信息禁 AI 署名+三红线 grep
+- [x] 18 组关键锚点主会话亲验（创建期已执行——锚点表承载）
+- [x] 两既有端口零演进+组合消费（OD-5/OD-10）
+- [x] 段级容错+双段联动+空态幂等读第六连（AC-5/OD-12）
+- [x] 投影白名单/exact set/恒等式三联/行序判别/遮蔽格五类断言形态（Task 2 矩阵）
+- [x] CLI 双清+禁二次 bootstrap（S7/S8）
+- [x] 性能三段口径差声明（OD-8）
+- [x] 全程禁抑制注释+提交信息禁 AI 署名+三红线 grep
 
 ### 其他约束速查
 
@@ -777,13 +777,42 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 完成清单 Completion Notes List
 
-- [ ] 故事需求从 `epics_v1.0.md` 提取（L2476-2516+依赖行 L656/L2020/L2035）
-- [ ] 架构约束从 architecture.md/arch-appendix.md/interface-design.md 提取（三视图表陈旧口径+Schema per Tenant 未实现注记）
-- [ ] 前一个故事学习经验整合（6-9 五轮双审查收敛样板+6-8 段级容错+6-5a 并发+实施攻坚五项预防）
-- [ ] 状态设置为 `ready-for-dev`
-- [ ] SDD+TDD 融合开发要求定义完成（五 VO 键契约/排序派生口径/12 场景/Task 0~7 共 8 Task）
-- [ ] 项目结构对齐统一规范（纯三零 Story 第二连+src 面 3 新建+2 扩展）
-- [ ] 四 Agent 并行调研（报告白标数据面/多项目快照面/CLI 组合根 R6 模板/治理面与边界）+ 主会话 18 组关键锚点亲验
+- [x] 故事需求从 `epics_v1.0.md` 提取（L2476-2516+依赖行 L656/L2020/L2035）
+- [x] 架构约束从 architecture.md/arch-appendix.md/interface-design.md 提取（三视图表陈旧口径+Schema per Tenant 未实现注记）
+- [x] 前一个故事学习经验整合（6-9 五轮双审查收敛样板+6-8 段级容错+6-5a 并发+实施攻坚五项预防）
+- [x] 状态设置为 `ready-for-dev`
+- [x] SDD+TDD 融合开发要求定义完成（五 VO 键契约/排序派生口径/12 场景/Task 0~7 共 8 Task）
+- [x] 项目结构对齐统一规范（纯三零 Story 第二连+src 面 3 新建+2 扩展）
+- [x] 四 Agent 并行调研（报告白标数据面/多项目快照面/CLI 组合根 R6 模板/治理面与边界）+ 主会话 18 组关键锚点亲验
+
+### dev-story 实施摘要 Implementation Summary（2026-11-08 dev-story 执行）
+
+**交付面**（src 3 新建+2 扩展/tests 8 新建+1 扩展——与项目结构图零偏差）：
+- `src/application/ports/consultant_view.py`——五 VO（5/4/6/5/7 键与 Task 0.1 冻结表逐键一致）+三常量（BRAND_STATUS_UNCONFIGURED/BRAND_FONT_STATUS/PANEL_ARCHIVE_LIMIT=1000）+LATEST_REPORT_TYPE_DOMAIN 值域 frozenset 单源+ConsultantViewPort v1.0.0 零参签名
+- `src/application/services/consultant_view_service.py`——三段编排（`_build_projects_section` find 全量→None 剔除→分组→循环 get_latest_by_plan→两趟稳定排序；`_build_brand_section` 零 IO 常量构造；`_build_export_section` 纯投影派生[入参=summaries+file_paths 映射——ProjectSummary 白名单不含 file_path，映射是循环结果组成部分]）+双段联动容错（find 级段值降默认/循环级行级 None——两捕获位分立）+单时间锚
+- `src/application/use_cases/get_consultant_view.py`——零参透传（无守卫面——OD-3 零输入零畸形面；无守卫面注记测试 inspect.getsource 零 EntityValidationError token 承载）
+- `src/entrypoints/agent_cli.py`——consultant-view 零 add_argument 注册（CLI 族首个）+分发+`_run_consultant_view` 异步壳+`_print_consultant_view` 三段打印（getattr 零 VO import）+`_run_consultant_view_cli` 四步实态（五步定式名保留 docstring 差异注记）
+- `src/composition_root.py`——双注册块（consultant_view_service/use_case 均 SINGLETON，两 SCOPED 依赖 resolve——OD-10）
+
+**TDD 全循环实证**（红→绿→重构→变异四态留痕）：
+- Task 1 VO：21 用例（红=ModuleNotFoundError 21 failed→绿→变异①删 BrandSection.font_status 双红+②常量改值双红→还原绿）
+- Task 2 服务：18 用例（红=18 failed→绿→变异五锚[行序反转三格红/遮蔽改全量三格红/双段联动改单段两格红/find 容错改 raise 一格红/None 剔除移除一格红]→还原绿）
+- Task 3 用例+CLI：用例 4+契约 6+CLI 8 用例（红=9 failed→绿→变异四锚[共→总两红/品牌注记删除红/导出提示删除红/降级标记置空红]→还原绿；期间一次 Edit 误删 projects_section 赋值行即测得 8 failed 修复——回归防护有效性实证）
+- Task 5 集成：4 场景全绿（变异两锚[membership count 1→2 红/并发篡改一路派生值红]——原拟「期望集缺员」形态被断言体系三重冗余兜底不红，改 count 形态直接判别，实施注记留档）
+- Task 6 架构：四验证器 13 用例绿（变异 publish token 注入红→还原绿）
+
+**实施攻坚两项**（真缺陷修复）：
+1. 预置时间戳单基准锚：初版 `_future_offset` 逐行取 now——微秒级偏移被调用间漂移淹没（集成场景①首三降序断言红实证捕获），修正为 `_preset_anchor()` 单一基准+偏移函数（六预置函数全注入——「禁 now() 双调」纪律的变体形态教训）
+2. A 面回查不可见：S1/S4 `latest_pdf` 三键原经独立连接回查预置行——A 面（set_session 事务内未提交）对独立连接不可见（回查 None 红），修正为预置侧登记定位三元组（report_id/file_path/created_at ISO）断言直推——「值级直推」更纯形态
+
+**验证收官**：
+- 验收 12/12 场景全绿（S1~S12——S12 完成清单随 Task 6 架构文件落位转绿）
+- 集成 4 场景全绿（真实双源 round-trip/空态/P95 实测远低门限/并发 20 路子集过滤对照）
+- 四目录全量两轮：第一轮 15260 passed+6 failed（全为本 Story 当轮未竟态）→第二轮 **15280 passed+2 skipped 零失败**
+- 覆盖率：新增三 src 文件 100%（63+59+8 语句全覆盖——json 报告实测，≥95% 门禁达成）
+- ruff check+format --check 全仓过；mypy 765 文件零错误（基线 762+新增 3）
+- 纯三零 git diff 实证：src/domain+src/infrastructure+src/interfaces 三目录零 diff 零未跟踪
+- deferred-work 14 锚位处置注记落档（Task 0.7——逐锚行内追加=6-9 先例形态）
 
 ### 文件清单 File List
 
@@ -793,22 +822,22 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 **修改的文件/Modified Files:**
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 6-10 状态流转 backlog→ready-for-dev
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/application/ports/consultant_view.py` - 五 VO+品牌两常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort
-- `src/application/services/consultant_view_service.py` - 三段编排+排序派生+双段联动容错
-- `src/application/use_cases/get_consultant_view.py` - 用例（零参透传）
-- `src/entrypoints/agent_cli.py` - consultant-view 子命令（扩展——零参数）
-- `src/composition_root.py` - 双注册块（扩展——:2139 邻位）
-- `tests/unit/application/test_consultant_view_vos.py` - VO 单测
-- `tests/unit/application/test_consultant_view_service.py` - 服务单测（排序派生矩阵+容错矩阵）
-- `tests/unit/application/use_cases/test_consultant_view_use_case.py` - 用例单测
-- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 单测（扩展）
-- `tests/unit/architecture/test_consultant_view.py` - 架构验证（四验证器）
-- `tests/integration/test_integration_consultant_view.py` - 集成测试（四场景）
-- `tests/contracts/test_port_contract_consultant_view.py` - 端口契约测试（五断言族）
-- `tests/acceptance/test_acceptance_consultant_view.feature` - Gherkin 场景（12 场景——R6 模板）
-- `tests/acceptance/test_acceptance_consultant_view.py` - BDD 步骤实现（6-9 R6 合规形态）
-- `_bmad-output/implementation-artifacts/deferred-work.md` - 11 条锚定义务处置注记（扩展）
+**待创建的文件/To Be Created (Dev Story 实施):** —— 已全部创建/扩展（2026-11-08 dev-story 完成）
+- `src/application/ports/consultant_view.py` - 五 VO+品牌两常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort ✅
+- `src/application/services/consultant_view_service.py` - 三段编排+排序派生+双段联动容错 ✅
+- `src/application/use_cases/get_consultant_view.py` - 用例（零参透传） ✅
+- `src/entrypoints/agent_cli.py` - consultant-view 子命令（扩展——零参数） ✅
+- `src/composition_root.py` - 双注册块（扩展——:2139 邻位） ✅
+- `tests/unit/application/test_consultant_view_vos.py` - VO 单测 ✅（21 用例）
+- `tests/unit/application/test_consultant_view_service.py` - 服务单测（排序派生矩阵+容错矩阵） ✅（18 用例）
+- `tests/unit/application/use_cases/test_consultant_view_use_case.py` - 用例单测 ✅（4 用例）
+- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 单测（扩展） ✅（+8 用例族）
+- `tests/unit/architecture/test_consultant_view.py` - 架构验证（四验证器） ✅（13 用例）
+- `tests/integration/test_integration_consultant_view.py` - 集成测试（四场景） ✅
+- `tests/contracts/test_port_contract_consultant_view.py` - 端口契约测试（五断言族） ✅（6 用例）
+- `tests/acceptance/test_acceptance_consultant_view.feature` - Gherkin 场景（12 场景——R6 模板） ✅
+- `tests/acceptance/test_acceptance_consultant_view.py` - BDD 步骤实现（6-9 R6 合规形态） ✅
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 11 条锚定义务处置注记（扩展） ✅（14 锚位行内追加）
 
 ---
 
@@ -915,18 +944,19 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
+- [x] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-7/6-8/6-9 五轮形态——R1 四视角调研+双审查/R2 回归+组合/R3 单深度/R4 纯验证/R5 独立终审；五轮收敛 v1.3.2——收敛声明见 Docs Review Fixes 节；六提交 486fb0e1→85706c14→8366d2af→72d8291a→本收敛提交）
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施（2026-11-08 完成——Task 0~7 全勾：12/12 验收全绿+四目录全量 15280 passed+2 skipped 零失败+新增三 src 文件覆盖率 100%+mypy 765 零错+变异 13 锚全实证+纯三零 diff 实证——详 Dev Agent Record 实施摘要）
 - [ ] 运行 `code-review` 进行代码审查（auto-marks done）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.3.2
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
+- v1.4.0: dev-story 实施完成 in-progress→review（Task 0~7 全勾+DoD 全过）。交付面：五 VO+三常量+值域 frozenset+ConsultantViewPort 零参+三段编排服务（两趟稳定排序+latest 遮蔽+双段联动容错）+零参透传用例+CLI consultant-view（族首个零 add_argument）+组合根双注册；验收 12/12+集成 4/4+四目录全量 15280 passed+2 skipped 零失败；变异 13 锚全实证（VO 2+服务 5+CLI 4+集成 2+架构 1）；实施攻坚两项留痕（预置时间戳单基准锚——逐行取 now 微秒漂移真缺陷[A 面回查不可见→预置侧登记直推]）；新增三 src 文件覆盖率 100%+mypy 765 零错+ruff 全仓过+纯三零 diff 实证+deferred-work 14 锚位处置落档
 - v1.3.2: 文档审查 Round 5 独立终审+收敛（不轻信自报六节取证——双向取证 12 项[11 过 1 证伪]+全文终扫+门禁/收敛判据；特权发现 2 项随收敛提交清偿）：**R5-F1**[P1] R3-F1「ArchiveRepositoryPort 无 save」伪实证勘误（六扩展方法枚举漏 L2RdbPort 基类四继承方法——save :36/:110-115/:191/服务三处消费四重证据；改钦 repo.save 对称通道五处联动+R3-F1 台账勘误内联——端口方法枚举须含基类继承面教训留档）；R5-F2[P2] OD-13 尾句 S6 复述双升格联动（membership 措辞+绊线语义）；收敛声明入档（五轮六提交 36 项处置=P0×3+P1×14+P2×8+P3×8+证伪×3；收敛判据五节全过；Next Steps 循环项勾选——**放行 dev-story**）
 - v1.3.1: 文档审查 Round 4（纯验证+双 Agent 晚归发现清偿轮——R2-A 回归核查 6 项开放+R2-B 组合推演 5 项新发现[事实基座：全仓提交型写入方普查+xdist 拓扑+时间戳构造普查]）：**R4-F1**[P1] Task 4.3 消费方全景清偿+5 项 P3 欠账；**R4-F2**[P1] Task 0.5 漏列 pytestmark xdist_group 硬纪律（提交型写入方全组串行的窗口免疫结构前提+前向约束登记）；R4-F3[P2] S6 诚实重标「单源契约绊线」（ReportRepository 无 plan 枚举 API——变异无实现通道，判别力面向未来端口扩展）；R4-F4 S8 更名；R4-F5 占首三未登记假设补强；R4-F6 值域守卫 6-11 对称注记+raise 落位钦定；三轴验证全过（锚点 8/8+计数终扫+版本一致）
 - v1.3.0: 文档审查 Round 3（单深度推演——主会话直执：12 场景最终态复推/预置通道深水区/可写性验证）——2 项处置：**R3-F1** 归档行预置通道钦定错误（6-7 `_archive_row` 编排通道 archived_at 不可编程+ArchiveRepositoryPort 无 save 方法——与 OD-13① 未来偏移结构性冲突；钦定 PG model 直写通道五处联动）；R3-F2 017 无 FK 证伪留痕（S6 任意 UUID 报告行可写）

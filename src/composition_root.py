@@ -2138,6 +2138,44 @@ def bootstrap() -> None:
         tags=("analyst", "use_case", "application"),
     )
 
+    # === Story 6-10: Consultant View（顾问视图三段聚合——纯读侧零事件）===
+    # SINGLETON 捕获两 SCOPED 依赖声明（OD-10）：archive_repository（SCOPED v1.1.0）+
+    # report_repository（SCOPED v1.0.0）的两 SCOPED 无混态最简捕获（6-8 三 SCOPED+
+    # 一 SINGLETON/6-9 两 SINGLETON+一 SCOPED 后的最简形态）——CLI 一次性进程 +
+    # 测试双清下无故障面（三连注记先例）；未来 7-2 长驻 REST 面改 SCOPED 触发器注记。
+    # 两依赖全既有注册名消费（零新仓储成员/零 infra 面——OD-11 纯三零第二连）。
+    from src.application.ports.consultant_view import ConsultantViewPort
+    from src.application.services.consultant_view_service import ConsultantViewService
+
+    register_port(
+        name="consultant_view_service",
+        version="v1.0.0",
+        interface=ConsultantViewPort,
+        impl=lambda resolver: ConsultantViewService(
+            archive_repository=resolver.resolve("archive_repository"),
+            report_repository=resolver.resolve("report_repository"),
+        ),
+        module="src.application.services.consultant_view_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("consultant", "view", "application"),
+    )
+
+    from src.application.use_cases.get_consultant_view import GetConsultantViewUseCase
+
+    register_port(
+        name="consultant_view_use_case",
+        version="v1.0.0",
+        interface=GetConsultantViewUseCase,
+        impl=lambda resolver: GetConsultantViewUseCase(
+            view_service=resolver.resolve("consultant_view_service"),
+        ),
+        module="src.application.use_cases.get_consultant_view",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("consultant", "use_case", "application"),
+    )
+
     # === ArchiveValidityHandler — 档案有效期事件处理器（Story 3.11/3.12）===
     from src.application.event_handlers.archive_handlers import ArchiveValidityHandler
 

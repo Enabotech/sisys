@@ -3662,3 +3662,228 @@ class TestAnalystViewExecution:
 
         assert exit_code == 0
         assert "降级 stage: 2" in capsys.readouterr().out.splitlines()
+
+
+# ===================================================================
+# === Story 6-10: consultant-view 子命令（顾问交付入口——零参数全局视图）===
+# ===================================================================
+
+
+def _make_stub_consultant_view(
+    *,
+    plans: tuple = (
+        (
+            "11111111-1111-4111-8111-111111111111",
+            3,
+            "2026-11-08T10:00:00.000300+00:00",
+            "pdf",
+            "2026-11-08T10:00:00.000060+00:00",
+            2,
+        ),
+        (
+            "22222222-2222-4222-8222-222222222222",
+            2,
+            "2026-11-08T09:00:00.000090+00:00",
+            "markdown",
+            "2026-11-08T09:00:00.000040+00:00",
+            1,
+        ),
+    ),
+    plan_count: int | None = None,
+    projects_degraded: bool = False,
+    build_degraded: bool = False,
+    plans_with_reports: int | None = None,
+    plans_with_latest_pdf: int | None = None,
+    latest_pdf_plan_id: str | None = "11111111-1111-4111-8111-111111111111",
+    latest_pdf_object_key: str | None = "reports/plan/rid.pdf",
+) -> Any:
+    """consultant-view 视图替身工厂（getattr 零 VO import——SimpleNamespace 造 VO 树）.
+
+    plans 五元组：(plan_id, archive_count, latest_activity_at, latest_report_type,
+    latest_report_at, latest_degraded_section_count)。
+    """
+    from types import SimpleNamespace
+
+    rows = tuple(
+        SimpleNamespace(
+            plan_id=plan_id,
+            archive_count=count,
+            latest_activity_at=activity,
+            latest_report_type=report_type,
+            latest_report_at=report_at,
+            latest_degraded_section_count=degraded_sections,
+        )
+        for plan_id, count, activity, report_type, report_at, degraded_sections in plans
+    )
+    projects = SimpleNamespace(
+        available=len(rows) > 0,
+        degraded=projects_degraded,
+        plan_count=plan_count if plan_count is not None else len(rows),
+        projects=rows,
+    )
+    brand = SimpleNamespace(
+        degraded=False,
+        configured=False,
+        logo_status="未配置（系统默认）",
+        color_scheme_status="未配置（系统默认）",
+        font_status="STSong-Light（内置）",
+    )
+    export = SimpleNamespace(
+        available=(plans_with_reports if plans_with_reports is not None else 2) > 0,
+        degraded=projects_degraded,
+        plans_with_reports=plans_with_reports if plans_with_reports is not None else 2,
+        plans_with_latest_pdf=plans_with_latest_pdf if plans_with_latest_pdf is not None else 1,
+        latest_pdf_plan_id=latest_pdf_plan_id,
+        latest_pdf_object_key=latest_pdf_object_key,
+        latest_pdf_generated_at="2026-11-08T10:00:00.000060+00:00" if latest_pdf_plan_id else None,
+    )
+    return SimpleNamespace(
+        generated_at="2026-11-08T10:00:01+00:00",
+        build_degraded=build_degraded,
+        projects=projects,
+        brand=brand,
+        export=export,
+    )
+
+
+class _StubConsultantViewUseCase:
+    """consultant-view 用例替身（记录调用/可编程视图或异常——_StubAnalystViewUseCase 同款形态）."""
+
+    def __init__(self, view: Any = None, error: Exception | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._view = view
+        self._error = error
+
+    async def execute(self) -> Any:
+        self.calls.append({})
+        if self._error is not None:
+            raise self._error
+        return self._view
+
+
+def _patch_consultant_view_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubConsultantViewUseCase) -> None:
+    """monkeypatch agent_cli 模块级 bootstrap/resolve（每命令族专用 patcher 纪律——6-8 R1-F11/6-9 第三连）."""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+class TestConsultantViewParser:
+    """consultant-view 参数解析（零参数面真空——CLI 族首个零 add_argument 命令）."""
+
+    def test_parses_command(self) -> None:
+        """注册锚：build_parser 识别 consultant-view 子命令（零参数可裸调）."""
+        args = agent_cli.build_parser().parse_args(["consultant-view"])
+        assert args.command == "consultant-view"
+
+    def test_any_argument_exits_2(self) -> None:
+        """任意参数 → argparse unrecognized exit 2（参数面真空——多项目面板无过滤/分页需求 YAGNI）."""
+        with pytest.raises(SystemExit) as exc_info:
+            agent_cli.build_parser().parse_args(["consultant-view", "--plan-id", "x"])
+        assert exc_info.value.code == 2
+
+    def test_zero_add_argument_calls(self) -> None:
+        """零参数面 getsource 断言：注册块内零 add_argument 调用（与 isolation-logs 可选参数面分立）."""
+        import inspect
+
+        source = inspect.getsource(agent_cli.build_parser)
+        block = source.split('add_parser(\n        "consultant-view"')[1].split("add_parser(")[0]
+        assert "add_argument" not in block, "参数面真空（首个零 add_argument 命令——AC-6 钦定）"
+
+
+class TestConsultantViewExecution:
+    """consultant-view 执行（三段打印+退出语义——输出即契约纯标准库 print）."""
+
+    def test_full_data_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """全数据：首行+三段分隔行+项目行两行形态+品牌两行+导出三行+提示行+exit 0."""
+        view = _make_stub_consultant_view()
+        stub = _StubConsultantViewUseCase(view)
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 0
+        assert stub.calls, "用例应被调用（零参 execute）"
+        lines = capsys.readouterr().out.splitlines()
+        assert "顾问视图（全局多项目面板）" in lines, f"首行应精确（实测={lines!r}）"
+        for separator in ("── 多项目概况 ──", "── 品牌配置 ──", "── 白标导出 ──"):
+            assert separator in lines, f"三段分隔行缺失 {separator}"
+        assert "项目: 共 2 个" in lines
+        assert "  11111111-1111-4111-8111-111111111111 | 归档: 3 | 最新活动: 2026-11-08 10:00" in lines
+        assert "    最新报告: pdf（2026-11-08 10:00，降级小节 2）" in lines, "两行形态（信息密度呈现拆两行）"
+        assert "    最新报告: 无" not in lines, "有报告行不降无报告行"
+        assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in lines
+        assert "提示: 品牌模板配置归 Story 6-11（白标报告基础）" in lines, "品牌注记行恒在（6-11 对接锚呈现面）"
+        assert "可交付: 2 项目有报告 | 最新 PDF: 1 项目" in lines
+        assert "  最新 PDF: 11111111-1111-4111-8111-111111111111" in lines
+        assert "  对象键: reports/plan/rid.pdf" in lines
+        assert "提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF" in lines
+
+    def test_empty_state_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空态：项目共 0 后无行+品牌两行恒在+导出空态行+exit 0（空态是正常态）."""
+        view = _make_stub_consultant_view(
+            plans=(),
+            plan_count=0,
+            plans_with_reports=0,
+            plans_with_latest_pdf=0,
+            latest_pdf_plan_id=None,
+            latest_pdf_object_key=None,
+        )
+        stub = _StubConsultantViewUseCase(view)
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        head = lines.index("项目: 共 0 个")
+        brand_separator = lines.index("── 品牌配置 ──")
+        project_body = lines[head + 1 : brand_separator]
+        assert project_body == [], f"空态项目计数行与品牌段之间应无任何行（实测 {project_body!r}）"
+        assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in lines
+        assert "可交付: 0 项目有报告 | 最新 PDF: 0 项目" in lines
+        assert "  最新 PDF: 无" in lines, "零 PDF 定位行降无"
+
+    def test_zero_report_plan_row(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """零报告 plan 行：最新报告行降「无」（有活动无交付物形态）."""
+        view = _make_stub_consultant_view(
+            plans=(("33333333-3333-4333-8333-333333333333", 1, "2026-11-08T08:00:00.000070+00:00", None, None, None),),
+            plan_count=1,
+            plans_with_reports=0,
+            plans_with_latest_pdf=0,
+            latest_pdf_plan_id=None,
+            latest_pdf_object_key=None,
+        )
+        stub = _StubConsultantViewUseCase(view)
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert "  33333333-3333-4333-8333-333333333333 | 归档: 1 | 最新活动: 2026-11-08 08:00" in lines
+        assert "    最新报告: 无" in lines, "零报告行降无报告行"
+
+    def test_degraded_mark_and_single_line(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """降级标记+段降级行：build_degraded 首行追加标记；projects 段降级降「项目清单获取失败」单行."""
+        view = _make_stub_consultant_view(projects_degraded=True, build_degraded=True)
+        stub = _StubConsultantViewUseCase(view)
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert "顾问视图（全局多项目面板）（部分数据降级）" in lines, "首行含顶层降级标记（6-8/6-9 直系）"
+        assert "项目清单获取失败" in lines, "项目段降级行"
+
+    def test_domain_error_stderr_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """用例抛 DomainError → stderr [EXCEPTION_ 前缀+exit 1（防御性兜底——段级容错下不可达，兜底结构照设）."""
+        from src.domain.exceptions import PlanningNotFoundError
+
+        stub = _StubConsultantViewUseCase(error=PlanningNotFoundError(plan_id="11111111-1111-4111-8111-111111111111"))
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 1
+        assert "[EXCEPTION_" in capsys.readouterr().err

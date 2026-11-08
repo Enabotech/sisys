@@ -579,6 +579,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="规划任务标识（UUID 字符串）",
     )
 
+    # Story 6-10: consultant-view 扁平子命令（顾问视图三段聚合——多项目/品牌/导出；
+    # CLI 顾问交付入口；零参数面真空（CLI 族首个无参数定义命令：多项目面板本义
+    # 跨 plan，无过滤/分页需求来源——YAGNI；与 isolation-logs 的可选过滤面分立）
+    subparsers.add_parser(
+        "consultant-view",
+        help="顾问视图（多项目概况/品牌配置状态/白标导出概况三段聚合——Story 6-10）",
+    )
+
     isolation_status = subparsers.add_parser(
         "isolation-status",
         help="查询 Agent EIP 隔离状态（等级 + 三维度策略 + 时间与触发原因）",
@@ -1734,6 +1742,103 @@ def _run_analyst_view_cli(plan_id: str) -> int:
         return 1
 
 
+# ===================================================================
+# Story 6-10: consultant-view 子命令（顾问交付入口——零参数全局视图+三段打印）
+# ===================================================================
+async def _run_consultant_view() -> Any:
+    """consultant-view 异步执行壳（resolve consultant_view_use_case——Story 6-10）。
+
+    resolve 入 try（代码审查 R1-F17——同 _run_analyst_view 注记）。
+    """
+    try:
+        use_case = resolve("consultant_view_use_case")
+        return await use_case.execute()
+    finally:
+        await _close_connection_pools()
+
+
+def _print_consultant_view(view: Any) -> None:
+    """顾问视图打印（三段分隔行+逐项目两行形态+品牌两行+导出定位——输出即契约，纯标准库 print）。
+
+    零参数全局面板：项目行含全库行（共享库背景行照常计入输出——CLI 呈现本义）；
+    时间戳呈现 ISO 截断 %Y-%m-%d %H:%M（分钟粒度——信息密度呈现形态）；段降级
+    形态：projects 段降级降「项目清单获取失败」单行（brand 两行恒在——零 IO 恒稳；
+    export 段值级降 0/无照常呈现）。getattr 形态零 VO import 依赖（6-3/6-8/6-9 先例）。
+    """
+    degraded_mark = "（部分数据降级）" if getattr(view, "build_degraded", False) else ""
+    print(f"顾问视图（全局多项目面板）{degraded_mark}")
+
+    projects_section = getattr(view, "projects", None)
+    print("── 多项目概况 ──")
+    if getattr(projects_section, "degraded", False):
+        print("项目清单获取失败")
+    else:
+        print(f"项目: 共 {getattr(projects_section, 'plan_count', 0)} 个")
+        for row in getattr(projects_section, "projects", None) or ():
+            activity = getattr(row, "latest_activity_at", None)
+            activity_text = activity[:16].replace("T", " ") if activity else "未知"
+            print(f"  {getattr(row, 'plan_id', '')} | 归档: {getattr(row, 'archive_count', 0)} | 最新活动: {activity_text}")
+            report_type = getattr(row, "latest_report_type", None)
+            if report_type is None:
+                print("    最新报告: 无")
+            else:
+                report_at = getattr(row, "latest_report_at", None)
+                report_at_text = report_at[:16].replace("T", " ") if report_at else "未知"
+                degraded_sections = getattr(row, "latest_degraded_section_count", None)
+                degraded_text = f"，降级小节 {degraded_sections}" if degraded_sections is not None else ""
+                print(f"    最新报告: {report_type}（{report_at_text}{degraded_text}）")
+
+    brand = getattr(view, "brand", None)
+    print("── 品牌配置 ──")
+    print(
+        f"品牌模板: {getattr(brand, 'logo_status', '未配置（系统默认）')}"
+        " | Logo: 默认 | 配色: 默认"
+        f" | 字体: {getattr(brand, 'font_status', 'STSong-Light（内置）')}"
+    )
+    print("提示: 品牌模板配置归 Story 6-11（白标报告基础）")
+
+    export = getattr(view, "export", None)
+    print("── 白标导出 ──")
+    print(
+        f"可交付: {getattr(export, 'plans_with_reports', 0)} 项目有报告"
+        f" | 最新 PDF: {getattr(export, 'plans_with_latest_pdf', 0)} 项目"
+    )
+    latest_pdf_plan = getattr(export, "latest_pdf_plan_id", None)
+    if latest_pdf_plan is None:
+        print("  最新 PDF: 无")
+    else:
+        print(f"  最新 PDF: {latest_pdf_plan}")
+        print(f"  对象键: {getattr(export, 'latest_pdf_object_key', '')}")
+    print("提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF")
+
+
+def _run_consultant_view_cli() -> int:
+    """consultant-view 子命令执行（五步定式名保留——实态四步去守卫步，Task 3 docstring 差异注记）。
+
+    零输入零守卫面（OD-3）：无 plan_id 输入——畸形守卫步语义自然缺席（零输入即
+    零畸形面，非缺失——6-8/6-9 连续两 Story UUID 守卫后的设计结果）；四步实态：
+    _ensure_bootstrapped → asyncio.run+resolve → 打印 → DomainError/Exception
+    双 except 兜底（防御性兜底——段级容错下不可达，兜底结构照设）。
+
+    Returns:
+        退出码（0=视图构建完成含空态——空态是正常态；1=业务异常；2=argparse
+        用法错误由 argparse 原生承载）。
+    """
+    try:
+        _ensure_bootstrapped()
+        view = asyncio.run(_run_consultant_view())
+        _print_consultant_view(view)
+        logger.info("顾问视图查询完成")
+        return 0
+    except DomainError as error:
+        logger.error("顾问视图查询失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("顾问视图查询异常: %s", error, exc_info=True)
+        return 1
+
+
 async def _run_checkpoint_recovery_view(plan_id: str, checkpoint_no: str) -> Any:
     """dry-run 评估数据面（resolve 既有恢复视图用例——仅取②步视图零执行）。
 
@@ -2328,6 +2433,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_executive_view_cli(args.plan_id)
     if args.command == "analyst-view":
         return _run_analyst_view_cli(args.plan_id)
+    if args.command == "consultant-view":
+        return _run_consultant_view_cli()
     if args.command == "report-generate":
         return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
     if args.command == "isolation-status":
