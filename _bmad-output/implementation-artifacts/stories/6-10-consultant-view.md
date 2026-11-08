@@ -1,6 +1,6 @@
 # Story 6-10: 顾问视图（三段聚合查询——多项目概况/品牌配置状态/白标导出概况 + CLI `consultant-view`）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -950,6 +950,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | R3-F1 | P3 | Defer 表第 1 条「VO 守卫 8 格中 3 格仅断类型」计数失实——实测 8 个 raises 块中 6 块无 code 断言（仅 :244/:255 有；按函数计 4——任何口径均非 3；主会话 grep 亲验定谳） | Defer 条计数勘误（6 块+两代表格注记） |
 | R3-F2 | P3 | 验收 :392/集成 :204 teardown docstring 裸引「R2-F3」欠「6-8」前缀——本 Story 自有审查编号止于 R2-F2，裸编号误读为自有（R1-F5 伪溯源同族欠前缀形态；同文件 :17/:32/:1059 均带前缀） | 两处补「6-8 」前缀 |
 | R3-F3 | P3 | Defer 第 9 条「archived_at 降序近似合理」未含 PG `DESC` 默认 NULLS FIRST 语义——NULL-archived_at 背景行居窗首先耗 limit 名额，membership 免疫完整前提应补「NULL 行+更新行<1000」（实测当前库 NULL=0 零暴露——纯边界注记） | Defer 条补 NULLS FIRST 边界注记 |
+| R5-F1 | P3 | 版本脚注未随 R2/R3 逐轮递增（对照 6-9 先例 R1 v1.5.0→R2 v1.5.1→R3 v1.5.2→R5 v1.6.0——本周期 R2/R3 提交信息与脚注均停留 v1.5.0，R2/R3 处置仅入 Findings 表无版本承载；R5 终审特权发现） | 收敛提交递增至 v1.6.0+单条 Change Log 合并承载 R2/R3/R4/R5+显式偏离注记（不回填虚构 v1.5.1/v1.5.2 脚注——两轮提交时点脚注确为 v1.5.0，回填属改写历史） |
 
 #### 已推迟 Defer（留档注记——非缺陷或先例一致）
 
@@ -966,6 +967,18 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 - CLI stub 工厂导出段默认值形态（无 latest_pdf_plan_id 显式 None 时的三键派生）与生产 ExportSection 构造面存在形态差——stub 内部自洽已由矛盾 VO 纪律约束（R1-F1 整形后两降级格显式置零）
 - 本地 `.env` PG 凭据失配致 CLI 真实运行多项目段降级（预存环境问题与本 Story 零交集；降级路径行为本身正确且被双测覆盖）
 
+### 📋 代码审查循环收敛声明（Round 5 终审定稿——v1.6.0 随收敛提交生效）
+
+**周期概述**：Story 6-10 dev-story 交付（52a3cb3a，17 文件 3855 行）后执行五轮代码审查循环（2026-11-08），收敛于 v1.6.0，状态 review→done。
+
+**五轮结构**：R1 四视角并行调研（A 契约符合性/B 测试判别力/C 真实通道隔离/D 运行面实测——零 P0/P1）+双评审员 C3 门禁（①优秀裁定[2×2 完备格证明]+②最小清单增补[stub 整形/DoD 补勾/六元组]）落码 9 项 → R2 回归核查+组合交互双 Agent（12 组零互拆）清偿 2 项传播漏网 → R3 单深度推演七轴（端到端异常链/共享库极端形态/ISO 字典序边界/场景终态复推/复刻差异面/Defer 生命周期/证伪三组留痕）3 项台账精度 → R4 纯验证三轴零发现零提交（78+9 passed+词根五扫零残留+锚点 3/3）→ R5 独立终审六节全过+1 项 P3 特权发现随收敛清偿。
+
+**处置统计**：周期累计 15 项处置（Findings 表 15 行 = R1×9 + R2×2 + R3×3 + R5×1）——零 P0/P1 + P2×3（R1-F1 CLI 段降级两形态分立/R1-F2 VO 空态默认零参断默认/R1-F8 DoD 补勾与分母注记）+ P3×12；Defer 留档 12 条（每条含触发条件/核销锚或风险注记）。核心修复：**OD-12 呈现面对齐**（CLI 段降级两形态分立——判别键结构不变量「服务 degraded 仅分组循环内置位⟹循环级清单恒非空」经评审员①完备格证明+R2-B 服务源码逐路径验证+R3 端到端异常链推演+突变实证四重确认）；**ExportSection 七键默认值获承载位**（find 级降级路径 load-bearing 契约）。
+
+**收敛判据达成声明**：① 周期闭合 ✅（五笔提交链[52a3cb3a/50b81608/49a00791/c1933e2a+本收敛提交]全属本 Story 变更集/工作区干净/R4 零提交合规）；② 关键修复落地 ✅（R5 双向取证 6/6——台账声称位 vs 代码现实零漂移）；③ 计数与残留终扫 ✅（File List 17/17 对合+Findings 15 行+「变异 13 锚」src/tests/sprint-status 零残留+R1-F17 本 Story 面零残留+裸 R2-F3 零残留）；④ 全量等效 ✅（R2 轮四目录 15279 passed+2 skipped[2 预存抖动隔离复跑 27 passed 甄别绿——isolation-switch-log P95 与本 Story 零交集 git 考古定谳]+R4/R5 相关面 78 passed×2 独立复现）；⑤ 零 P0/P1/P2 残留 ✅（Defer 12 条均 P3/信息级留档——「不轻信自报」终审第十一次复现）。
+
+**遗留事项**：无 P0/P1/P2/P3 代码级残留。Defer 12 条留档（含 S9 skip 门 COUNT(DISTINCT) 触发条件/VO 守卫 code 断言补强/架构 rglob 内容级升级等）；PF-1 版本簿记偏离已显式注记（R2/R3 未逐轮递增 patch——合并入 v1.6.0 承载，不回填虚构脚注）。
+
 ---
 
 ### 下一步 Next Steps
@@ -973,15 +986,16 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 - [x] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-7/6-8/6-9 五轮形态——R1 四视角调研+双审查/R2 回归+组合/R3 单深度/R4 纯验证/R5 独立终审；五轮收敛 v1.3.2——收敛声明见 Docs Review Fixes 节；六提交 486fb0e1→85706c14→8366d2af→72d8291a→本收敛提交）
 - [x] 运行 `dev-story` 开始实施（2026-11-08 完成——Task 0~7 全勾：12/12 验收全绿+四目录全量 15280 passed+2 skipped 零失败+新增三 src 文件覆盖率 100%+mypy 765 零错+变异 14 锚全实证+纯三零 diff 实证——详 Dev Agent Record 实施摘要）
-- [ ] 运行 `code-review` 进行代码审查（auto-marks done）
+- [x] 运行 `code-review` 进行代码审查（auto-marks done）（2026-11-08 完成——五轮循环收敛 v1.5.0→v1.6.0 review→done：15 项处置零 P0/P1+P2×3+P3×12+Defer 12 条留档；收敛声明见 Review Findings 节末；四笔审查提交 50b81608→49a00791→c1933e2a+收敛提交）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
+- v1.6.0: 代码审查五轮收敛 review→done（R2~R5 合并承载+R5-F1 版本簿记偏离显式注记——R2/R3 轮处置时未逐轮递增 patch 而是并入本收敛条目，不回填虚构 v1.5.1/v1.5.2 脚注）：**R2** 回归核查+组合交互双 Agent 零互拆（R2-F1 sprint-status 镜像「变异 13 锚」传播漏网勘误+R2-F2 R1-F4 台账代码域限定——双 Agent 独立同发现；全量 15279 passed+2 预存抖动隔离复跑甄别）；**R3** 单深度推演七轴全过（R3-F1 Defer 守卫计数勘误[8 块中 6 块]+R3-F2 两处 docstring 补 6-8 R2-F3 前缀+R3-F3 NULLS FIRST 边界注记；证伪三组留痕[7a 不成立=不变量确认/7b 澄清/7c 预存 git 考古]）；**R4** 纯验证三轴零发现零提交（78+9 passed+词根五扫零残留+锚点 3/3 精确）；**R5** 独立终审六节全过（周期闭合 4+1 笔提交链/关键修复双向取证 6/6/78 用例独立复跑/Defer 台账完整/文档-仓库一致/红线双口径零命中+CLI 实跑 exit 0 三段在场[附带真实验证 R1-F1 find 级分支运行面呈现]）+特权发现 R5-F1 随收敛清偿；Next Steps code-review 项勾选+Status → done；收敛声明入档（周期累计 15 项处置：零 P0/P1+P2×3+P3×12+Defer 12 条留档）
 - v1.5.0: 代码审查 Round 1（四视角并行调研+双评审员 C3 门禁——评审①裁定优秀[2×2 完备格证明]+②最小清单增补[stub 整形/DoD 补勾/六元组]后落码）：P2×3+P3×6 落码 9 项——**R1-F1** CLI 段降级呈现拆两形态（OD-12 呈现面对齐：find 级[degraded+空清单]降获取失败单行/循环级[清单保留]照常呈现+行内「最新报告: 无」+首行标记；判别键结构不变量=服务 degraded 仅循环内置位⟹循环级清单恒非空；既有降级格整形 find 级+新增循环级格——双突变实证）；**R1-F2** VO 空态默认测试改零参裸构造断默认（ExportSection 七键默认值获承载位——突变实证）；**R1-F8** DoD 七项补勾+deferred-work 14/13 锚位分母口径注记（行数 vs 组数）；R1-F3/F7 Story 计数措辞勘误（变异 14 锚×2/两 plan 四行×2）；R1-F4/F5/F6/F9 注记卫生四小项（6-11 连字符/伪溯源编号去除/死产物行删除/六元组勘误）；留档 12 项注记（Defer 表）——运行面 D 视角全量复核属实（15280 passed/ruff+mypy 零错/覆盖 100%/纯三零）
 - v1.4.0: dev-story 实施完成 in-progress→review（Task 0~7 全勾+DoD 全过）。交付面：五 VO+三常量+值域 frozenset+ConsultantViewPort 零参+三段编排服务（两趟稳定排序+latest 遮蔽+双段联动容错）+零参透传用例+CLI consultant-view（族首个零 add_argument）+组合根双注册；验收 12/12+集成 4/4+四目录全量 15280 passed+2 skipped 零失败；变异 14 锚全实证（VO 2+服务 5+CLI 4+集成 2+架构 1）；实施攻坚两项留痕（预置时间戳单基准锚——逐行取 now 微秒漂移真缺陷[A 面回查不可见→预置侧登记直推]）；新增三 src 文件覆盖率 100%+mypy 765 零错+ruff 全仓过+纯三零 diff 实证+deferred-work 14 锚位处置落档
 - v1.3.2: 文档审查 Round 5 独立终审+收敛（不轻信自报六节取证——双向取证 12 项[11 过 1 证伪]+全文终扫+门禁/收敛判据；特权发现 2 项随收敛提交清偿）：**R5-F1**[P1] R3-F1「ArchiveRepositoryPort 无 save」伪实证勘误（六扩展方法枚举漏 L2RdbPort 基类四继承方法——save :36/:110-115/:191/服务三处消费四重证据；改钦 repo.save 对称通道五处联动+R3-F1 台账勘误内联——端口方法枚举须含基类继承面教训留档）；R5-F2[P2] OD-13 尾句 S6 复述双升格联动（membership 措辞+绊线语义）；收敛声明入档（五轮六提交 36 项处置=P0×3+P1×14+P2×8+P3×8+证伪×3；收敛判据五节全过；Next Steps 循环项勾选——**放行 dev-story**）
