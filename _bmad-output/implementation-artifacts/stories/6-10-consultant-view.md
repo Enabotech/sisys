@@ -118,16 +118,16 @@
 **Given** 全数据在位（AC-2 形态）
 **When** 执行 `sisys-agent consultant-view`（**零参数——零 add_argument（parser 无任何参数定义）**：16 命令族实测形态为 6 个 `--plan-id` 必填读命令[chain-query/checkpoint-list/checkpoint-show/trace-tree/executive-view/analyst-view]+7 个写命令[instantiate/run-task/blm-plan/report-generate/checkpoint-create/checkpoint-recover/set-isolation]+2 个 `--agent-id` 锚定读命令（load-profile :255/isolation-status :582）+1 个可选参数全局检索命令（isolation-logs :623——六参数全 required=False 可裸调但带可选过滤/分页面；6+7+2+1=16 加法闭合）；consultant-view 是**首个零 add_argument 命令**（参数面真空——与 isolation-logs 的「可裸调但带可选过滤面」分立：全局面板无过滤/分页需求来源，YAGNI，6-8/6-9 零可选参数裁定直系）
 **Then** 三段结构化输出（纯标准库 print——「输出即契约」6-8/6-9 同哲学；无 JSON 输出模式——仓内 CLI 全 stdlib print 惯例）：首行 `顾问视图（全局多项目面板）` + 三段各以 `── {段名} ──` 分隔行承载：
-- 多项目概况：`项目: 共 {plan_count} 个` + 逐项目行（`  {plan_id} | 归档: {n} | 最新活动: {YYYY-MM-DD HH:MM}` + `    最新报告: {type}（{ts}，降级小节 {n}）` 两行形态——信息密度呈现形态拆两行[非源码行宽约束——输出行 ~78 字符本不超 128]；无报告行降 `    最新报告: 无`；**段降级时**降 `项目清单获取失败` 单行）
+- 多项目概况：`项目: 共 {plan_count} 个` + 逐项目行（`  {plan_id} | 归档: {n} | 最新活动: {YYYY-MM-DD HH:MM}` + `    最新报告: {type}（{ts}，降级小节 {n}）` 两行形态——信息密度呈现形态拆两行[非源码行宽约束——输出行 ~78 字符本不超 128]；无报告行降 `    最新报告: 无`；**段降级两形态分立（OD-12 呈现面对齐——R1-F1）**：find 级[degraded+空清单——服务段值降默认]降 `项目清单获取失败` 单行；循环级[degraded+清单保留——行报告列 None]照常呈现清单[行内 `    最新报告: 无`+首行「（部分数据降级）」标记承载降级信号]）
 - 品牌配置：`品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）` + 恒在注记行 `提示: 品牌模板配置归 Story 6-11（白标报告基础）`（6-11 对接锚的呈现面——提示行恒在非降级行）
 - 白标导出：`可交付: {plans_with_reports} 项目有报告 | 最新 PDF: {n} 项目` + 最新 PDF 定位行（`  最新 PDF: {plan_id}` + `  对象键: {object_key}`——latest_pdf_plan_id None 时降 `  最新 PDF: 无`）+ 恒在提示行 `提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF`（指向既有命令——6-8 :1579「可先执行 report-generate」/6-9「执行 trace-tree」同款形态第三连）
 **And** 退出语义：正常 exit 0（含空态——空态是正常态非错误）；**验收输出断言口径（OD-13 背景行免疫）**：CLI 输出含全库行（全局视图本义），验收断言用**包含断言**（预置三 plan 的逐行输出在 stdout 中+品牌段两行+导出段行+提示行逐字 in 断言）与**格式断言**（`项目: 共 ` 前缀+` 个` 后缀模式），**不断言完整输出集/总行数**（背景行计入输出）；「空态输出=`项目: 共 0 个` 后无行」的**精确空态输出断言归 CLI 单测 stub 直构空 VO 格承载**（S8 验收面断言格式模式+brand 两行恒在+提示行恒在+exit 0）；`build_degraded` 时首行后追加 `（部分数据降级）`标记（6-8/6-9 降级标记直系——单测 stub 格承载）；DomainError 兜底 stderr `[EXCEPTION_{code}]` exit 1（防御性兜底——段级容错下不可达，兜底结构照设[名保留注记：五步定式名沿先例、实态四步去守卫步——Task 3 docstring 差异注记]）
 **And** 本 Story CLI 面无角色门槛（「顾问」是 UX 语义——查询命令族先例均无角色检查；RBAC 门槛归 7-2 REST 入口立项时评估——6-8/6-9 同款注记第三连）；**零参数与 D6-9-R1-1 命令族关系注记**：本命令无 `--plan-id` 输入面——**不入**「`*--plan-id` 命令族非 canonical UUID 观察项」波及面（deferred-work L409——该锚处置见 OD-8）
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据输出断言双承载：CLI 单测 stub 格**精确断言**（三段分隔行+项目段首行+三 plan 六行两行/项目形态+品牌两行+导出三行+提示行——stub 数据无背景行可精确）；验收场景**包含断言**（预置三 plan 逐行输出+品牌两行+导出段行+提示行 in stdout+exit 0——CLI in-process 直调，6-9 S8/S9 双清先例；背景行免疫 OD-13）
+- [ ] 全数据输出断言双承载：CLI 单测 stub 格**精确断言**（三段分隔行+项目段首行+两 plan 四行两行/项目形态+品牌两行+导出三行+提示行——stub 数据无背景行可精确）；验收场景**包含断言**（预置三 plan 逐行输出+品牌两行+导出段行+提示行 in stdout+exit 0——CLI in-process 直调，6-9 S8/S9 双清先例；背景行免疫 OD-13）
 - [ ] 空态输出断言双承载：CLI 单测 stub 空 VO 格**精确断言**（`项目: 共 0 个` 后无行+品牌两行恒在+导出空态行）；验收场景**格式断言**（`项目: 共 ` 模式+brand 两行+提示行恒在+exit 0）
-- [ ] 降级标记形态（build_degraded=True → 首行含「（部分数据降级）」——stub 直构降级 VO 单测格）
+- [ ] 降级标记形态（build_degraded=True → 首行含「（部分数据降级）」——stub 直构降级 VO 单测格；**段降级两形态分立（R1-F1）**：find 级格[空清单+degraded]断言 `项目清单获取失败` 单行+导出段值级降 0；循环级格[清单保留+degraded]断言清单行在场+行内「最新报告: 无」+不降获取失败单行）
 - [ ] 零参数断言（parser 无任何 add_argument 调用——getsource 切块断言零参数面；`sisys-agent consultant-view --plan-id x` → argparse unrecognized exit 2 格）
 
 ### AC-7: 性能与并发（三段口径——OD-8）
@@ -414,7 +414,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`_StubConsultantViewUseCase` 替身+专用 patcher（`_patch_consultant_view_entry`——`monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)` + `setattr(agent_cli, "resolve", lambda name: stub)` 形态——**每命令族新建专用 patcher 纪律**[6-8 R1-F11/6-9 第三连]）：解析（注册锚/`--plan-id` 传入 → exit 2 unrecognized 格/**零参数面 getsource 断言**——`add_parser("consultant-view"` 切块后零 `add_argument` 调用）/全数据输出（三段分隔行+三 plan 六行+品牌两行+导出三行+提示行）/空态输出（`项目: 共 0 个`+品牌两行恒在+导出空态行+exit 0）/降级标记格（stub 直构 build_degraded=True VO → 首行含「（部分数据降级）」）/DomainError 兜底格（stub error → stderr `[EXCEPTION_` 前缀+exit 1——防御性兜底判别）/exit 0） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`_StubConsultantViewUseCase` 替身+专用 patcher（`_patch_consultant_view_entry`——`monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)` + `setattr(agent_cli, "resolve", lambda name: stub)` 形态——**每命令族新建专用 patcher 纪律**[6-8 R1-F11/6-9 第三连]）：解析（注册锚/`--plan-id` 传入 → exit 2 unrecognized 格/**零参数面 getsource 断言**——`add_parser("consultant-view"` 切块后零 `add_argument` 调用）/全数据输出（三段分隔行+两 plan 四行+品牌两行+导出三行+提示行）/空态输出（`项目: 共 0 个`+品牌两行恒在+导出空态行+exit 0）/降级两形态格（**R1-F1 分立**：find 级格[plans=()+plan_count=0+导出七键置零——矛盾 VO 纪律]断言首行含「（部分数据降级）」+`项目清单获取失败`+导出段值级降 0；循环级格[清单保留+行报告列 None]断言清单行在场+不降获取失败单行）/DomainError 兜底格（stub error → stderr `[EXCEPTION_` 前缀+exit 1——防御性兜底判别）/exit 0） |
 | 🟢 绿 | 实现 CLI：`build_parser` 注册（**零 add_argument**）+分发分支+`_run_consultant_view_cli` 五步定式（无守卫步——四步实态：`_ensure_bootstrapped`→`asyncio.run`+resolve→打印→DomainError/Exception 双 except exit 1；五步定式名保留注记——去守卫步差异 docstring）+`_run_consultant_view` async 壳（finally `_close_connection_pools`）+`_print_consultant_view` 三段打印（getattr 零 VO import 形态——6-9 直系） |
 | 🔄 重构 | 输出行格式统一（「输出即契约」——空态行恒在+两行/项目形态+时间戳 `%Y-%m-%d %H:%M` 截断呈现注记） |
 
@@ -812,7 +812,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 - 覆盖率：新增三 src 文件 100%（63+59+8 语句全覆盖——json 报告实测，≥95% 门禁达成）
 - ruff check+format --check 全仓过；mypy 765 文件零错误（基线 762+新增 3）
 - 纯三零 git diff 实证：src/domain+src/infrastructure+src/interfaces 三目录零 diff 零未跟踪
-- deferred-work 14 锚位处置注记落档（Task 0.7——逐锚行内追加=6-9 先例形态）
+- deferred-work 14 锚位处置注记落档（Task 0.7——逐锚行内追加=6-9 先例形态；**分母口径注记（R1-F8 消歧）**：14=锚位**行**实数——Task 0.7 预案的 L117/L170 归并一组在 deferred-work 中是两行、各得一处注记；预案口径「13 锚位」为归并**组**数——两口分母差非计数冲突）
 
 ### 文件清单 File List
 
@@ -856,13 +856,13 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成（Task 0~7 含 TDD 循环+变异锚）
-2. [ ] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-7+12 场景钉死）
-3. [ ] Architecture constraints extracted 架构约束已提取（纯三零 Story 第二连+依赖方向矩阵）
-4. [ ] Previous story learnings integrated 前一个故事学习经验已整合（8 学习点+7 应用项）
-5. [ ] Sprint status synced to `ready-for-dev`
-6. [ ] OD-1~OD-13 十三裁定落档（范围收窄 CLI-only 第九连/零事件/零异常+零 242 面/五 VO 键契约/archives 反推数据源/品牌段 6-11 对接锚/导出段纯投影+遮蔽口径/性能三段+锚定义务 11 条/命名/组合根+零参数先例/纯三零/双段联动容错/共享库全局面断言体系[R1 新增 OD-13]）
-7. [ ] deferred-work 11 行锚定义务处置预案落档（Task 0.7——Epic 6 锚七行归并六组+两条 6.5a-DF 顺延+两条 6.7-DF 维持+两条 D6-8-R 维持+一条 D6-9-R 不入命令族注记——13 锚位归并 10 行处置+第 11 行不登记新锚裁定）
+1. [x] All tasks defined 所有任务定义完成（Task 0~7 含 TDD 循环+变异锚）
+2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-7+12 场景钉死）
+3. [x] Architecture constraints extracted 架构约束已提取（纯三零 Story 第二连+依赖方向矩阵）
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合（8 学习点+7 应用项）
+5. [x] Sprint status synced to `ready-for-dev`
+6. [x] OD-1~OD-13 十三裁定落档（范围收窄 CLI-only 第九连/零事件/零异常+零 242 面/五 VO 键契约/archives 反推数据源/品牌段 6-11 对接锚/导出段纯投影+遮蔽口径/性能三段+锚定义务 11 条/命名/组合根+零参数先例/纯三零/双段联动容错/共享库全局面断言体系[R1 新增 OD-13]）
+7. [x] deferred-work 11 行锚定义务处置预案落档（Task 0.7——Epic 6 锚七行归并六组+两条 6.5a-DF 顺延+两条 6.7-DF 维持+两条 D6-8-R 维持+一条 D6-9-R 不入命令族注记——13 锚位归并 10 行处置+第 11 行不登记新锚裁定）
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
@@ -925,20 +925,41 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待代码审查轮次）
-**审查模式:** full（四视角并行调研+双评审员 C3 门禁——6-9 审查形态直系）
+**审查日期:** 2026-11-08（Round 1）
+**审查模式:** full（四视角并行调研+双评审员 C3 门禁——6-9 审查形态直系；R1 四视角=A 契约符合性/B 测试判别力/C 真实通道隔离纪律/D 运行面实测——零 P0/P1，运行面全量 15280 passed+2 skipped 零失败/三 src 覆盖 100%/纯三零 diff 实证全复核属实）
 
 #### 需决策 Decision Needed
 
-- 无（待审查轮次登记）
+- 无（Round 1 双评审员①裁定优秀+②最小清单增补，合并后落码——无悬置决策）
 
 #### 已修复 Patch
 
-- （待审查轮次登记）
+| # | 严重度 | 问题 | 修复 |
+|---|--------|------|------|
+| R1-F1 | P2 | CLI 段降级呈现与 OD-12 两形态分立错位：循环级降级（清单保留+行报告列 None）时已取到的全清单被丢弃、统一降「项目清单获取失败」——VO 层「部分降级」语义在呈现面失真（AC-6 原文仅定义单形态——规范缺口，服务层两形态分立本身正确） | `_print_consultant_view` 分支拆两形态：`degraded+空清单`（find 级——服务段值降默认的结构不变量：degraded 仅在分组循环内置位⟹循环级清单恒非空）降获取失败单行；`degraded+清单保留`（循环级）照常呈现清单+行内「最新报告: 无」+首行降级标记承载信号；既有降级格整形为 find 级格（plans=()+plan_count=0+导出七键置零——矛盾 VO 纪律）+新增循环级格 `test_partial_degraded_keeps_listing`；docstring/AC-6 L121/L130/L417 三承载位联动（评审员①2×2 完备格证明+②stub 整形联动位——突变实证：删判别键→循环级格红→还原绿） |
+| R1-F2 | P2 | `test_empty_state_defaults` 半恒真回读（显式传默认值再断言回读）——ExportSection 七键默认值全仓零承载位（服务恒显式传七键、VO 测试经工厂显式传值），默认值漂移无测试变红 | 改零参裸构造断默认（ProjectsSection 四键+ExportSection 七键——find 级降级路径 load-bearing 契约面；突变实证：latest_pdf_plan_id 默认改值→红→还原绿） |
+| R1-F8 | P2 | DoD 完成总结七项全未勾而 v1.4.0 自报「DoD 全过」（6-9 done 终态同位七项全勾——F-1 勾选卫生缺口第三例）；L815「14 锚位」vs Task 0.7「13 锚位」两口分母差无消歧（评审员②发现） | 七项补勾 `[x]`；L815 补分母口径注记（14=锚位行实数[L117/L170 一组两行拆计] vs 13=归并组数——非计数冲突） |
+| R1-F3 | P3 | 「变异 13 锚」计数笔误——分项枚举 2+5+4+2+1=14（与已纠正的 R1-F15/R2-F2 同族；L949/L959 两处；同文件另有 4 处「13 锚位」系 deferred-work 概念不误伤） | 两处 13→14 勘误（评审员①分项亲验闭合） |
+| R1-F4 | P3 | ports :9「Story 6.11」连字符——全仓统一「6-11」（唯一命中位） | 改「6-11」 |
+| R1-F5 | P3 | `_run_consultant_view` docstring 引用「代码审查 R1-F17」对本 Story 为伪溯源（dev 期照抄 6-9 形态——本 Story 审查无此编号；存量 7 处同注记系 6-4~6-9 期合入不动） | 去编号改实名（「同 _run_analyst_view 注记：resolve 抛出时 finally 仍关闭连接池」——真源性优先于形态统一） |
+| R1-F6 | P3 | 验收 context fixture `_monkeypatch_ref` 登记后全程零消费（死产物；`_capsys_ref` 有两处真消费保留） | 删除该行 |
+| R1-F7 | P3 | Story L128/L417「三 plan 六行」失实——CLI stub 实际 2 plan 四行（判别力等价：两行覆盖有/无报告两形态） | 两处措辞勘误（「两 plan 四行」；L128 同句验收半句「预置三 plan」保留） |
+| R1-F9 | P3 | CLI stub 工厂 docstring「plans 五元组」实列六元素（plan_id/archive_count/latest_activity_at/latest_report_type/latest_report_at/latest_degraded_section_count） | 勘误「六元组」（随 R1-F1 同文件顺手修——评审员②发现） |
 
-#### 已推迟 Defer
+#### 已推迟 Defer（留档注记——非缺陷或先例一致）
 
-- （待审查轮次登记）
+- VO 守卫 8 格中 3 格仅断异常类型未断 code（代表格有 `code=="EXCEPTION_242"` 断言、模块单异常类仅守卫 raise——替换遮蔽风险低）
+- 服务单测循环级容错格 side_effect 为按 plan_id 分派函数（Story 钦定「列表形态」）——顺序无关判别等价且更强，良性偏离注记
+- 架构验证器 C 的 rglob 零命中为文件名级匹配（Story 措辞隐含内容级）——主会话内容级 grep 实证当前零命中，当下等价留档
+- `test_generated_at_single_time_anchor` 判别力弱于命名（「单次 now」无行为可观测面——结构性不可测，注记性测试）
+- limit 覆写行为断言不判别「传入超上限被 clamp」形态（对钦定变异形态[默认 20 截断]判别成立）
+- 并发对照含未过滤 plan_count/available/degraded 键——等价性依赖 blm-planning-perf 组串行前提（R4-F2 前向约束已在册）
+- 验收 teardown 非 AssertionError 异常 print 容错（6-9 同款先例一致——行数断言 AssertionError 正确 re-raise）
+- S9 性能 skip 门计数经 `find(limit=1000)`——背景行超千级时 distinct plan 数被截断低估（archived_at 降序近似合理；量级逼近 50 阈值时改 SQL COUNT(DISTINCT)——deferred 触发条件）
+- 集成 `_fresh_resolver_per_test` 为 async fixture（6-9 是 sync monkeypatch 形态）——asyncio_mode=auto 下可用，语义等价最小偏差
+- 集成场景④在剥掉 `-n auto --dist loadgroup` 的非标准形态下偶发时序敏感（标准门禁形态 3 次全绿——R4-F2 组串行正是免疫手段，非门禁风险）
+- CLI stub 工厂导出段默认值形态（无 latest_pdf_plan_id 显式 None 时的三键派生）与生产 ExportSection 构造面存在形态差——stub 内部自洽已由矛盾 VO 纪律约束（R1-F1 整形后两降级格显式置零）
+- 本地 `.env` PG 凭据失配致 CLI 真实运行多项目段降级（预存环境问题与本 Story 零交集；降级路径行为本身正确且被双测覆盖）
 
 ---
 
@@ -946,17 +967,18 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行文档审查修订循环（参照 6-7/6-8/6-9 五轮形态——R1 四视角调研+双审查/R2 回归+组合/R3 单深度/R4 纯验证/R5 独立终审；五轮收敛 v1.3.2——收敛声明见 Docs Review Fixes 节；六提交 486fb0e1→85706c14→8366d2af→72d8291a→本收敛提交）
-- [x] 运行 `dev-story` 开始实施（2026-11-08 完成——Task 0~7 全勾：12/12 验收全绿+四目录全量 15280 passed+2 skipped 零失败+新增三 src 文件覆盖率 100%+mypy 765 零错+变异 13 锚全实证+纯三零 diff 实证——详 Dev Agent Record 实施摘要）
+- [x] 运行 `dev-story` 开始实施（2026-11-08 完成——Task 0~7 全勾：12/12 验收全绿+四目录全量 15280 passed+2 skipped 零失败+新增三 src 文件覆盖率 100%+mypy 765 零错+变异 14 锚全实证+纯三零 diff 实证——详 Dev Agent Record 实施摘要）
 - [ ] 运行 `code-review` 进行代码审查（auto-marks done）
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
-- v1.4.0: dev-story 实施完成 in-progress→review（Task 0~7 全勾+DoD 全过）。交付面：五 VO+三常量+值域 frozenset+ConsultantViewPort 零参+三段编排服务（两趟稳定排序+latest 遮蔽+双段联动容错）+零参透传用例+CLI consultant-view（族首个零 add_argument）+组合根双注册；验收 12/12+集成 4/4+四目录全量 15280 passed+2 skipped 零失败；变异 13 锚全实证（VO 2+服务 5+CLI 4+集成 2+架构 1）；实施攻坚两项留痕（预置时间戳单基准锚——逐行取 now 微秒漂移真缺陷[A 面回查不可见→预置侧登记直推]）；新增三 src 文件覆盖率 100%+mypy 765 零错+ruff 全仓过+纯三零 diff 实证+deferred-work 14 锚位处置落档
+- v1.5.0: 代码审查 Round 1（四视角并行调研+双评审员 C3 门禁——评审①裁定优秀[2×2 完备格证明]+②最小清单增补[stub 整形/DoD 补勾/六元组]后落码）：P2×3+P3×6 落码 9 项——**R1-F1** CLI 段降级呈现拆两形态（OD-12 呈现面对齐：find 级[degraded+空清单]降获取失败单行/循环级[清单保留]照常呈现+行内「最新报告: 无」+首行标记；判别键结构不变量=服务 degraded 仅循环内置位⟹循环级清单恒非空；既有降级格整形 find 级+新增循环级格——双突变实证）；**R1-F2** VO 空态默认测试改零参裸构造断默认（ExportSection 七键默认值获承载位——突变实证）；**R1-F8** DoD 七项补勾+deferred-work 14/13 锚位分母口径注记（行数 vs 组数）；R1-F3/F7 Story 计数措辞勘误（变异 14 锚×2/两 plan 四行×2）；R1-F4/F5/F6/F9 注记卫生四小项（6-11 连字符/伪溯源编号去除/死产物行删除/六元组勘误）；留档 12 项注记（Defer 表）——运行面 D 视角全量复核属实（15280 passed/ruff+mypy 零错/覆盖 100%/纯三零）
+- v1.4.0: dev-story 实施完成 in-progress→review（Task 0~7 全勾+DoD 全过）。交付面：五 VO+三常量+值域 frozenset+ConsultantViewPort 零参+三段编排服务（两趟稳定排序+latest 遮蔽+双段联动容错）+零参透传用例+CLI consultant-view（族首个零 add_argument）+组合根双注册；验收 12/12+集成 4/4+四目录全量 15280 passed+2 skipped 零失败；变异 14 锚全实证（VO 2+服务 5+CLI 4+集成 2+架构 1）；实施攻坚两项留痕（预置时间戳单基准锚——逐行取 now 微秒漂移真缺陷[A 面回查不可见→预置侧登记直推]）；新增三 src 文件覆盖率 100%+mypy 765 零错+ruff 全仓过+纯三零 diff 实证+deferred-work 14 锚位处置落档
 - v1.3.2: 文档审查 Round 5 独立终审+收敛（不轻信自报六节取证——双向取证 12 项[11 过 1 证伪]+全文终扫+门禁/收敛判据；特权发现 2 项随收敛提交清偿）：**R5-F1**[P1] R3-F1「ArchiveRepositoryPort 无 save」伪实证勘误（六扩展方法枚举漏 L2RdbPort 基类四继承方法——save :36/:110-115/:191/服务三处消费四重证据；改钦 repo.save 对称通道五处联动+R3-F1 台账勘误内联——端口方法枚举须含基类继承面教训留档）；R5-F2[P2] OD-13 尾句 S6 复述双升格联动（membership 措辞+绊线语义）；收敛声明入档（五轮六提交 36 项处置=P0×3+P1×14+P2×8+P3×8+证伪×3；收敛判据五节全过；Next Steps 循环项勾选——**放行 dev-story**）
 - v1.3.1: 文档审查 Round 4（纯验证+双 Agent 晚归发现清偿轮——R2-A 回归核查 6 项开放+R2-B 组合推演 5 项新发现[事实基座：全仓提交型写入方普查+xdist 拓扑+时间戳构造普查]）：**R4-F1**[P1] Task 4.3 消费方全景清偿+5 项 P3 欠账；**R4-F2**[P1] Task 0.5 漏列 pytestmark xdist_group 硬纪律（提交型写入方全组串行的窗口免疫结构前提+前向约束登记）；R4-F3[P2] S6 诚实重标「单源契约绊线」（ReportRepository 无 plan 枚举 API——变异无实现通道，判别力面向未来端口扩展）；R4-F4 S8 更名；R4-F5 占首三未登记假设补强；R4-F6 值域守卫 6-11 对称注记+raise 落位钦定；三轴验证全过（锚点 8/8+计数终扫+版本一致）
 - v1.3.0: 文档审查 Round 3（单深度推演——主会话直执：12 场景最终态复推/预置通道深水区/可写性验证）——2 项处置：**R3-F1** 归档行预置通道钦定错误（6-7 `_archive_row` 编排通道 archived_at 不可编程+ArchiveRepositoryPort 无 save 方法——与 OD-13① 未来偏移结构性冲突；钦定 PG model 直写通道五处联动）；R3-F2 017 无 FK 证伪留痕（S6 任意 UUID 报告行可写）

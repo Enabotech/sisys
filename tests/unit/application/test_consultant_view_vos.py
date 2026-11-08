@@ -196,25 +196,28 @@ class TestVOKeyContracts:
         }
 
     def test_empty_state_defaults(self) -> None:
-        """空态/段降级共用默认值（键恒在纪律——plan_count 0+空 tuple+两计数 0+latest_pdf 三键 None）."""
-        view = _make_view(
-            projects=_make_projects_section(available=False, plan_count=0, projects=()),
-            export=_make_export_section(
-                available=False,
-                plans_with_reports=0,
-                plans_with_latest_pdf=0,
-                latest_pdf_plan_id=None,
-                latest_pdf_object_key=None,
-                latest_pdf_generated_at=None,
-            ),
-        )
-        assert view.projects.plan_count == 0
-        assert view.projects.projects == ()
-        assert view.projects.available is False
-        assert view.export.plans_with_reports == 0
-        assert view.export.plans_with_latest_pdf == 0
-        assert view.export.latest_pdf_plan_id is None
-        assert view.export.available is False
+        """空态/段降级共用默认值（零参构造断默认——键恒在纪律：plan_count 0+空 tuple+两计数 0+latest_pdf 三键 None）.
+
+        零参裸构造形态（R1-F2）：段默认值是 find 级降级路径的 load-bearing 契约
+        （服务 find 异常格裸构造 ProjectsSection(degraded=True)），显式传值再断言
+        回读属恒真——改零参构造后默认值漂移（如 latest_pdf_plan_id 默认改非 None）即红。
+        """
+        from src.application.ports.consultant_view import ExportSection, ProjectsSection
+
+        projects = ProjectsSection()
+        assert projects.available is False
+        assert projects.degraded is False
+        assert projects.plan_count == 0
+        assert projects.projects == ()
+
+        export = ExportSection()
+        assert export.available is False
+        assert export.degraded is False
+        assert export.plans_with_reports == 0
+        assert export.plans_with_latest_pdf == 0
+        assert export.latest_pdf_plan_id is None
+        assert export.latest_pdf_object_key is None
+        assert export.latest_pdf_generated_at is None
 
     def test_brand_section_defaults(self) -> None:
         """BrandSection 零参构造恒默认态（V1 时点事实——configured False+三 status 常量）."""

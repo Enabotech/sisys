@@ -162,7 +162,6 @@ def context(event_loop: Any, capsys: pytest.CaptureFixture[str], monkeypatch: py
     ctx: dict[str, Any] = {
         "_loop": event_loop,
         "_capsys_ref": capsys,
-        "_monkeypatch_ref": monkeypatch,
         "_a_mode": False,
         "_session_token": None,
         # 预置资产登记（teardown 定向 DELETE 面——B/C 面；A 面经 pg_session rollback 回收）

@@ -1748,7 +1748,8 @@ def _run_analyst_view_cli(plan_id: str) -> int:
 async def _run_consultant_view() -> Any:
     """consultant-view 异步执行壳（resolve consultant_view_use_case——Story 6-10）。
 
-    resolve 入 try（代码审查 R1-F17——同 _run_analyst_view 注记）。
+    resolve 入 try（同 _run_analyst_view 注记）：resolve 抛出（注册名漂移等）时
+    finally 仍关闭连接池。
     """
     try:
         use_case = resolve("consultant_view_use_case")
@@ -1762,19 +1763,26 @@ def _print_consultant_view(view: Any) -> None:
 
     零参数全局面板：项目行含全库行（共享库背景行照常计入输出——CLI 呈现本义）；
     时间戳呈现 ISO 截断 %Y-%m-%d %H:%M（分钟粒度——信息密度呈现形态）；段降级
-    形态：projects 段降级降「项目清单获取失败」单行（brand 两行恒在——零 IO 恒稳；
-    export 段值级降 0/无照常呈现）。getattr 形态零 VO import 依赖（6-3/6-8/6-9 先例）。
+    两形态分立（OD-12 呈现面对齐）：find 级（degraded+空清单）降「项目清单获取
+    失败」单行；循环级（degraded+清单保留）照常呈现清单——行报告列 None 呈现
+    「最新报告: 无」+首行「（部分数据降级）」标记承载降级信号（brand 两行恒在
+    ——零 IO 恒稳；export 段值级降 0/无照常呈现）。getattr 形态零 VO import
+    依赖（6-3/6-8/6-9 先例）。
     """
     degraded_mark = "（部分数据降级）" if getattr(view, "build_degraded", False) else ""
     print(f"顾问视图（全局多项目面板）{degraded_mark}")
 
     projects_section = getattr(view, "projects", None)
+    projects_rows = getattr(projects_section, "projects", None) or ()
     print("── 多项目概况 ──")
-    if getattr(projects_section, "degraded", False):
+    if getattr(projects_section, "degraded", False) and not projects_rows:
+        # find 级降级（OD-12 段值降默认——清单为空判别键；循环级降级清单恒非空：
+        # 服务端 degraded 仅在分组循环内置位，循环执行即至少一行入清单）
         print("项目清单获取失败")
     else:
+        # 正常/循环级部分降级共用呈现（循环级：清单保留+行报告列 None——「最新报告: 无」）
         print(f"项目: 共 {getattr(projects_section, 'plan_count', 0)} 个")
-        for row in getattr(projects_section, "projects", None) or ():
+        for row in projects_rows:
             activity = getattr(row, "latest_activity_at", None)
             activity_text = activity[:16].replace("T", " ") if activity else "未知"
             print(f"  {getattr(row, 'plan_id', '')} | 归档: {getattr(row, 'archive_count', 0)} | 最新活动: {activity_text}")

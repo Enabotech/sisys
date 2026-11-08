@@ -3699,7 +3699,7 @@ def _make_stub_consultant_view(
 ) -> Any:
     """consultant-view 视图替身工厂（getattr 零 VO import——SimpleNamespace 造 VO 树）.
 
-    plans 五元组：(plan_id, archive_count, latest_activity_at, latest_report_type,
+    plans 六元组：(plan_id, archive_count, latest_activity_at, latest_report_type,
     latest_report_at, latest_degraded_section_count)。
     """
     from types import SimpleNamespace
@@ -3864,8 +3864,22 @@ class TestConsultantViewExecution:
         assert "    最新报告: 无" in lines, "零报告行降无报告行"
 
     def test_degraded_mark_and_single_line(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-        """降级标记+段降级行：build_degraded 首行追加标记；projects 段降级降「项目清单获取失败」单行."""
-        view = _make_stub_consultant_view(projects_degraded=True, build_degraded=True)
+        """find 级降级格：build_degraded 首行追加标记；projects 段降级（degraded+空清单）降「项目清单获取失败」单行.
+
+        段降级两形态分立（OD-12 呈现面）：find 级=段值降默认（空清单）——本格；
+        循环级=清单保留——test_partial_degraded_keeps_listing 承载。导出七键随形态
+        置零（矛盾 VO 纪律——清单获取失败与「2 报告」并存属 stub 自身缺陷）。
+        """
+        view = _make_stub_consultant_view(
+            plans=(),
+            plan_count=0,
+            projects_degraded=True,
+            build_degraded=True,
+            plans_with_reports=0,
+            plans_with_latest_pdf=0,
+            latest_pdf_plan_id=None,
+            latest_pdf_object_key=None,
+        )
         stub = _StubConsultantViewUseCase(view)
         _patch_consultant_view_entry(monkeypatch, stub)
 
@@ -3874,7 +3888,37 @@ class TestConsultantViewExecution:
         assert exit_code == 0
         lines = capsys.readouterr().out.splitlines()
         assert "顾问视图（全局多项目面板）（部分数据降级）" in lines, "首行含顶层降级标记（6-8/6-9 直系）"
-        assert "项目清单获取失败" in lines, "项目段降级行"
+        assert "项目清单获取失败" in lines, "find 级项目段降级行"
+        assert "可交付: 0 项目有报告 | 最新 PDF: 0 项目" in lines, "导出段降级值级（段值降默认）"
+
+    def test_partial_degraded_keeps_listing(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """循环级降级格：degraded+清单保留 → 照常呈现清单（行报告列 None 呈「最新报告: 无」）+不降「获取失败」单行.
+
+        OD-12 循环级=清单保留+行报告列 None（「部分降级」语义的呈现面）——清单
+        已取到的行不得因单 plan 点查失败被丢弃；降级信号由首行标记承载。
+        """
+        view = _make_stub_consultant_view(
+            plans=(("44444444-4444-4444-8444-444444444444", 2, "2026-11-08T07:30:00.000080+00:00", None, None, None),),
+            plan_count=1,
+            projects_degraded=True,
+            build_degraded=True,
+            plans_with_reports=0,
+            plans_with_latest_pdf=0,
+            latest_pdf_plan_id=None,
+            latest_pdf_object_key=None,
+        )
+        stub = _StubConsultantViewUseCase(view)
+        _patch_consultant_view_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(["consultant-view"])
+
+        assert exit_code == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert "顾问视图（全局多项目面板）（部分数据降级）" in lines, "首行含顶层降级标记"
+        assert "项目清单获取失败" not in lines, "循环级降级清单保留——不得降获取失败单行"
+        assert "项目: 共 1 个" in lines, "清单照常呈现"
+        assert "  44444444-4444-4444-8444-444444444444 | 归档: 2 | 最新活动: 2026-11-08 07:30" in lines, "清单行在场"
+        assert "    最新报告: 无" in lines, "循环级行报告列 None 呈现「无」"
 
     def test_domain_error_stderr_exit_1(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         """用例抛 DomainError → stderr [EXCEPTION_ 前缀+exit 1（防御性兜底——段级容错下不可达，兜底结构照设）."""

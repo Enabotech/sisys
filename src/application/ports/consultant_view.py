@@ -6,7 +6,7 @@
       limit=PANEL_ARCHIVE_LIMIT)) 全量行 distinct plan_id 分组（每 plan 归档计数+
       最新活动时间+循环 get_latest_by_plan 报告概况——plan_id=None 行剔除防御）；
     - 品牌段（brand）：V1 恒系统默认态零 IO 静态段（三段中唯一无数据源段——
-      空态/降级全场景值恒不变；品牌配置实现归 Story 6.11「白标报告基础」）；
+      空态/降级全场景值恒不变；品牌配置实现归 Story 6-11「白标报告基础」）；
     - 导出段（export）：项目段循环结果的纯投影派生（零新读——单源纪律 OD-7；
       latest 遮蔽口径：「最新报告为 pdf 的 plan 数」非「历史曾生成计数」）。
 
