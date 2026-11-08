@@ -260,7 +260,7 @@
 | 约束类型 | 规则 | 违反后果 |
 |---------|------|----------|
 | **品牌段隔离** | 静态默认态零预置零清理（零 IO——段测试无资源生命周期） | 无风险面（本 Story 设计收益） |
-| **PG 归档行隔离** | 归档行直写+定向清理（6-7 `_archive_row`/`_teardown_tree_assets` 直系样板；plan_id TestTenant UUID 前缀天然隔离） | 跨 plan 污染 |
+| **PG 归档行隔离** | 归档行 model 直写+定向清理（PG model 直写通道 R3-F1——archived_at 可编程；`_teardown_tree_assets` 定向清理直系样板 6-7；plan_id TestTenant UUID 前缀天然隔离） | 跨 plan 污染 |
 | **PG 报告行隔离** | 报告行直写+定向 DELETE 行数断言（report_repository.save 直写通道；report_id uuid4 唯一——幂等锚 report_id 语义天然隔离） | 行冲突 |
 | **PG 面三分面** | A 编程面 sync 层 set_session 回滚式 / B CLI 面 clear_session+commit 式+定向 DELETE 行数断言 / C 并发·性能面禁 set_session+每路独立会话+commit+定向 DELETE（6-8 R2-F3/6-9 直系第三连） | 并发炸/假绿 |
 | **BDD async** | 步骤函数禁 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()` | context 数据丢失 |
@@ -317,7 +317,7 @@
 - [ ] Subtask 0.2: 冻结排序与派生口径（口径一：行序 latest_activity_at 降序+plan_id 字典序 tie-break+None 时间戳恒排尾；口径二：latest 遮蔽计数口径；口径三：latest_pdf 三键选择[latest_report_at 最大者+tie-break plan_id 升序]；口径四：None 行剔除；口径五：双段联动降级语义——AC-2/AC-4/AC-5 规则逐字冻结）
 - [ ] Subtask 0.3: 定义端口契约（ConsultantViewPort v1.0.0 零参签名+两依赖注册名+组合根落位 :2139 邻位锚）+ 契约测试文件骨架
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态——注记型场景禁用]；epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 正向可见性口径[OD-13]）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+归档行预置[6-7 `_archive_row` 直系]+报告行直写[report_repository.save——集成直写先例 6-8 `_save_report` :504-512 单参形态]+PG 三分面通道+CLI 直调 helper；**py 模块级零 consultant_view 词族 import 硬纪律**——src 符号全部延迟到步骤函数内 import[含类型注解用途——模块级 import 会使收集期 ImportError 全文件 ERROR，S7/S8 exit 2 与 S12 AssertionError 红形态全部不可达——6-9 :55-68 形态逐字复刻]；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳未来偏移判别构造**（预置归档行 archived_at 与报告行 created_at 均自基准 now 起微秒级递减——三 plan 相互判别+恒新于共享库背景行[背景行免疫 OD-13]；find/get_latest_by_plan 均无时间窗过滤、无 6-8 审计窗「未来偏移出窗」风险——场景分立注记；禁 `now()` 双调同值形态）；**S9 背景清点步骤**（仅性能场景：预置前 distinct plan 背景数清点——skip 门[>50 跳过]专用；membership 全含断言体系无需差值基线[R2 勘误：差值法对基线后外来写入假红，废止——OD-13②]））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+**归档行预置走 PG model 直写通道**[R3 钦定：`ArchiveModel` 构造+`session.add`+flush/commit——archived_at 未来偏移可编程；**禁复刻 6-7 `_archive_row` 编排通道**——其走 `service.archive_plan` 时间戳服务内部生成不可控，与 OD-13① 结构性冲突；且 ArchiveRepositoryPort 无 save 方法[写入面在服务编排非仓储]——仓储直写不可达；raw INSERT 形态备选（6-9 documents 直插 :547-554 先例）]+报告行直写[report_repository.save——集成直写先例 6-8 `_save_report` :504-512 单参形态+实体 created_at 可编程 `_make_report_entity` :448-461 样板]+PG 三分面通道+CLI 直调 helper；**py 模块级零 consultant_view 词族 import 硬纪律**——src 符号全部延迟到步骤函数内 import[含类型注解用途——模块级 import 会使收集期 ImportError 全文件 ERROR，S7/S8 exit 2 与 S12 AssertionError 红形态全部不可达——6-9 :55-68 形态逐字复刻]；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳未来偏移判别构造**（预置归档行 archived_at 与报告行 created_at 均自基准 now 起微秒级递减——三 plan 相互判别+恒新于共享库背景行[背景行免疫 OD-13]；find/get_latest_by_plan 均无时间窗过滤、无 6-8 审计窗「未来偏移出窗」风险——场景分立注记；禁 `now()` 双调同值形态）；**S9 背景清点步骤**（仅性能场景：预置前 distinct plan 背景数清点——skip 门[>50 跳过]专用；membership 全含断言体系无需差值基线[R2 勘误：差值法对基线后外来写入假红，废止——OD-13②]））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
 - [ ] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError）
 - [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——**台账形态：13 个锚位归并 10 行处置+第 11 行不登记新锚裁定=11 行**，计数口径按行[R1 勘误：原稿「共 11 条」与枚举算术 13 锚不自洽]）
 - [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@b9525f8b，实施前复核；本 Story 锚点表按当前 HEAD 校正 6-9 期漂移注记：6-9 故事锚组合根 analyst_view 块 :2102-2139 实测吻合）
@@ -457,9 +457,9 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_consultant_view.py`（**集成面同为共享库**[事务回滚式非独立 schema——背景行同在，OD-13 断言口径同验收面]：场景① 全数据三段 round-trip：真实归档行直写[6-7 集成样板——三 plan 形态+None 行]+报告行直写[report_repository.save——plan-A markdown+pdf/plan-B markdown，预置时间戳未来偏移]→服务直调断言[**membership 全含口径 OD-13**：三 plan ∈ 清单+各恰一行/预置行占首三+内部降序/逐行 archive_count 与 latest_report_type 直推/latest_pdf 三键与预置 pdf 行直推/品牌恒默认/计数恒等式三联——VO 内部不变量背景行免疫]（**判别形态**：plan-C 零报告行判别「有活动无交付物」、plan-A pdf 最新判别遮蔽口径）；场景② 空态幂等读（零预置 → 5 键恒在+brand 完整+build_degraded False+不抛——核心四断言口径；绝对空态值断言归单测[Task 2 空态格]；6-8 集成侧「绝对空断言不可写 R1-F6」先例直系）；场景③ 性能 20 轮 P95<800ms（模块级期望常量+sorted 数学口径+预热；C 面禁 set_session；**背景 distinct plan 数>50 时 pytest.skip**——环境量级敏感）；场景④ 并发 20 路 gather 全成功+**预置子集过滤后逐路相等**（membership 过滤 projects+brand+build_degraded 对照——全集相等禁用[6-8 R2-F2 直系]；禁 set_session）） |
+| 🔴 红 | 编写 `tests/integration/test_integration_consultant_view.py`（**集成面同为共享库**[事务回滚式非独立 schema——背景行同在，OD-13 断言口径同验收面]：场景① 全数据三段 round-trip：真实归档行直写[PG model 直写通道 R3-F1——三 plan 形态+None 行+archived_at 未来偏移]+报告行直写[report_repository.save——plan-A markdown+pdf/plan-B markdown，预置时间戳未来偏移]→服务直调断言[**membership 全含口径 OD-13**：三 plan ∈ 清单+各恰一行/预置行占首三+内部降序/逐行 archive_count 与 latest_report_type 直推/latest_pdf 三键与预置 pdf 行直推/品牌恒默认/计数恒等式三联——VO 内部不变量背景行免疫]（**判别形态**：plan-C 零报告行判别「有活动无交付物」、plan-A pdf 最新判别遮蔽口径）；场景② 空态幂等读（零预置 → 5 键恒在+brand 完整+build_degraded False+不抛——核心四断言口径；绝对空态值断言归单测[Task 2 空态格]；6-8 集成侧「绝对空断言不可写 R1-F6」先例直系）；场景③ 性能 20 轮 P95<800ms（模块级期望常量+sorted 数学口径+预热；C 面禁 set_session；**背景 distinct plan 数>50 时 pytest.skip**——环境量级敏感）；场景④ 并发 20 路 gather 全成功+**预置子集过滤后逐路相等**（membership 过滤 projects+brand+build_degraded 对照——全集相等禁用[6-8 R2-F2 直系]；禁 set_session）） |
 | 🟢 绿 | 预置/清理通道落地（归档行+报告行 PG 直写+定向清理[行数断言]；PG 三分面按场景分组——6-8 R2-F3/6-9 直系第三连）+断言通过 |
-| 🔄 重构 | 预置工厂函数收口（`_make_archive_row`/`_make_report_row`——时间戳显式递减微秒偏移构造形态固化） |
+| 🔄 重构 | 预置工厂函数收口（`_make_archive_row`[model 直写——archived_at 参数化]/`_make_report_row`——时间戳未来偏移显式构造形态固化） |
 
 - [ ] Subtask 5.1: 🔴 红 — 四场景失败测试
 - [ ] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
@@ -605,7 +605,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | 架构验证样板 | `tests/unit/architecture/test_analyst_view.py`（四验证器 :56-197+SERVICE_ALLOWED_PREFIXES :30-37） | 本 Story 架构验证直系复刻（验证器 C 零命中形态——OD-11） |
 | 验收样板（R6 模板） | `tests/acceptance/test_acceptance_postgresql_relational_layer.feature`（243 行）/.py（863 行） | **用户钦定 R6 模板**：AC 横幅分节+@scenario 双行字面量+docstring+pass 形态 |
 | 验收样板（6-9 最新） | `tests/acceptance/test_acceptance_analyst_view.py`（1545 行——R6 合规最新形态） | 三件套 :148-208/双清 :161-167/context dict :177-208/CLI 直调 :717-738——本 Story 直系复刻 |
-| 归档行预置样板 | `tests/acceptance/test_acceptance_traceability_tree.py`：`_archive_row` :319/`_teardown_tree_assets` :473 | 多项目段归档行预置直系样板（6-7 交付——plan_id/archived_at 参数化扩展） |
+| 归档行预置样板 | 6-7 `_archive_row` :319[编排通道——**本 Story 禁复刻**：archived_at 服务内部生成，R3-F1]+`_teardown_tree_assets` :473[定向清理三步链直系]；**PG model 直写通道**：`ArchiveModel`（src/infrastructure/storage/postgresql/models——`_do_find` 同源模型）+session.add+flush/commit；raw INSERT 备选先例 6-9 documents 直插 :547-554 | 多项目段归档行预置（archived_at 未来偏移可编程——OD-13①；定向清理复刻 6-7 teardown 链） |
 | 报告行预置通道 | `report_repository.save(report)`（PG 直写——**集成直写先例 6-8** `_save_report` acceptance :504-512/integration :383/:454 均单参调用[R1 勘误：原稿「6-5a 集成先例」标签错挂——metadata 两参实调先例仅 6-5a 单测 test_report_repository.py:117]）+ `StrategicReport` 构造（八字段——6-8 `_make_report_entity` :448-461 样板） | 报告概况预置直写通道（markdown+pdf 双行+时间戳未来偏移判别构造[OD-13]） |
 | 6-8 遮蔽教训锚 | 6-8 R2「未来秒级 timestamp×闭区间出窗→递减微秒偏移」裁定 | 预置时间戳判别构造纪律（plan-A 最新活动晚于 plan-B ≥1s 显式偏移——Task 0.5） |
 | 6-8 差值断言体系锚（R1 新增） | `tests/acceptance/test_acceptance_executive_view.py:627-641/:783-788`（audit_baseline_total 基线+delta 断言）+:87-89（R2-F2 排除集不可收缩注记）+`tests/integration/test_integration_executive_view.py:436`（R1-F6「绝对空断言不可写」） | 共享库全局面断言体系先例（OD-13 四件套的直系样板——基线查询/差值/子集对照/空态分立） |
@@ -867,6 +867,8 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | R2-F5 | R1 修复扇出欠账族（正文已改、汇总/枚举/锚点表未跟随——审查员①系统发现）：零事件「八连」应七连（族枚举 7 员）×3 处；L614 Epic 6 锚漏 L170；完成总结「十二裁定」应十三；L106「六先例族」应五；「6-9 两单一 SCOPED」丢字乱码×2（应为两 SINGLETON+一 SCOPED）；「四口径」应五口径（Task 0.2 重写后 Subtask 0.2 枚举与尾注未跟随+AC-4 缺口径三引用）；find 锚 :120-123/:123-131 两说 | P2 | 十二处定向修正（七连×3/L170 入列/十三裁定/五先例族/乱码复原×2/五口径三联动/锚统一 :123-131） |
 | R2-F6 | P3 欠账族：锚定义务旧枚举残留（Task 0 目的/完成总结第 7 条与新按行口径并存）；矩阵 AC-7 行「5.3-5.4」映射错位（应为 5.1-5.2）+AC-4 行漏循环 B；完成标志红形态漏 S9；S4「可选」与钦定矛盾 | P3 | 五处修正（按行口径改写×2/矩阵两行/补 S9/删「可选」） |
 | R2-F7 | 疑点证伪留痕：未来偏移免疫假设依赖「其他测试时间戳均为 now/过去」——实地核查 6-7/6-8 归档与报告预置构造形态 | 证伪留痕 | 现存测试均为 now/过去形态（6-7 archived_at 服务侧 now 生成/6-8 created_at=now(UTC)）——免疫假设成立；OD-13① 已加「未来偏移同构形态出现时重评」注记 |
+| R3-F1 | 归档行预置通道钦定错误：Task 0.5/隔离表/锚点表/Task 5 引用「6-7 `_archive_row` 直系」——该样板走 `service.archive_plan` 编排通道（archived_at 服务内部生成**不可编程**），与 OD-13① 未来偏移构造结构性冲突；且 ArchiveRepositoryPort **无 save 方法**（六方法枚举实证——写入面在服务编排非仓储），「实体直构造+repo.save」通道亦不可达——dev 照抄样板将卡死或被迫放弃未来偏移 | P1 | 钦定 **PG model 直写通道**（ArchiveModel 构造+session.add+flush/commit——与 `_do_find` 同源模型，A/B/C 三面按既有分派；raw INSERT 备选[6-9 documents :547-554 先例]）——Task 0.5/隔离表/锚点表/Task 5 场景①/工厂收口 五处联动修正；6-7 样板降级为「定向清理链直系+编排通道禁复刻注记」 |
+| R3-F2 | 疑点证伪留痕：S6 任意 UUID 报告行（无对应归档行 plan）的可写性——017 strategic_reports.plan_id 是否有 FK 约束 | 证伪留痕 | 017 :26 纯 Column+索引**无 FK**——任意 UUID 报告行可写 ✓ S6 预置形态成立 |
 
 ---
 
@@ -899,10 +901,11 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
+- v1.3.0: 文档审查 Round 3（单深度推演——主会话直执：12 场景最终态复推/预置通道深水区/可写性验证）——2 项处置：**R3-F1** 归档行预置通道钦定错误（6-7 `_archive_row` 编排通道 archived_at 不可编程+ArchiveRepositoryPort 无 save 方法——与 OD-13① 未来偏移结构性冲突；钦定 PG model 直写通道五处联动）；R3-F2 017 无 FK 证伪留痕（S6 任意 UUID 报告行可写）
 - v1.2.0: 文档审查 Round 2（回归核查+组合交互——审查员①[一致性六轴，晚归全量并入]+主会话亲验[差值竞态定谳/未来偏移免疫假设核查/时间戳形态实证]+双 Agent 配额降级承接）——7 项处置（P1×3+P2×2+P3×1+证伪 1）：**R2-F1** R1 差值断言窗口竞态升格 membership 全含（十四处联动——外来 plan 免疫+判别更强+基线查询废止）；R2-F2 命令族分解算术勘误（6+7+2+1=16 加法闭合）；R2-F3 常量口径统一（品牌两常量+PANEL=三常量，7 处）；R2-F4 OD-5 消费方传播漏网；R2-F5 扇出欠账族 12 处（七连/L170/十三裁定/五先例族/乱码/五口径/锚统一）；R2-F6 P3 欠账 5 处；R2-F7 未来偏移免疫假设证伪留痕
 - v1.1.0: 文档审查 Round 1（四调研 Agent+主会话亲验[测试库背景行实测/isolation-logs 参数面亲验/008 migration FK 亲验/排序先例亲验]+审查员②可满足性推演回归+审查员①配额降级主会话承接一致性六轴）——19 项修复登记（P0×3+P1×7+P2×4+P3×4+证伪留痕 1）：**R1-F1** 命令族全称断言失实（isolation-logs 可裸调——「首个零 add_argument」口径重述）；**R1-F2** 共享库全局查询断言体系不可满足（新增 **OD-13 四件套**：未来偏移/plan 集差值/CLI 包含格式/绝对空态归单务——8 场景断言口径全面改写+Task 0.5 基线查询步骤+「当前租户 schema」表述勘误）；**R1-F3** 并发对照与 6-8 R2-F2 冲突（membership 子集过滤对照五处联动）；R1-F4 排序伪码不可执行（两趟稳定排序钦定+None 排尾口径）；R1-F5 latest_pdf 选择口径冻结（口径三新增+双 plan pdf 判别格）；R1-F6 S6 重定义单源口径判别场景；R1-F7~F9/F14 锚点勘误族（14 键/:56/:69/:21-92/save 先例标签/三视图表真实锚位）；R1-F8 find 消费方全景改写+Task 4.3 回归面补全；R1-F10 性能背景量级 skip 门；R1-F11~F13 守卫增值域/第五变异锚/模块级零 import 硬纪律；R1-F15~F18 计数口径/行宽归因/注释纪律双注记/双装饰器先例锚
 - v1.0.0: 创建故事文件（四 Agent 并行调研【报告白标数据面/多项目与快照清单面/CLI+组合根+R6 模板/治理面与范围边界】+主会话亲验 18 组关键锚点；OD-1~OD-12 十二裁定：范围收窄 CLI-only 第九连（零参数全局视图——CLI 族首个零参数查询命令；Web 归 Epic 21/22+顾问角色枚举缺口注记；品牌配置实现归 6-11——品牌段 V1 恒默认态对接锚；白标 REST 归 Epic 20 Story 20.4；批量导出显式不做——L129 第五轮维持）/零新增事件第九连（_FROZEN_EVENT_COUNT=56 零变化）/零新增异常+零 242 消费面（零输入语义自然缺席——report 段 494-499 预留不占）/五 VO 5-4-6-5-7 键契约（顶层无 plan_id 键+brand 零 IO 恒在段+latest 遮蔽计数口径）/多项目段 archives 反推数据源（ArchiveQuery(plan_id=None, limit=1000) find 现成跨 plan 查询首个应用层消费+None 行剔除+N+1 双风险注记立项锚 Epic 7/21+项目行不含进度列两视图正交）/品牌段三常量+禁 import infra（STSong-Light 字面量 :60 锚）/导出段纯投影派生（零新读单源纪律+与 6-8 ReportSection 语义正交）/性能三段口径（P95<800ms 服务面+并发 20 排除集单键第三连+导出<1min 归 6-5b 既有面+隔离 100% 继承口径——口径差声明六连）/锚定义务 11 条处置（L13/L17/L107/L117+L170/L127/L129 六 Epic6 锚+6.5a-DF1·DF2 顺延+6.7-DF1·DF2 维持+D6-8-R1·R2 第三连+D6-9-R1-1 不入命令族注记+品牌对接锚不登记裁定）/命名 consultant_view 词族（integration 前缀对 epics 钦定名显式偏离第三连）/组合根双注册+两 SCOPED 无混态（最简形态）+CLI 注释措辞纪律/纯三零 Story 第二连（零 domain+零 migration+零 infra——src 面 3 新建+2 扩展）/双段联动容错（find 级+循环级两捕获位+行级 None 同形段哨兵区分裁定）；12 验收场景钉死（S1~S12——epics 架构测试三项对账：多项目→S2/白标→S4+口径差声明/隔离→S11 继承口径））
