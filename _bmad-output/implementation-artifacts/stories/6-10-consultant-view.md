@@ -19,7 +19,7 @@
 - **Epic 6 价值组「战略规划与审批能力」的顾问交付面**：生成侧（6-1~6-5b）、审批侧（6-6）、溯源面（6-7）、高管速览面（6-8）、分析师作业面（6-9）已 done，本 Story 交付 **P1-10 顾问视图**——面向交付者的多项目/品牌/导出三合一入口（epics L2020 依赖列钦定「依赖 Story 6.5b」——PDF 报告生成已 done）
 - **范围权威（epics L656 + UX 三页面驾驶舱格局）**：Story 6.10 是「UX 三页面驾驶舱（顾问）」的后端承载位——**Web/前端交互面归 Epic 21/22**（注记：Epic 21 九 Story 与 Epic 22 八 Story 均无顾问专属 Web Story，22.8 角色自适应的角色枚举为高管/分析师/企业战略人员**不含顾问**——顾问 Web 面届时归 22.8 扩展或后续 Web Story 立项，本 Story 不预建）；本 Story 交付其**后端聚合口径与 CLI 呈现**（Epic 6 第九个 CLI-only Story——6.1-DF5 八连先例延续；6-8/6-9「CLI 呈现即 MVP fallback 形态」直系复刻）
 - **FR Coverage Map 无独立 FR（同 6-6/6-7/6-8/6-9 形态第五连）**：白标 REST 面 `POST /reports/whitelabel` 归 FR-SP-16（P2）→ Epic 20 Story 20.4（epics L600 映射行）；品牌模板配置实现（Logo/配色/字体+模板复用持久化）归 Story 6.11「白标报告基础」P0-11（epics L2021/L2518-2561——依赖 6.5a，**backlog 未实施**）；三页面架构+角色自适应归 FR-IF-05 → Story 22.8（prd L2199-2204——角色枚举无顾问）；本 Story 是**聚合展示面**（查询型故事先例族第九连）
-- **激活既有跨 plan 查询面的首个应用层服务消费**：`ArchiveRepositoryPort.find(ArchiveQuery(plan_id=None))`（组合根 `archive_repository` :2315 SCOPED v1.1.0——现成跨 plan 全量清单查询，既有生产码消费方仅 REST `/api/v1/archive/entries`（`interfaces/api/strategic_archive.py:196-204`——plan_id 可选 Query 全局面）与 StalenessWeightService 兜底链）+ `ReportRepositoryProtocol.get_latest_by_plan`（组合根 `report_repository` :3513 SCOPED——6-8 首消费激活后本 Story 第二消费方，循环消费形态）——两既有通道首次跨 plan 单点聚合
+- **激活既有跨 plan 查询面的首个视图服务消费**：`ArchiveRepositoryPort.find(ArchiveQuery(plan_id=None))`（组合根 `archive_repository` :2315 SCOPED v1.1.0——现成跨 plan 全量清单查询；既有生产码消费方全景：REST `/api/v1/archive/entries` 与 `/plans/{plan_id}` 两端点均经 `strategic_archive_service.query_archive` :315-325 中继、StalenessWeightService 兜底链 :95-96、SummaryGenerationService 陈旧标记兜底链 :441-446[同形态 archive_ids 批量]——find 签名零变化零影响面）+ `ReportRepositoryProtocol.get_latest_by_plan`（组合根 `report_repository` :3513 SCOPED——6-8 首消费激活后本 Story 第二消费方，循环消费形态）——两既有通道首次跨 plan 单点聚合（「首个」限定口径：plan_id=None 全量清单形态的**视图服务**消费——归档域既有消费均为单 plan 锚定或 archive_ids 批量形态）
 - **Epic 6 内部顺序**：6-9（done，分析师作业面）→ **6-10（本 Story，顾问交付面）** → 6-11 白标报告基础（backlog）
 
 ### 范围边界（出处逐行声明）
@@ -27,11 +27,11 @@
 | 面（出处） | 已交付（禁重复造轮） | 6-10 增量（本 Story） |
 |---|---|---|
 | 报告生成面（6-5a/6-5b） | `ReportGenerationServicePort.generate_markdown_report`（`ports/report_generation.py:69`）+ `PdfReportGenerationServicePort.generate_pdf_report`（`ports/pdf_report.py:118`）；L2 `strategic_reports` 表（017 migration：report_id PK/plan_id 索引/report_type/file_path/section 双计数/generation_ms/metadata JSONB/created_at）；`ReportGenerated` 事件（payload 无 plan_id——`workflow_events.py:57-72`）；CLI `report-generate --plan-id --format {markdown,pdf}`（agent_cli :342-362） | **只查询不生成**：导出段消费 `get_latest_by_plan` 循环派生（报告元数据投影）；生成链零触碰（导出执行归 report-generate 既有入口——「指向既有命令」操作提示形态，6-8 :1579 同款） |
-| 跨 plan 清单查询面（3-10/6-4） | `ArchiveRepositoryPort.find(ArchiveQuery)`（`ports/archive_repository.py:120-123`）——`plan_id=None` 即全量跨 plan（软删过滤+archived_at 降序+offset/limit 1-1000 默认 20，PG `_do_find` :233-250）；`ArchiveQuery` 15 键值对象（:39-75）；`strategic_archives` 表（008 migration，plan_id 列 nullable） | **应用层服务首个消费**：多项目段 = find 全量→distinct plan_id 分组→每 plan 归档计数+最新活动时间；`plan_id=None` 行剔除（`StrategicArchive.plan_id: UUID \| None` 可空——不变量仅 ASSUMPTION/DECISION/DEVIATION 强制非空亲验 :48-58，EVIDENCE_PACKAGE 思维链归档恒带 plan_id 但防御性剔除注记） |
+| 跨 plan 清单查询面（3-10/6-4） | `ArchiveRepositoryPort.find(ArchiveQuery)`（`ports/archive_repository.py:123-131`）——`plan_id=None` 即全量跨 plan（软删过滤+archived_at 降序+offset/limit 1-1000 默认 20，PG `_do_find` :233-250）；`ArchiveQuery` 14 键值对象（字段区 :62-75）；`strategic_archives` 表（008 migration，plan_id 列 nullable 无外键——None 行预置可行） | **视图服务首个全量清单消费**：多项目段 = find 全量→distinct plan_id 分组→每 plan 归档计数+最新活动时间；`plan_id=None` 行剔除（`StrategicArchive.plan_id: UUID \| None` 可空——不变量仅 ASSUMPTION/DECISION/DEVIATION 强制非空亲验 :48-53，EVIDENCE_PACKAGE 思维链归档恒带 plan_id 但防御性剔除注记） |
 | 单 plan 视图族（6-8/6-9） | `ExecutiveViewPort` 四段（planning/approval/audit/report——`ReportSection` 8 键单 plan 最新报告概况 :152-167）+ `AnalystViewPort` 三段（toolbox/progress/traceability）+ CLI `executive-view`/`analyst-view`（均 `--plan-id` 必填） | **不重复**：单 plan 报告概况/审批/审计/进度/溯源面零消费（6-8/6-9 已交付）；本 Story 是**跨 plan 全局面**（视图族中首个零 plan_id 输入命令——语义正当性：多项目管理面板本义跨 plan）；6-8 `ReportSection`（单 plan 可得性）与 6-10 `ExportSection`（跨 plan 派生计数+全局最新 PDF 定位）**语义正交非演进**（OD-7 分立声明） |
 | 品牌模板配置实现（6-11 归属） | **未立项**（6-11 backlog——Logo/配色/字体上传保存、预设 3 套配色/2 种字体、模板复用持久化、reportlab Image 位图渲染、`report-generate` 品牌参数扩展全部归 6-11——6-5b L31/L682/L684 显式移交注记在档；`PdfRendererPort.render` 单参零品牌扩展点亲验 :96；reportlab 硬编码 STSong-Light `_FONT_NAME` :60+灰系颜色 :305/:313/:374-375——词族 brand/white_label/logo src+tests+configs 零命中亲验） | **不实现配置**：品牌段 = 配置状态展示面（V1 恒「未配置（系统默认）」静态段——零 IO）；configured 键是 6-11 对接锚（届时端口演进 v1.1.0 读配置面——docstring 触发器注记）；`BrandSection` 值级断言=V1 时点事实断言（6-11 实施后 configured 可 True——预期演进信号，非 flake） |
 | 白标 REST 导出面（Epic 20） | `POST /reports/whitelabel` 归 FR-SP-16 P2 → Epic 20 Story 20.4（epics L600/L714）——未立项 | **不做**（CLI-only 第九连+REST 白标 API 归 Epic 20——openapi.yaml 零 diff） |
-| 多租户存储隔离（1-11/后续） | 1-11 交付**合规面**（敏感检测/数据驻留/跨境审批——`test_acceptance_data_sovereignty_isolation.py`）；Schema per Tenant 仅架构文档设计（arch-appendix :1297-1362 伪码，`SET search_path` src 零命中亲验）；strategic_reports/strategic_archives **均无 tenant 列**；MVP 单租户 `MVP_TENANT_ID`（`pdf_report.py:54-58` docstring「多租户归后续 Story」先例） | **展示口径非实现**：面板查询天然 schema-scoped（PG 连接绑定 schema——测试面 TestTenant UUID 前缀 schema 隔离继承）；验收 S11 断言「面板仅见本租户 schema 预置行」隔离继承口径；「Schema per Tenant 完整实现归租户管理后续 Story」docstring+OD-1 注记 |
+| 多租户存储隔离（1-11/后续） | 1-11 交付**合规面**（敏感检测/数据驻留/跨境审批——`test_acceptance_data_sovereignty_isolation.py`）；Schema per Tenant 仅架构文档设计（arch-appendix :1297-1362 伪码，`SET search_path` src 零命中亲验）；strategic_reports/strategic_archives **均无 tenant 列**；MVP 单租户 `MVP_TENANT_ID`（`pdf_report.py:54-58` docstring「多租户归后续 Story」先例） | **展示口径非实现**：测试面为共享库单 schema（R1 亲验——验收/集成均无 per-test schema 切换；预置行以 plan_id TestTenant UUID 前缀区分）；验收 S11 断言=正向可见性（预置 plan 可见+值级直推——「零跨漏」排他断言共享单 schema 下不可判别[OD-13]，隔离语义本体归 1-11 合规面测试承载）；「Schema per Tenant 完整实现归租户管理后续 Story」docstring+OD-1 注记 |
 | 批量报告管线（L129 锚） | `orchestration_service/data_pipeline` 轨休眠——再锚定条件原文含「6-11 白标多用户场景或 Epic 7」（deferred-work L129） | **显式不做批量导出**（OD-8 第五轮同构裁定+本 Story 主动收窄声明：白标导出=单 plan 单次生成归 report-generate 既有入口；多项目批量导出管线不立项——L129 锚位维持「6-11/Epic 7 再锚定」不变） |
 | 进度可视化（6-8/6-9 既有） | planning 快照 latest 读（`blm-planning-{plan_id}` TTL 86400——**不可作持久清单源**：过期即失）；`SnapshotRepositoryProtocol` 仅 save/load/delete 无 scan（亲验 :20/:28/:39——多项目面板快照扫描方案不可行） | **项目行不含进度列**（OD-5 裁定：进度可视化归 6-9 analyst-view 单 plan 面两视图正交；快照 TTL 24h 过期→「进度未知」列语义不稳，不入面板） |
 
@@ -41,7 +41,7 @@
 
 ### AC-1: 三段聚合数据结构（ConsultantView 键契约）
 
-**Given** 当前租户 schema 下已存在跨 plan 数据（≥2 个 plan 的思维链归档行族——6-4/6-7 形态 EVIDENCE_PACKAGE 行带 plan_id；其中 plan-A 另有 markdown+pdf 两报告行、plan-B 仅 markdown 报告行——L2 `strategic_reports` 行直写预置），品牌配置面未实施（6-11 backlog——系统默认态是唯一可达形态）
+**Given** 测试库已预置跨 plan 数据（≥2 个 plan 的思维链归档行族——6-4/6-7 形态 EVIDENCE_PACKAGE 行带 plan_id；其中 plan-A 另有 markdown+pdf 两报告行、plan-B 仅 markdown 报告行——L2 `strategic_reports` 行直写预置；预置时间戳用**未来偏移构造**（基准 now+微秒递减——find 无时间窗过滤无出窗风险，与 6-8 审计窗「未来偏移出窗」教训场景分立注记；保证预置行恒新于共享库背景行→行序/latest_pdf 断言免疫背景行），品牌配置面未实施（6-11 backlog——系统默认态是唯一可达形态）
 **When** 顾问请求顾问视图（编程面 `ConsultantViewService.build_consultant_view()` 或 CLI `consultant-view`——**零输入参数**，全局多项目面板）
 **Then** 返回 `ConsultantView` **5 键** frozen VO（`generated_at`/`build_degraded`/`projects`/`brand`/`export`——全键契约见 Task 0.1 冻结表；**顶层无 plan_id 键**——全局视图零输入 OD-1 钦定，与 6-8 `ExecutiveView` 8 键/6-9 `AnalystView` 6 键的分立点），三段各自键恒在：
 - **多项目段** `ProjectsSection` **4 键**：`available`（==plan_count>0——有规划活动项目在位）/`degraded`（段级降级哨兵——find 异常或循环读异常两源）/`plan_count`（distinct plan_id 计数）/`projects`（tuple[`ProjectSummary` **6 键**：plan_id[str 化钦定——实体 UUID→str，6-8 report_id 同款]/archive_count[该 plan 归档行数]/latest_activity_at[该 plan 最大 archived_at ISO]/latest_report_type[None|\"markdown\"|\"pdf\"——get_latest_by_plan 循环派生]/latest_report_at/latest_degraded_section_count]——**行序钦定 latest_activity_at 降序、tie-break plan_id 字典序升序**（确定性排序——顾问作业面「最新活动优先」语义））
@@ -51,24 +51,24 @@
 **And** 顶层 `generated_at` 为 ISO 字符串（`datetime.now(UTC).isoformat()`——服务入口**单时间锚**取一次 now，6-8/6-9 单锚派生直系第三连；三段值全派生自既有单源（归档行/报告行）——**服务不新算任何跨源复合指标**（导出段计数=项目段循环结果的纯投影，单源纪律 OD-7））
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据场景：5 键 exact set（`{f.name for f in fields(ConsultantView)}`）+ 三段嵌套键集各自 exact set + 值级断言（plan_count==2/两行 archive_count 与预置直推/latest_pdf 定位三键与预置直推）
+- [ ] 全数据场景：5 键 exact set（`{f.name for f in fields(ConsultantView)}`）+ 三段嵌套键集各自 exact set + 值级断言（**差值口径 OD-13**：预置前后 distinct plan 集差=={plan-A,plan-B}——共享库背景行免疫；两预置行 archive_count 与预置直推/latest_pdf 定位三键与预置行直推[预置 pdf 行 created_at 未来偏移→恒为全库最新]）
 - [ ] `ProjectSummary` 6 键 exact set + `BrandSection` 5 键 exact set + `ExportSection` 7 键 exact set（投影白名单防扩散）
-- [ ] 计数恒等式（判别锚）：`plans_with_reports == sum(1 for p in projects.projects if p.latest_report_type is not None)` + `plans_with_latest_pdf == sum(1 for p in projects.projects if p.latest_report_type == "pdf")` + `plan_count == len(projects.projects)`
+- [ ] 计数恒等式（判别锚）：`plans_with_reports == sum(1 for p in projects.projects if p.latest_report_type is not None)` + `plans_with_latest_pdf == sum(1 for p in projects.projects if p.latest_report_type == "pdf")` + `plan_count == len(projects.projects)`（恒等式是 VO 内部不变量——对任意行集成立，背景行免疫，验收面直接断言）
 - [ ] brand 恒值事实断言（V1 时点——configured is False + 三 status 值级；6-11 演进信号注记落 docstring）
 
 ### AC-2: 多项目段聚合（跨 plan 清单+每 plan 交付物概况）
 
-**Given** 三个 plan 预置形态：**plan-A**（3 条归档行+markdown+pdf 报告行——pdf created_at 最新）、**plan-B**（2 条归档行+仅 markdown 报告行）、**plan-C**（1 条归档行+零报告行——「有活动无交付物」形态）；另预置 1 条 `plan_id=None` 归档行（EVIDENCE_PACKAGE 可空防御形态）
+**Given** 三个 plan 预置形态：**plan-A**（3 条归档行+markdown+pdf 报告行——pdf created_at 最新）、**plan-B**（2 条归档行+仅 markdown 报告行）、**plan-C**（1 条归档行+零报告行——「有活动无交付物」形态）；另预置 1 条 `plan_id=None` 归档行（EVIDENCE_PACKAGE 可空防御形态）；**预置归档行 archived_at 与报告行 created_at 均用未来偏移构造**（基准 now 起微秒级递减分配——三 plan 的 latest_activity_at 相互判别+恒新于共享库背景行——背景行免疫 OD-13；无时间窗过滤无 6-8 出窗风险）
 **When** 构建顾问视图
-**Then** 项目段与归档单源一致：`plan_count == 3`（**None 行剔除**——`plan_id=None` 行不入清单，防御性注记：当前写侧思维链归档恒带 plan_id，None 仅可达于手工修数/未来写入方，读侧守卫廉价且诚实）；`projects` 行序 `plan-A 首位`（预置其最新 archived_at 晚于 B/C——降序判别）+plan-B/plan-C 按 latest_activity_at 降序继后；每行 `archive_count` 与预置行数直推（3/2/1）、`latest_activity_at`==该 plan 归档行最大 archived_at、plan-A/plan-B `latest_report_type`==预置最新报告类型、**plan-C 三报告键全 None**（「有活动无交付物」诚实态——无报告非降级）
+**Then** 项目段与归档单源一致（**背景行免疫口径 OD-13**）：预置前后 distinct plan 集差=={plan-A,plan-B,plan-C}（差值==3——**None 行剔除判别含于差值**：`plan_id=None` 行不入清单不扩集，防御性注记：当前写侧思维链归档恒带 plan_id，None 仅可达于手工修数/未来写入方，读侧守卫廉价且诚实）；`projects` 行序——**预置三 plan 恒占清单首三**（预置行 archived_at 未来偏移恒新于背景行）且首三内部序==plan-A→plan-B→plan-C（降序判别——plan-A 最新偏移）；每预置行 `archive_count` 与预置行数直推（3/2/1）、`latest_activity_at`==该 plan 归档行最大 archived_at、plan-A/plan-B `latest_report_type`==预置最新报告类型、**plan-C 三报告键全 None**（「有活动无交付物」诚实态——无报告非降级）
 **And** 查询口径钦定：`ArchiveQuery(plan_id=None, limit=1000)`（**上限声明**：单租户 MVP 量级归档行数 << 1000；超限截断是 MVP 外量级——docstring 风险注记「归档行超千级触发 SQL 化清单端口立项锚 Epic 7/21」；默认 limit 20 显式覆写 1000——find 默认 20 行会截断多项目面板，**禁用默认值**是本段正确性前提）
 **And** 报告概况循环口径：逐 plan `get_latest_by_plan(uuid.UUID(plan_id))`（N+1 点查形态——MVP plan 数个位数量级 <50ms 实测预期；**风险注记**：plan 数百级时 N+1 成热点，「DISTINCT plan_id+JOIN LATERAL 单查询化」立项锚 Epic 7/21，docstring 承载）；单 plan 点查异常→该行报告列 None+**双段 degraded=True**（保守诚实——「拿不到」与「没有」经段哨兵区分，行内 None 同形但段降级标记在场）
 
 **验证标准/Validation Criteria:**
-- [ ] 三 plan 清单值级断言（plan_count/行序/archive_count/latest_activity_at/latest_report_type 逐行）
-- [ ] None 行剔除断言（预置 None 行后 plan_count 仍 3——防御格）
+- [ ] 三 plan 清单值级断言（差值==3/预置行占首三+内部降序/逐行 archive_count/latest_activity_at/latest_report_type——背景行免疫 OD-13）
+- [ ] None 行剔除断言（预置 None 行后差值仍恰三 plan——None 行不扩集，防御格）
 - [ ] plan-C 零报告行报告三键 None（有活动无交付物形态）
-- [ ] 排序判别锚（plan-A 最新活动时间戳构造晚于 plan-B ≥1s——降序断言可判别；同时间戳 tie-break plan_id 字典序单测承载）
+- [ ] 排序判别锚（预置三行未来偏移内部递减≥微秒量级——降序+首三占位断言可判别；同时间戳 tie-break plan_id 字典序单测承载）
 - [ ] limit=1000 覆写断言（服务源码 getsource 锚或行为断言——默认 20 截断形态红）
 
 ### AC-3: 品牌段（V1 恒系统默认态——6-11 对接锚）
@@ -85,29 +85,30 @@
 
 ### AC-4: 导出段（跨 plan 报告派生+最新 PDF 定位）
 
-**Given** AC-2 预置形态（plan-A markdown+pdf——pdf 最新；plan-B 仅 markdown；plan-C 零报告）
+**Given** AC-2 预置形态（plan-A markdown+pdf——pdf 最新；plan-B 仅 markdown；plan-C 零报告；预置报告行 created_at 未来偏移恒新于背景行——latest_pdf 三键免疫背景行 OD-13）
 **When** 构建顾问视图
-**Then** 导出段为项目段循环结果的**纯投影派生**（零新读——服务仅两读源 archives+reports，导出段不发起第三次 IO）：`plans_with_reports == 2`（A/B——C 不计）/`plans_with_latest_pdf == 1`（A）/`latest_pdf_plan_id == 预置 plan-A`/`latest_pdf_object_key == 预置 pdf 行 file_path`（L4 对象键 `reports/{plan_id}/{report_id}.pdf` 直传）/`latest_pdf_generated_at == 预置 pdf 行 created_at ISO`
+**Then** 导出段为项目段循环结果的**纯投影派生**（零新读——服务仅两读源 archives+reports，导出段不发起第三次 IO）：预置面断言——plan-A/plan-B 行 `latest_report_type` 非None/plan-A 行 =="pdf"（**行级断言按预置 plan 定位——背景行免疫**）；`latest_pdf_plan_id == 预置 plan-A`/`latest_pdf_object_key == 预置 pdf 行 file_path`（L4 对象键 `reports/{plan_id}/{report_id}.pdf` 直传）/`latest_pdf_generated_at == 预置 pdf 行 created_at ISO`（三键绝对断言成立依据：预置 pdf 行未来偏移恒为全库最新）；计数恒等式（AC-1 承载——VO 内部不变量背景行免疫）
 **And** 计数口径注记（OD-7）：`plans_with_latest_pdf` 是「**最新**报告为 pdf 的 plan 数」——历史曾生成 PDF 但 latest 被 markdown 遮蔽的 plan 不计入（latest 遮蔽语义：`get_latest_by_plan` created_at 降序首行唯一——「当前交付物形态」非「累计交付史」；呈现语义=顾问面板关注「现在可交付什么」）
 **And** 零 PDF 形态（全 plan latest 均 markdown 或零报告）→ `available` 判定钦定：`plans_with_reports>0` 即 True（**有报告可导出**——markdown 亦是可交付物；latest_pdf 三键 None+`plans_with_latest_pdf==0` 承载「无 PDF」诚实态——available 不随 PDF 缺席降 False，「可导出」与「已导出 PDF」分立）
 **And** 操作提示归 CLI 承载（AC-6）——导出执行归 `report-generate --plan-id <uuid> --format pdf` 既有入口（6-5b OD-11 单入口钦定；本 Story 零导出执行面）
 
 **验证标准/Validation Criteria:**
-- [ ] 派生计数值级断言（2/1 与预置直推）+ 两计数恒等式（AC-1 承载）
-- [ ] latest_pdf 三键值级与预置 pdf 行直推（plan_id/object_key/generated_at）
-- [ ] 零 PDF 形态断言（仅 markdown 预置 → available True+latest_pdf 三键 None——对照腿）
-- [ ] latest 遮蔽口径单测格（构造 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf==0——判别计数面错接）
+- [ ] 派生行级断言（预置 A/B 行 latest_report_type 非 None/A 行=="pdf"——按预置 plan 定位行断言，背景行免疫）+ 两计数恒等式（AC-1 承载——VO 内部不变量）
+- [ ] latest_pdf 三键值级与预置 pdf 行直推（plan_id/object_key/generated_at——未来偏移保全库最新）
+- [ ] 零 PDF 形态断言（仅 markdown 预置 → latest_pdf 三键 None——对照腿；「available True」按行级差值口径：预置 plan 集 reports 差>0 且 pdf 差==0）
+- [ ] latest 遮蔽口径单测格（构造 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf 不含该 plan——判别计数面错接）
 
 ### AC-5: 段级容错与空态幂等读
 
 **Given** 空租户形态（零归档行零报告行——**brand 段静态恒在**，与数据面正交：空租户的品牌段照常返回默认态五键）或某数据源查询异常（异常形态归单测承载——验收面真实服务无故障注入通道，6-8 AC-5/6-9 AC-5 分立裁定直系第三连）
 **When** 构建顾问视图
 **Then** **段级独立容错**（6-8/6-9 段级容错直系延续+本 Story 双段联动特有面）：`archive find` 异常 → projects 段 `degraded=True`（plan_count=0+projects 空 tuple+available=False——段值降默认）+ **export 段连带 `degraded=True`**（派生源受损——available=False+计数 0+latest_pdf 三键 None）+ brand 段照常默认态 + 视图整体不抛 + 顶层 `build_degraded=True`；循环内 `get_latest_by_plan` 单 plan 异常 → 该行报告列三键 None + **双段 degraded=True**（保守诚实裁定——行级 None 与「无报告」同形，段哨兵是唯一区分面；其余 plan 行照常聚合）；brand 段无降级面（零 IO 恒稳）
-**And** 空态幂等读：视图正常返回 5 键（projects.available==False+plan_count==0+空 tuple/export.available==False+计数 0+latest_pdf 三键 None/**brand 段完整默认态五键**（三段中唯一恒数据段——6-9 toolbox 段镜像）、`build_degraded==False`（「没有数据」非「拿不到数据」——6-4/6-6/6-7/6-8/6-9 五连空态分立语义第六连）、**不抛异常**（六先例族））
+**And** 空态幂等读（**断言承载分立 OD-13**：`projects.available==False+plan_count==0+空 tuple/export.available==False+计数 0` 的**绝对空态断言归单测承载**——共享测试库存在背景行（实测 3 条归档行/1 个背景 plan），「零行全库」物理不可构造，单测 find 返回空列表形态承载空态值语义[Task 2 循环 C 空态格]+CLI stub 直构空 VO 格承载空态输出语义；**验收/集成面承载差值口径**——零预置下 distinct plan 集差==∅[零新增] + 视图正常返回 5 键 + **brand 段完整默认态五键**（三段中唯一恒数据段——6-9 toolbox 段镜像，背景行免疫——零 IO 恒在）+ `build_degraded==False`（「没有数据」非「拿不到数据」——6-4/6-6/6-7/6-8/6-9 五连空态分立语义第六连）+ **不抛异常**（六先例族）——6-8 审计窗差值断言体系直系适配[背景行无清理且跨 xdist 组的先例教训]）
 **And** **零输入零守卫面注记**（OD-3）：本 Story 无 plan_id 输入——6-8/6-9 的畸形 plan_id 242 守卫面**语义自然缺席**（零输入即零畸形面，非缺失；用例为 `execute()` 无参透传——242 无触发面是设计结果；验收无 242 场景属正确形态，与 6-8/6-9 的 S7 分立声明）
 
 **验证标准/Validation Criteria:**
-- [ ] 空态幂等读四断言（5 键恒在+build_degraded False+brand 完整默认态+两段空态默认值）
+- [ ] 验收空态幂等读断言（5 键恒在+build_degraded False+brand 完整默认态五键+distinct plan 集差==∅+不抛——差值口径 OD-13）
+- [ ] 绝对空态断言归单测（find 返回空列表 → available False+plan_count 0+空 tuple+计数 0+latest_pdf 三键 None——Task 2 循环 C 空态格承载值语义）
 - [ ] find 异常双段降级归单测（AsyncMock 抛异常 → 双段 degraded+brand 照常+不抛——Task 2 容错矩阵）
 - [ ] 循环单 plan 异常归单测（AsyncMock side_effect 定向抛 → 该行报告列 None+双段 degraded+其余行照常）
 - [ ] 验收面零 mock 红线（段级容错三格全归单测承载——验收场景不设异常注入）
@@ -115,17 +116,17 @@
 ### AC-6: CLI `consultant-view` 命令（顾问交付入口——零参数全局视图）
 
 **Given** 全数据在位（AC-2 形态）
-**When** 执行 `sisys-agent consultant-view`（**零参数**——CLI 族首个零参数查询命令：多项目面板本义跨 plan 全局，无 --plan-id 必填（16 命令族先例均为单 plan 锚定或写命令——本命令语义分立注记）、零可选参数（YAGNI：无过滤/分页/格式需求来源，6-8/6-9 零可选参数裁定直系）
+**When** 执行 `sisys-agent consultant-view`（**零参数——零 add_argument（parser 无任何参数定义）**：16 命令族实测形态为 7 个 `--plan-id` 必填读命令+7 个写命令+2 个 `--agent-id` 锚定读命令（load-profile :255/isolation-status :582）+1 个可选参数全局检索命令（isolation-logs :623——六参数全 required=False 可裸调但带可选过滤/分页面）；consultant-view 是**首个零 add_argument 命令**（参数面真空——与 isolation-logs 的「可裸调但带可选过滤面」分立：全局面板无过滤/分页需求来源，YAGNI，6-8/6-9 零可选参数裁定直系）
 **Then** 三段结构化输出（纯标准库 print——「输出即契约」6-8/6-9 同哲学；无 JSON 输出模式——仓内 CLI 全 stdlib print 惯例）：首行 `顾问视图（全局多项目面板）` + 三段各以 `── {段名} ──` 分隔行承载：
-- 多项目概况：`项目: 共 {plan_count} 个` + 逐项目行（`  {plan_id} | 归档: {n} | 最新活动: {YYYY-MM-DD HH:MM}` + `    最新报告: {type}（{ts}，降级小节 {n}）` 两行形态——plan_id 36 字符+行宽 128 纪律拆两行；无报告行降 `    最新报告: 无`；**段降级时**降 `项目清单获取失败` 单行）
+- 多项目概况：`项目: 共 {plan_count} 个` + 逐项目行（`  {plan_id} | 归档: {n} | 最新活动: {YYYY-MM-DD HH:MM}` + `    最新报告: {type}（{ts}，降级小节 {n}）` 两行形态——信息密度呈现形态拆两行[非源码行宽约束——输出行 ~78 字符本不超 128]；无报告行降 `    最新报告: 无`；**段降级时**降 `项目清单获取失败` 单行）
 - 品牌配置：`品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）` + 恒在注记行 `提示: 品牌模板配置归 Story 6-11（白标报告基础）`（6-11 对接锚的呈现面——提示行恒在非降级行）
 - 白标导出：`可交付: {plans_with_reports} 项目有报告 | 最新 PDF: {n} 项目` + 最新 PDF 定位行（`  最新 PDF: {plan_id}` + `  对象键: {object_key}`——latest_pdf_plan_id None 时降 `  最新 PDF: 无`）+ 恒在提示行 `提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF`（指向既有命令——6-8 :1579「可先执行 report-generate」/6-9「执行 trace-tree」同款形态第三连）
-**And** 退出语义：正常 exit 0（含空态——空态是正常态非错误；空态输出=首行+三段各自空态行[项目段 `项目: 共 0 个` 后无行；品牌段照常两行恒在；导出段 `可交付: 0 项目有报告 | 最新 PDF: 0 项目`+`  最新 PDF: 无`+提示行恒在——**空态三段行形态钉死**：S8 断言可精确落笔]）；`build_degraded` 时首行后追加 `（部分数据降级）`标记（6-8/6-9 降级标记直系）；DomainError 兜底 stderr `[EXCEPTION_{code}]` exit 1（防御性兜底——段级容错下不可达，兜底结构照设五步定式完整性）
+**And** 退出语义：正常 exit 0（含空态——空态是正常态非错误）；**验收输出断言口径（OD-13 背景行免疫）**：CLI 输出含全库行（全局视图本义），验收断言用**包含断言**（预置三 plan 的逐行输出在 stdout 中+品牌段两行+导出段行+提示行逐字 in 断言）与**格式断言**（`项目: 共 ` 前缀+` 个` 后缀模式），**不断言完整输出集/总行数**（背景行计入输出）；「空态输出=`项目: 共 0 个` 后无行」的**精确空态输出断言归 CLI 单测 stub 直构空 VO 格承载**（S8 验收面断言格式模式+brand 两行恒在+提示行恒在+exit 0）；`build_degraded` 时首行后追加 `（部分数据降级）`标记（6-8/6-9 降级标记直系——单测 stub 格承载）；DomainError 兜底 stderr `[EXCEPTION_{code}]` exit 1（防御性兜底——段级容错下不可达，兜底结构照设[名保留注记：五步定式名沿先例、实态四步去守卫步——Task 3 docstring 差异注记]）
 **And** 本 Story CLI 面无角色门槛（「顾问」是 UX 语义——查询命令族先例均无角色检查；RBAC 门槛归 7-2 REST 入口立项时评估——6-8/6-9 同款注记第三连）；**零参数与 D6-9-R1-1 命令族关系注记**：本命令无 `--plan-id` 输入面——**不入**「`*--plan-id` 命令族非 canonical UUID 观察项」波及面（deferred-work L409——该锚处置见 OD-8）
 
 **验证标准/Validation Criteria:**
-- [ ] 全数据输出断言：三段分隔行+项目段首行+三 plan 六行（两行/项目形态）+品牌段两行+导出段三行+提示行（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-9 S8/S9 双清先例）
-- [ ] 空态输出断言（品牌段两行恒在+导出段空态行形态+`项目: 共 0 个`+exit 0）
+- [ ] 全数据输出断言双承载：CLI 单测 stub 格**精确断言**（三段分隔行+项目段首行+三 plan 六行两行/项目形态+品牌两行+导出三行+提示行——stub 数据无背景行可精确）；验收场景**包含断言**（预置三 plan 逐行输出+品牌两行+导出段行+提示行 in stdout+exit 0——CLI in-process 直调，6-9 S8/S9 双清先例；背景行免疫 OD-13）
+- [ ] 空态输出断言双承载：CLI 单测 stub 空 VO 格**精确断言**（`项目: 共 0 个` 后无行+品牌两行恒在+导出空态行）；验收场景**格式断言**（`项目: 共 ` 模式+brand 两行+提示行恒在+exit 0）
 - [ ] 降级标记形态（build_degraded=True → 首行含「（部分数据降级）」——stub 直构降级 VO 单测格）
 - [ ] 零参数断言（parser 无任何 add_argument 调用——getsource 切块断言零参数面；`sisys-agent consultant-view --plan-id x` → argparse unrecognized exit 2 格）
 
@@ -134,13 +135,13 @@
 **Given** 全数据在位（AC-2 形态，服务面已预热）
 **When** 采样计时（20 轮——`sorted(durations)[ceil(0.95*n)-1]` 数学口径，6-3/6-6/6-7/6-8/6-9 五连同款公式与模块级期望常量独立构造）
 **Then** **视图加载 P95<800ms**（epics L2498「视图加载延迟 P95<800ms」的聚合服务面等价口径）：口径 = `build_consultant_view` 服务面窗口（两读源：archive find 1 次 PG 查询[1000 行内聚合在应用层]+plan_count 次 get_latest_by_plan 点查[plan_id 索引命中——017 migration ix_strategic_reports_plan_id]——20 轮数学口径；**N+1 风险注记**：plan 数百级时点查链成热点，「DISTINCT+JOIN LATERAL 单查询化」立项锚 Epic 7/21，落 docstring；**find 截断风险注记**：归档行超 1000 截断——SQL 化清单端口同锚）
-**And** **并发 20 路读**：**20 路并发读**（asyncio.gather 20 路 `build_consultant_view()`——读面幂等无副作用；**服务无状态约束**——SINGLETON 实例并发共享禁持可变实例态——6-8/6-9 同款第三连；20 路结果两两相等断言+全部成功不抛；**对照排除集钦定 {generated_at} 单键**（顶层唯一每次调用新生成键——projects/export 段值在同数据窗内全稳定[读间隔内无写入前提：测试预置后并发窗]/brand 段恒稳——排除集最小化是本 Story VO 设计的直接收益第三连）；逐路对照形态=「dataclasses.asdict 序列化剔除 generated_at 后逐路相等」；**禁 set_session**——每路独立会话天然 per-task 隔离，6-8 R2-F3 C 面纪律直系第三连）
-**And** **「白标报告导出时间<1 分钟」与「多租户隔离测试 100% 通过」为既有面/继承面口径差声明**：导出时间<1min = `report-generate --format pdf` 既有入口的生成性能面（6-5b 性能验收已承载——本 Story 导出段是**导出状态展示面**非导出执行面，同 6-9「溯源跳转<300ms 归 6-7 既有面」裁定形态第三连）；多租户隔离 100% = Schema 隔离继承口径（面板查询 schema-scoped 天然隔离——1-11 合规面测试+TestTenant 测试基建承载；验收 S11 断言「面板仅见本租户预置行」；「Schema per Tenant 完整实现」归租户管理后续 Story——docstring+OD-1 注记）——两项口径差声明落验收/集成 docstring
+**And** **并发 20 路读（对照口径重定义 OD-13——预置子集过滤对照）**：**20 路并发读**（asyncio.gather 20 路 `build_consultant_view()`——读面幂等无副作用；**服务无状态约束**——SINGLETON 实例并发共享禁持可变实例态——6-8/6-9 同款第三连；20 路全部成功不抛；**对照形态=预置 plan 子集过滤后逐路相等**：asdict 序列化后 projects 列表按预置 plan_id 集合 membership 过滤+brand 段逐路相等+每路 build_degraded False——**全集相等断言禁用**：全局无窗查询在并发窗内受其他 worker 写入抖动[6-8 R2-F2「排除集不可收缩」教训同源——收缩为只排 generated_at 假红；且本 Story projects/export 全排除后判别力归零，故改预置子集稳定对照——过滤后子集含背景行免疫的全量键]；**禁 set_session**——每路独立会话天然 per-task 隔离，6-8 R2-F3 C 面纪律直系第三连；Task 5.4 并发变异锚的篡改位同步钦定为「篡改一路的预置 plan 行派生值」（不进过滤对照则变异不红））
+**And** **「白标报告导出时间<1 分钟」与「多租户隔离测试 100% 通过」为既有面/继承面口径差声明**：导出时间<1min = `report-generate --format pdf` 既有入口的生成性能面（6-5b 性能验收已承载——本 Story 导出段是**导出状态展示面**非导出执行面，同 6-9「溯源跳转<300ms 归 6-7 既有面」裁定形态第三连）；多租户隔离 100% = 继承口径（1-11 合规面测试承载；**S11 断言口径 OD-13**：共享测试库单 schema 下「零跨漏」排他断言不可判别——S11 改**正向可见性断言**（预置 plan 在面板可见+值级直推+预置子集差值正确）+隔离继承口径声明 docstring 注记；「Schema per Tenant 完整实现」归租户管理后续 Story——OD-1 注记）——两项口径差声明落验收/集成 docstring；**性能场景背景量级敏感处置**（S9/集成③）：性能窗口含全库 distinct plan 数 N 次点查（N 含背景 plan）——预置前动态清点背景 distinct plan 数，超阈值（50——N+1 风险注记同源门限）`pytest.skip()`（验收动态跳过先例形态）+docstring 声明环境量级敏感性
 
 **验证标准/Validation Criteria:**
-- [ ] 20 轮采样 P95<800ms（预检服务可达+预热含首轮）
-- [ ] 并发 20 路全部成功+两两相等（排除集单键 {generated_at}——asdict 序列化剔除后逐路相等）
-- [ ] 口径差声明落 docstring（导出<1min 归 6-5b 既有面+隔离 100% 继承口径——模块 docstring 承载）
+- [ ] 20 轮采样 P95<800ms（预检服务可达+预热含首轮+背景 distinct plan 数>50 时 pytest.skip 动态跳过——环境量级敏感 OD-13）
+- [ ] 并发 20 路全部成功+预置子集过滤后逐路相等（membership 过滤 projects+brand 段+build_degraded——全集相等禁用 OD-13；6-8 R2-F2 排除集不可收缩教训直系适配）
+- [ ] 口径差声明落 docstring（导出<1min 归 6-5b 既有面+隔离 100% 继承口径+S11 正向可见性口径——模块 docstring 承载）
 
 ---
 
@@ -193,7 +194,7 @@
 - [ ] 功能测试文件：`tests/acceptance/test_acceptance_consultant_view.feature`（12 场景——R6 模板 `test_acceptance_postgresql_relational_layer.feature` 形态：AC 横幅分节+zh-CN 步骤）
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规最新形态：三件套/双清/context dict/CLI 直调/完成清单）
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）；Edge Cases 含空态幂等读+None 行剔除防御形态（异常路径归单测分立——AC-5 裁定）
-- [ ] **BDD 步骤实现约束**：步骤函数 `event_loop.run_until_complete()`；同一中文文本双装饰器支持；禁 `@pytest.mark.asyncio`
+- [ ] **BDD 步骤实现约束**：步骤函数 `event_loop.run_until_complete()`；同一中文文本双装饰器支持（仓内先例锚 `test_acceptance_autonomous_invocation_route.py:505-506`——R1 注记：6-9 验收步骤文本全唯一无此形态）；禁 `@pytest.mark.asyncio`
 
 **Task 0 完成标志：**
 - [ ] 规范项全部定义完毕（键契约/排序与派生口径/端口/12 场景钉死/锚定义务处置）
@@ -315,10 +316,10 @@
 - [ ] Subtask 0.1: 冻结五 VO 键契约（Task 0.1 冻结表落 Dev Agent Record——5/4/6/5/7 键+品牌默认值三常量+PANEL_ARCHIVE_LIMIT——实现禁增删键）
 - [ ] Subtask 0.2: 冻结排序与派生口径（行序 latest_activity_at 降序+plan_id 字典序 tie-break；latest 遮蔽计数口径；None 行剔除；双段联动降级语义——AC-2/AC-4/AC-5 规则逐字冻结）
 - [ ] Subtask 0.3: 定义端口契约（ConsultantViewPort v1.0.0 零参签名+两依赖注册名+组合根落位 :2139 邻位锚）+ 契约测试文件骨架
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死+epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 继承口径）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+归档行预置[6-7 `_archive_row` 直系]+报告行直写[report_repository.save]+PG 三分面通道+CLI 直调 helper；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳判别构造**（plan-A 最新活动晚于 plan-B ≥1s——`datetime` 显式递减微秒偏移构造，禁 `now()` 双调同值形态——6-8 R2 S4「未来秒级 timestamp×闭区间出窗」教训直系））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态——注记型场景禁用]；epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 正向可见性口径[OD-13]）
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+归档行预置[6-7 `_archive_row` 直系]+报告行直写[report_repository.save——集成直写先例 6-8 `_save_report` :504-512 单参形态]+PG 三分面通道+CLI 直调 helper；**py 模块级零 consultant_view 词族 import 硬纪律**——src 符号全部延迟到步骤函数内 import[含类型注解用途——模块级 import 会使收集期 ImportError 全文件 ERROR，S7/S8 exit 2 与 S12 AssertionError 红形态全部不可达——6-9 :55-68 形态逐字复刻]；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳未来偏移判别构造**（预置归档行 archived_at 与报告行 created_at 均自基准 now 起微秒级递减——三 plan 相互判别+恒新于共享库背景行[背景行免疫 OD-13]；find/get_latest_by_plan 均无时间窗过滤、无 6-8 审计窗「未来偏移出窗」风险——场景分立注记；禁 `now()` 双调同值形态）；**基线查询步骤**（各数据场景 Given 含「预置前 distinct plan 基线集已查询」——差值断言的基线锚，6-8 audit_baseline_total :627-641 直系））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
 - [ ] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError）
-- [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——共 11 条）
+- [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——**台账形态：13 个锚位归并 10 行处置+第 11 行不登记新锚裁定=11 行**，计数口径按行[R1 勘误：原稿「共 11 条」与枚举算术 13 锚不自洽]）
 - [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@b9525f8b，实施前复核；本 Story 锚点表按当前 HEAD 校正 6-9 期漂移注记：6-9 故事锚组合根 analyst_view 块 :2102-2139 实测吻合）
 
 **完成标准/Definition of Done:**
@@ -337,7 +338,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_vos.py`（五 VO 键集 exact set+品牌默认值三常量值级断言+PANEL_ARCHIVE_LIMIT==1000 断言+构造守卫 242 三形态：plan_id 非空字符串/计数 ≥0（plan_count/archive_count/三计数）/latest_degraded_section_count ≥0 或 None；frozen 断言 `setattr` 形态——6-9 R1-F9 mypy 教训直系） |
+| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_vos.py`（五 VO 键集 exact set+品牌默认值三常量值级断言+PANEL_ARCHIVE_LIMIT==1000 断言+构造守卫 242 四形态：plan_id 非空字符串/latest_report_type 值域 {None,"markdown","pdf"}/计数 ≥0（plan_count/archive_count/三计数）/latest_degraded_section_count ≥0 或 None；frozen 断言 `setattr` 形态——6-9 R1-F9 mypy 教训直系） |
 | 🟢 绿 | 实现 `src/application/ports/consultant_view.py`（五 frozen dataclass+`__post_init__` 守卫+三品牌常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort Protocol v1.0.0 零参签名） |
 | 🔄 重构 | docstring 全中文 Google 风格+类型注解收口（品牌段 V1 事实断言语义+6-11 对接触发器+禁 import infra 锚注记+font_status 字面量 reportlab :60 单源注记落 VO docstring），运行 `ruff` + `mypy` |
 
@@ -363,7 +364,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_service.py` 循环 A 用例（三段聚合：archive find→ProjectsSection[None 行剔除+分组计数+最新活动+行序降序+循环 get_latest_by_plan 报告概况]；BrandSection[默认值常量构造——零 IO]；ExportSection[纯投影派生——两计数+latest_pdf 三键]——**Mock spec 形态**：archive_repository `AsyncMock(spec=ArchiveRepositoryPort)`+report_repository `AsyncMock(spec=ReportRepositoryProtocol)`（两端口 Protocol 全在册——组合根 interface 注册面，无需具体类 spec）+ `_make_*` 工厂——`_make_archive`（plan_id/archive_type/archived_at 可编程）+`_make_report`（report_type/file_path/created_at 可编程）+`_make_archive_repo`/`_make_report_repo`/`_make_service`） |
+| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_service.py` 循环 A 用例（三段聚合：archive find→ProjectsSection[None 行剔除+分组计数+最新活动+行序降序+循环 get_latest_by_plan 报告概况]；BrandSection[默认值常量构造——零 IO+**行为断言**：`_build_brand` 返回值与三常量恒等断言（服务行为锚——V1 无配置面变异不可构造，行为断言足额注记 R1）]；ExportSection[纯投影派生——两计数+latest_pdf 三键]——**Mock spec 形态**：archive_repository `AsyncMock(spec=ArchiveRepositoryPort)`+report_repository `AsyncMock(spec=ReportRepositoryProtocol)`（两端口 Protocol 全在册——组合根 interface 注册面，无需具体类 spec）+ `_make_*` 工厂——`_make_archive`（plan_id/archive_type/archived_at 可编程——含 archived_at=None 形态）+`_make_report`（report_type/file_path/created_at 可编程）+`_make_archive_repo`/`_make_report_repo`/`_make_service`） |
 | 🟢 绿 | 实现 `src/application/services/consultant_view_service.py` 三段私有方法+`build_consultant_view` 编排（入口单时间锚一次 now——顶层 generated_at 唯一时间键；零参数签名） |
 | 🔄 重构 | 段方法职责收口（每段一方法——`_build_projects`/`_build_brand`/`_build_export`；export 段入参=项目段循环结果——纯投影零 IO 钦定） |
 
@@ -371,8 +372,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编排序与派生矩阵用例（**行序格**：三 plan 活动时间降序+同时间戳 tie-break plan_id 字典序[两 plan 同 archived_at 构造]；**None 行剔除格**：plan_id=None 行混入 → plan_count 不含；**latest 遮蔽格**：同 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf==0；**零 PDF 格**：全 latest markdown → available True+latest_pdf 三键 None；**单报告行格**：latest pdf → 定位三键直推；**limit 覆写格**：find 调用参数断言 limit==1000——spec Mock call_args 锚） |
-| 🟢 绿 | 实现排序与派生（Task 0.2 冻结口径逐字——`sorted(key=(-latest_activity_at, plan_id))` 形态或等价显式比较器；latest 遮蔽口径=get_latest_by_plan 结果直判零补查） |
+| 🔴 红 | 编排序与派生矩阵用例（**行序格**：三 plan 活动时间降序+同时间戳 tie-break plan_id 字典序[两 plan 同 archived_at 构造]；**None 时间戳格**：latest_activity_at=None 行恒排尾[全行 archived_at=None 的 plan 构造——口径一钦定]；**None 行剔除格**：plan_id=None 行混入 → plan_count 不含；**latest 遮蔽格**：同 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf==0；**双 plan pdf 判别格**：两 plan latest 均 pdf 且 latest_report_at 可分 → latest_pdf 三键取最大者[tie-break plan_id 升序构造同时间戳格]——口径三判别；**零 PDF 格**：全 latest markdown → available True+latest_pdf 三键 None；**单报告行格**：latest pdf → 定位三键直推；**limit 覆写格**：find 调用参数断言 limit==1000——spec Mock call_args 锚） |
+| 🟢 绿 | 实现排序与派生（Task 0.2 冻结口径逐字——**两趟稳定排序钦定形态**[plan_id 升序先排+latest_activity_at 归一降序后排]，禁 `key=(-ts, plan_id)` 伪码[str 无一元负]与 `reverse=True` 整键复合反转[tie-break 连带反转]；latest 遮蔽口径=get_latest_by_plan 结果直判零补查；latest_pdf 选择=口径三） |
 | 🔄 重构 | 口径 docstring 化（排序钦定+遮蔽语义+None 剔除+limit 上限风险注记——与 AC-2/AC-4 逐字对齐；N+1 与截断风险立项锚注记） |
 
 #### TDD 循环 C：段级容错与空态幂等读
@@ -386,11 +387,11 @@
 - [ ] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
 - [ ] Subtask 2.2: 🟢 绿 — 三段编排+排序派生+容错实现
 - [ ] Subtask 2.3: 🔄 重构 — 服务代码优化（品牌常量/PANEL_ARCHIVE_LIMIT 单源引用禁字面量——6-9 Subtask 2.3 投影白名单常量教训：值单源在 VO 文件常量，服务禁再镜像第二源）
-- [ ] Subtask 2.4: 🟡 变异 — 规则断言突变实证（行序比较器反转 → 行序格红；latest 遮蔽判定改全量历史 → 遮蔽格红；find 容错改 raise → 容错格红；None 行剔除删除断言侧 → None 格红——还原后全绿）
+- [ ] Subtask 2.4: 🟡 变异 — 规则断言突变实证五锚（行序比较器反转 → 行序格红；latest 遮蔽判定改全量历史 → 遮蔽格红；**双段联动改单段置位**[循环异常只置 projects.degraded 不置 export.degraded] → 循环格联动断言红——OD-12 新容错形态的专属锚；find 容错改 raise → 容错格红；None 行剔除删除断言侧 → None 格红——还原后全绿）
 
 **完成标准/Definition of Done:**
 - [ ] 三段编排+排序派生+容错实现完成
-- [ ] TDD 循环全部通过（变异锚 4 处全实证红→还原绿留痕）
+- [ ] TDD 循环全部通过（变异锚 5 处全实证红→还原绿留痕——含双段联动专属锚）
 - [ ] 覆盖率：服务文件 ≥95%（排序派生三分支+容错两捕获位 100%）
 
 ---
@@ -435,7 +436,7 @@
 
 > **性质说明：** 契约级守护复跑+新增端口契约测试定稿——非功能实现 Task。
 
-- [ ] Subtask 4.1: 端口契约测试五断言族定稿（注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 两依赖注册名锚/resolve 可达 isinstance/方法签名零参——`test_port_contract_analyst_view.py` 逐段对齐；签名断言 `build_consultant_view` == {self} 零参——与 6-8/6-9 {self, plan_id} 分立注记）
+- [ ] Subtask 4.1: 端口契约测试五断言族复跑确认（禁改断言——改动需回 Task 3 循环重走红绿；注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 两依赖注册名锚/resolve 可达 isinstance/方法签名零参——`test_port_contract_analyst_view.py` 逐段对齐；签名断言 `build_consultant_view` == {self} 零参——与 6-8/6-9 {self, plan_id} 分立注记）
 - [ ] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` 6 passed——_FROZEN_EVENT_COUNT=56 零变化；event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 实证）
 - [ ] Subtask 4.3: 回归面验证（四目录全量零失败——6-7/6-8/6-9 既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配[纯新增子命令/注册块——**6-9 教训预防**：新注释块与既有 test_no_optional_arguments/getsource 切块断言边界复核]；archive_repository 既有生产码消费方 REST archive 端点+StalenessWeightService 零影响[find 既有方法消费无签名变化]；report_repository 既有消费方 executive_view_service+report_generation_service 零影响[get_latest_by_plan 消费无变化]）
 - [ ] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出；noqa/type: ignore/pylint disable 全部新增文件零输出）
@@ -456,17 +457,17 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_integration_consultant_view.py`（场景① 全数据三段 round-trip：真实归档行直写[6-7 集成样板——三 plan 形态+None 行]+报告行直写[report_repository.save——plan-A markdown+pdf/plan-B markdown]→服务直调值级断言[plan_count 3/行序 plan-A 首/archive_count 3-2-1/latest_pdf 定位三键/品牌恒默认]（**钦定 chunk_count≠stage_count 同款判别形态：plan-C 零报告行判别「有活动无交付物」、plan-A pdf 最新判别遮蔽口径**）；场景② 空态幂等读（零预置 → 三段空态+brand 完整+不抛）；场景③ 性能 20 轮 P95<800ms（模块级期望常量+sorted 数学口径+预热；C 面禁 set_session）；场景④ 并发 20 路 gather 全成功+两两相等（**排除集单键 {generated_at}** 剔除对照——asdict 序列化形态；禁 set_session）） |
+| 🔴 红 | 编写 `tests/integration/test_integration_consultant_view.py`（**集成面同为共享库**[事务回滚式非独立 schema——背景行同在，OD-13 断言口径同验收面]：场景① 全数据三段 round-trip：真实归档行直写[6-7 集成样板——三 plan 形态+None 行]+报告行直写[report_repository.save——plan-A markdown+pdf/plan-B markdown，预置时间戳未来偏移]→服务直调断言[**差值口径**：预置前后 distinct plan 集差==三 plan/预置行占首三+内部降序/逐行 archive_count 与 latest_report_type 直推/latest_pdf 三键与预置 pdf 行直推/品牌恒默认/计数恒等式三联——VO 内部不变量背景行免疫]（**判别形态**：plan-C 零报告行判别「有活动无交付物」、plan-A pdf 最新判别遮蔽口径）；场景② 空态幂等读（零预置 → distinct plan 集差==∅+5 键恒在+brand 完整+build_degraded False+不抛——差值口径；绝对空态值断言归单测[Task 2 空态格]；6-8 集成侧「绝对空断言不可写 R1-F6」先例直系）；场景③ 性能 20 轮 P95<800ms（模块级期望常量+sorted 数学口径+预热；C 面禁 set_session；**背景 distinct plan 数>50 时 pytest.skip**——环境量级敏感）；场景④ 并发 20 路 gather 全成功+**预置子集过滤后逐路相等**（membership 过滤 projects+brand+build_degraded 对照——全集相等禁用[6-8 R2-F2 直系]；禁 set_session）） |
 | 🟢 绿 | 预置/清理通道落地（归档行+报告行 PG 直写+定向清理[行数断言]；PG 三分面按场景分组——6-8 R2-F3/6-9 直系第三连）+断言通过 |
 | 🔄 重构 | 预置工厂函数收口（`_make_archive_row`/`_make_report_row`——时间戳显式递减微秒偏移构造形态固化） |
 
 - [ ] Subtask 5.1: 🔴 红 — 四场景失败测试
 - [ ] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
 - [ ] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-8；N+1/截断风险注记）
-- [ ] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 2 处：plan_count 断言改 2 → 值级红；并发篡改一路 export 段 → 等价性红——还原后 4 passed）
+- [ ] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 2 处：差值断言改期望集缺一 plan → 值级红；并发篡改一路的**预置 plan 行派生值**[archive_count+1 形态——须进 membership 过滤对照面] → 子集等价性红——还原后 4 passed）
 
 **完成标准/Definition of Done:**
-- [ ] 四场景全绿（真实服务零 mock——P95<800ms 实测通过+并发 20 路排除集单键两两相等通过）
+- [ ] 四场景全绿（真实服务零 mock——P95<800ms 实测通过[背景量级 skip 门]+并发 20 路 subsetting 过滤对照通过[OD-13]）
 - [ ] 性能 P95 断言通过+口径声明落档
 - [ ] 覆盖率：集成新增面 ≥75%
 
@@ -527,7 +528,7 @@
 - **设计约束:** 领域层零依赖（零 domain 改动天然满足）；读侧 DTO 归应用层（五 VO ports 文件承载）；查询不发布事件（architecture.md:1293——引用形态注记+八查询型 Story 零事件族实践）
 - **接口治理:** 统一端口注册（新端口 v1.0.0 一次到位）、Registry/Resolver、组合根唯一装配、契约优先、禁同义接口重复（consultant_view 跨 plan 交付面 vs executive_view 单 plan 速览面 vs analyst_view 单 plan 作业面——三语义正交）；两依赖全既有注册名消费不新开底层端口
 - **技术栈:** Python 3.11+ / PostgreSQL（archive find 1 次+get_latest_by_plan N 次点查——plan_id 索引命中）/ pytest-bdd；品牌段零 IO（应用层常量构造）
-- **关键设计条款:** prd L423-424（MVP 基础多租户+白标输出基础——「品牌元素 100% 准确，导出<1 分钟」验收归 6-11 生成面/6-5b 既有性能面）；prd L1898-1901 FR-SP-16（白标 REST API 归 Epic 20 Story 20.4）；prd L2199-2204 FR-IF-05（三页面角色枚举无顾问）；ux-design-specification L1401-1405（顾问视图=三页面布局的品牌模板化变体——Web 面口径）；interface-design.md 三视图表（高管/分析师/顾问——顾问行同样属陈旧口径族，本 Story 按 epics L2476 现行权威+CLI-only 裁定，6-8/6-9 同款注记先例第三连）
+- **关键设计条款:** prd L423-424（MVP 基础多租户+白标输出基础——「品牌元素 100% 准确，导出<1 分钟」验收归 6-11 生成面/6-5b 既有性能面）；prd L1898-1901 FR-SP-16（白标 REST API 归 Epic 20 Story 20.4）；prd L2199-2204 FR-IF-05（三页面角色枚举无顾问）；ux-design-specification L1401-1405（顾问视图=视图布局差异化表中「基于品牌模板调整」行——Web 面口径）；interface-design.md 13.2 三视图表（:2001-2007——高管/分析师/**企业战略与市场人员**三行，**无顾问行**；:2090「实现 Web 前端三视图[高管/分析师/战略人员]｜Story 6.9/6.10」行是本 Story 真实锚位——顾问视图在 interface-design 的呈现即 CLI-only 裁定与 epics L2476 现行权威一致，6-8/6-9 同款注记先例第三连）
 
 ### 关键架构决策（OD 偏离声明——Task 0 落档）
 
@@ -540,11 +541,12 @@
 | **OD-5** | **多项目段数据源裁定——archives 反推 plan 清单+报告循环 enrichment**：plan 清单 = `ArchiveRepositoryPort.find(ArchiveQuery(plan_id=None, limit=1000))` 全量行 distinct plan_id（**该查询面应用层服务首个消费**——既有生产码消费方仅 REST `/api/v1/archive/entries` 与 StalenessWeightService 兜底链；find 现成跨 plan 查询零新端口零新 SQL——纯三零 Story 的关键裁定）；`plan_id=None` 行剔除（实体可空亲验 :55——防御性守卫）；每 plan 报告概况 = 循环 `get_latest_by_plan`（N+1 点查——plan_id 索引命中 MVP 量级 <50ms；**风险注记双联**：plan 数百级 N+1 成热点+归档行超 1000 截断——「DISTINCT+JOIN LATERAL 单查询化/SQL 清单端口」立项锚 Epic 7/21，docstring 承载）；**项目行不含进度列**（进度可视化归 6-9 analyst-view 单 plan 面两视图正交；快照 TTL 86400 过期语义不稳+SnapshotRepositoryProtocol 无 scan 亲验——快照扫描方案结构性不可行亦排除）；**不选** ReportRepository 新增 list 方法（需 domain port 扩展+infra 实现破坏纯三零；get_latest_by_plan 循环已足——报告计数口径本就是「最新分布」非「全史」）；**不选** L4 list_objects/L0 list_memories（L4 仅 PDF 对象+L4/L0 面报告元数据不全——section 双计数在 L2；两源引入第三依赖徒增复杂度） | find 现成面实证+纯三零收益+N+1 风险可控（MVP 量级）+两视图正交原则 |
 | **OD-6** | **品牌段 V1 恒系统默认态+6-11 对接锚**：零 IO 静态段（构造无任何仓储调用——服务 `_build_brand` 纯常量构造）；三常量钦定 ports 文件（BRAND_STATUS_UNCONFIGURED/BRAND_FONT_STATUS——`font_status` 值「STSong-Light（内置）」与渲染器 `_FONT_NAME` :60 冻结字体事实对齐——**字面量承载禁 import infra**：application→infrastructure 依赖方向禁止+锚注记落 docstring）；`configured` 键是 6-11 对接锚（届时品牌配置面落地后本段演进读配置面——端口 v1.1.0 触发器 docstring 注记）；值级断言=V1 时点事实断言（6-11 实施后红是预期演进信号——6-9「23 工具事实断言」语义直系第二连） | 6-11 边界（epics L2036+6-5b 移交注记）+依赖方向矩阵+零 IO 恒稳段设计收益（空态断言可钉死） |
 | **OD-7** | **导出段纯投影派生+latest 遮蔽口径声明**：export 段零新读（入参=项目段循环结果——服务仅两读源 archives+reports，第三段纯投影——单源纪律）；`plans_with_latest_pdf` =「**最新**报告为 pdf 的 plan 数」非「历史曾生成计数」（get_latest_by_plan created_at 降序首行唯一——先生成 PDF 后又生成 markdown 的 plan 其 latest=markdown 不入 pdf 计数——「当前交付物形态」呈现语义：顾问面板关注「现在可交付什么」非「累计交付史」；遮蔽判别格钦定入 Task 2 循环 B）；available==plans_with_reports>0（「可导出」与「已导出 PDF」分立——markdown 亦是可交付物）；与 6-8 `ReportSection`（单 plan 可得性 8 键）**语义正交非演进**（跨 plan 全局投影 vs 单 plan 可得性——两段 VO 各自独立禁共享，消费方/演进节奏不同——6-9 OD-13 两视图正交原则直系第二连） | 单源纪律+呈现语义+读侧投影独立演进原则 |
-| **OD-8** | **性能三段口径声明+锚定义务 11 条处置**：① 视图加载 P95<800ms = `build_consultant_view` 服务面窗口（两读源：find 1 次+N 次点查；20 轮 `sorted[ceil(0.95*n)-1]` 数学口径六连；N+1/截断双风险注记立项锚 Epic 7/21）；② 并发 20 路=零输入全局读 20 路并发（gather+服务无状态+两两相等——**排除集单键 {generated_at}**：projects/export 段同数据窗全稳定+brand 恒稳——排除集最小化第三连；asdict 剔除对照；禁 set_session C 面第三连）；③ 「白标导出<1 分钟」=report-generate 既有入口性能面（6-5b 承载——本 Story 导出段是状态展示面非执行面，6-9「溯源跳转<300ms 归 6-7」裁定形态第三连）+「多租户隔离 100%」=Schema 隔离继承口径（schema-scoped 查询天然隔离+S11 断言+完整实现归租户管理后续 Story）——③ 两项口径差声明落验收/集成 docstring。**锚定义务 11 条**（Task 0.7 落档）：L13 第七轮不触发（无版本统计面）/L17 第七轮同构顺延（纯读侧零图引擎）/L107 不触发（本 Story 零 Skills 消费——无 skill_selector 依赖，比 6-9 更远）/L117+L170 第九连零消费顺延 Epic 8/L127 第七轮不触发（零记忆消费）/L129 **第五轮维持+显式不做批量裁定**（读侧聚合非批量报告管线——本 Story 主动收窄：批量导出不立项，锚位维持「6-11/Epic 7 再锚定」不变）/6.7-DF1·DF2 维持 Epic 21-22/D6-8-R1·R2 第三连维持（新增子命令沿用既有入口形态+json_chain 零触碰）/D6-9-R1-1 **不入命令族注记**（consultant-view 零 --plan-id 输入面——该观察项波及面 `*--plan-id` 命令族不含本命令；deferred-work L409 处置注记追加）/6.5a-DF1·DF2 顺延 Epic 7（REST 导出面/L0 撕裂——CLI-only 形态触发条件不含本 Story） | epics L2498-2500 性能行与 CLI 交付面口径对齐（六连口径差声明纪律）+deferred-work 原文触发条件逐条对表+七轮先例链 |
+| **OD-8** | **性能三段口径声明+锚定义务 11 条处置**：① 视图加载 P95<800ms = `build_consultant_view` 服务面窗口（两读源：find 1 次+N 次点查；20 轮 `sorted[ceil(0.95*n)-1]` 数学口径六连；N+1/截断双风险注记立项锚 Epic 7/21）；② 并发 20 路=零输入全局读 20 路并发（gather+服务无状态+**预置子集过滤后逐路相等[OD-13——全集相等禁用：全局无窗查询并发窗内受其他 worker 写入抖动，6-8 R2-F2「排除集不可收缩」教训同源；membership 过滤 projects+brand 恒稳对照；原「排除集单键 {generated_at}」设计经 R1 证伪废止]**；禁 set_session C 面第三连）；③ 「白标导出<1 分钟」=report-generate 既有入口性能面（6-5b 承载——本 Story 导出段是状态展示面非执行面，6-9「溯源跳转<300ms 归 6-7」裁定形态第三连）+「多租户隔离 100%」=继承口径（1-11 合规面承载+S11 正向可见性断言[OD-13]+完整实现归租户管理后续 Story）——③ 两项口径差声明落验收/集成 docstring。**锚定义务 11 条**（Task 0.7 落档）：L13 第七轮不触发（无版本统计面）/L17 第七轮同构顺延（纯读侧零图引擎）/L107 不触发（本 Story 零 Skills 消费——无 skill_selector 依赖，比 6-9 更远）/L117+L170 第九连零消费顺延 Epic 8/L127 第七轮不触发（零记忆消费）/L129 **第五轮维持+显式不做批量裁定**（读侧聚合非批量报告管线——本 Story 主动收窄：批量导出不立项，锚位维持「6-11/Epic 7 再锚定」不变）/6.7-DF1·DF2 维持 Epic 21-22/D6-8-R1·R2 第三连维持（新增子命令沿用既有入口形态+json_chain 零触碰）/D6-9-R1-1 **不入命令族注记**（consultant-view 零 --plan-id 输入面——该观察项波及面 `*--plan-id` 命令族不含本命令；deferred-work L409 处置注记追加）/6.5a-DF1·DF2 顺延 Epic 7（REST 导出面/L0 撕裂——CLI-only 形态触发条件不含本 Story） | epics L2498-2500 性能行与 CLI 交付面口径对齐（六连口径差声明纪律）+deferred-work 原文触发条件逐条对表+七轮先例链 |
 | **OD-9** | **测试文件命名（禁故事编号后缀）+ 词族统一 consultant_view**：acceptance `test_acceptance_consultant_view.feature/.py`；integration `test_integration_consultant_view.py`（**对 epics L2513 钦定名 `test_consultant_view_integration.py` 的显式偏离**——仓规 test_integration_* 前缀，6-8/6-9 OD-9 同款偏离声明第三连）；unit/architecture `test_consultant_view.py`（**对齐 epics L2512 钦定名**——零偏离）；`consultant` 词族 src+tests+configs+docs/api 零占用亲验（grep 全域零命中）；CLI 子命令 `consultant-view` 无重名亲验（add_parser 16 命令族逐一比对——本 Story 落地后 17）；service 单测 `test_consultant_view_service.py`+VO 单测 `test_consultant_view_vos.py`；契约 `test_port_contract_consultant_view.py`（五断言族） | 记忆「禁止故事编号命名文件」+仓规前缀惯例+词族零占用亲验（epics 钦定名的采纳/偏离逐处声明——6-8/6-9 同款第三连） |
-| **OD-10** | **组合根双注册+两既有依赖复用+CLI 零参数先例**：`consultant_view_service`（SINGLETON——无状态聚合读；lambda resolve 两既有注册名：`archive_repository` :2315[SCOPED v1.1.0]+`report_repository` :3513[SCOPED]——**两 SCOPED 无混态捕获**注记：6-8 三 SCOPED+一 SINGLETON/6-9 两单一 SCOPED 后的最简形态，SINGLETON 捕获 SCOPED 声明照写[CLI 一次性进程+测试双清下无故障面——三连注记先例]）+`consultant_view_use_case`（SINGLETON 透传）；**零新 PG 仓储家族成员/零 infra 面**；两依赖注入端口面（AsyncMock spec=ArchiveRepositoryPort/ReportRepositoryProtocol——两 Protocol 全在册无需具体类 spec）；6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造/无新仓储成员——无 session_factory 缺口面（两仓储均组合根 session_factory 注入形态既有）；**CLI 零参数先例声明**：consultant-view 是 CLI 族首个零参数查询命令（16 命令族先例均 --plan-id 必填或写命令——多项目面板本义跨 plan 全局，语义分立注记落注册块注释；**注释措辞纪律**：禁 `--plan-id`/`--format` 字样入 consultant-view 注释块——防污染既有 getsource 切块断言边界[6-9 R1 实施攻坚教训预防]） | 6-8/6-9 组合根先例+端口 Protocol 在册实证+单租户口径延续+CLI 命令族语义分立 |
+| **OD-10** | **组合根双注册+两既有依赖复用+CLI 零参数先例**：`consultant_view_service`（SINGLETON——无状态聚合读；lambda resolve 两既有注册名：`archive_repository` :2315[SCOPED v1.1.0]+`report_repository` :3513[SCOPED]——**两 SCOPED 无混态捕获**注记：6-8 三 SCOPED+一 SINGLETON/6-9 两单一 SCOPED 后的最简形态，SINGLETON 捕获 SCOPED 声明照写[CLI 一次性进程+测试双清下无故障面——三连注记先例]）+`consultant_view_use_case`（SINGLETON 透传）；**零新 PG 仓储家族成员/零 infra 面**；两依赖注入端口面（AsyncMock spec=ArchiveRepositoryPort/ReportRepositoryProtocol——两 Protocol 全在册无需具体类 spec）；6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造/无新仓储成员——无 session_factory 缺口面（两仓储均组合根 session_factory 注入形态既有）；**CLI 零参数先例声明（R1 修正口径）**：consultant-view 是 CLI 族**首个零 add_argument 命令**（参数面真空）——16 命令族实测形态：7 个 --plan-id 必填读+7 个写命令+2 个 --agent-id 锚定读（load-profile/isolation-status）+1 个可选参数全局检索（isolation-logs :623——六参数全 required=False **可裸调但带可选过滤/分页面**）；语义分立点=「参数面真空」vs isolation-logs 的「零必填含可选面」（多项目面板无过滤/分页需求来源——YAGNI）；语义分立注记落注册块注释；**注释措辞纪律**：禁 `--format` 字样入 consultant-view 注释块（getsource 切块断言实际 token 面——6-8 :3215 检 --window-days/--format、6-9 :3492 检 --format/--category；`--plan-id` 字样禁令为过度谨慎预防位，一并保持） | 6-8/6-9 组合根先例+端口 Protocol 在册实证+单租户口径延续+CLI 命令族语义分立 |
 | **OD-11** | **纯三零 Story：零 domain+零 migration+零 infra**（6-9 直系第二连——Epic 6 视图族两个纯三零连员）：五 VO+三常量全应用层（ports 文件——读侧 DTO 归应用层+消费的两 R1 端口均既有零演进双依据）；本 Story 改动面 = **src 面 3 新建+2 扩展**（新建：ports/consultant_view.py+services/consultant_view_service.py+use_cases/get_consultant_view.py；扩展：agent_cli.py+composition_root.py）；tests 面 8 新建+1 扩展（test_agent_cli.py 扩展）；**架构验证器 C 零命中断言**（src/domain+src/infrastructure 均零 consultant 词命中——与 6-8 白名单形态分立[彼有钦定 infra 增量]、与 6-9 零命中形态直系） | 两源既有零缺口（find 现成跨 plan+get_latest_by_plan 既有）+最小改动面形态 |
 | **OD-12** | **段级容错双段联动+行级同形裁定**：archive find 异常 → projects+export **双段联动降级**（export 派生源受损——段级容错族的复合段新形态：6-8/6-9 各段独立互不波及，本 Story export 段结构性依赖 projects 段循环结果，联动降级是诚实语义非耦合缺陷）；循环内单 plan `get_latest_by_plan` 异常 → 该行报告列三键 None+**双段 degraded=True**（保守诚实裁定：行级 None 与「无报告」同形——段哨兵是唯一「拿不到 vs 没有」区分面[6-7/6-8/6-9 诚实性纪律延续]；否决「行级 degraded 键」备选：判别价值低+VO 键面膨胀，YAGNI）；降级值两形态分立注记（find 级=段值全默认[plan_count 0+空 tuple]；循环级=清单保留+报告列 None——「部分降级」语义 docstring 钦定）；brand 段零降级面（零 IO 恒稳——degraded 键恒 False 是结构性承诺非断言缺失） | 段级容错先例族+派生段结构性依赖+诚实性纪律（「拿不到」vs「没有」两层分立） |
+| **OD-13** | **共享库全局面断言体系（R1 新增——本 Story 特有结构性裁定）**：验收/集成 PG 是**共享库共享 schema**（验收 pg_session 直连 env PG 无 search_path；集成为事务回滚式非独立 schema——ensure_alembic_migration 是默认 schema 全局迁移），库中存在其他测试已提交、无清理、跨 xdist 组的背景行（R1 实测 3 条归档行/1 个背景 plan；6-8 审计周期同源实证）。`find(plan_id=None)` 是 Epic 6 视图族**首个跨 plan 全局无窗查询**——6-8/6-9 单 plan 锚定先例（plan_id 前缀天然免疫背景行）结构性失效。**断言体系四件套**：① 预置时间戳**未来偏移**（基准 now 起微秒递减——预置行恒新于背景行→行序「占首三」/latest_pdf 三键恢复绝对可判别；find/get_latest_by_plan 均无时间窗过滤，无 6-8 审计窗「未来偏移出窗」风险——场景分立注记）；② **差值断言**（distinct plan 集合差==预置集——计数类断言背景行免疫；6-8 audit_baseline_total :627-641 差值体系直系）；③ CLI/清单**包含断言+格式断言**（预置行输出 in stdout/`项目: 共 ` 模式——不断言完整输出集）；④ **绝对空态断言分立**（available==False/plan_count==0/`共 0 个` 精确输出归单测承载[find 空返回格+stub 空 VO 格]；验收/集成承载差值==∅+键恒在——6-8 集成侧「绝对空断言不可写 R1-F6」先例直系）。**并发对照**改预置子集 membership 过滤后逐路相等（全集相等禁用——6-8 R2-F2「排除集不可收缩」直系；projects/export 全排除则判别力归零故改子集对照）。**S11 隔离**改正向可见性（单 schema 下「零跨漏」排他断言不可判别——隔离语义本体归 1-11 合规面测试）。**性能场景**背景量级敏感（全库 distinct plan 数 N 次点查——预置前清点，>50 skip 动态跳过）。**S6 重定义**为单源口径判别场景（零归档+报告行在场→plan 集差==∅——判别清单源纯 archives 反推；原「注记型场景」无 Then 可执行断言[6-9 先例每场景均有断言]废止） | 共享库实证（R1 实测背景行）+6-8 差值断言体系/R2-F2 排除集教训/R1-F6 空断言禁令三大先例直系适配+Gherkin 场景可执行性纪律 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
 
@@ -583,9 +585,9 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 |---|---|---|
 | epics Story 6.10 定义 | `_bmad-output/planning-artifacts/epics_v1.0.md:2476-2516` | AC 三要素/性能三项/测试文件名钦定源（L656/L2020/L2035 依赖行） |
 | 跨 plan 清单查询端口 | `src/domain/ports/archive_repository.py:120-123`（`ArchiveRepositoryPort.find`） | `async def find(self, query: ArchiveQuery) -> list[StrategicArchive]`——**plan_id=None 即全量跨 plan**（软删过滤+archived_at 降序+offset/limit）；本 Story 多项目段数据源 OD-5 钦定 |
-| ArchiveQuery 值对象 | `src/domain/ports/archive_repository.py:39-75` | 15 键 Query Object（plan_id: UUID\|None 默认 None/limit 1-1000 默认 20——**默认 20 截断防御：服务显式传 1000**）；`__post_init__` limit 范围校验 :77-79 |
+| ArchiveQuery 值对象 | `src/domain/ports/archive_repository.py:39-75`（字段区 :62-75） | 14 键 Query Object（R1 勘误：原稿 15 键系误数——plan_id: UUID\|None 默认 None/limit 1-1000 默认 20——**默认 20 截断防御：服务显式传 1000**）；`__post_init__` limit 范围校验 :80-85（超界 clamp 非 raise） |
 | find PG 实现 | `src/infrastructure/storage/postgresql/repository/archive_repository.py:233-250`（`_do_find`） | 软删过滤+多条件+`order_by(archived_at.desc()).offset().limit()`——排序单源（服务层分组不改此序） |
-| StrategicArchive.plan_id 可空 | `src/domain/entities/strategic_archive.py:55`（`plan_id: UUID \| None = None`）+ 不变量 :48-52 | None 行剔除防御依据（OD-5）；archived_at 字段 :70（latest_activity_at 派生源） |
+| StrategicArchive.plan_id 可空 | `src/domain/entities/strategic_archive.py:56`（`plan_id: UUID \| None = None`——R1 勘误原稿 :55 漂 1 行）+ 不变量 :48-53 | None 行剔除防御依据（OD-5）；archived_at 字段 :69（**datetime \| None 可空默认 None**——latest_activity_at 派生源+None 排尾口径依据[R1-B2]） |
 | archive_repository 注册 | `src/composition_root.py:2315-2326` | SCOPED v1.1.0，lambda 注入 session_factory（6-4 CR1-F1 形态第五成员注记）——SINGLETON 服务捕获注记依据 |
 | 报告仓储端口 | `src/domain/ports/report_repository.py:23/:38` | save+`get_latest_by_plan(plan_id: uuid.UUID) -> StrategicReport \| None`（created_at 降序+report_id 降序 tie-break+limit 1——PG :172-177）——报告概况循环数据源 |
 | report_repository 注册 | `src/composition_root.py:3513-3521` | SCOPED v1.0.0，PostgreSQLReportRepository(session_factory 注入)——双模式 fallback（CLI 直调可达 :153-161） |
@@ -599,13 +601,14 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | CLI 注册样板 | `src/entrypoints/agent_cli.py`：analyst-view 注册 :567-580/异步壳 :1620-1629/打印 :1632-1698/五步定式 :1701-1734（`_ensure_bootstrapped` :101）/分发 :2329-2330 | consultant-view 直系样板（argparse；**零参数面**——本 Story 去掉 add_argument 段与守卫步，四步实态+五步定式名保留注记） |
 | CLI 单测样板 | `tests/unit/interfaces/cli/test_agent_cli.py`：6-9 节 :3367-3664（`_make_stub_analyst_view` :3371/`_StubAnalystViewUseCase` :3456/`_patch_analyst_view_entry` :3471-3474） | consultant-view 测试直系复刻（**每命令族专用 patcher 纪律**第三连） |
 | 组合根注册样板 | `src/composition_root.py:2102-2139`（analyst_view 双注册块——主会话亲验吻合） | consultant_view 双注册直系复刻（**追加位 :2139 后**；注释块+两 SCOPED 无混态注记+触发器注记） |
-| 端口契约测试样板 | `tests/contracts/test_port_contract_analyst_view.py`（五断言族 :21-93） | 本 Story 契约测试直系复刻（签名断言零参分立注记） |
+| 端口契约测试样板 | `tests/contracts/test_port_contract_analyst_view.py`（五断言族 :21-92——文件总 92 行，族 2 含两函数） | 本 Story 契约测试直系复刻（签名断言零参分立注记） |
 | 架构验证样板 | `tests/unit/architecture/test_analyst_view.py`（四验证器 :56-197+SERVICE_ALLOWED_PREFIXES :30-37） | 本 Story 架构验证直系复刻（验证器 C 零命中形态——OD-11） |
 | 验收样板（R6 模板） | `tests/acceptance/test_acceptance_postgresql_relational_layer.feature`（243 行）/.py（863 行） | **用户钦定 R6 模板**：AC 横幅分节+@scenario 双行字面量+docstring+pass 形态 |
 | 验收样板（6-9 最新） | `tests/acceptance/test_acceptance_analyst_view.py`（1545 行——R6 合规最新形态） | 三件套 :148-208/双清 :161-167/context dict :177-208/CLI 直调 :717-738——本 Story 直系复刻 |
 | 归档行预置样板 | `tests/acceptance/test_acceptance_traceability_tree.py`：`_archive_row` :319/`_teardown_tree_assets` :473 | 多项目段归档行预置直系样板（6-7 交付——plan_id/archived_at 参数化扩展） |
-| 报告行预置通道 | `report_repository.save(report, metadata)`（PG 直写——6-5a 集成先例）+ `StrategicReport` 构造（八字段） | 报告概况预置直写通道（markdown+pdf 双行+时间戳判别构造） |
+| 报告行预置通道 | `report_repository.save(report)`（PG 直写——**集成直写先例 6-8** `_save_report` acceptance :504-512/integration :383/:454 均单参调用[R1 勘误：原稿「6-5a 集成先例」标签错挂——metadata 两参实调先例仅 6-5a 单测 test_report_repository.py:117]）+ `StrategicReport` 构造（八字段——6-8 `_make_report_entity` :448-461 样板） | 报告概况预置直写通道（markdown+pdf 双行+时间戳未来偏移判别构造[OD-13]） |
 | 6-8 遮蔽教训锚 | 6-8 R2「未来秒级 timestamp×闭区间出窗→递减微秒偏移」裁定 | 预置时间戳判别构造纪律（plan-A 最新活动晚于 plan-B ≥1s 显式偏移——Task 0.5） |
+| 6-8 差值断言体系锚（R1 新增） | `tests/acceptance/test_acceptance_executive_view.py:627-641/:783-788`（audit_baseline_total 基线+delta 断言）+:87-89（R2-F2 排除集不可收缩注记）+`tests/integration/test_integration_executive_view.py:436`（R1-F6「绝对空断言不可写」） | 共享库全局面断言体系先例（OD-13 四件套的直系样板——基线查询/差值/子集对照/空态分立） |
 | report 异常码段 | `src/domain/exceptions/_code_ranges.py:192-212`（490-493 已用注释 :199-208/494-499 预留 :210） | 零新码不占预留依据（OD-3） |
 | 冻结键数基线 | `tests/contracts/test_event_channel_mapping_pdf_report.py:24` 等（三处 56） | `_FROZEN_EVENT_COUNT=56`——零新增事件守护（Task 4.2） |
 | deferred-work 锚位 | `_bmad-output/implementation-artifacts/deferred-work.md`：L13/L17/L107/L117/L127/L129（Epic 6 锚六条）+L369/L370（6.5a-DF）+L395/L396（6.7-DF）+L402/L403（D6-8-R）+L409（D6-9-R1-1） | 锚定义务 11 条处置原文位（Task 0.7——主会话亲验行号 2026-11-08） |
@@ -632,7 +635,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 **来源:** [Story 6-9 分析师视图](./6-9-analyst-view.md)（五轮文档审查+五轮代码审查收敛 done v1.6.0——2026-11-07）+ 6-8（四段聚合+段级容错+audit 白名单投影）+ 6-5a（并发采样）
 
 **关键学习/Key Learnings:**
-- **Agent 误报主会话复核**（五连教训）：调研结论关键锚点主会话亲验后方可入 Story——本 Story 已亲验 18 组关键事实（epics 六行原文/ArchiveQuery 15 键与 limit 默认 20/find PG 实现排序软删/StrategicArchive.plan_id 可空+不变量/archive+report 两注册名行号 lifetime/ReportRepositoryProtocol 仅两方法/StrategicReport 八字段/017 表列+plan_id 索引/PDF_OBJECT_KEY_TEMPLATE/_FONT_NAME :60+render 单参/consultant 词族全域零命中/CLI 16 命令族+样板四区行号/组合根 analyst_view 块 :2102-2139 吻合/_FROZEN_EVENT_COUNT 三处/report 码段 490-493 已用/openapi 零视图端点/deferred-work 11 锚行号/MVP_TENANT_ID docstring 先例）
+- **Agent 误报主会话复核**（五连教训）：调研结论关键锚点主会话亲验后方可入 Story——本 Story 已亲验 18 组关键事实（epics 六行原文/ArchiveQuery 14 键[R1 勘误：创建期自报 15 键系误数——四调研+主会话双重复核定谳 14]与 limit 默认 20/find PG 实现排序软删/StrategicArchive.plan_id 可空+不变量/archive+report 两注册名行号 lifetime/ReportRepositoryProtocol 仅两方法/StrategicReport 八字段/017 表列+plan_id 索引/PDF_OBJECT_KEY_TEMPLATE/_FONT_NAME :60+render 单参/consultant 词族全域零命中/CLI 16 命令族+样板四区行号[命令参数形态 R1 复核补全四分类]/组合根 analyst_view 块 :2102-2139 吻合/_FROZEN_EVENT_COUNT 三处/report 码段 490-493 已用/openapi 零视图端点/deferred-work 11 锚行号/MVP_TENANT_ID docstring 先例）
 - **读侧消费既有冻结面纪律**（6-5b/6-7/6-8/6-9 直系）：两源全既有端口消费零演进——find 既有跨 plan 查询首个应用层消费+get_latest_by_plan 第二消费方循环形态；纯三零第二连
 - **降级哲学段级化演进**（6-5b 节点→6-7 树形→6-8 段级→6-9 段级+两层哨兵→本 Story **双段联动**）：派生段结构性依赖主源段→联动降级诚实语义（OD-12）——段级容错族的复合段新形态
 - **投影白名单+恒在段**（6-8 审计 15 键→6-9 ToolMetadata 18 字段面→本 Story StrategicReport 八字段投影六键）：展示面 VO 只投影消费键（generation_ms/metadata JSONB 不入 ProjectSummary——呈现面零消费）；brand 段零 IO 恒在段（6-9 toolbox 静态恒在段镜像）
@@ -652,7 +655,7 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 其他约束速查
 
-- **风险集中登记**：①口径风险=排序与 latest 遮蔽口径（Task 0.2 冻结唯一版本+单测矩阵全枚举——同时间戳 tie-break 格+遮蔽格）；②契约风险=五 VO 键契约+品牌恒值（Task 0.1 冻结——实现禁增删键禁改默认值）；③清理风险=PG 面三分面（A 编程面回滚式/B CLI 面 clear_session+commit+定向 DELETE 行数断言/C 并发面禁 set_session 每路独立——6-8/6-9 直系第三连；归档行+报告行双资产定向清理）；④判别风险=品牌 V1 事实断言语义注记（防误判 flake——预期演进信号）+行级 None 同形（段哨兵唯一区分面——OD-12）；⑤性能风险=N+1 点查+find 截断双联（MVP 量级远小于门限——立项锚 Epic 7/21 docstring 注记）；⑥装配风险=两依赖注册名漂移（lambda resolve 以 grep 为准——Task 0.8 复核；本 Story 锚点按 HEAD@b9525f8b 校正）
+- **风险集中登记**：①口径风险=排序与 latest 遮蔽与 latest_pdf 选择口径（Task 0.2 冻结五口径唯一版本+单测矩阵全枚举——同时间戳 tie-break 格+遮蔽格+双 plan pdf 判别格+None 时间戳排尾格）；②契约风险=五 VO 键契约+品牌恒值（Task 0.1 冻结——实现禁增删键禁改默认值）；③清理风险=PG 面三分面（A 编程面回滚式/B CLI 面 clear_session+commit+定向 DELETE 行数断言/C 并发面禁 set_session 每路独立——6-8/6-9 直系第三连；归档行+报告行双资产定向清理）；④判别风险=品牌 V1 事实断言语义注记（防误判 flake——预期演进信号）+行级 None 同形（段哨兵唯一区分面——OD-12）；⑤性能风险=N+1 点查+find 截断双联（MVP 量级远小于门限——立项锚 Epic 7/21 docstring 注记）+背景 distinct plan 量级（>50 skip 门——OD-13）；⑥装配风险=两依赖注册名漂移（lambda resolve 以 grep 为准——Task 0.8 复核；本 Story 锚点按 HEAD@b9525f8b 校正）；⑦**共享库背景行风险（R1 新增——本 Story 最大结构性风险）**=全局无窗查询见全库已提交行（R1 实测 3 条背景归档行）——断言体系四件套硬纪律（未来偏移/差值/包含格式/绝对空态分立——OD-13；dev 实施时 Task 0.5/Task 5 场景断言禁回退绝对计数断言）
 - **三条红线**：禁 `raise ValueError` / 手动 HTTPException / 继承内置 Exception（提交前三条 grep 自查零输出）；禁 noqa/type: ignore/pylint disable；提交信息禁 AI 署名
 - **覆盖率**：整体 ≥80%（基线 93%）/ application ≥85%（主改动层——epics L2503 对齐；新增文件 ≥95%）/ domain ≥90% 维持 / 集成 ≥75%（epics L2504 对齐）
 - **验收零 mock 全真实**（pytest.skip() 动态跳过；双通道真实服务——PG 归档行+报告行；段级异常容错归单测 AsyncMock——验收面无故障注入通道，6-8/6-9 分立同款第三连）
@@ -697,25 +700,38 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 **常量冻结**：`BRAND_STATUS_UNCONFIGURED = "未配置（系统默认）"` / `BRAND_FONT_STATUS = "STSong-Light（内置）"` / `PANEL_ARCHIVE_LIMIT = 1000`——三常量均 ports 文件模块级。
 
-构造守卫（`__post_init__` 抛 242）：plan_id 非空字符串；计数 ≥0（plan_count/archive_count/plans_with_reports/plans_with_latest_pdf）；latest_degraded_section_count ≥0 或 None。**空态/段降级共用默认值钦定**：plan_count=0/projects=空 tuple/两计数 0/latest_pdf 三键 None/brand 五键恒默认——brand 段无空态（恒在段）。
+构造守卫（`__post_init__` 抛 242）：plan_id 非空字符串；latest_report_type ∈ {None, "markdown", "pdf"}（值域守卫 R1 补——值域外字符串静默通过会使 plans_with_reports 入计而 pdf 计数漏计，语义悬空）；计数 ≥0（plan_count/archive_count/plans_with_reports/plans_with_latest_pdf）；latest_degraded_section_count ≥0 或 None。**派生键不设守卫的明示裁定（R1）**：available 恒等式（==对应计数>0）不设构造守卫——available 是服务派生投影键，stub 直构矛盾 VO 属测试自身缺陷由断言面暴露，守卫面收窄到「外部输入可错的字段」（plan_id/值域/计数非负），禁扩到服务内派生键。**空态/段降级共用默认值钦定**：plan_count=0/projects=空 tuple/两计数 0/latest_pdf 三键 None/brand 五键恒默认——brand 段无空态（恒在段）。
 
 #### Task 0.2 排序与派生口径冻结
 
 ```python
-# 行序钦定（确定性排序）：latest_activity_at 降序（最新活动优先——顾问作业面语义），
-# 同时间戳 tie-break plan_id 字典序升序（判别确定性）。
-# 实现形态：显式比较器或 sorted(key=(-ts, plan_id)) 等价形态——禁依赖 find 返回序
-#（find 序是行级 archived_at 降序非 plan 聚合序——两序分立注记）。
+# 口径一（行序钦定——确定性排序）：latest_activity_at 降序（最新活动优先——顾问作业面
+# 语义），同时间戳 tie-break plan_id 字典序升序（判别确定性）。latest_activity_at 为
+# None 的行恒排尾（该 plan 全行 archived_at=None 时可达——StrategicArchive.archived_at
+# 可空默认 None，_do_find 的 order_by 不过滤 NULL；None 与 str 不可比较故钦定排尾位）。
+# 实现形态钦定（可执行——str 不支持一元负号，禁写 key=(-ts, plan_id) 伪码；禁
+# reverse=True 整键反转——会连带把 tie-break plan_id 反转为降序）：两趟稳定排序
+#     rows = sorted(rows, key=lambda r: r.plan_id)            # 第二键升序先排
+#     rows = sorted(rows, key=lambda r: r.latest_activity_at or "", reverse=True)
+#     # None 排尾：非 None 时 ISO 字符串字典序==时间序；None 归一 "" 在 reverse 后居尾
+# （等价形态：functools.cmp_to_key 显式比较器；禁依赖 find 返回序——find 序是行级
+#  archived_at 降序非 plan 聚合序，两序分立注记）。
 #
-# latest 遮蔽口径：latest_report_type == get_latest_by_plan 结果直判（created_at 降序
-# 首行唯一）——plans_with_latest_pdf 计「最新为 pdf 的 plan 数」非「历史曾生成计数」
+# 口径二（latest 遮蔽）：latest_report_type == get_latest_by_plan 结果直判（created_at
+# 降序首行唯一）——plans_with_latest_pdf 计「最新为 pdf 的 plan 数」非「历史曾生成计数」
 #（先生成 pdf 后又生成 markdown 的 plan 不入 pdf 计数——「当前交付物形态」呈现语义）。
 #
-# None 行剔除：StrategicArchive.plan_id is None 的行不入 plan 清单（防御性——当前写侧
-# 恒带 plan_id，None 仅可达于手工修数/未来写入方）。
+# 口径三（latest_pdf 三键选择）：latest_pdf_* 取 latest_report_type=="pdf" 的
+# ProjectSummary 中 latest_report_at 最大者（tie-break plan_id 字典序升序——与口径一
+# tie-break 一致；全无 pdf 行时三键 None）。多 plan latest 均 pdf 的取谁由本口径唯一
+# 钦定（禁「行序首个 pdf」备选——两口径在 tie-break 方向分叉）。
 #
-# 双段联动降级：find 异常或循环内单 plan get_latest_by_plan 异常 → projects.degraded
-# 与 export.degraded 同置 True（派生源受损联动）；brand 段零降级面（零 IO 恒稳）。
+# 口径四（None 行剔除）：StrategicArchive.plan_id is None 的行不入 plan 清单（防御性
+# ——当前写侧恒带 plan_id，None 仅可达于手工修数/未来写入方）。
+#
+# 口径五（双段联动降级）：find 异常或循环内单 plan get_latest_by_plan 异常 →
+# projects.degraded 与 export.degraded 同置 True（派生源受损联动）；brand 段零降级面
+#（零 IO 恒稳）。
 ```
 
 （实现形态 dev-story 时按冻结口径落码；四口径与 AC-2/AC-4/AC-5 逐字对齐。）
@@ -728,6 +744,8 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 - 契约测试：`tests/contracts/test_port_contract_consultant_view.py`（五断言族）
 
 #### Task 0.6 逐场景红锚符号表（12 场景预期形态）
+
+> **前置条件（Task 0.5 硬纪律）**：BDD py 模块级零 consultant_view 词族 import——否则收集期 ImportError 全文件 ERROR，下表场景级红形态全部不可达。
 
 | 场景 | 红阶段形态（Task 0.5 运行实测） |
 |---|---|
@@ -742,20 +760,20 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 | 场景 | AC | 内容摘要 |
 |---|---|---|
-| S1 | AC-1 | 全数据三段 5 键 exact set+嵌套键集+值级（AC-1 双 plan 形态：plan_count==2+两行 archive_count 直推+latest_pdf 定位三键+计数恒等式三联——三 plan 扩展形态归 S2） |
-| S2 | AC-2 | 多项目段三 plan 形态（plan-A 活动+双报告/plan-B 活动+markdown/plan-C 活动零报告+None 行剔除——行序降序判别+archive_count 直推+plan-C 报告三键 None） |
-| S3 | AC-3 | 品牌段恒默认态（5 键 exact set+五值级恒等——V1 事实断言语义） |
-| S4 | AC-4 | 导出段派生（计数 2/1+latest_pdf 定位三键与预置直推+零 PDF 对照腿可选归单测） |
-| S5 | AC-5 | 空态幂等读（零预置 → 5 键恒在+brand 完整默认态+两段空态默认值+build_degraded False+不抛） |
-| S6 | AC-5 | 段级容错分立声明（find/循环两分支归单测 AsyncMock——验收面零 mock 红线注记承载） |
-| S7 | AC-6 | CLI 全数据输出（三段分隔行+项目行两行/项目形态+品牌两行+导出三行+提示行——双清直调） |
-| S8 | AC-6 | CLI 空态输出（`项目: 共 0 个`+品牌两行恒在+导出空态行+exit 0） |
-| S9 | AC-7 | 性能 20 轮 P95<800ms（服务面两读窗口） |
-| S10 | AC-7 | 并发 20 路全成功+两两相等（排除集单键 {generated_at}——asdict 剔除对照） |
-| S11 | AC-7 | 租户隔离继承断言（TestTenant schema 内预置 → 面板仅见预置行零跨漏——schema-scoped 继承口径） |
+| S1 | AC-1 | 全数据三段 5 键 exact set+嵌套键集+值级（AC-1 双 plan 形态：**差值==2**+两行 archive_count 直推+latest_pdf 定位三键与预置直推[未来偏移]+计数恒等式三联——三 plan 扩展形态归 S2——背景行免疫 OD-13） |
+| S2 | AC-2 | 多项目段三 plan 形态（plan-A 活动+双报告/plan-B 活动+markdown/plan-C 活动零报告+None 行剔除[差值不含 None 行]——**预置行占首三+内部降序判别**+archive_count 直推+plan-C 报告三键 None） |
+| S3 | AC-3 | 品牌段恒默认态（5 键 exact set+五值级恒等——V1 事实断言语义；零 IO 背景行天然免疫） |
+| S4 | AC-4 | 导出段派生（预置行级断言：A/B 行 latest_report_type 非 None/A 行=="pdf"+latest_pdf 定位三键与预置直推[未来偏移保全库最新]+计数恒等式；零 PDF 对照腿可选归单测） |
+| S5 | AC-5 | 空态幂等读差值口径（零预置 → 5 键恒在+brand 完整默认态+**distinct plan 集差==∅**+build_degraded False+不抛——绝对空态断言归单测[OD-13 分立]） |
+| S6 | AC-5 | **单源口径判别场景**（零归档行预置+报告行在场 → distinct plan 集差==∅[报告行不扩清单]+导出段预置子集计数零新增——判别「plan 清单纯源自 archives 反推」变异[错从报告行聚合 plan 则差值==该 plan 红]；段级容错归单测的注记随场景 docstring 承载） |
+| S7 | AC-6 | CLI 全数据输出包含断言（预置三 plan 逐行输出+品牌两行+导出段行+提示行 in stdout+exit 0——双清直调；完整输出集断言归 CLI 单测 stub 格[OD-13]） |
+| S8 | AC-6 | CLI 空态输出格式断言（`项目: 共 ` 模式+brand 两行+提示行恒在+exit 0；`共 0 个` 精确断言归 CLI 单测 stub 空 VO 格[OD-13]） |
+| S9 | AC-7 | 性能 20 轮 P95<800ms（服务面两读窗口+背景 distinct plan 数>50 时 pytest.skip——环境量级敏感） |
+| S10 | AC-7 | 并发 20 路全成功+**预置子集过滤后逐路相等**（membership 过滤对照——全集相等禁用 6-8 R2-F2 直系[OD-13]） |
+| S11 | AC-7 | 租户隔离**正向可见性**断言（预置 plan 在面板可见+值级直推+预置子集差值正确——「零跨漏」排他断言共享单 schema 下不可判别，归隔离继承口径声明 docstring[OD-13]） |
 | S12 | 收尾 | src+四测试目录完成清单存在性断言 |
 
-（epics L2493-2495 架构测试三项对账：多项目显示测试→S2；白标报告测试→S4+口径差声明[导出执行归 report-generate 既有入口——OD-8 docstring 承载]；多租户隔离测试→S11 继承口径。）
+（epics L2493-2495 架构测试三项对账：多项目显示测试→S2；白标报告测试→S4+口径差声明[导出执行归 report-generate 既有入口——OD-8 docstring 承载]；多租户隔离测试→S11 正向可见性口径[OD-13——1-11 合规面测试承载隔离语义本体]。）
 
 ### 完成清单 Completion Notes List
 
@@ -819,10 +837,29 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
-> 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项（创建期 v1.0.0 未历审查轮——表留空待登记，6-9 创建期同款形态）。
+> 文档审查修订循环 Round 1（D1~D5 形态——四调研 Agent[数据面/CLI 组合根/验收形态/治理面]+主会话亲验+双审查员[①配额降级主会话承接一致性六轴/②可满足性推演全量回归]）。编号 R1-Fn；行号为修复时点快照。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
+| R1-F1 | 「16 命令族先例均为单 plan 锚定或写命令」全称断言失实（isolation-logs :623 六参数全 required=False 可裸调全局检索；load-profile/isolation-status 为 agent-id 锚定只读）——AC-6/OD-10 两处「均」字断言与「CLI 族首个零参数查询命令」论据链断裂 | P0 | AC-6/OD-10 改「首个零 add_argument 命令（参数面真空）」+16 命令实测四分类（7 plan 读+7 写+2 agent 读+1 可选全局检索）+与 isolation-logs 语义分立点重述 |
+| R1-F2 | 共享库全局查询断言体系不可满足：验收/集成 PG 共享库共享 schema（集成为事务回滚式非独立 schema），find(plan_id=None) 全局无窗查询见全库背景行（R1 实测 3 条归档背景行）——S1/S2/S4/S5/S7/S8 绝对计数/行序/空态断言+AC-1「当前租户 schema」表述全部失真；6-8 差值断言体系/R1-F6/R2-F2 三大先例未适配 | P0 | 新增 OD-13 断言体系四件套（预置时间戳未来偏移/distinct plan 集差值/CLI 包含+格式断言/绝对空态断言归单测分立）+8 场景断言口径全面改写（AC-1/2/4/5/6/7+Task 0.5 基线查询步骤+Task 5 集成四场景同步）+风险登记⑦ |
+| R1-F3 | S10 并发「排除集单键 {generated_at}」与 6-8 R2-F2「排除集不可收缩」实证教训冲突（全局无窗查询并发窗内受其他 worker 写入抖动；projects/export 全排除则判别力归零） | P0 | 并发对照改「预置 plan membership 过滤后逐路相等」（AC-7/OD-8②/S10/Task 5 场景④/Task 5.4 变异锚篡改位五处联动改写） |
+| R1-F4 | 排序冻结口径含不可执行伪码（`sorted(key=(-ts, plan_id))`——str 无一元负号；reverse=True 连带反转 tie-break 方向）+latest_activity_at=None 排序位未冻结（StrategicArchive.archived_at 可空默认 None，_do_find 不过滤 NULL） | P1 | Task 0.2 口径一重写：两趟稳定排序钦定形态（可运行示例码+None 归一 "" 降序排尾）+循环 B 增 None 时间戳格+绿格禁伪码/禁整键反转 |
+| R1-F5 | latest_pdf 三键「全局最新 PDF」选择口径未冻结（多 plan latest 均 pdf 时取谁无钦定——单 pdf 预置下两种实现均满足全部已冻结口径） | P1 | Task 0.2 新增口径三（latest_report_at 最大者+tie-break plan_id 升序；禁「行序首个 pdf」备选）+循环 B 增双 plan pdf 判别格 |
+| R1-F6 | S6「段级容错分立声明」注记型场景无 Then 可执行断言（6-9 先例每场景均有断言；Task 0.6 又给它分配红形态——绿阶段断言悬空） | P1 | S6 重定义为「单源口径判别场景」（零归档+报告行在场→plan 集差==∅——判别清单源纯 archives 反推，错接则红；容错分立注记随 docstring 承载） |
+| R1-F7 | ArchiveQuery「15 键」失实（实际 14 键——:62-75 逐字段清点）；StrategicArchive.plan_id :55→:56/archived_at :70→:69 漂移；契约样板 :21-93→:21-92 | P1 | 三处锚点表+范围边界表勘误（R1 勘误内联标注） |
+| R1-F8 | find 既有生产码消费方全称断言失准（漏 SummaryGenerationService :441-446 同形态兜底+第二 REST 端点 /plans/{plan_id}+REST 实经 strategic_archive_service.query_archive :315-325 中继）；「应用层服务首个消费」口径过宽 | P1 | 消费方全景改写（两端点中继+两兜底链）+「首个」限定为「plan_id=None 全量清单形态的视图服务消费」+Task 4.3 回归面补 SummaryGenerationService |
+| R1-F9 | interface-design.md 三视图表无「顾问行」（第三行=企业战略与市场人员视图——原稿「三视图表（高管/分析师/顾问）」失实） | P1 | L530 改真实锚位（:2001-2007 三行实测+:2090「Story 6.9/6.10」行是真实引用位） |
+| R1-F10 | S9 性能背景量级不稳（N=全库 distinct plan 数含背景 plan——环境量级非实现质量；find limit=1000 截断随机丢 plan） | P1 | AC-7/Task 5 场景③/S9 增「预置前清点背景 distinct plan 数>50 pytest.skip」+docstring 环境量级敏感性声明 |
+| R1-F11 | 构造守卫缺口：latest_report_type 值域无守卫（值域外字符串语义悬空）；available 恒等式无守卫也无豁免裁定 | P2 | 守卫清单增值域四形态（Task 0.1 冻结表+Task 1 红格联动）+available 派生键不设守卫的明示裁定（守卫面收窄原则） |
+| R1-F12 | 双段联动（OD-12 本 Story 唯一新容错形态）无变异锚 | P2 | Task 2.4 增第五锚「联动改单段置位→循环格红」+DoD 4→5 联动 |
+| R1-F13 | Task 0.6 符号表成立性系于「py 模块级零 consultant_view import」未钉死（模块级 import→收集期全文件 ERROR→S7/S8/S12 红形态全部不可达） | P2 | Task 0.5 增硬纪律（含类型注解用途禁令——6-9 :55-68 形态逐字复刻）+Task 0.6 表头前置条件注记 |
+| R1-F14 | report_repository.save「6-5a 集成先例」标签错挂（集成直写先例是 6-8 executive_view 单参调用；metadata 两参实调仅 6-5a 单测） | P2 | 锚点表报告行预置通道行改真实先例（6-8 `_save_report` :504-512 单参形态） |
+| R1-F15 | 「锚定义务 11 条」枚举算术不自洽（6+2+2+1+2=13 锚 vs 11 行） | P3 | Task 0.7 改「13 个锚位归并 10 行处置+第 11 行不登记裁定=11 行」计数口径按行（R1 勘误内联） |
+| R1-F16 | 「行宽 128 纪律拆两行」归因不准（输出行 ~78 字符不超源码行宽 128——拆行是信息密度呈现选择） | P3 | AC-6 项目行形态注记改「信息密度呈现形态拆两行[非源码行宽约束]」 |
+| R1-F17 | 「禁 --plan-id 字样入注释块」超出 getsource 断言实际 token 面（实测仅 --format/--category/--window-days） | P3 | OD-10 注释措辞纪律改双注记（实际 token 面锚+--plan-id 保持为过度谨慎预防位） |
+| R1-F18 | 双装饰器先例不在 6-9 文件（实际锚 autonomous_invocation_route:505-506） | P3 | BDD 约束行补真实先例锚注记 |
+| R1-F19 | 调研附带观察：OD-9 词族声明范围（src+tests+configs+docs/api）外有 docs/images/architecture.svg:22 "Consultant View" 图形标签 | 证伪留痕 | 非缺陷——OD-9 声明范围本就限定四代码域且准确（svg 图形域不在内）；登记免后续轮重查 |
 
 ---
 
@@ -855,8 +892,9 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.1.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
+- v1.1.0: 文档审查 Round 1（四调研 Agent+主会话亲验[测试库背景行实测/isolation-logs 参数面亲验/008 migration FK 亲验/排序先例亲验]+审查员②可满足性推演回归+审查员①配额降级主会话承接一致性六轴）——19 项修复登记（P0×3+P1×7+P2×4+P3×4+证伪留痕 1）：**R1-F1** 命令族全称断言失实（isolation-logs 可裸调——「首个零 add_argument」口径重述）；**R1-F2** 共享库全局查询断言体系不可满足（新增 **OD-13 四件套**：未来偏移/plan 集差值/CLI 包含格式/绝对空态归单务——8 场景断言口径全面改写+Task 0.5 基线查询步骤+「当前租户 schema」表述勘误）；**R1-F3** 并发对照与 6-8 R2-F2 冲突（membership 子集过滤对照五处联动）；R1-F4 排序伪码不可执行（两趟稳定排序钦定+None 排尾口径）；R1-F5 latest_pdf 选择口径冻结（口径三新增+双 plan pdf 判别格）；R1-F6 S6 重定义单源口径判别场景；R1-F7~F9/F14 锚点勘误族（14 键/:56/:69/:21-92/save 先例标签/三视图表真实锚位）；R1-F8 find 消费方全景改写+Task 4.3 回归面补全；R1-F10 性能背景量级 skip 门；R1-F11~F13 守卫增值域/第五变异锚/模块级零 import 硬纪律；R1-F15~F18 计数口径/行宽归因/注释纪律双注记/双装饰器先例锚
 - v1.0.0: 创建故事文件（四 Agent 并行调研【报告白标数据面/多项目与快照清单面/CLI+组合根+R6 模板/治理面与范围边界】+主会话亲验 18 组关键锚点；OD-1~OD-12 十二裁定：范围收窄 CLI-only 第九连（零参数全局视图——CLI 族首个零参数查询命令；Web 归 Epic 21/22+顾问角色枚举缺口注记；品牌配置实现归 6-11——品牌段 V1 恒默认态对接锚；白标 REST 归 Epic 20 Story 20.4；批量导出显式不做——L129 第五轮维持）/零新增事件第九连（_FROZEN_EVENT_COUNT=56 零变化）/零新增异常+零 242 消费面（零输入语义自然缺席——report 段 494-499 预留不占）/五 VO 5-4-6-5-7 键契约（顶层无 plan_id 键+brand 零 IO 恒在段+latest 遮蔽计数口径）/多项目段 archives 反推数据源（ArchiveQuery(plan_id=None, limit=1000) find 现成跨 plan 查询首个应用层消费+None 行剔除+N+1 双风险注记立项锚 Epic 7/21+项目行不含进度列两视图正交）/品牌段三常量+禁 import infra（STSong-Light 字面量 :60 锚）/导出段纯投影派生（零新读单源纪律+与 6-8 ReportSection 语义正交）/性能三段口径（P95<800ms 服务面+并发 20 排除集单键第三连+导出<1min 归 6-5b 既有面+隔离 100% 继承口径——口径差声明六连）/锚定义务 11 条处置（L13/L17/L107/L117+L170/L127/L129 六 Epic6 锚+6.5a-DF1·DF2 顺延+6.7-DF1·DF2 维持+D6-8-R1·R2 第三连+D6-9-R1-1 不入命令族注记+品牌对接锚不登记裁定）/命名 consultant_view 词族（integration 前缀对 epics 钦定名显式偏离第三连）/组合根双注册+两 SCOPED 无混态（最简形态）+CLI 注释措辞纪律/纯三零 Story 第二连（零 domain+零 migration+零 infra——src 面 3 新建+2 扩展）/双段联动容错（find 级+循环级两捕获位+行级 None 同形段哨兵区分裁定）；12 验收场景钉死（S1~S12——epics 架构测试三项对账：多项目→S2/白标→S4+口径差声明/隔离→S11 继承口径））
