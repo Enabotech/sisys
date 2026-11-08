@@ -940,11 +940,13 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | R1-F2 | P2 | `test_empty_state_defaults` 半恒真回读（显式传默认值再断言回读）——ExportSection 七键默认值全仓零承载位（服务恒显式传七键、VO 测试经工厂显式传值），默认值漂移无测试变红 | 改零参裸构造断默认（ProjectsSection 四键+ExportSection 七键——find 级降级路径 load-bearing 契约面；突变实证：latest_pdf_plan_id 默认改值→红→还原绿） |
 | R1-F8 | P2 | DoD 完成总结七项全未勾而 v1.4.0 自报「DoD 全过」（6-9 done 终态同位七项全勾——F-1 勾选卫生缺口第三例）；L815「14 锚位」vs Task 0.7「13 锚位」两口分母差无消歧（评审员②发现） | 七项补勾 `[x]`；L815 补分母口径注记（14=锚位行实数[L117/L170 一组两行拆计] vs 13=归并组数——非计数冲突） |
 | R1-F3 | P3 | 「变异 13 锚」计数笔误——分项枚举 2+5+4+2+1=14（与已纠正的 R1-F15/R2-F2 同族；L949/L959 两处；同文件另有 4 处「13 锚位」系 deferred-work 概念不误伤） | 两处 13→14 勘误（评审员①分项亲验闭合） |
-| R1-F4 | P3 | ports :9「Story 6.11」连字符——全仓统一「6-11」（唯一命中位） | 改「6-11」 |
+| R1-F4 | P3 | ports :9「Story 6.11」连字符——src+tests 代码域统一「6-11」（代码域唯一命中位；Story/epics 引文面 4 处 epics 原文点号形态「6.11」合法保留——R2-F2 口径限定补注） | 改「6-11」 |
 | R1-F5 | P3 | `_run_consultant_view` docstring 引用「代码审查 R1-F17」对本 Story 为伪溯源（dev 期照抄 6-9 形态——本 Story 审查无此编号；存量 7 处同注记系 6-4~6-9 期合入不动） | 去编号改实名（「同 _run_analyst_view 注记：resolve 抛出时 finally 仍关闭连接池」——真源性优先于形态统一） |
 | R1-F6 | P3 | 验收 context fixture `_monkeypatch_ref` 登记后全程零消费（死产物；`_capsys_ref` 有两处真消费保留） | 删除该行 |
 | R1-F7 | P3 | Story L128/L417「三 plan 六行」失实——CLI stub 实际 2 plan 四行（判别力等价：两行覆盖有/无报告两形态） | 两处措辞勘误（「两 plan 四行」；L128 同句验收半句「预置三 plan」保留） |
 | R1-F9 | P3 | CLI stub 工厂 docstring「plans 五元组」实列六元素（plan_id/archive_count/latest_activity_at/latest_report_type/latest_report_at/latest_degraded_section_count） | 勘误「六元组」（随 R1-F1 同文件顺手修——评审员②发现） |
+| R2-F1 | P3 | R1-F3 计数勘误的镜像传播漏网：sprint-status.yaml 两处「变异 13 锚」（:31 last_updated 注记+:188 6-10 行——:188 括号分项 2+5+4+2+1=14 与计数词 13 自相矛盾即 R1-F3 诊断的同族笔误原样存于治理镜像文件，R1 提交 6 文件不含该文件——「修一处漏同类处」传播破口，R2-B 发现） | 两处 13→14 同族勘误（grep 验证 0 残留） |
+| R2-F2 | P3 | R1-F4 台账「全仓统一」措辞口径失实——实际仅 src+tests 代码域统一（Story/epics 引文面 4 处 epics 原文「6.11」点号形态合法保留；R2-A 与 R2-B 双 Agent 独立发现） | 台账行补「代码域」限定+引文面保留注记 |
 
 #### 已推迟 Defer（留档注记——非缺陷或先例一致）
 
