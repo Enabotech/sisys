@@ -1,0 +1,862 @@
+# Story 6-10: 顾问视图（三段聚合查询——多项目概况/品牌配置状态/白标导出概况 + CLI `consultant-view`）
+
+**Status:** `ready-for-dev`
+
+> **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
+> 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
+> 运行文档审查修订循环（参照 6-7/6-8/6-9 五轮形态）+ 人工按 story-template 合规清单核对后再执行 `dev-story`。
+
+---
+
+## 📖 Story 描述
+
+**As a** 专业顾问（咨询/投资/银行）,
+**I want** 系统输出顾问视图——单命令聚合多项目概况（跨 plan 归档活动清单+每项目最新报告交付物状态）、品牌模板配置状态（V1 恒系统默认态——配置实现归 Story 6-11）与白标导出概况（可交付项目计数+最新 PDF 定位）三段,
+**So that** 高效交付客户项目并保证品牌一致性——单命令掌握「有哪些客户项目在进行、各项目交付物状态如何、白标 PDF 导出到哪了」（epics L2478-2480 用户价值；L2484-2488 AC 三要素）。
+
+### 业务价值
+
+- **Epic 6 价值组「战略规划与审批能力」的顾问交付面**：生成侧（6-1~6-5b）、审批侧（6-6）、溯源面（6-7）、高管速览面（6-8）、分析师作业面（6-9）已 done，本 Story 交付 **P1-10 顾问视图**——面向交付者的多项目/品牌/导出三合一入口（epics L2020 依赖列钦定「依赖 Story 6.5b」——PDF 报告生成已 done）
+- **范围权威（epics L656 + UX 三页面驾驶舱格局）**：Story 6.10 是「UX 三页面驾驶舱（顾问）」的后端承载位——**Web/前端交互面归 Epic 21/22**（注记：Epic 21 九 Story 与 Epic 22 八 Story 均无顾问专属 Web Story，22.8 角色自适应的角色枚举为高管/分析师/企业战略人员**不含顾问**——顾问 Web 面届时归 22.8 扩展或后续 Web Story 立项，本 Story 不预建）；本 Story 交付其**后端聚合口径与 CLI 呈现**（Epic 6 第九个 CLI-only Story——6.1-DF5 八连先例延续；6-8/6-9「CLI 呈现即 MVP fallback 形态」直系复刻）
+- **FR Coverage Map 无独立 FR（同 6-6/6-7/6-8/6-9 形态第五连）**：白标 REST 面 `POST /reports/whitelabel` 归 FR-SP-16（P2）→ Epic 20 Story 20.4（epics L600 映射行）；品牌模板配置实现（Logo/配色/字体+模板复用持久化）归 Story 6.11「白标报告基础」P0-11（epics L2021/L2518-2561——依赖 6.5a，**backlog 未实施**）；三页面架构+角色自适应归 FR-IF-05 → Story 22.8（prd L2199-2204——角色枚举无顾问）；本 Story 是**聚合展示面**（查询型故事先例族第九连）
+- **激活既有跨 plan 查询面的首个应用层服务消费**：`ArchiveRepositoryPort.find(ArchiveQuery(plan_id=None))`（组合根 `archive_repository` :2315 SCOPED v1.1.0——现成跨 plan 全量清单查询，既有生产码消费方仅 REST `/api/v1/archive/entries`（`interfaces/api/strategic_archive.py:196-204`——plan_id 可选 Query 全局面）与 StalenessWeightService 兜底链）+ `ReportRepositoryProtocol.get_latest_by_plan`（组合根 `report_repository` :3513 SCOPED——6-8 首消费激活后本 Story 第二消费方，循环消费形态）——两既有通道首次跨 plan 单点聚合
+- **Epic 6 内部顺序**：6-9（done，分析师作业面）→ **6-10（本 Story，顾问交付面）** → 6-11 白标报告基础（backlog）
+
+### 范围边界（出处逐行声明）
+
+| 面（出处） | 已交付（禁重复造轮） | 6-10 增量（本 Story） |
+|---|---|---|
+| 报告生成面（6-5a/6-5b） | `ReportGenerationServicePort.generate_markdown_report`（`ports/report_generation.py:69`）+ `PdfReportGenerationServicePort.generate_pdf_report`（`ports/pdf_report.py:118`）；L2 `strategic_reports` 表（017 migration：report_id PK/plan_id 索引/report_type/file_path/section 双计数/generation_ms/metadata JSONB/created_at）；`ReportGenerated` 事件（payload 无 plan_id——`workflow_events.py:57-72`）；CLI `report-generate --plan-id --format {markdown,pdf}`（agent_cli :342-362） | **只查询不生成**：导出段消费 `get_latest_by_plan` 循环派生（报告元数据投影）；生成链零触碰（导出执行归 report-generate 既有入口——「指向既有命令」操作提示形态，6-8 :1579 同款） |
+| 跨 plan 清单查询面（3-10/6-4） | `ArchiveRepositoryPort.find(ArchiveQuery)`（`ports/archive_repository.py:120-123`）——`plan_id=None` 即全量跨 plan（软删过滤+archived_at 降序+offset/limit 1-1000 默认 20，PG `_do_find` :233-250）；`ArchiveQuery` 15 键值对象（:39-75）；`strategic_archives` 表（008 migration，plan_id 列 nullable） | **应用层服务首个消费**：多项目段 = find 全量→distinct plan_id 分组→每 plan 归档计数+最新活动时间；`plan_id=None` 行剔除（`StrategicArchive.plan_id: UUID \| None` 可空——不变量仅 ASSUMPTION/DECISION/DEVIATION 强制非空亲验 :48-58，EVIDENCE_PACKAGE 思维链归档恒带 plan_id 但防御性剔除注记） |
+| 单 plan 视图族（6-8/6-9） | `ExecutiveViewPort` 四段（planning/approval/audit/report——`ReportSection` 8 键单 plan 最新报告概况 :152-167）+ `AnalystViewPort` 三段（toolbox/progress/traceability）+ CLI `executive-view`/`analyst-view`（均 `--plan-id` 必填） | **不重复**：单 plan 报告概况/审批/审计/进度/溯源面零消费（6-8/6-9 已交付）；本 Story 是**跨 plan 全局面**（视图族中首个零 plan_id 输入命令——语义正当性：多项目管理面板本义跨 plan）；6-8 `ReportSection`（单 plan 可得性）与 6-10 `ExportSection`（跨 plan 派生计数+全局最新 PDF 定位）**语义正交非演进**（OD-7 分立声明） |
+| 品牌模板配置实现（6-11 归属） | **未立项**（6-11 backlog——Logo/配色/字体上传保存、预设 3 套配色/2 种字体、模板复用持久化、reportlab Image 位图渲染、`report-generate` 品牌参数扩展全部归 6-11——6-5b L31/L682/L684 显式移交注记在档；`PdfRendererPort.render` 单参零品牌扩展点亲验 :96；reportlab 硬编码 STSong-Light `_FONT_NAME` :60+灰系颜色 :305/:313/:374-375——词族 brand/white_label/logo src+tests+configs 零命中亲验） | **不实现配置**：品牌段 = 配置状态展示面（V1 恒「未配置（系统默认）」静态段——零 IO）；configured 键是 6-11 对接锚（届时端口演进 v1.1.0 读配置面——docstring 触发器注记）；`BrandSection` 值级断言=V1 时点事实断言（6-11 实施后 configured 可 True——预期演进信号，非 flake） |
+| 白标 REST 导出面（Epic 20） | `POST /reports/whitelabel` 归 FR-SP-16 P2 → Epic 20 Story 20.4（epics L600/L714）——未立项 | **不做**（CLI-only 第九连+REST 白标 API 归 Epic 20——openapi.yaml 零 diff） |
+| 多租户存储隔离（1-11/后续） | 1-11 交付**合规面**（敏感检测/数据驻留/跨境审批——`test_acceptance_data_sovereignty_isolation.py`）；Schema per Tenant 仅架构文档设计（arch-appendix :1297-1362 伪码，`SET search_path` src 零命中亲验）；strategic_reports/strategic_archives **均无 tenant 列**；MVP 单租户 `MVP_TENANT_ID`（`pdf_report.py:54-58` docstring「多租户归后续 Story」先例） | **展示口径非实现**：面板查询天然 schema-scoped（PG 连接绑定 schema——测试面 TestTenant UUID 前缀 schema 隔离继承）；验收 S11 断言「面板仅见本租户 schema 预置行」隔离继承口径；「Schema per Tenant 完整实现归租户管理后续 Story」docstring+OD-1 注记 |
+| 批量报告管线（L129 锚） | `orchestration_service/data_pipeline` 轨休眠——再锚定条件原文含「6-11 白标多用户场景或 Epic 7」（deferred-work L129） | **显式不做批量导出**（OD-8 第五轮同构裁定+本 Story 主动收窄声明：白标导出=单 plan 单次生成归 report-generate 既有入口；多项目批量导出管线不立项——L129 锚位维持「6-11/Epic 7 再锚定」不变） |
+| 进度可视化（6-8/6-9 既有） | planning 快照 latest 读（`blm-planning-{plan_id}` TTL 86400——**不可作持久清单源**：过期即失）；`SnapshotRepositoryProtocol` 仅 save/load/delete 无 scan（亲验 :20/:28/:39——多项目面板快照扫描方案不可行） | **项目行不含进度列**（OD-5 裁定：进度可视化归 6-9 analyst-view 单 plan 面两视图正交；快照 TTL 24h 过期→「进度未知」列语义不稳，不入面板） |
+
+---
+
+## ✅ Acceptance Criteria 验收标准
+
+### AC-1: 三段聚合数据结构（ConsultantView 键契约）
+
+**Given** 当前租户 schema 下已存在跨 plan 数据（≥2 个 plan 的思维链归档行族——6-4/6-7 形态 EVIDENCE_PACKAGE 行带 plan_id；其中 plan-A 另有 markdown+pdf 两报告行、plan-B 仅 markdown 报告行——L2 `strategic_reports` 行直写预置），品牌配置面未实施（6-11 backlog——系统默认态是唯一可达形态）
+**When** 顾问请求顾问视图（编程面 `ConsultantViewService.build_consultant_view()` 或 CLI `consultant-view`——**零输入参数**，全局多项目面板）
+**Then** 返回 `ConsultantView` **5 键** frozen VO（`generated_at`/`build_degraded`/`projects`/`brand`/`export`——全键契约见 Task 0.1 冻结表；**顶层无 plan_id 键**——全局视图零输入 OD-1 钦定，与 6-8 `ExecutiveView` 8 键/6-9 `AnalystView` 6 键的分立点），三段各自键恒在：
+- **多项目段** `ProjectsSection` **4 键**：`available`（==plan_count>0——有规划活动项目在位）/`degraded`（段级降级哨兵——find 异常或循环读异常两源）/`plan_count`（distinct plan_id 计数）/`projects`（tuple[`ProjectSummary` **6 键**：plan_id[str 化钦定——实体 UUID→str，6-8 report_id 同款]/archive_count[该 plan 归档行数]/latest_activity_at[该 plan 最大 archived_at ISO]/latest_report_type[None|\"markdown\"|\"pdf\"——get_latest_by_plan 循环派生]/latest_report_at/latest_degraded_section_count]——**行序钦定 latest_activity_at 降序、tie-break plan_id 字典序升序**（确定性排序——顾问作业面「最新活动优先」语义））
+- **品牌段** `BrandSection` **5 键**：`degraded`（恒 False——零 IO 静态段无降级面）/`configured`（恒 False V1——6-11 对接锚）/`logo_status`（恒「未配置（系统默认）」）/`color_scheme_status`（同上）/`font_status`（恒「STSong-Light（内置）」——与渲染器 `_FONT_NAME` 冻结字体事实单源对齐注记：**字面量+docstring 锚承载，禁 import infra**（application 层不得依赖 `src.infrastructure.reporting`——依赖方向矩阵；reportlab_pdf_renderer.py:60 锚注记））
+- **导出段** `ExportSection` **7 键**：`available`（==plans_with_reports>0）/`degraded`（与 projects 段同源联动——派生源受损即降级）/`plans_with_reports`（latest_report_type 非 None 的 plan 数）/`plans_with_latest_pdf`（latest_report_type==\"pdf\" 的 plan 数——**「最新报告类型分布」口径**非「历史曾生成计数」：先生成 PDF 后又生成 markdown 的 plan，其 latest=markdown 不入 pdf 计数——latest 遮蔽语义诚实注记 OD-7）/`latest_pdf_plan_id`/`latest_pdf_object_key`（file_path 直传——PDF 行即 L4 对象键 `reports/{plan_id}/{report_id}.pdf`，`PDF_OBJECT_KEY_TEMPLATE` :79 单源）/`latest_pdf_generated_at`（三键 None 态=零 PDF 最新报告）
+
+**And** 顶层 `generated_at` 为 ISO 字符串（`datetime.now(UTC).isoformat()`——服务入口**单时间锚**取一次 now，6-8/6-9 单锚派生直系第三连；三段值全派生自既有单源（归档行/报告行）——**服务不新算任何跨源复合指标**（导出段计数=项目段循环结果的纯投影，单源纪律 OD-7））
+
+**验证标准/Validation Criteria:**
+- [ ] 全数据场景：5 键 exact set（`{f.name for f in fields(ConsultantView)}`）+ 三段嵌套键集各自 exact set + 值级断言（plan_count==2/两行 archive_count 与预置直推/latest_pdf 定位三键与预置直推）
+- [ ] `ProjectSummary` 6 键 exact set + `BrandSection` 5 键 exact set + `ExportSection` 7 键 exact set（投影白名单防扩散）
+- [ ] 计数恒等式（判别锚）：`plans_with_reports == sum(1 for p in projects.projects if p.latest_report_type is not None)` + `plans_with_latest_pdf == sum(1 for p in projects.projects if p.latest_report_type == "pdf")` + `plan_count == len(projects.projects)`
+- [ ] brand 恒值事实断言（V1 时点——configured is False + 三 status 值级；6-11 演进信号注记落 docstring）
+
+### AC-2: 多项目段聚合（跨 plan 清单+每 plan 交付物概况）
+
+**Given** 三个 plan 预置形态：**plan-A**（3 条归档行+markdown+pdf 报告行——pdf created_at 最新）、**plan-B**（2 条归档行+仅 markdown 报告行）、**plan-C**（1 条归档行+零报告行——「有活动无交付物」形态）；另预置 1 条 `plan_id=None` 归档行（EVIDENCE_PACKAGE 可空防御形态）
+**When** 构建顾问视图
+**Then** 项目段与归档单源一致：`plan_count == 3`（**None 行剔除**——`plan_id=None` 行不入清单，防御性注记：当前写侧思维链归档恒带 plan_id，None 仅可达于手工修数/未来写入方，读侧守卫廉价且诚实）；`projects` 行序 `plan-A 首位`（预置其最新 archived_at 晚于 B/C——降序判别）+plan-B/plan-C 按 latest_activity_at 降序继后；每行 `archive_count` 与预置行数直推（3/2/1）、`latest_activity_at`==该 plan 归档行最大 archived_at、plan-A/plan-B `latest_report_type`==预置最新报告类型、**plan-C 三报告键全 None**（「有活动无交付物」诚实态——无报告非降级）
+**And** 查询口径钦定：`ArchiveQuery(plan_id=None, limit=1000)`（**上限声明**：单租户 MVP 量级归档行数 << 1000；超限截断是 MVP 外量级——docstring 风险注记「归档行超千级触发 SQL 化清单端口立项锚 Epic 7/21」；默认 limit 20 显式覆写 1000——find 默认 20 行会截断多项目面板，**禁用默认值**是本段正确性前提）
+**And** 报告概况循环口径：逐 plan `get_latest_by_plan(uuid.UUID(plan_id))`（N+1 点查形态——MVP plan 数个位数量级 <50ms 实测预期；**风险注记**：plan 数百级时 N+1 成热点，「DISTINCT plan_id+JOIN LATERAL 单查询化」立项锚 Epic 7/21，docstring 承载）；单 plan 点查异常→该行报告列 None+**双段 degraded=True**（保守诚实——「拿不到」与「没有」经段哨兵区分，行内 None 同形但段降级标记在场）
+
+**验证标准/Validation Criteria:**
+- [ ] 三 plan 清单值级断言（plan_count/行序/archive_count/latest_activity_at/latest_report_type 逐行）
+- [ ] None 行剔除断言（预置 None 行后 plan_count 仍 3——防御格）
+- [ ] plan-C 零报告行报告三键 None（有活动无交付物形态）
+- [ ] 排序判别锚（plan-A 最新活动时间戳构造晚于 plan-B ≥1s——降序断言可判别；同时间戳 tie-break plan_id 字典序单测承载）
+- [ ] limit=1000 覆写断言（服务源码 getsource 锚或行为断言——默认 20 截断形态红）
+
+### AC-3: 品牌段（V1 恒系统默认态——6-11 对接锚）
+
+**Given** 品牌配置面未实施（6-11 backlog——词族 brand/white_label/logo src+tests+configs 零命中亲验；`PdfRendererPort.render` 单参零品牌参数亲验 :96）
+**When** 构建顾问视图
+**Then** 品牌段恒系统默认态：`configured is False` + `logo_status == "未配置（系统默认）"` + `color_scheme_status == "未配置（系统默认）"` + `font_status == "STSong-Light（内置）"` + `degraded is False`——**零 IO 静态段**（三段中唯一无数据源段——与 6-9 toolbox 段「静态真源恒有数据」镜像对称：本段是「静态默认态恒在」；空态/降级全场景值恒不变——S5 空态断言可精确落笔）
+**And** 值级断言语义=「V1 交付时点品牌面未配置事实」（6-11 实施后 configured 可 True、logo_status 可为已配置值——断言红是**预期演进信号**非 flake，防面板静默漂移；同 6-9 23 工具事实断言语义）；`font_status` 值与渲染器冻结字体 `_FONT_NAME = "STSong-Light"`（reportlab_pdf_renderer.py:60）事实对齐——**字面量承载禁 import**（依赖方向：application 禁 import infrastructure——`SERVICE_ALLOWED_PREFIXES` 白名单外；锚注记落 VO docstring）
+
+**验证标准/Validation Criteria:**
+- [ ] 品牌段 5 键 exact set + 五值级恒等断言（configured/degraded False+三 status 字面量精确）
+- [ ] V1 事实断言语义注记落 VO docstring（6-11 演进信号+禁 import infra 锚注记）
+- [ ] 空态场景品牌段值恒不变断言（S5 承载——空态与全数据品牌段逐值相等）
+
+### AC-4: 导出段（跨 plan 报告派生+最新 PDF 定位）
+
+**Given** AC-2 预置形态（plan-A markdown+pdf——pdf 最新；plan-B 仅 markdown；plan-C 零报告）
+**When** 构建顾问视图
+**Then** 导出段为项目段循环结果的**纯投影派生**（零新读——服务仅两读源 archives+reports，导出段不发起第三次 IO）：`plans_with_reports == 2`（A/B——C 不计）/`plans_with_latest_pdf == 1`（A）/`latest_pdf_plan_id == 预置 plan-A`/`latest_pdf_object_key == 预置 pdf 行 file_path`（L4 对象键 `reports/{plan_id}/{report_id}.pdf` 直传）/`latest_pdf_generated_at == 预置 pdf 行 created_at ISO`
+**And** 计数口径注记（OD-7）：`plans_with_latest_pdf` 是「**最新**报告为 pdf 的 plan 数」——历史曾生成 PDF 但 latest 被 markdown 遮蔽的 plan 不计入（latest 遮蔽语义：`get_latest_by_plan` created_at 降序首行唯一——「当前交付物形态」非「累计交付史」；呈现语义=顾问面板关注「现在可交付什么」）
+**And** 零 PDF 形态（全 plan latest 均 markdown 或零报告）→ `available` 判定钦定：`plans_with_reports>0` 即 True（**有报告可导出**——markdown 亦是可交付物；latest_pdf 三键 None+`plans_with_latest_pdf==0` 承载「无 PDF」诚实态——available 不随 PDF 缺席降 False，「可导出」与「已导出 PDF」分立）
+**And** 操作提示归 CLI 承载（AC-6）——导出执行归 `report-generate --plan-id <uuid> --format pdf` 既有入口（6-5b OD-11 单入口钦定；本 Story 零导出执行面）
+
+**验证标准/Validation Criteria:**
+- [ ] 派生计数值级断言（2/1 与预置直推）+ 两计数恒等式（AC-1 承载）
+- [ ] latest_pdf 三键值级与预置 pdf 行直推（plan_id/object_key/generated_at）
+- [ ] 零 PDF 形态断言（仅 markdown 预置 → available True+latest_pdf 三键 None——对照腿）
+- [ ] latest 遮蔽口径单测格（构造 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf==0——判别计数面错接）
+
+### AC-5: 段级容错与空态幂等读
+
+**Given** 空租户形态（零归档行零报告行——**brand 段静态恒在**，与数据面正交：空租户的品牌段照常返回默认态五键）或某数据源查询异常（异常形态归单测承载——验收面真实服务无故障注入通道，6-8 AC-5/6-9 AC-5 分立裁定直系第三连）
+**When** 构建顾问视图
+**Then** **段级独立容错**（6-8/6-9 段级容错直系延续+本 Story 双段联动特有面）：`archive find` 异常 → projects 段 `degraded=True`（plan_count=0+projects 空 tuple+available=False——段值降默认）+ **export 段连带 `degraded=True`**（派生源受损——available=False+计数 0+latest_pdf 三键 None）+ brand 段照常默认态 + 视图整体不抛 + 顶层 `build_degraded=True`；循环内 `get_latest_by_plan` 单 plan 异常 → 该行报告列三键 None + **双段 degraded=True**（保守诚实裁定——行级 None 与「无报告」同形，段哨兵是唯一区分面；其余 plan 行照常聚合）；brand 段无降级面（零 IO 恒稳）
+**And** 空态幂等读：视图正常返回 5 键（projects.available==False+plan_count==0+空 tuple/export.available==False+计数 0+latest_pdf 三键 None/**brand 段完整默认态五键**（三段中唯一恒数据段——6-9 toolbox 段镜像）、`build_degraded==False`（「没有数据」非「拿不到数据」——6-4/6-6/6-7/6-8/6-9 五连空态分立语义第六连）、**不抛异常**（六先例族））
+**And** **零输入零守卫面注记**（OD-3）：本 Story 无 plan_id 输入——6-8/6-9 的畸形 plan_id 242 守卫面**语义自然缺席**（零输入即零畸形面，非缺失；用例为 `execute()` 无参透传——242 无触发面是设计结果；验收无 242 场景属正确形态，与 6-8/6-9 的 S7 分立声明）
+
+**验证标准/Validation Criteria:**
+- [ ] 空态幂等读四断言（5 键恒在+build_degraded False+brand 完整默认态+两段空态默认值）
+- [ ] find 异常双段降级归单测（AsyncMock 抛异常 → 双段 degraded+brand 照常+不抛——Task 2 容错矩阵）
+- [ ] 循环单 plan 异常归单测（AsyncMock side_effect 定向抛 → 该行报告列 None+双段 degraded+其余行照常）
+- [ ] 验收面零 mock 红线（段级容错三格全归单测承载——验收场景不设异常注入）
+
+### AC-6: CLI `consultant-view` 命令（顾问交付入口——零参数全局视图）
+
+**Given** 全数据在位（AC-2 形态）
+**When** 执行 `sisys-agent consultant-view`（**零参数**——CLI 族首个零参数查询命令：多项目面板本义跨 plan 全局，无 --plan-id 必填（16 命令族先例均为单 plan 锚定或写命令——本命令语义分立注记）、零可选参数（YAGNI：无过滤/分页/格式需求来源，6-8/6-9 零可选参数裁定直系）
+**Then** 三段结构化输出（纯标准库 print——「输出即契约」6-8/6-9 同哲学；无 JSON 输出模式——仓内 CLI 全 stdlib print 惯例）：首行 `顾问视图（全局多项目面板）` + 三段各以 `── {段名} ──` 分隔行承载：
+- 多项目概况：`项目: 共 {plan_count} 个` + 逐项目行（`  {plan_id} | 归档: {n} | 最新活动: {YYYY-MM-DD HH:MM}` + `    最新报告: {type}（{ts}，降级小节 {n}）` 两行形态——plan_id 36 字符+行宽 128 纪律拆两行；无报告行降 `    最新报告: 无`；**段降级时**降 `项目清单获取失败` 单行）
+- 品牌配置：`品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）` + 恒在注记行 `提示: 品牌模板配置归 Story 6-11（白标报告基础）`（6-11 对接锚的呈现面——提示行恒在非降级行）
+- 白标导出：`可交付: {plans_with_reports} 项目有报告 | 最新 PDF: {n} 项目` + 最新 PDF 定位行（`  最新 PDF: {plan_id}` + `  对象键: {object_key}`——latest_pdf_plan_id None 时降 `  最新 PDF: 无`）+ 恒在提示行 `提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF`（指向既有命令——6-8 :1579「可先执行 report-generate」/6-9「执行 trace-tree」同款形态第三连）
+**And** 退出语义：正常 exit 0（含空态——空态是正常态非错误；空态输出=首行+三段各自空态行[项目段 `项目: 共 0 个` 后无行；品牌段照常两行恒在；导出段 `可交付: 0 项目有报告 | 最新 PDF: 0 项目`+`  最新 PDF: 无`+提示行恒在——**空态三段行形态钉死**：S8 断言可精确落笔]）；`build_degraded` 时首行后追加 `（部分数据降级）`标记（6-8/6-9 降级标记直系）；DomainError 兜底 stderr `[EXCEPTION_{code}]` exit 1（防御性兜底——段级容错下不可达，兜底结构照设五步定式完整性）
+**And** 本 Story CLI 面无角色门槛（「顾问」是 UX 语义——查询命令族先例均无角色检查；RBAC 门槛归 7-2 REST 入口立项时评估——6-8/6-9 同款注记第三连）；**零参数与 D6-9-R1-1 命令族关系注记**：本命令无 `--plan-id` 输入面——**不入**「`*--plan-id` 命令族非 canonical UUID 观察项」波及面（deferred-work L409——该锚处置见 OD-8）
+
+**验证标准/Validation Criteria:**
+- [ ] 全数据输出断言：三段分隔行+项目段首行+三 plan 六行（两行/项目形态）+品牌段两行+导出段三行+提示行（CLI 单测承载完整覆盖；验收场景经 CLI in-process 直调保红——6-9 S8/S9 双清先例）
+- [ ] 空态输出断言（品牌段两行恒在+导出段空态行形态+`项目: 共 0 个`+exit 0）
+- [ ] 降级标记形态（build_degraded=True → 首行含「（部分数据降级）」——stub 直构降级 VO 单测格）
+- [ ] 零参数断言（parser 无任何 add_argument 调用——getsource 切块断言零参数面；`sisys-agent consultant-view --plan-id x` → argparse unrecognized exit 2 格）
+
+### AC-7: 性能与并发（三段口径——OD-8）
+
+**Given** 全数据在位（AC-2 形态，服务面已预热）
+**When** 采样计时（20 轮——`sorted(durations)[ceil(0.95*n)-1]` 数学口径，6-3/6-6/6-7/6-8/6-9 五连同款公式与模块级期望常量独立构造）
+**Then** **视图加载 P95<800ms**（epics L2498「视图加载延迟 P95<800ms」的聚合服务面等价口径）：口径 = `build_consultant_view` 服务面窗口（两读源：archive find 1 次 PG 查询[1000 行内聚合在应用层]+plan_count 次 get_latest_by_plan 点查[plan_id 索引命中——017 migration ix_strategic_reports_plan_id]——20 轮数学口径；**N+1 风险注记**：plan 数百级时点查链成热点，「DISTINCT+JOIN LATERAL 单查询化」立项锚 Epic 7/21，落 docstring；**find 截断风险注记**：归档行超 1000 截断——SQL 化清单端口同锚）
+**And** **并发 20 路读**：**20 路并发读**（asyncio.gather 20 路 `build_consultant_view()`——读面幂等无副作用；**服务无状态约束**——SINGLETON 实例并发共享禁持可变实例态——6-8/6-9 同款第三连；20 路结果两两相等断言+全部成功不抛；**对照排除集钦定 {generated_at} 单键**（顶层唯一每次调用新生成键——projects/export 段值在同数据窗内全稳定[读间隔内无写入前提：测试预置后并发窗]/brand 段恒稳——排除集最小化是本 Story VO 设计的直接收益第三连）；逐路对照形态=「dataclasses.asdict 序列化剔除 generated_at 后逐路相等」；**禁 set_session**——每路独立会话天然 per-task 隔离，6-8 R2-F3 C 面纪律直系第三连）
+**And** **「白标报告导出时间<1 分钟」与「多租户隔离测试 100% 通过」为既有面/继承面口径差声明**：导出时间<1min = `report-generate --format pdf` 既有入口的生成性能面（6-5b 性能验收已承载——本 Story 导出段是**导出状态展示面**非导出执行面，同 6-9「溯源跳转<300ms 归 6-7 既有面」裁定形态第三连）；多租户隔离 100% = Schema 隔离继承口径（面板查询 schema-scoped 天然隔离——1-11 合规面测试+TestTenant 测试基建承载；验收 S11 断言「面板仅见本租户预置行」；「Schema per Tenant 完整实现」归租户管理后续 Story——docstring+OD-1 注记）——两项口径差声明落验收/集成 docstring
+
+**验证标准/Validation Criteria:**
+- [ ] 20 轮采样 P95<800ms（预检服务可达+预热含首轮）
+- [ ] 并发 20 路全部成功+两两相等（排除集单键 {generated_at}——asdict 序列化剔除后逐路相等）
+- [ ] 口径差声明落 docstring（导出<1min 归 6-5b 既有面+隔离 100% 继承口径——模块 docstring 承载）
+
+---
+
+## 🏗️ SDD+TDD 融合开发
+
+> ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
+
+### SDD 规范定义（Task 0 — 必选前置）
+
+> **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
+
+#### 领域事件 Schema (Domain Events)
+
+- [ ] **零新增领域事件、零发布、零订阅**（OD-2——查询型故事第九连：纯查询聚合面零状态变更；6-4/6-5a/6-5b/6-6/6-7/6-8/6-9 八连零事件先例族延续；`event_channels.yaml`/`DEFAULT_MAPPINGS` 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化——Task 4.2 守护复跑；蓝图无顾问视图事件载体）
+
+#### 数据模型 (Data Models)
+
+- [ ] 五 VO 全应用层 `src/application/ports/consultant_view.py`（frozen dataclass——6-6 CheckpointSummaryView/6-7 五 VO/6-8 七 VO/6-9 七 VO 先例族；零 domain VO——OD-11）：`ConsultantView` 5 键/`ProjectsSection` 4/`ProjectSummary` 6/`BrandSection` 5/`ExportSection` 7（Task 0.1 冻结表——实现禁增删键）
+- [ ] 品牌段默认值三常量钦定应用层 ports 文件（OD-6：`BRAND_STATUS_UNCONFIGURED="未配置（系统默认）"`/`BRAND_FONT_STATUS="STSong-Light（内置）"`——字面量单源+reportlab :60 锚注记；6-11 对接触发器 docstring 注记）
+- [ ] 面板查询常量：`PANEL_ARCHIVE_LIMIT=1000`（ArchiveQuery limit 覆写单源——默认 20 截断防御）
+
+#### 统一端口定义注册与管理 (Port Contract)
+
+- [ ] `ConsultantViewPort`（应用层 `src/application/ports/consultant_view.py`，`@runtime_checkable Protocol` v1.0.0）：`async def build_consultant_view(self) -> ConsultantView`（**零参数**——全局视图 OD-1；ExecutiveViewPort/AnalystViewPort keyword-only plan_id 形态的分立点）
+- [ ] 端口注册中心/解析器/契约门禁零改动（既有机制消费）；组合根双注册（OD-10）：`consultant_view_service`（SINGLETON）+ `consultant_view_use_case`（SINGLETON）——落位 analyst_view 块后（:2139 邻位）
+- [ ] 两依赖复用既有注册名零新端口：`archive_repository`（:2315 SCOPED v1.1.0）/`report_repository`（:3513 SCOPED）——**两 SCOPED 无混态**（6-8 三 SCOPED+一 SINGLETON/6-9 两单一 SCOPED 混态后的最简形态）
+- [ ] 端口契约测试：`tests/contracts/test_port_contract_consultant_view.py`（五断言族——`test_port_contract_analyst_view.py` 直系复刻）
+- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
+
+#### 端口契约清单执行约束（强制）
+
+- [ ] 本清单是唯一事实源；禁止新增未登记端口（本 Story 零新底层端口——仅一个视图聚合端口）；禁止语义重复端口（consultant_view 跨 plan 交付面 vs executive_view 单 plan 速览面 vs analyst_view 单 plan 作业面——三语义正交：交付者全局/高管单点/分析师单点）
+- [ ] 端口具备唯一名称、版本 v1.0.0、owner、tags；未通过 Contract Gate 的端口变更不得进入实现 Task
+
+#### 领域异常契约 (Domain Exception Contract)
+
+- [ ] **零新增领域异常、零既有异常改动**（OD-3）：**本 Story 无 242 消费面**（零输入零畸形面——6-8/6-9 连续两 Story 242 UUID 守卫后本 Story 语义自然缺席，用例 `execute()` 无参透传无守卫；空态幂等读不抛——五先例族第六连）；report 段 490-493 已用/494-499 预留**不占**（490 ReportGenerationError 是生成面语义——本 Story 零生成零触碰；`_code_ranges.py:192-212` 亲验）；report/archive 两域零异常改动；planning 480-489/report 490-499/traceability 372-379 三段预留维持零触碰（无 view 码段亲验维持）。**否决备选**：开新码（ConsultantViewError）——段级容错+空态幂等读后无真实 raise 触发面，开码即引入「空租户误报」反语义面（6-7/6-8/6-9 OD-3 否决论证同构第四连）
+
+#### API 契约 (API Contract)
+
+- [ ] **零 REST 端点**（CLI-only 第九连——openapi.yaml 零 diff；6.1-DF5 八连先例；epics L2512-2513 钦定测试文件为 CLI/编程面测试非 API 契约；白标 REST 面 `/reports/whitelabel` 归 Epic 20 Story 20.4——epics L600）
+
+#### 六边形架构约束（必须遵守）
+
+- [ ] **R1~R4 设计规则落点**：R1 领域层基础端口零改动（本 Story 零 domain——消费的 ArchiveRepositoryPort/ReportRepositoryProtocol 均既有 R1 端口）；R2 应用层具体端口 `ConsultantViewPort` 组合注入两既有 R1 端口（archive_repository+report_repository——ExecutiveViewPort 四依赖/AnalystViewPort 三依赖同构延续）；R3 基础设施层零改动（OD-11 三零）；R4 接口层零改动（CLI 归 entrypoints 组装层——D1 方案 A 既有格局）
+- [ ] 依赖方向矩阵合规：application→domain（ports 消费）/entrypoints→application（CLI resolve）；domain/interfaces/infrastructure 零触碰
+
+#### 验收标准 Gherkin (Acceptance Tests)
+
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_consultant_view.feature`（12 场景——R6 模板 `test_acceptance_postgresql_relational_layer.feature` 形态：AC 横幅分节+zh-CN 步骤）
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规最新形态：三件套/双清/context dict/CLI 直调/完成清单）
+- [ ] 所有场景覆盖（Happy Path + Edge Cases）；Edge Cases 含空态幂等读+None 行剔除防御形态（异常路径归单测分立——AC-5 裁定）
+- [ ] **BDD 步骤实现约束**：步骤函数 `event_loop.run_until_complete()`；同一中文文本双装饰器支持；禁 `@pytest.mark.asyncio`
+
+**Task 0 完成标志：**
+- [ ] 规范项全部定义完毕（键契约/排序与派生口径/端口/12 场景钉死/锚定义务处置）
+- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [ ] **链路接线断言清单**：组合根 `register_port` 双注册 resolve 可达（契约测试承载）/零事件零中间件接线面（查询型 Story——接线断言归架构验证器 D CLI 锚）
+
+---
+
+### TDD 循环约束（适用于每个 Task）
+
+> **每个 Task 必须依次执行以下步骤，禁止跳过或颠倒顺序：**
+
+| 阶段 | 动作 | 完成标志 |
+|------|------|----------|
+| **🔴 红** | 根据 SDD 规范编写失败测试 | `pytest` 运行失败，且失败原因符合预期 |
+| **🟢 绿** | 编写最小实现让测试通过 | `pytest` 全部通过 |
+| **🟡 变异** | 对新行为契约的断言做突变注入-还原实证（Epic 4 回顾行动项 7.1-2） | 改坏生产代码 → 测试红 → 还原 → 绿（证明断言活着） |
+| **🔄 重构** | 优化代码（保持测试通过） | `ruff check` + `mypy` + `pytest` 全部通过 |
+
+**禁止行为：**
+- ❌ 先写代码后写测试 / 测试集中到最后 Task / 跳过红阶段 / 跳过变异实证（新断言未经突变验证即视为不可信——Epic 4 教训：8/13 Story 恒真断言）
+
+---
+
+### 测试分类与归属
+
+| 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
+|---------|------|----------|----------|-----------|
+| **TDD 单元测试** | 五 VO+常量 | 键集 exact set+构造守卫+品牌默认值常量 | `tests/unit/application/test_consultant_view_vos.py` | Task 1 |
+| **TDD 单元测试** | ConsultantViewService | 三段编排/排序与派生矩阵/容错矩阵 | `tests/unit/application/test_consultant_view_service.py` | Task 2 |
+| **TDD 单元测试** | GetConsultantViewUseCase | 零参透传（无守卫面注记） | `tests/unit/application/use_cases/test_consultant_view_use_case.py` | Task 3 |
+| **TDD 单元测试** | CLI consultant-view | 解析/输出/退出码 | `tests/unit/interfaces/cli/test_agent_cli.py`（扩展） | Task 3 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_consultant_view.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数 | `test_acceptance_consultant_view.py` | Task 0 |
+| **TDD 验收测试** | 收尾验收场景 | 完成清单最终确认 | 同上两文件 | Task 7 |
+| **TDD 契约测试** | 端口契约/registry/resolver | 注册/元数据/注入链/可达/签名 | `tests/contracts/test_port_contract_consultant_view.py` | Task 3/4 |
+| **SDD 架构验证** | 六边形架构约束 | 落位/零事件/依赖方向/CLI 接线 | `tests/unit/architecture/test_consultant_view.py` | Task 6 |
+| **集成测试** | 真实双源链 | 跨 plan 聚合 round-trip+性能并发 | `tests/integration/test_integration_consultant_view.py` | Task 5 |
+
+---
+
+### 测试要求与质量门禁
+
+#### 覆盖率要求
+
+- [ ] **整体覆盖率 ≥80%**（基线 93%——6-9 定稿轮实测；本 Story 纯新增不降基线）- **P0 阻断门禁**
+- [ ] **应用层覆盖率 ≥85%**（主改动层——epics L2503 对齐；新增文件目标 ≥95%）- **P1 阻断门禁**
+- [ ] domain ≥90% 维持（零改动不降）/ 集成 ≥75%（epics L2504 对齐）
+
+#### 代码质量门禁
+
+- [ ] **Ruff 检查通过**（`poetry run ruff check src/ tests/` + `ruff format --check`——6-9 R1-F2 教训：多行推导式压行，提交前 format 亲验）
+- [ ] **MyPy 类型检查通过**（基线 mypy 762 文件零错误——6-9 定稿轮；零新增错误）
+- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`——提交时钩子承载）
+- [ ] **三红线 grep 自查零输出**（`raise ValueError`/手动 HTTPException/继承内置 Exception）
+
+#### 测试隔离约束
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+
+**本 Story 关键隔离面**（6-8/6-9 隔离纪律直系延续+本 Story 特有面）：
+
+| 约束类型 | 规则 | 违反后果 |
+|---------|------|----------|
+| **品牌段隔离** | 静态默认态零预置零清理（零 IO——段测试无资源生命周期） | 无风险面（本 Story 设计收益） |
+| **PG 归档行隔离** | 归档行直写+定向清理（6-7 `_archive_row`/`_teardown_tree_assets` 直系样板；plan_id TestTenant UUID 前缀天然隔离） | 跨 plan 污染 |
+| **PG 报告行隔离** | 报告行直写+定向 DELETE 行数断言（report_repository.save 直写通道；report_id uuid4 唯一——幂等锚 report_id 语义天然隔离） | 行冲突 |
+| **PG 面三分面** | A 编程面 sync 层 set_session 回滚式 / B CLI 面 clear_session+commit 式+定向 DELETE 行数断言 / C 并发·性能面禁 set_session+每路独立会话+commit+定向 DELETE（6-8 R2-F3/6-9 直系第三连） | 并发炸/假绿 |
+| **BDD async** | 步骤函数禁 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()` | context 数据丢失 |
+| **CLI 直调双清** | clear_singleton()+clear_scoped() 双清+禁二次 bootstrap（6-6 R3-1 实跑证伪教训钦定第三连） | 假数据/ConflictError |
+| **xdist 串行组** | pytestmark `xdist_group("blm-planning-perf")` 整模块挂法（6-7/6-8/6-9 同组） | 并行互扰 |
+
+**禁止行为：**
+- ❌ 集成测试手动 `delete`/`truncate`（回滚式/定向 DELETE 行数断言）
+- ❌ BDD 步骤函数使用 `@pytest.mark.asyncio` / asyncio.run()
+- ❌ 验收面 mock（真实服务双通道——PG 归档行+报告行；段级容错归单测 AsyncMock——6-8 DR1-5/6-9 分立同款）
+
+**验证要求：**
+- [ ] 四目录全量 `SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`（显式四目录，裸 `tests/` 挂起）零失败×2 轮
+- [ ] `poetry run ruff check` + `poetry run mypy` 通过
+
+---
+
+## 📊 AC → Task → Subtask 追溯矩阵
+
+> **编号语义注记**（6-8/6-9 同款）：Subtask 列引用的循环 A/B/C 为 **TDD 循环语义位**；Task 内 Subtask 编号（2.1 红/2.2 绿/2.3 重构/2.4 变异）是 TDD 阶段序，两套编号体系分立防混引；验收场景统一归 Task 0 编写/Task 7 收尾承载。
+
+| AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
+|----|-------------|-----------|-------------|----------|
+| AC-1 | 三段聚合 5 键结构 | Task 1 | 1.1-1.3 五 VO | `test_consultant_view_vos.py` |
+| AC-1 | 三段聚合编排 | Task 2 | 循环 A 服务编排 | `test_consultant_view_service.py` |
+| AC-1 | 全数据 round-trip | Task 5 | 5.1-5.2 集成场景① | `test_integration_consultant_view.py` |
+| AC-2 | 跨 plan 清单+行概况+排序 | Task 2 | 循环 A 多项目段聚合 | `test_consultant_view_service.py` |
+| AC-2 | 三 plan 形态验收 | Task 0 | 0.4 场景 S2 | `test_acceptance_consultant_view.py` |
+| AC-3 | 品牌段恒默认态 | Task 2 | 循环 A 品牌段构造 | `test_consultant_view_service.py` |
+| AC-3 | 品牌段键值验收 | Task 0 | 0.4 场景 S3 | `test_acceptance_consultant_view.py` |
+| AC-4 | 导出段派生+最新 PDF 定位 | Task 2 | 循环 A 导出段投影 | `test_consultant_view_service.py` |
+| AC-5 | 段级容错+空态幂等读 | Task 2 | 循环 C 容错矩阵 | `test_consultant_view_service.py` |
+| AC-6 | CLI 命令 | Task 3 | 3.2-3.4 CLI+注册 | `test_agent_cli.py` |
+| AC-7 | P95<800ms+并发 20 | Task 5 | 5.3-5.4 性能场景 | `test_integration_consultant_view.py` |
+| AC-7 | 隔离继承断言 | Task 0 | 0.4 场景 S11 | `test_acceptance_consultant_view.py` |
+| 全 AC | 收尾完成清单 | Task 7 | 7.1-7.4 | `test_acceptance_consultant_view.py` |
+
+---
+
+## 📋 Tasks / Subtasks 任务分解
+
+> ⚠️ **TDD 循环内化原则：** 每个 Task 必须独立完成 红→绿→重构 循环，禁止将测试编写推迟到单独 Task。
+> 每个 Subtask 组内的 TDD 循环按领域粒度拆分。
+
+---
+
+### Task 0: SDD 规范定义（必选前置）
+
+**关联 AC:** AC-1~AC-7（全量——规范冻结是全部实现的前置）
+
+> **目的：** 在进入代码实现前，明确 VO 键契约、排序与派生口径、端口契约、验收场景与六边形架构边界，并处置 deferred-work 锚定义务（六条 Epic 6 锚+两条 6.7-DF 维持+两条 D6-8-R 维持+一条 D6-9-R 注记+两条 6.5a-DF 顺延——OD-8）。
+
+- [ ] Subtask 0.1: 冻结五 VO 键契约（Task 0.1 冻结表落 Dev Agent Record——5/4/6/5/7 键+品牌默认值三常量+PANEL_ARCHIVE_LIMIT——实现禁增删键）
+- [ ] Subtask 0.2: 冻结排序与派生口径（行序 latest_activity_at 降序+plan_id 字典序 tie-break；latest 遮蔽计数口径；None 行剔除；双段联动降级语义——AC-2/AC-4/AC-5 规则逐字冻结）
+- [ ] Subtask 0.3: 定义端口契约（ConsultantViewPort v1.0.0 零参签名+两依赖注册名+组合根落位 :2139 邻位锚）+ 契约测试文件骨架
+- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_consultant_view.feature`（12 场景钉死+epics L2493-2495 架构测试三项落位对账：多项目显示→S2/白标报告→S4+口径差声明/多租户隔离→S11 继承口径）
+- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_consultant_view.py`（6-9 R6 合规形态：三件套+双清+context dict+归档行预置[6-7 `_archive_row` 直系]+报告行直写[report_repository.save]+PG 三分面通道+CLI 直调 helper；**归档行预置带 plan_id=None 形态行**（S2 防御格）+**时间戳判别构造**（plan-A 最新活动晚于 plan-B ≥1s——`datetime` 显式递减微秒偏移构造，禁 `now()` 双调同值形态——6-8 R2 S4「未来秒级 timestamp×闭区间出窗」教训直系））；运行验收测试，确认失败（🔴 红阶段验证——延迟 import ImportError 形态）
+- [ ] Subtask 0.6: 定义逐场景红锚符号表（12 场景预期红形态：ImportError/exit code/AssertionError）
+- [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L13/L17/L107/L117+L170/L127/L129 六条 Epic 6 锚+6.7-DF1/DF2 两条维持+D6-8-R1/R2 两条维持+D6-9-R1-1 不入命令族注记+6.5a-DF1/DF2 两条顺延——共 11 条）
+- [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@b9525f8b，实施前复核；本 Story 锚点表按当前 HEAD 校正 6-9 期漂移注记：6-9 故事锚组合根 analyst_view 块 :2102-2139 实测吻合）
+
+**完成标准/Definition of Done:**
+- [ ] 规范项全部定义完毕（键契约/排序派生口径/端口/场景钉死/锚定义务）
+- [ ] 验收测试运行失败（预期行为，红阶段确认——12 场景全红；预期 S1~S6/S10/S11 ImportError 形态/S7/S8 CLI 未注册 exit 2 红/S12 文件不存在 AssertionError——Task 0.6 符号表）
+
+---
+
+### Task 1: 应用层端口与五 VO——`ports/consultant_view.py`（含品牌默认值常量+面板查询常量）
+
+**关联 AC:** AC-1/AC-3
+
+> **六边形落位：** 全部应用层（`src/application/ports/`）——零 domain（OD-11；消费的两 R1 端口均既有零演进）。
+
+#### TDD 循环 A：五 VO + 常量 + 端口
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_vos.py`（五 VO 键集 exact set+品牌默认值三常量值级断言+PANEL_ARCHIVE_LIMIT==1000 断言+构造守卫 242 三形态：plan_id 非空字符串/计数 ≥0（plan_count/archive_count/三计数）/latest_degraded_section_count ≥0 或 None；frozen 断言 `setattr` 形态——6-9 R1-F9 mypy 教训直系） |
+| 🟢 绿 | 实现 `src/application/ports/consultant_view.py`（五 frozen dataclass+`__post_init__` 守卫+三品牌常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort Protocol v1.0.0 零参签名） |
+| 🔄 重构 | docstring 全中文 Google 风格+类型注解收口（品牌段 V1 事实断言语义+6-11 对接触发器+禁 import infra 锚注记+font_status 字面量 reportlab :60 单源注记落 VO docstring），运行 `ruff` + `mypy` |
+
+- [ ] Subtask 1.1: 🔴 红 — 编写 VO 键集/常量/守卫失败测试
+- [ ] Subtask 1.2: 🟢 绿 — 实现五 VO+常量+端口最小代码
+- [ ] Subtask 1.3: 🔄 重构 — 优化 VO 代码（None/0/() 降级值语义 docstring 化——空租户三段降级键注记）
+- [ ] Subtask 1.4: 🟡 变异 — 键集断言突变实证（删 BrandSection 一键 → exact set 红 → 还原绿；品牌常量改值 → 值级断言红）
+
+**完成标准/Definition of Done:**
+- [ ] 五 VO+常量+端口实现完成，键契约与 Task 0.1 冻结表逐键一致
+- [ ] TDD 循环全部通过（红绿变异三态留痕）
+- [ ] 覆盖率：新增文件 ≥95%
+
+---
+
+### Task 2: 应用层视图服务——`ConsultantViewService` 三段编排
+
+**关联 AC:** AC-1/AC-2/AC-3/AC-4/AC-5
+
+> **两依赖注入：** archive_repository/report_repository（keyword-only 构造——ExecutiveViewService 四依赖/AnalystViewService 三依赖同风格）；服务无状态（SINGLETON 并发共享——AC-7 约束）。
+
+#### TDD 循环 A：三段聚合编排（Mock 两依赖）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/application/test_consultant_view_service.py` 循环 A 用例（三段聚合：archive find→ProjectsSection[None 行剔除+分组计数+最新活动+行序降序+循环 get_latest_by_plan 报告概况]；BrandSection[默认值常量构造——零 IO]；ExportSection[纯投影派生——两计数+latest_pdf 三键]——**Mock spec 形态**：archive_repository `AsyncMock(spec=ArchiveRepositoryPort)`+report_repository `AsyncMock(spec=ReportRepositoryProtocol)`（两端口 Protocol 全在册——组合根 interface 注册面，无需具体类 spec）+ `_make_*` 工厂——`_make_archive`（plan_id/archive_type/archived_at 可编程）+`_make_report`（report_type/file_path/created_at 可编程）+`_make_archive_repo`/`_make_report_repo`/`_make_service`） |
+| 🟢 绿 | 实现 `src/application/services/consultant_view_service.py` 三段私有方法+`build_consultant_view` 编排（入口单时间锚一次 now——顶层 generated_at 唯一时间键；零参数签名） |
+| 🔄 重构 | 段方法职责收口（每段一方法——`_build_projects`/`_build_brand`/`_build_export`；export 段入参=项目段循环结果——纯投影零 IO 钦定） |
+
+#### TDD 循环 B：排序与派生规则矩阵
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编排序与派生矩阵用例（**行序格**：三 plan 活动时间降序+同时间戳 tie-break plan_id 字典序[两 plan 同 archived_at 构造]；**None 行剔除格**：plan_id=None 行混入 → plan_count 不含；**latest 遮蔽格**：同 plan 先 pdf 后 markdown 两行 → latest=markdown → plans_with_latest_pdf==0；**零 PDF 格**：全 latest markdown → available True+latest_pdf 三键 None；**单报告行格**：latest pdf → 定位三键直推；**limit 覆写格**：find 调用参数断言 limit==1000——spec Mock call_args 锚） |
+| 🟢 绿 | 实现排序与派生（Task 0.2 冻结口径逐字——`sorted(key=(-latest_activity_at, plan_id))` 形态或等价显式比较器；latest 遮蔽口径=get_latest_by_plan 结果直判零补查） |
+| 🔄 重构 | 口径 docstring 化（排序钦定+遮蔽语义+None 剔除+limit 上限风险注记——与 AC-2/AC-4 逐字对齐；N+1 与截断风险立项锚注记） |
+
+#### TDD 循环 C：段级容错与空态幂等读
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写容错矩阵（**find 异常格**：AsyncMock side_effect 抛 → projects+export 双段 degraded=True+默认值+brand 照常+build_degraded=True+不抛；**循环单 plan 异常格**：report_repo side_effect 定向抛（首次调用抛/其余返回——side_effect 列表形态）→ 该行报告列三键 None+双段 degraded+其余 plan 行照常；**空态格**：find 返回空列表 → 三段空态默认值+brand 完整+build_degraded=False+不抛） |
+| 🟢 绿 | 实现段级 try 包裹+双段联动降级（find 级+循环级两捕获位分立；warning 日志段名+异常摘要——6-8/6-9 同款） |
+| 🔄 重构 | 降级 warning 日志统一+降级值语义 docstring（「段值降默认」与「清单保留+报告列 None」两形态分立注记——AC-5 钦定） |
+
+- [ ] Subtask 2.1: 🔴 红 — 循环 A/B/C 失败测试
+- [ ] Subtask 2.2: 🟢 绿 — 三段编排+排序派生+容错实现
+- [ ] Subtask 2.3: 🔄 重构 — 服务代码优化（品牌常量/PANEL_ARCHIVE_LIMIT 单源引用禁字面量——6-9 Subtask 2.3 投影白名单常量教训：值单源在 VO 文件常量，服务禁再镜像第二源）
+- [ ] Subtask 2.4: 🟡 变异 — 规则断言突变实证（行序比较器反转 → 行序格红；latest 遮蔽判定改全量历史 → 遮蔽格红；find 容错改 raise → 容错格红；None 行剔除删除断言侧 → None 格红——还原后全绿）
+
+**完成标准/Definition of Done:**
+- [ ] 三段编排+排序派生+容错实现完成
+- [ ] TDD 循环全部通过（变异锚 4 处全实证红→还原绿留痕）
+- [ ] 覆盖率：服务文件 ≥95%（排序派生三分支+容错两捕获位 100%）
+
+---
+
+### Task 3: 用例 + CLI `consultant-view` + 组合根注册
+
+**关联 AC:** AC-6（CLI）
+
+> **组装层扩展：** `src/entrypoints/agent_cli.py`（argparse 扁平子命令——analyst-view 注册块 :567-580 邻位）+ `src/composition_root.py`（:2139 analyst_view_use_case 块尾邻位双注册）。
+
+#### TDD 循环 A：用例 + 组合根
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/application/use_cases/test_consultant_view_use_case.py`（零参透传——`execute()` 无参调用服务一次+返回直传；**无守卫面注记测试**：用例源码零 `EntityValidationError` token 断言——「242 语义自然缺席」架构注记落测试）+ `tests/contracts/test_port_contract_consultant_view.py` 五断言族 |
+| 🟢 绿 | 实现 `src/application/use_cases/get_consultant_view.py`（零参透传——`GetExecutiveViewUseCase`/`GetAnalystViewUseCase` 直系样板去守卫形态）+ 组合根双注册块（consultant_view_service SINGLETON lambda 两依赖 resolve+consultant_view_use_case SINGLETON 透传） |
+| 🔄 重构 | 注册块注释（两 SCOPED 依赖无混态注记——比 6-8/6-9 混态更简；未来 7-2 REST 面改 SCOPED 触发器注记——6-8/6-9 OD 同款第三连） |
+
+#### TDD 循环 B：CLI consultant-view
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 扩展 `tests/unit/interfaces/cli/test_agent_cli.py`（`_StubConsultantViewUseCase` 替身+专用 patcher（`_patch_consultant_view_entry`——`monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)` + `setattr(agent_cli, "resolve", lambda name: stub)` 形态——**每命令族新建专用 patcher 纪律**[6-8 R1-F11/6-9 第三连]）：解析（注册锚/`--plan-id` 传入 → exit 2 unrecognized 格/**零参数面 getsource 断言**——`add_parser("consultant-view"` 切块后零 `add_argument` 调用）/全数据输出（三段分隔行+三 plan 六行+品牌两行+导出三行+提示行）/空态输出（`项目: 共 0 个`+品牌两行恒在+导出空态行+exit 0）/降级标记格（stub 直构 build_degraded=True VO → 首行含「（部分数据降级）」）/DomainError 兜底格（stub error → stderr `[EXCEPTION_` 前缀+exit 1——防御性兜底判别）/exit 0） |
+| 🟢 绿 | 实现 CLI：`build_parser` 注册（**零 add_argument**）+分发分支+`_run_consultant_view_cli` 五步定式（无守卫步——四步实态：`_ensure_bootstrapped`→`asyncio.run`+resolve→打印→DomainError/Exception 双 except exit 1；五步定式名保留注记——去守卫步差异 docstring）+`_run_consultant_view` async 壳（finally `_close_connection_pools`）+`_print_consultant_view` 三段打印（getattr 零 VO import 形态——6-9 直系） |
+| 🔄 重构 | 输出行格式统一（「输出即契约」——空态行恒在+两行/项目形态+时间戳 `%Y-%m-%d %H:%M` 截断呈现注记） |
+
+- [ ] Subtask 3.1: 🔴 红 — 用例/契约/CLI 失败测试
+- [ ] Subtask 3.2: 🟢 绿 — 用例+组合根+CLI 实现
+- [ ] Subtask 3.3: 🔄 重构 — CLI 打印面优化（注册注释措辞注意：**禁出现 `--format`/`--plan-id` 字样于 consultant-view 注释块**——6-9 R1「注释字样污染 6-8 既有 getsource 块边界断言」教训预防性纪律：新注释块措辞自查不触既有命令族切块断言边界）
+- [ ] Subtask 3.4: 🟡 变异 — CLI 输出断言突变实证（四锚：①项目段首行「共」改「总」②品牌注记行删除③导出提示行删除④降级标记置空——还原后全绿）
+
+**完成标准/Definition of Done:**
+- [ ] 用例+CLI+组合根实现完成（resolve 可达+分发接线）
+- [ ] TDD 循环全部通过（变异锚 4 处全实证）
+- [ ] 覆盖率：用例 100%/CLI 新增面 ≥90%
+
+---
+
+### Task 4: 契约守护与回归面
+
+**关联 AC:** AC-1（端口契约）/OD-2（零事件）/OD-3（零异常）
+
+> **性质说明：** 契约级守护复跑+新增端口契约测试定稿——非功能实现 Task。
+
+- [ ] Subtask 4.1: 端口契约测试五断言族定稿（注册可达/spec 元数据 v1.0.0+SINGLETON+tags/lambda 注入链 getsource 两依赖注册名锚/resolve 可达 isinstance/方法签名零参——`test_port_contract_analyst_view.py` 逐段对齐；签名断言 `build_consultant_view` == {self} 零参——与 6-8/6-9 {self, plan_id} 分立注记）
+- [ ] Subtask 4.2: 零事件守护复跑（`tests/contracts/test_event_channel_mapping_pdf_report.py` 6 passed——_FROZEN_EVENT_COUNT=56 零变化；event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 实证）
+- [ ] Subtask 4.3: 回归面验证（四目录全量零失败——6-7/6-8/6-9 既有验收零破坏；agent_cli/composition_root 扩展面既有单测零适配[纯新增子命令/注册块——**6-9 教训预防**：新注释块与既有 test_no_optional_arguments/getsource 切块断言边界复核]；archive_repository 既有生产码消费方 REST archive 端点+StalenessWeightService 零影响[find 既有方法消费无签名变化]；report_repository 既有消费方 executive_view_service+report_generation_service 零影响[get_latest_by_plan 消费无变化]）
+- [ ] Subtask 4.4: 三红线 grep 自查（`raise ValueError`/`HTTPException`/`Exception(` 继承——新增面零输出；noqa/type: ignore/pylint disable 全部新增文件零输出）
+
+**完成标准/Definition of Done:**
+- [ ] 契约测试全绿+冻结键数基线零变化
+- [ ] 四目录全量零失败（第一轮 no-cov+第二轮覆盖率——Task 7.4 承载最终确认）
+
+---
+
+### Task 5: 集成测试——真实双源链聚合
+
+**关联 AC:** AC-1/AC-7
+
+> **真实服务 Schema 隔离子模式**（6-x 集成双子模式选型：真实服务面——双源全真实[PG 归档行+PG 报告行]）+ xdist 同组串行。
+
+#### TDD 循环 A：真实链三段聚合 + 性能并发
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/integration/test_integration_consultant_view.py`（场景① 全数据三段 round-trip：真实归档行直写[6-7 集成样板——三 plan 形态+None 行]+报告行直写[report_repository.save——plan-A markdown+pdf/plan-B markdown]→服务直调值级断言[plan_count 3/行序 plan-A 首/archive_count 3-2-1/latest_pdf 定位三键/品牌恒默认]（**钦定 chunk_count≠stage_count 同款判别形态：plan-C 零报告行判别「有活动无交付物」、plan-A pdf 最新判别遮蔽口径**）；场景② 空态幂等读（零预置 → 三段空态+brand 完整+不抛）；场景③ 性能 20 轮 P95<800ms（模块级期望常量+sorted 数学口径+预热；C 面禁 set_session）；场景④ 并发 20 路 gather 全成功+两两相等（**排除集单键 {generated_at}** 剔除对照——asdict 序列化形态；禁 set_session）） |
+| 🟢 绿 | 预置/清理通道落地（归档行+报告行 PG 直写+定向清理[行数断言]；PG 三分面按场景分组——6-8 R2-F3/6-9 直系第三连）+断言通过 |
+| 🔄 重构 | 预置工厂函数收口（`_make_archive_row`/`_make_report_row`——时间戳显式递减微秒偏移构造形态固化） |
+
+- [ ] Subtask 5.1: 🔴 红 — 四场景失败测试
+- [ ] Subtask 5.2: 🟢 绿 — 预置通道+断言通过
+- [ ] Subtask 5.3: 🔄 重构 — 工厂收口+docstring（性能三段口径差声明落模块 docstring——OD-8；N+1/截断风险注记）
+- [ ] Subtask 5.4: 🟡 变异 — 集成断言突变实证（验证型 2 处：plan_count 断言改 2 → 值级红；并发篡改一路 export 段 → 等价性红——还原后 4 passed）
+
+**完成标准/Definition of Done:**
+- [ ] 四场景全绿（真实服务零 mock——P95<800ms 实测通过+并发 20 路排除集单键两两相等通过）
+- [ ] 性能 P95 断言通过+口径声明落档
+- [ ] 覆盖率：集成新增面 ≥75%
+
+---
+
+### Task 6: SDD 架构约束验证测试
+
+**关联 AC:** 六边形架构约束（全 AC 底座）
+
+> **性质说明：** 本 Task 是 **SDD 规范验证测试**——验证代码是否符合架构规则（非功能 TDD）。
+
+#### 架构验证测试实现（四验证器——`test_analyst_view.py` 直系样板）
+
+- [ ] Subtask 6.1: 验证器 A 落位守护（交付文件在 application 层/五 VO+两常量+端口定义于 ports 文件非服务本地/服务与用例禁本地 Protocol——AST 扫 ClassDef bases+模块级 AnnAssign 常量形态——6-9 实施攻坚教训直系）
+- [ ] Subtask 6.2: 验证器 B 零 publish 守护（服务源码 token grep `publish`/`event_publisher` 零出现+AST 零事件构造——pkgutil 强制导入 events 全子模块后 DomainEvent 子类名全集比对 Call 节点）
+- [ ] Subtask 6.3: 验证器 C 零 domain/infra 改动+依赖方向（`SERVICE_ALLOWED_PREFIXES` 白名单逐 import startswith 断言+三方禁 import frozenset+rglob 零命中结构断言——OD-11 纯三零：src/domain+src/infrastructure 双目录 consultant 词零命中——与 6-9 零命中形态直系、与 6-8 白名单形态分立注记）
+- [ ] Subtask 6.4: 验证器 D CLI 接线（源码含 `add_parser(\n        "consultant-view"` 缩进敏感锚+`args.command == "consultant-view"` 分发+`resolve("consultant_view_use_case")` 调用锚+组合根双注册块锚+**两依赖注入锚** `'"archive_repository"'`/`'"report_repository"'`）
+- [ ] Subtask 6.5: 运行完整测试套件并生成报告（ruff E/I 循环依赖检测——不引入 pylint）
+- [ ] Subtask 6.6: 🟡 变异 — 架构断言突变实证（验证器 B token grep 断言：源码临时注入 `publish` token → 测试红 → 还原绿）
+
+**完成标准/Definition of Done:**
+- [ ] 四验证器全绿（任何违规即测试失败）
+- [ ] 循环依赖检测用 ruff/isort
+
+---
+
+### Task 7: 开发结束验收测试
+
+**关联 AC:** 全 AC 收尾
+
+> **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `test_acceptance_consultant_view.feature` 收尾场景（完成清单存在性断言） |
+| 🟢 绿 | 编写 `test_acceptance_consultant_view.py` 收尾 BDD 步骤（`_COMPLETION_SRC_FILES`/`_COMPLETION_TEST_FILES` dict 常量+`path.is_file()` 断言——6-7/6-8/6-9 S12 形态第四连） |
+| 🔄 重构 | 收敛场景命名、统一断言表达 |
+
+- [ ] Subtask 7.1: 场景 12 — 验证 `src` 完成清单的逐项确认
+- [ ] Subtask 7.2: 场景 12 — 验证四测试目录完成清单的逐项确认
+- [ ] Subtask 7.3: 运行开发结束验收测试并确认通过（12/12 场景全绿）
+- [ ] Subtask 7.4: 运行 `pytest` 四目录全量、`ruff check`+`ruff format --check`、`mypy` 进行收尾校验+deferred-work 处置注记终检（Task 0.7 11 条落档确认）+纯三零 git diff 实证（src/domain+src/infrastructure+src/interfaces 三目录零 diff）
+
+**完成标准/Definition of Done:**
+- [ ] `src` 与四测试目录完成清单已逐项验证确认
+- [ ] 开发结束验收测试通过（12/12 场景全绿）
+- [ ] Story 可进入 `review`
+
+---
+
+## 📝 Dev Notes 开发笔记
+
+### 相关架构模式和约束 Architecture Patterns & Constraints
+
+**来源:** [`architecture.md`](../../docs/architecture/architecture.md)
+
+- **架构模式:** 六边形架构严格分层（本 Story 纯应用层+组装层扩展——**纯三零：零 domain/零 migration/零 infra**，6-9 直系第二连；读侧聚合 CQRS 投影形态（三段聚合视图=两源读模型——6-8/6-9 第三连+跨 plan 全局投影首例））
+- **设计约束:** 领域层零依赖（零 domain 改动天然满足）；读侧 DTO 归应用层（五 VO ports 文件承载）；查询不发布事件（architecture.md:1293——引用形态注记+八查询型 Story 零事件族实践）
+- **接口治理:** 统一端口注册（新端口 v1.0.0 一次到位）、Registry/Resolver、组合根唯一装配、契约优先、禁同义接口重复（consultant_view 跨 plan 交付面 vs executive_view 单 plan 速览面 vs analyst_view 单 plan 作业面——三语义正交）；两依赖全既有注册名消费不新开底层端口
+- **技术栈:** Python 3.11+ / PostgreSQL（archive find 1 次+get_latest_by_plan N 次点查——plan_id 索引命中）/ pytest-bdd；品牌段零 IO（应用层常量构造）
+- **关键设计条款:** prd L423-424（MVP 基础多租户+白标输出基础——「品牌元素 100% 准确，导出<1 分钟」验收归 6-11 生成面/6-5b 既有性能面）；prd L1898-1901 FR-SP-16（白标 REST API 归 Epic 20 Story 20.4）；prd L2199-2204 FR-IF-05（三页面角色枚举无顾问）；ux-design-specification L1401-1405（顾问视图=三页面布局的品牌模板化变体——Web 面口径）；interface-design.md 三视图表（高管/分析师/顾问——顾问行同样属陈旧口径族，本 Story 按 epics L2476 现行权威+CLI-only 裁定，6-8/6-9 同款注记先例第三连）
+
+### 关键架构决策（OD 偏离声明——Task 0 落档）
+
+| OD | 裁定 | 依据 |
+|----|------|------|
+| **OD-1** | **范围边界——MVP = 三段聚合查询面（ConsultantViewPort+ConsultantViewService+GetConsultantViewUseCase+CLI `consultant-view` 零参数全局视图）。不含**：Web 顾问面板（归 Epic 21/22——注记：21/22 均无顾问专属 Story、22.8 角色枚举[高管/分析师/企业战略人员]不含顾问——顾问 Web 面归 22.8 扩展或后续 Web Story 立项，本 Story 不预建）/品牌模板配置实现（Logo/配色/字体上传保存+预设选择+模板复用+reportlab Image 位图渲染+report-generate 品牌参数——**全部归 Story 6.11** P0-11；epics L2036「品牌配置可独立实现」+6-5b L31/L682/L684 显式移交在档；本 Story 品牌段=状态展示面 V1 恒默认态）/白标渲染与品牌 100% 准确（6.11 AC 逐字重叠面——本 Story 零渲染零触碰 `PdfRendererPort` 签名）/REST 端点（CLI-only 第九连 6.1-DF5 先例+openapi.yaml 零 diff；白标 REST `/reports/whitelabel` 归 Epic 20 Story 20.4）/批量导出管线（L129 显式裁定不做——白标导出=单 plan 单次生成归 report-generate 既有入口 6-5b OD-11 单入口钦定）/多租户存储隔离实现（Schema per Tenant 归租户管理后续 Story——1-11 交付合规面；本 Story 展示口径+隔离继承断言）/单 plan 视图要素（报告可得性/审批/审计/进度/溯源归 6-8/6-9 已交付——禁重复聚合）/plan 生命周期管理（StrategicPlan 实体孤岛零消费亲验——plan 注册表/状态机是独立立项面非本 Story 增量） | epics L2476-2516 范围权威+L656/L2020 依赖行 + 6.1-DF5 八连 CLI-only 先例 + 6-8/6-9 OD-1 边界先例 + YAGNI |
+| **OD-2** | **零新增领域事件、零发布、零订阅**（查询型故事第九连）：纯查询聚合面零状态变更——八连零事件先例族延续；event_channels.yaml/DEFAULT_MAPPINGS 零 diff；`_FROZEN_EVENT_COUNT=56` 零变化（Task 4.2 守护复跑）；蓝图无顾问视图事件载体；架构验证器 B 零 publish 守护 | 查询语义纯度+八连先例族+零 yaml/router diff 红利 |
+| **OD-3** | **零新增领域异常、零既有异常改动+零 242 消费面**：本 Story **零输入**（build_consultant_view 无参）——畸形 plan_id 守卫面语义自然缺席（6-8/6-9 连续 242 UUID 守卫后本 Story 无输入即无畸形面——设计结果非缺失；验收无 242 场景属正确形态）；空态幂等读不抛（五先例族第六连）；report 段 490-493 已用/494-499 预留**不占**（490 生成面语义零触碰——`_code_ranges.py:199-211` 亲验）；archive/report 两域零异常改动。**否决备选**：开新码（ConsultantViewError）——段级容错+空态幂等读后无真实 raise 触发面，开码即引入「空租户误报」反语义面（6-7/6-8/6-9 否决论证同构第四连） | 异常语义纯度+五先例族+空态幂等读语义+零输入设计连锁 |
+| **OD-4** | **五 VO 键契约**（Task 0.1 冻结）：`ConsultantView` 5 键（generated_at[ISO 单时间锚]/build_degraded[顶层降级哨兵]/三段——**顶层无 plan_id 键**：全局视图零输入的 VO 投影，与 6-8 8 键/6-9 6 键分立点）/`ProjectsSection` 4（available[==plan_count>0]/degraded/plan_count/projects）/`ProjectSummary` 6（plan_id[str 化——实体 UUID→str，6-8 report_id 钦定直系]/archive_count/latest_activity_at[该 plan 最大 archived_at ISO]/latest_report_type[None\|"markdown"\|"pdf"——ReportType 值域直传]/latest_report_at/latest_degraded_section_count[None\|int]）/`BrandSection` 5（degraded 恒 False/configured 恒 False V1/logo_status/color_scheme_status/font_status——**零 IO 静态段**：三段中唯一无数据源段，空态/降级全场景值恒不变）/`ExportSection` 7（available[==plans_with_reports>0——「有报告可导出」与「已导出 PDF」分立：markdown 亦是可交付物，PDF 缺席不降 available]/degraded[与 projects 段同源联动]/plans_with_reports/plans_with_latest_pdf[latest 遮蔽口径——OD-7]/latest_pdf_plan_id/latest_pdf_object_key[file_path 直传——PDF 行即 L4 对象键 :79 单源]/latest_pdf_generated_at）——全应用层 frozen dataclass；键恒在纪律（None/0/() 降级值）；构造守卫 242（计数 ≥0/plan_id 非空——VO 不变量面守卫归 VO，与服务容错分立） | 键恒在纪律+读侧 DTO 层位先例+空态幂等读语义第六连 |
+| **OD-5** | **多项目段数据源裁定——archives 反推 plan 清单+报告循环 enrichment**：plan 清单 = `ArchiveRepositoryPort.find(ArchiveQuery(plan_id=None, limit=1000))` 全量行 distinct plan_id（**该查询面应用层服务首个消费**——既有生产码消费方仅 REST `/api/v1/archive/entries` 与 StalenessWeightService 兜底链；find 现成跨 plan 查询零新端口零新 SQL——纯三零 Story 的关键裁定）；`plan_id=None` 行剔除（实体可空亲验 :55——防御性守卫）；每 plan 报告概况 = 循环 `get_latest_by_plan`（N+1 点查——plan_id 索引命中 MVP 量级 <50ms；**风险注记双联**：plan 数百级 N+1 成热点+归档行超 1000 截断——「DISTINCT+JOIN LATERAL 单查询化/SQL 清单端口」立项锚 Epic 7/21，docstring 承载）；**项目行不含进度列**（进度可视化归 6-9 analyst-view 单 plan 面两视图正交；快照 TTL 86400 过期语义不稳+SnapshotRepositoryProtocol 无 scan 亲验——快照扫描方案结构性不可行亦排除）；**不选** ReportRepository 新增 list 方法（需 domain port 扩展+infra 实现破坏纯三零；get_latest_by_plan 循环已足——报告计数口径本就是「最新分布」非「全史」）；**不选** L4 list_objects/L0 list_memories（L4 仅 PDF 对象+L4/L0 面报告元数据不全——section 双计数在 L2；两源引入第三依赖徒增复杂度） | find 现成面实证+纯三零收益+N+1 风险可控（MVP 量级）+两视图正交原则 |
+| **OD-6** | **品牌段 V1 恒系统默认态+6-11 对接锚**：零 IO 静态段（构造无任何仓储调用——服务 `_build_brand` 纯常量构造）；三常量钦定 ports 文件（BRAND_STATUS_UNCONFIGURED/BRAND_FONT_STATUS——`font_status` 值「STSong-Light（内置）」与渲染器 `_FONT_NAME` :60 冻结字体事实对齐——**字面量承载禁 import infra**：application→infrastructure 依赖方向禁止+锚注记落 docstring）；`configured` 键是 6-11 对接锚（届时品牌配置面落地后本段演进读配置面——端口 v1.1.0 触发器 docstring 注记）；值级断言=V1 时点事实断言（6-11 实施后红是预期演进信号——6-9「23 工具事实断言」语义直系第二连） | 6-11 边界（epics L2036+6-5b 移交注记）+依赖方向矩阵+零 IO 恒稳段设计收益（空态断言可钉死） |
+| **OD-7** | **导出段纯投影派生+latest 遮蔽口径声明**：export 段零新读（入参=项目段循环结果——服务仅两读源 archives+reports，第三段纯投影——单源纪律）；`plans_with_latest_pdf` =「**最新**报告为 pdf 的 plan 数」非「历史曾生成计数」（get_latest_by_plan created_at 降序首行唯一——先生成 PDF 后又生成 markdown 的 plan 其 latest=markdown 不入 pdf 计数——「当前交付物形态」呈现语义：顾问面板关注「现在可交付什么」非「累计交付史」；遮蔽判别格钦定入 Task 2 循环 B）；available==plans_with_reports>0（「可导出」与「已导出 PDF」分立——markdown 亦是可交付物）；与 6-8 `ReportSection`（单 plan 可得性 8 键）**语义正交非演进**（跨 plan 全局投影 vs 单 plan 可得性——两段 VO 各自独立禁共享，消费方/演进节奏不同——6-9 OD-13 两视图正交原则直系第二连） | 单源纪律+呈现语义+读侧投影独立演进原则 |
+| **OD-8** | **性能三段口径声明+锚定义务 11 条处置**：① 视图加载 P95<800ms = `build_consultant_view` 服务面窗口（两读源：find 1 次+N 次点查；20 轮 `sorted[ceil(0.95*n)-1]` 数学口径六连；N+1/截断双风险注记立项锚 Epic 7/21）；② 并发 20 路=零输入全局读 20 路并发（gather+服务无状态+两两相等——**排除集单键 {generated_at}**：projects/export 段同数据窗全稳定+brand 恒稳——排除集最小化第三连；asdict 剔除对照；禁 set_session C 面第三连）；③ 「白标导出<1 分钟」=report-generate 既有入口性能面（6-5b 承载——本 Story 导出段是状态展示面非执行面，6-9「溯源跳转<300ms 归 6-7」裁定形态第三连）+「多租户隔离 100%」=Schema 隔离继承口径（schema-scoped 查询天然隔离+S11 断言+完整实现归租户管理后续 Story）——③ 两项口径差声明落验收/集成 docstring。**锚定义务 11 条**（Task 0.7 落档）：L13 第七轮不触发（无版本统计面）/L17 第七轮同构顺延（纯读侧零图引擎）/L107 不触发（本 Story 零 Skills 消费——无 skill_selector 依赖，比 6-9 更远）/L117+L170 第九连零消费顺延 Epic 8/L127 第七轮不触发（零记忆消费）/L129 **第五轮维持+显式不做批量裁定**（读侧聚合非批量报告管线——本 Story 主动收窄：批量导出不立项，锚位维持「6-11/Epic 7 再锚定」不变）/6.7-DF1·DF2 维持 Epic 21-22/D6-8-R1·R2 第三连维持（新增子命令沿用既有入口形态+json_chain 零触碰）/D6-9-R1-1 **不入命令族注记**（consultant-view 零 --plan-id 输入面——该观察项波及面 `*--plan-id` 命令族不含本命令；deferred-work L409 处置注记追加）/6.5a-DF1·DF2 顺延 Epic 7（REST 导出面/L0 撕裂——CLI-only 形态触发条件不含本 Story） | epics L2498-2500 性能行与 CLI 交付面口径对齐（六连口径差声明纪律）+deferred-work 原文触发条件逐条对表+七轮先例链 |
+| **OD-9** | **测试文件命名（禁故事编号后缀）+ 词族统一 consultant_view**：acceptance `test_acceptance_consultant_view.feature/.py`；integration `test_integration_consultant_view.py`（**对 epics L2513 钦定名 `test_consultant_view_integration.py` 的显式偏离**——仓规 test_integration_* 前缀，6-8/6-9 OD-9 同款偏离声明第三连）；unit/architecture `test_consultant_view.py`（**对齐 epics L2512 钦定名**——零偏离）；`consultant` 词族 src+tests+configs+docs/api 零占用亲验（grep 全域零命中）；CLI 子命令 `consultant-view` 无重名亲验（add_parser 16 命令族逐一比对——本 Story 落地后 17）；service 单测 `test_consultant_view_service.py`+VO 单测 `test_consultant_view_vos.py`；契约 `test_port_contract_consultant_view.py`（五断言族） | 记忆「禁止故事编号命名文件」+仓规前缀惯例+词族零占用亲验（epics 钦定名的采纳/偏离逐处声明——6-8/6-9 同款第三连） |
+| **OD-10** | **组合根双注册+两既有依赖复用+CLI 零参数先例**：`consultant_view_service`（SINGLETON——无状态聚合读；lambda resolve 两既有注册名：`archive_repository` :2315[SCOPED v1.1.0]+`report_repository` :3513[SCOPED]——**两 SCOPED 无混态捕获**注记：6-8 三 SCOPED+一 SINGLETON/6-9 两单一 SCOPED 后的最简形态，SINGLETON 捕获 SCOPED 声明照写[CLI 一次性进程+测试双清下无故障面——三连注记先例]）+`consultant_view_use_case`（SINGLETON 透传）；**零新 PG 仓储家族成员/零 infra 面**；两依赖注入端口面（AsyncMock spec=ArchiveRepositoryPort/ReportRepositoryProtocol——两 Protocol 全在册无需具体类 spec）；6-4 CLI session P0 三步排查法核验：lambda 无新 PG 构造/无新仓储成员——无 session_factory 缺口面（两仓储均组合根 session_factory 注入形态既有）；**CLI 零参数先例声明**：consultant-view 是 CLI 族首个零参数查询命令（16 命令族先例均 --plan-id 必填或写命令——多项目面板本义跨 plan 全局，语义分立注记落注册块注释；**注释措辞纪律**：禁 `--plan-id`/`--format` 字样入 consultant-view 注释块——防污染既有 getsource 切块断言边界[6-9 R1 实施攻坚教训预防]） | 6-8/6-9 组合根先例+端口 Protocol 在册实证+单租户口径延续+CLI 命令族语义分立 |
+| **OD-11** | **纯三零 Story：零 domain+零 migration+零 infra**（6-9 直系第二连——Epic 6 视图族两个纯三零连员）：五 VO+三常量全应用层（ports 文件——读侧 DTO 归应用层+消费的两 R1 端口均既有零演进双依据）；本 Story 改动面 = **src 面 3 新建+2 扩展**（新建：ports/consultant_view.py+services/consultant_view_service.py+use_cases/get_consultant_view.py；扩展：agent_cli.py+composition_root.py）；tests 面 8 新建+1 扩展（test_agent_cli.py 扩展）；**架构验证器 C 零命中断言**（src/domain+src/infrastructure 均零 consultant 词命中——与 6-8 白名单形态分立[彼有钦定 infra 增量]、与 6-9 零命中形态直系） | 两源既有零缺口（find 现成跨 plan+get_latest_by_plan 既有）+最小改动面形态 |
+| **OD-12** | **段级容错双段联动+行级同形裁定**：archive find 异常 → projects+export **双段联动降级**（export 派生源受损——段级容错族的复合段新形态：6-8/6-9 各段独立互不波及，本 Story export 段结构性依赖 projects 段循环结果，联动降级是诚实语义非耦合缺陷）；循环内单 plan `get_latest_by_plan` 异常 → 该行报告列三键 None+**双段 degraded=True**（保守诚实裁定：行级 None 与「无报告」同形——段哨兵是唯一「拿不到 vs 没有」区分面[6-7/6-8/6-9 诚实性纪律延续]；否决「行级 degraded 键」备选：判别价值低+VO 键面膨胀，YAGNI）；降级值两形态分立注记（find 级=段值全默认[plan_count 0+空 tuple]；循环级=清单保留+报告列 None——「部分降级」语义 docstring 钦定）；brand 段零降级面（零 IO 恒稳——degraded 键恒 False 是结构性承诺非断言缺失） | 段级容错先例族+派生段结构性依赖+诚实性纪律（「拿不到」vs「没有」两层分立） |
+
+### 项目结构说明 Project Structure（本 Story 涉及面）
+
+```
+src/
+├── application/
+│   ├── ports/consultant_view.py              ★ 新建（五 VO+品牌默认值三常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort v1.0.0 零参——Task 1）
+│   ├── services/consultant_view_service.py   ★ 新建（三段编排+排序派生+双段联动容错——Task 2）
+│   └── use_cases/get_consultant_view.py      ★ 新建（零参透传——Task 3）
+├── entrypoints/agent_cli.py                  ▲ consultant-view 子命令（Task 3——analyst-view 注册块 :567-580 邻位）
+└── composition_root.py                       ▲ 双注册块（Task 3——:2139 analyst_view_use_case 块尾邻位）
+
+（src/domain/ 零改动；src/infrastructure/ 零改动；src/interfaces/ 零改动——OD-11 纯三零第二连）
+
+tests/
+├── unit/
+│   ├── application/test_consultant_view_vos.py                ★ 新建（Task 1）
+│   ├── application/test_consultant_view_service.py            ★ 新建（Task 2——排序派生矩阵+容错矩阵）
+│   ├── application/use_cases/test_consultant_view_use_case.py ★ 新建（Task 3）
+│   ├── architecture/test_consultant_view.py                   ★ 新建（Task 6——四验证器）
+│   └── interfaces/cli/test_agent_cli.py                       ▲ consultant-view 扩展（Task 3）
+├── integration/test_integration_consultant_view.py            ★ 新建（Task 5，OD-9）
+├── contracts/test_port_contract_consultant_view.py            ★ 新建（Task 3/4——五断言族）
+└── acceptance/
+    ├── test_acceptance_consultant_view.feature/.py            ★ 新建（Task 0/7，R6 模板+OD-9）
+    └──（6-7/6-8/6-9 既有测试文件零修改——Task 4 回归验证）
+
+_bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记（Task 0.7/7.4）
+```
+
+（▲ 修改 / ★ 新建 / 禁整文件覆盖——就地扩展纪律）
+
+### 关键代码锚点（实现直读——主会话亲验 2026-11-08+四 Agent 调研交叉；行号基准 HEAD@b9525f8b，实施前 Task 0.8 复核为准——并行会话提交会使行号漂移）
+
+| 锚点 | 位置 | 说明 |
+|---|---|---|
+| epics Story 6.10 定义 | `_bmad-output/planning-artifacts/epics_v1.0.md:2476-2516` | AC 三要素/性能三项/测试文件名钦定源（L656/L2020/L2035 依赖行） |
+| 跨 plan 清单查询端口 | `src/domain/ports/archive_repository.py:120-123`（`ArchiveRepositoryPort.find`） | `async def find(self, query: ArchiveQuery) -> list[StrategicArchive]`——**plan_id=None 即全量跨 plan**（软删过滤+archived_at 降序+offset/limit）；本 Story 多项目段数据源 OD-5 钦定 |
+| ArchiveQuery 值对象 | `src/domain/ports/archive_repository.py:39-75` | 15 键 Query Object（plan_id: UUID\|None 默认 None/limit 1-1000 默认 20——**默认 20 截断防御：服务显式传 1000**）；`__post_init__` limit 范围校验 :77-79 |
+| find PG 实现 | `src/infrastructure/storage/postgresql/repository/archive_repository.py:233-250`（`_do_find`） | 软删过滤+多条件+`order_by(archived_at.desc()).offset().limit()`——排序单源（服务层分组不改此序） |
+| StrategicArchive.plan_id 可空 | `src/domain/entities/strategic_archive.py:55`（`plan_id: UUID \| None = None`）+ 不变量 :48-52 | None 行剔除防御依据（OD-5）；archived_at 字段 :70（latest_activity_at 派生源） |
+| archive_repository 注册 | `src/composition_root.py:2315-2326` | SCOPED v1.1.0，lambda 注入 session_factory（6-4 CR1-F1 形态第五成员注记）——SINGLETON 服务捕获注记依据 |
+| 报告仓储端口 | `src/domain/ports/report_repository.py:23/:38` | save+`get_latest_by_plan(plan_id: uuid.UUID) -> StrategicReport \| None`（created_at 降序+report_id 降序 tie-break+limit 1——PG :172-177）——报告概况循环数据源 |
+| report_repository 注册 | `src/composition_root.py:3513-3521` | SCOPED v1.0.0，PostgreSQLReportRepository(session_factory 注入)——双模式 fallback（CLI 直调可达 :153-161） |
+| StrategicReport 实体 | `src/domain/entities/strategic_report.py:57-64` | 八字段（report_id/plan_id[str]/report_type[ReportType 枚举 markdown\|pdf]/file_path/section_count/degraded_section_count/generation_ms/created_at）——投影源 |
+| L2 报告表结构 | `deploy/postgresql/alembic/versions/017_strategic_reports.py:21-41` | plan_id 有索引（ix_strategic_reports_plan_id）——N+1 点查性能依据；无 tenant 列（租户隔离 schema 承载注记） |
+| PDF 对象键模板 | `src/application/ports/pdf_report.py:79`（`PDF_OBJECT_KEY_TEMPLATE`） | `reports/{plan_id}/{report_id}.pdf`——latest_pdf_object_key=file_path 直传依据（PDF 行 file_path 存此值——6-5b OD-4） |
+| 渲染器冻结字体锚 | `src/infrastructure/reporting/reportlab_pdf_renderer.py:60`（`_FONT_NAME = "STSong-Light"`） | BrandSection.font_status 值单源锚（**字面量对齐禁 import**——OD-6）；零品牌扩展点（:96 render 单参亲验） |
+| 6-8 报告段对照 | `src/application/ports/executive_view.py:152-167`（`ReportSection` 8 键） | 单 plan 可得性段——与 6-10 ExportSection 语义正交注记依据（OD-7） |
+| 6-8 复刻样板（服务） | `src/application/services/executive_view_service.py`（编排 :126-153/四段私有方法+段级 try :155-290） | 段级 try+单时间锚直系样板 |
+| 6-9 复刻样板（端口/服务/用例） | `src/application/ports/analyst_view.py`+`services/analyst_view_service.py`+`use_cases/get_analyst_view.py` | 最近直系样板（2026-11-07 交付——五轮代码审查收敛 v1.6.0） |
+| CLI 注册样板 | `src/entrypoints/agent_cli.py`：analyst-view 注册 :567-580/异步壳 :1620-1629/打印 :1632-1698/五步定式 :1701-1734（`_ensure_bootstrapped` :101）/分发 :2329-2330 | consultant-view 直系样板（argparse；**零参数面**——本 Story 去掉 add_argument 段与守卫步，四步实态+五步定式名保留注记） |
+| CLI 单测样板 | `tests/unit/interfaces/cli/test_agent_cli.py`：6-9 节 :3367-3664（`_make_stub_analyst_view` :3371/`_StubAnalystViewUseCase` :3456/`_patch_analyst_view_entry` :3471-3474） | consultant-view 测试直系复刻（**每命令族专用 patcher 纪律**第三连） |
+| 组合根注册样板 | `src/composition_root.py:2102-2139`（analyst_view 双注册块——主会话亲验吻合） | consultant_view 双注册直系复刻（**追加位 :2139 后**；注释块+两 SCOPED 无混态注记+触发器注记） |
+| 端口契约测试样板 | `tests/contracts/test_port_contract_analyst_view.py`（五断言族 :21-93） | 本 Story 契约测试直系复刻（签名断言零参分立注记） |
+| 架构验证样板 | `tests/unit/architecture/test_analyst_view.py`（四验证器 :56-197+SERVICE_ALLOWED_PREFIXES :30-37） | 本 Story 架构验证直系复刻（验证器 C 零命中形态——OD-11） |
+| 验收样板（R6 模板） | `tests/acceptance/test_acceptance_postgresql_relational_layer.feature`（243 行）/.py（863 行） | **用户钦定 R6 模板**：AC 横幅分节+@scenario 双行字面量+docstring+pass 形态 |
+| 验收样板（6-9 最新） | `tests/acceptance/test_acceptance_analyst_view.py`（1545 行——R6 合规最新形态） | 三件套 :148-208/双清 :161-167/context dict :177-208/CLI 直调 :717-738——本 Story 直系复刻 |
+| 归档行预置样板 | `tests/acceptance/test_acceptance_traceability_tree.py`：`_archive_row` :319/`_teardown_tree_assets` :473 | 多项目段归档行预置直系样板（6-7 交付——plan_id/archived_at 参数化扩展） |
+| 报告行预置通道 | `report_repository.save(report, metadata)`（PG 直写——6-5a 集成先例）+ `StrategicReport` 构造（八字段） | 报告概况预置直写通道（markdown+pdf 双行+时间戳判别构造） |
+| 6-8 遮蔽教训锚 | 6-8 R2「未来秒级 timestamp×闭区间出窗→递减微秒偏移」裁定 | 预置时间戳判别构造纪律（plan-A 最新活动晚于 plan-B ≥1s 显式偏移——Task 0.5） |
+| report 异常码段 | `src/domain/exceptions/_code_ranges.py:192-212`（490-493 已用注释 :199-208/494-499 预留 :210） | 零新码不占预留依据（OD-3） |
+| 冻结键数基线 | `tests/contracts/test_event_channel_mapping_pdf_report.py:24` 等（三处 56） | `_FROZEN_EVENT_COUNT=56`——零新增事件守护（Task 4.2） |
+| deferred-work 锚位 | `_bmad-output/implementation-artifacts/deferred-work.md`：L13/L17/L107/L117/L127/L129（Epic 6 锚六条）+L369/L370（6.5a-DF）+L395/L396（6.7-DF）+L402/L403（D6-8-R）+L409（D6-9-R1-1） | 锚定义务 11 条处置原文位（Task 0.7——主会话亲验行号 2026-11-08） |
+| MVP 单租户先例 | `src/application/ports/pdf_report.py:54-58`（tenant_id 构造参数 docstring「多租户归后续 Story」） | 租户隔离展示口径注记援引先例（OD-1） |
+
+### 锚定义务清单（deferred-work 台账——Task 0.7 逐条处置）
+
+| # | 台账锚位（deferred-work.md） | 留项内容 | 6-10 处置（Task 0 落档） |
+|---|---|---|---|
+| 1 | L13（灰度推进/per-version 统计视图） | 工具版本统计视图（触发=产品立项） | **第七轮同构不触发，锚位维持**（OD-8）：多项目段是 plan 维度聚合非工具版本统计面；注记落档 |
+| 2 | L17（langgraph retry/timeout 字段） | 触发=checkpoint_table/图引擎字段消费方 | **第七轮同构不触发，锚位顺延**（OD-8）：纯读侧聚合零图引擎/零 checkpoint_table 消费（五轮+6-9 先例延续）；注记落档 |
+| 3 | L107（B2 事件驱动摄取+持续数据供给） | 触发=Epic 6 首个 Skills 消费场景定型 | **不触发**（OD-8）：本 Story 零 Skills 消费（无 skill_selector 依赖——比 6-9 工具箱段消费更远）；锚位不变；注记落档 |
+| 4 | L117/L170（RabbitMQ 消费侧零接线+事件消费基建四件） | 触发=首个消费方 Story | **顺延 Epic 8**（OD-8）：纯查询聚合面零事件订阅（九连零消费延续）；注记落档 |
+| 5 | L127（unified_storage+L0/memory 12 端口休眠） | 触发=Epic 6（多轮顺延） | **第七轮同构不触发，锚位顺延**（OD-8）：纯读侧聚合零记忆消费（6-1/6-3/6-9 同款）；注记落档 |
+| 6 | L129（orchestration_service/data_pipeline 轨） | 再锚定=批量报告管线需求（6-11/Epic 7） | **第五轮维持注记顺延+显式不做批量裁定**（OD-8）：读侧聚合非批量报告管线（6-5a/6-5b/6-8/6-9 四轮同构+本 Story 主动收窄：批量导出不立项，白标导出=单 plan 单次归 report-generate 既有入口）；再锚定条件「6-11/Epic 7」不变；注记落档 |
+| 7 | L369/L370（6.5a-DF1 REST 导出面/DF2 L0 撕裂） | 触发=Epic 7 API 入口立项 | **顺延 Epic 7**（OD-8）：CLI-only 形态触发条件不含本 Story（6-8 处置先例延续）；注记落档 |
+| 8 | L395/L396（6.7-DF1 finding 级引文/DF2 bbox 四元组） | 锚位 Epic 21/22 | **锚位维持 Epic 21/22**（OD-8）：CLI-only 无 Web 高亮/句级面（6-8/6-9 维持先例延续）；注记落档 |
+| 9 | L402/L403（D6-8-R1-1 CLI .env 加载/R1-2 json_chain S 编号） | 触发=CLI 入口标准化/下次触及 | **非 6-10 修复面维持**（OD-8 第三连）：新增子命令沿用既有 agent_cli 入口形态（.env 缺口波及全命令族非本 Story 引入）；json_chain 文件零触碰；注记落档 |
+| 10 | L409（D6-9-R1-1 CLI `*--plan-id` 命令族非 canonical UUID 观察项） | 触发=CLI 输入标准化专项或 7-2 REST 契约 | **不入命令族注记**（OD-8）：consultant-view **零 `--plan-id` 输入面**——该观察项波及面（`*-view`/trace-tree 等 `--plan-id` 命令族）不含本命令；锚位不变；注记落档 |
+| 11 | （新增观察面候选登记评估） | 品牌段 V1 恒默认态的 6-11 对接锚 | **不登记新锚**（裁定：BrandSection.configured 是 VO 契约面非 deferred-work 留项——6-11 实施时经端口版本演进 v1.1.0 承载，触发器 docstring 注记已足；登记属双源冗余） |
+
+### 前一个故事学习经验 Lessons Learned from Previous Story
+
+**来源:** [Story 6-9 分析师视图](./6-9-analyst-view.md)（五轮文档审查+五轮代码审查收敛 done v1.6.0——2026-11-07）+ 6-8（四段聚合+段级容错+audit 白名单投影）+ 6-5a（并发采样）
+
+**关键学习/Key Learnings:**
+- **Agent 误报主会话复核**（五连教训）：调研结论关键锚点主会话亲验后方可入 Story——本 Story 已亲验 18 组关键事实（epics 六行原文/ArchiveQuery 15 键与 limit 默认 20/find PG 实现排序软删/StrategicArchive.plan_id 可空+不变量/archive+report 两注册名行号 lifetime/ReportRepositoryProtocol 仅两方法/StrategicReport 八字段/017 表列+plan_id 索引/PDF_OBJECT_KEY_TEMPLATE/_FONT_NAME :60+render 单参/consultant 词族全域零命中/CLI 16 命令族+样板四区行号/组合根 analyst_view 块 :2102-2139 吻合/_FROZEN_EVENT_COUNT 三处/report 码段 490-493 已用/openapi 零视图端点/deferred-work 11 锚行号/MVP_TENANT_ID docstring 先例）
+- **读侧消费既有冻结面纪律**（6-5b/6-7/6-8/6-9 直系）：两源全既有端口消费零演进——find 既有跨 plan 查询首个应用层消费+get_latest_by_plan 第二消费方循环形态；纯三零第二连
+- **降级哲学段级化演进**（6-5b 节点→6-7 树形→6-8 段级→6-9 段级+两层哨兵→本 Story **双段联动**）：派生段结构性依赖主源段→联动降级诚实语义（OD-12）——段级容错族的复合段新形态
+- **投影白名单+恒在段**（6-8 审计 15 键→6-9 ToolMetadata 18 字段面→本 Story StrategicReport 八字段投影六键）：展示面 VO 只投影消费键（generation_ms/metadata JSONB 不入 ProjectSummary——呈现面零消费）；brand 段零 IO 恒在段（6-9 toolbox 静态恒在段镜像）
+- **断言判别力**：exact set 键集/计数恒等式三联（plan_count==len/plans_with_reports==sum/plans_with_latest_pdf==sum）/行序降序判别（时间戳递减偏移构造）/latest 遮蔽判别格（先 pdf 后 markdown→pdf 计数 0）/None 行剔除防御格/品牌 V1 事实断言（预期演进信号语义）
+- **CLI 直调双清**（6-6 R3-1 实跑证伪教训第三连）：clear_singleton+clear_scoped 双清+禁二次 bootstrap——S7/S8 钦定直系
+- **性能口径差声明**（六连纪律）：P95/并发/既有面指标（导出<1min 归 6-5b）+继承面口径（隔离 100% schema-scoped）三段落 OD+docstring
+- **实施攻坚预防**（6-9 五项教训前置）：注释措辞纪律（禁 `--plan-id`/`--format` 字样入新注释块——防 getsource 切块断言边界污染）/BDD 步骤文本重复绑定合并自足/时间戳显式偏移构造（6-8 出窗教训）/ruff format 提交前亲验/集成 collection 场景级生命周期幂等
+
+**应用到本故事/Applied to This Story:**
+- [ ] 18 组关键锚点主会话亲验（创建期已执行——锚点表承载）
+- [ ] 两既有端口零演进+组合消费（OD-5/OD-10）
+- [ ] 段级容错+双段联动+空态幂等读第六连（AC-5/OD-12）
+- [ ] 投影白名单/exact set/恒等式三联/行序判别/遮蔽格五类断言形态（Task 2 矩阵）
+- [ ] CLI 双清+禁二次 bootstrap（S7/S8）
+- [ ] 性能三段口径差声明（OD-8）
+- [ ] 全程禁抑制注释+提交信息禁 AI 署名+三红线 grep
+
+### 其他约束速查
+
+- **风险集中登记**：①口径风险=排序与 latest 遮蔽口径（Task 0.2 冻结唯一版本+单测矩阵全枚举——同时间戳 tie-break 格+遮蔽格）；②契约风险=五 VO 键契约+品牌恒值（Task 0.1 冻结——实现禁增删键禁改默认值）；③清理风险=PG 面三分面（A 编程面回滚式/B CLI 面 clear_session+commit+定向 DELETE 行数断言/C 并发面禁 set_session 每路独立——6-8/6-9 直系第三连；归档行+报告行双资产定向清理）；④判别风险=品牌 V1 事实断言语义注记（防误判 flake——预期演进信号）+行级 None 同形（段哨兵唯一区分面——OD-12）；⑤性能风险=N+1 点查+find 截断双联（MVP 量级远小于门限——立项锚 Epic 7/21 docstring 注记）；⑥装配风险=两依赖注册名漂移（lambda resolve 以 grep 为准——Task 0.8 复核；本 Story 锚点按 HEAD@b9525f8b 校正）
+- **三条红线**：禁 `raise ValueError` / 手动 HTTPException / 继承内置 Exception（提交前三条 grep 自查零输出）；禁 noqa/type: ignore/pylint disable；提交信息禁 AI 署名
+- **覆盖率**：整体 ≥80%（基线 93%）/ application ≥85%（主改动层——epics L2503 对齐；新增文件 ≥95%）/ domain ≥90% 维持 / 集成 ≥75%（epics L2504 对齐）
+- **验收零 mock 全真实**（pytest.skip() 动态跳过；双通道真实服务——PG 归档行+报告行；段级异常容错归单测 AsyncMock——验收面无故障注入通道，6-8/6-9 分立同款第三连）
+- **运行命令**：`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`（显式四目录，裸 `tests/` 挂起）
+- **xdist 串行组**：pytestmark `xdist_group("blm-planning-perf")` 整模块挂法（6-7/6-8/6-9 同组第四连）
+
+---
+
+## 🤖 开发代理记录 Dev Agent Record
+
+### 使用模型 Agent Model Used
+
+| 配置项 | 值 |
+|--------|-----|
+| **Model** | Claude Code（create-story：GLM 调度） |
+| **Version** | create-story workflow（bmad-create-story skill v6.3.0） |
+| **Execution Date** | 2026-11-08 |
+
+### 调试日志引用 Debug Log References
+
+| 配置项 | 路径 |
+|--------|------|
+| **Workflow Config** | `.claude/skills/bmad-create-story/workflow.md` |
+| **Template** | `.claude/skills/bmad-create-story/template.md` |
+| **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md`（Story 6.10 定义 L2476-2516；依赖行 L656/L2020/L2035；Epic 20 L600/L714、Epic 21 L3354+、Epic 22 L3388+） |
+| **架构文档** | `docs/architecture/architecture.md` + `docs/architecture/arch-appendix.md`（Schema per Tenant 伪码 :1297-1362——未实现注记）+ `docs/architecture/interface-design.md`（三视图表陈旧口径注记先例） |
+| **UX/需求规范** | `_bmad-output/planning-artifacts/prd.md`（FR-SP-16 L1898-1901/FR-IF-05 L2199-2204/白标假设 L423-424/多租户 L1474+L2607/顾问 Persona L674-708）+ `ux-design-specification.md`（顾问视图布局差异化 L1401-1405/品牌配置旅程 L2100-2119）+ `roadmap.md`（白标 L29/L60/L73/L114） |
+| **前一个 Story** | `_bmad-output/implementation-artifacts/stories/6-9-analyst-view.md`（v1.6.0 收敛定稿——直系样板） |
+| **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
+
+### 实现计划与规范冻结 Implementation Plan & Frozen Specs（Task 0——dev-story 实施时落档）
+
+#### Task 0.1 五 VO 键契约冻结表（实现禁增删键）
+
+| VO | 键数 | 键清单（序=字段序） |
+|---|---|---|
+| `ConsultantView` | 5 | generated_at: str / build_degraded: bool / projects: ProjectsSection / brand: BrandSection / export: ExportSection（**无 plan_id 键**——全局视图零输入 OD-1） |
+| `ProjectsSection` | 4 | available: bool（==plan_count>0） / degraded: bool / plan_count: int / projects: tuple[ProjectSummary, ...] |
+| `ProjectSummary` | 6 | plan_id: str / archive_count: int / latest_activity_at: str \| None / latest_report_type: str \| None（值域 None/"markdown"/"pdf"） / latest_report_at: str \| None / latest_degraded_section_count: int \| None |
+| `BrandSection` | 5 | degraded: bool（恒 False） / configured: bool（恒 False V1） / logo_status: str（恒 BRAND_STATUS_UNCONFIGURED） / color_scheme_status: str（同上） / font_status: str（恒 BRAND_FONT_STATUS——"STSong-Light（内置）"） |
+| `ExportSection` | 7 | available: bool（==plans_with_reports>0） / degraded: bool（与 projects 段联动） / plans_with_reports: int / plans_with_latest_pdf: int / latest_pdf_plan_id: str \| None / latest_pdf_object_key: str \| None / latest_pdf_generated_at: str \| None |
+
+**常量冻结**：`BRAND_STATUS_UNCONFIGURED = "未配置（系统默认）"` / `BRAND_FONT_STATUS = "STSong-Light（内置）"` / `PANEL_ARCHIVE_LIMIT = 1000`——三常量均 ports 文件模块级。
+
+构造守卫（`__post_init__` 抛 242）：plan_id 非空字符串；计数 ≥0（plan_count/archive_count/plans_with_reports/plans_with_latest_pdf）；latest_degraded_section_count ≥0 或 None。**空态/段降级共用默认值钦定**：plan_count=0/projects=空 tuple/两计数 0/latest_pdf 三键 None/brand 五键恒默认——brand 段无空态（恒在段）。
+
+#### Task 0.2 排序与派生口径冻结
+
+```python
+# 行序钦定（确定性排序）：latest_activity_at 降序（最新活动优先——顾问作业面语义），
+# 同时间戳 tie-break plan_id 字典序升序（判别确定性）。
+# 实现形态：显式比较器或 sorted(key=(-ts, plan_id)) 等价形态——禁依赖 find 返回序
+#（find 序是行级 archived_at 降序非 plan 聚合序——两序分立注记）。
+#
+# latest 遮蔽口径：latest_report_type == get_latest_by_plan 结果直判（created_at 降序
+# 首行唯一）——plans_with_latest_pdf 计「最新为 pdf 的 plan 数」非「历史曾生成计数」
+#（先生成 pdf 后又生成 markdown 的 plan 不入 pdf 计数——「当前交付物形态」呈现语义）。
+#
+# None 行剔除：StrategicArchive.plan_id is None 的行不入 plan 清单（防御性——当前写侧
+# 恒带 plan_id，None 仅可达于手工修数/未来写入方）。
+#
+# 双段联动降级：find 异常或循环内单 plan get_latest_by_plan 异常 → projects.degraded
+# 与 export.degraded 同置 True（派生源受损联动）；brand 段零降级面（零 IO 恒稳）。
+```
+
+（实现形态 dev-story 时按冻结口径落码；四口径与 AC-2/AC-4/AC-5 逐字对齐。）
+
+#### Task 0.3 端口契约定义
+
+- `ConsultantViewPort`（应用层 `src/application/ports/consultant_view.py`，`@runtime_checkable Protocol` v1.0.0）：`async def build_consultant_view(self) -> ConsultantView`（**零参数**——全局视图）
+- 两依赖注册名（组合根既有——主会话亲验 HEAD@b9525f8b）：`archive_repository`（:2315 SCOPED v1.1.0）/ `report_repository`（:3513 SCOPED v1.0.0）
+- 组合根双注册：`consultant_view_service`（SINGLETON，tags=("consultant","view","application")）+ `consultant_view_use_case`（SINGLETON，tags=("consultant","use_case","application")）——落位 :2139 analyst_view_use_case 块之后
+- 契约测试：`tests/contracts/test_port_contract_consultant_view.py`（五断言族）
+
+#### Task 0.6 逐场景红锚符号表（12 场景预期形态）
+
+| 场景 | 红阶段形态（Task 0.5 运行实测） |
+|---|---|
+| S1~S6/S10/S11 | 运行期 ImportError（`consultant_view` 模块缺失——预置/构建步骤延迟 import 抛出） |
+| S7/S8 | CLI 未注册 → argparse invalid choice exit 2 → 断言步红（`cli_exit_code == 0` 断言失败） |
+| S9 | 性能场景 ImportError 同 S1 形态（服务符号缺失） |
+| S12 | Then 文件不存在 AssertionError（`_COMPLETION_SRC_FILES` 路径缺失） |
+
+（**红锚演进注记**——6-9 R3-F7 直系：红锚形态随实现 Task 落地演进——Task 1 后 ImportError 从 ports 模块迁至 services 模块→Task 2 后迁断言/注册红——属预期非做错信号；中途零意外绿推演：全场景依赖服务符号或注册名，部分绿仅出现在其依赖 Task 完成后；Task 1→2→3 串行（Task 2 断言需 Task 1 VO 符号）隐含于任务序，dev 按序执行。）
+
+#### 12 验收场景钉死（S1~S12）
+
+| 场景 | AC | 内容摘要 |
+|---|---|---|
+| S1 | AC-1 | 全数据三段 5 键 exact set+嵌套键集+值级（AC-1 双 plan 形态：plan_count==2+两行 archive_count 直推+latest_pdf 定位三键+计数恒等式三联——三 plan 扩展形态归 S2） |
+| S2 | AC-2 | 多项目段三 plan 形态（plan-A 活动+双报告/plan-B 活动+markdown/plan-C 活动零报告+None 行剔除——行序降序判别+archive_count 直推+plan-C 报告三键 None） |
+| S3 | AC-3 | 品牌段恒默认态（5 键 exact set+五值级恒等——V1 事实断言语义） |
+| S4 | AC-4 | 导出段派生（计数 2/1+latest_pdf 定位三键与预置直推+零 PDF 对照腿可选归单测） |
+| S5 | AC-5 | 空态幂等读（零预置 → 5 键恒在+brand 完整默认态+两段空态默认值+build_degraded False+不抛） |
+| S6 | AC-5 | 段级容错分立声明（find/循环两分支归单测 AsyncMock——验收面零 mock 红线注记承载） |
+| S7 | AC-6 | CLI 全数据输出（三段分隔行+项目行两行/项目形态+品牌两行+导出三行+提示行——双清直调） |
+| S8 | AC-6 | CLI 空态输出（`项目: 共 0 个`+品牌两行恒在+导出空态行+exit 0） |
+| S9 | AC-7 | 性能 20 轮 P95<800ms（服务面两读窗口） |
+| S10 | AC-7 | 并发 20 路全成功+两两相等（排除集单键 {generated_at}——asdict 剔除对照） |
+| S11 | AC-7 | 租户隔离继承断言（TestTenant schema 内预置 → 面板仅见预置行零跨漏——schema-scoped 继承口径） |
+| S12 | 收尾 | src+四测试目录完成清单存在性断言 |
+
+（epics L2493-2495 架构测试三项对账：多项目显示测试→S2；白标报告测试→S4+口径差声明[导出执行归 report-generate 既有入口——OD-8 docstring 承载]；多租户隔离测试→S11 继承口径。）
+
+### 完成清单 Completion Notes List
+
+- [ ] 故事需求从 `epics_v1.0.md` 提取（L2476-2516+依赖行 L656/L2020/L2035）
+- [ ] 架构约束从 architecture.md/arch-appendix.md/interface-design.md 提取（三视图表陈旧口径+Schema per Tenant 未实现注记）
+- [ ] 前一个故事学习经验整合（6-9 五轮双审查收敛样板+6-8 段级容错+6-5a 并发+实施攻坚五项预防）
+- [ ] 状态设置为 `ready-for-dev`
+- [ ] SDD+TDD 融合开发要求定义完成（五 VO 键契约/排序派生口径/12 场景/Task 0~7 共 8 Task）
+- [ ] 项目结构对齐统一规范（纯三零 Story 第二连+src 面 3 新建+2 扩展）
+- [ ] 四 Agent 并行调研（报告白标数据面/多项目快照面/CLI 组合根 R6 模板/治理面与边界）+ 主会话 18 组关键锚点亲验
+
+### 文件清单 File List
+
+**创建的文件/Created Files:**
+- `_bmad-output/implementation-artifacts/stories/6-10-consultant-view.md`
+
+**修改的文件/Modified Files:**
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - 6-10 状态流转 backlog→ready-for-dev
+
+**待创建的文件/To Be Created (Dev Story 实施):**
+- `src/application/ports/consultant_view.py` - 五 VO+品牌三常量+PANEL_ARCHIVE_LIMIT+ConsultantViewPort
+- `src/application/services/consultant_view_service.py` - 三段编排+排序派生+双段联动容错
+- `src/application/use_cases/get_consultant_view.py` - 用例（零参透传）
+- `src/entrypoints/agent_cli.py` - consultant-view 子命令（扩展——零参数）
+- `src/composition_root.py` - 双注册块（扩展——:2139 邻位）
+- `tests/unit/application/test_consultant_view_vos.py` - VO 单测
+- `tests/unit/application/test_consultant_view_service.py` - 服务单测（排序派生矩阵+容错矩阵）
+- `tests/unit/application/use_cases/test_consultant_view_use_case.py` - 用例单测
+- `tests/unit/interfaces/cli/test_agent_cli.py` - CLI 单测（扩展）
+- `tests/unit/architecture/test_consultant_view.py` - 架构验证（四验证器）
+- `tests/integration/test_integration_consultant_view.py` - 集成测试（四场景）
+- `tests/contracts/test_port_contract_consultant_view.py` - 端口契约测试（五断言族）
+- `tests/acceptance/test_acceptance_consultant_view.feature` - Gherkin 场景（12 场景——R6 模板）
+- `tests/acceptance/test_acceptance_consultant_view.py` - BDD 步骤实现（6-9 R6 合规形态）
+- `_bmad-output/implementation-artifacts/deferred-work.md` - 11 条锚定义务处置注记（扩展）
+
+---
+
+## 📊 故事详情 Story Details
+
+| 配置项 | 值 |
+|--------|-----|
+| **Story ID** | 6.10 |
+| **Story Key** | 6-10-consultant-view |
+| **File** | `_bmad-output/implementation-artifacts/stories/6-10-consultant-view.md` |
+| **Status** | `backlog` → `ready-for-dev` |
+| **Epic** | Epic 6: 战略规划流程（BLM 前两阶段） |
+| **价值组** | 战略规划与审批能力 / UX 三页面驾驶舱（顾问） |
+| **优先级** | P1-10（依赖 Story 6.5b——epics L2020 钦定，PDF 报告生成已 done） |
+| **覆盖 FR** | 无独立 FR（跨 plan 聚合展示面——同 6-6/6-7/6-8/6-9 形态第五连；FR-SP-16 白标 REST 归 Epic 20 Story 20.4、品牌配置实现归 6.11、FR-IF-05 三页面归 22.8） |
+
+### 完成总结 Completion Summary
+
+1. [ ] All tasks defined 所有任务定义完成（Task 0~7 含 TDD 循环+变异锚）
+2. [ ] All acceptance criteria specified 所有验收标准已定义（AC-1~AC-7+12 场景钉死）
+3. [ ] Architecture constraints extracted 架构约束已提取（纯三零 Story 第二连+依赖方向矩阵）
+4. [ ] Previous story learnings integrated 前一个故事学习经验已整合（8 学习点+7 应用项）
+5. [ ] Sprint status synced to `ready-for-dev`
+6. [ ] OD-1~OD-12 十二裁定落档（范围收窄 CLI-only 第九连/零事件/零异常+零 242 面/五 VO 键契约/archives 反推数据源/品牌段 6-11 对接锚/导出段纯投影+遮蔽口径/性能三段+锚定义务 11 条/命名/组合根+零参数先例/纯三零/双段联动容错）
+7. [ ] deferred-work 11 条锚定义务处置预案落档（Task 0.7——六条 Epic 6 锚+两条 6.5a-DF 顺延+两条 6.7-DF 维持+两条 D6-8-R 维持+一条 D6-9-R 不入命令族注记——第 11 条裁定不登记新锚）
+
+### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
+
+> 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项（创建期 v1.0.0 未历审查轮——表留空待登记，6-9 创建期同款形态）。
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+
+---
+
+### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
+
+**审查日期:** （待代码审查轮次）
+**审查模式:** full（四视角并行调研+双评审员 C3 门禁——6-9 审查形态直系）
+
+#### 需决策 Decision Needed
+
+- 无（待审查轮次登记）
+
+#### 已修复 Patch
+
+- （待审查轮次登记）
+
+#### 已推迟 Defer
+
+- （待审查轮次登记）
+
+---
+
+### 下一步 Next Steps
+
+- [ ] Story created with `ready-for-dev` status
+- [ ] 运行文档审查修订循环（参照 6-7/6-8/6-9 五轮形态——R1 四视角调研+双审查/R2 回归+组合/R3 单深度/R4 纯验证/R5 独立终审）
+- [ ] 运行 `dev-story` 开始实施
+- [ ] 运行 `code-review` 进行代码审查（auto-marks done）
+- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+
+---
+
+**故事版本/Story Version:** v1.0.0
+**创建日期/Created:** 2026-11-08
+**最后更新/Last Updated:** 2026-11-08
+**更新说明/Description:**
+- v1.0.0: 创建故事文件（四 Agent 并行调研【报告白标数据面/多项目与快照清单面/CLI+组合根+R6 模板/治理面与范围边界】+主会话亲验 18 组关键锚点；OD-1~OD-12 十二裁定：范围收窄 CLI-only 第九连（零参数全局视图——CLI 族首个零参数查询命令；Web 归 Epic 21/22+顾问角色枚举缺口注记；品牌配置实现归 6-11——品牌段 V1 恒默认态对接锚；白标 REST 归 Epic 20 Story 20.4；批量导出显式不做——L129 第五轮维持）/零新增事件第九连（_FROZEN_EVENT_COUNT=56 零变化）/零新增异常+零 242 消费面（零输入语义自然缺席——report 段 494-499 预留不占）/五 VO 5-4-6-5-7 键契约（顶层无 plan_id 键+brand 零 IO 恒在段+latest 遮蔽计数口径）/多项目段 archives 反推数据源（ArchiveQuery(plan_id=None, limit=1000) find 现成跨 plan 查询首个应用层消费+None 行剔除+N+1 双风险注记立项锚 Epic 7/21+项目行不含进度列两视图正交）/品牌段三常量+禁 import infra（STSong-Light 字面量 :60 锚）/导出段纯投影派生（零新读单源纪律+与 6-8 ReportSection 语义正交）/性能三段口径（P95<800ms 服务面+并发 20 排除集单键第三连+导出<1min 归 6-5b 既有面+隔离 100% 继承口径——口径差声明六连）/锚定义务 11 条处置（L13/L17/L107/L117+L170/L127/L129 六 Epic6 锚+6.5a-DF1·DF2 顺延+6.7-DF1·DF2 维持+D6-8-R1·R2 第三连+D6-9-R1-1 不入命令族注记+品牌对接锚不登记裁定）/命名 consultant_view 词族（integration 前缀对 epics 钦定名显式偏离第三连）/组合根双注册+两 SCOPED 无混态（最简形态）+CLI 注释措辞纪律/纯三零 Story 第二连（零 domain+零 migration+零 infra——src 面 3 新建+2 扩展）/双段联动容错（find 级+循环级两捕获位+行级 None 同形段哨兵区分裁定）；12 验收场景钉死（S1~S12——epics 架构测试三项对账：多项目→S2/白标→S4+口径差声明/隔离→S11 继承口径））
