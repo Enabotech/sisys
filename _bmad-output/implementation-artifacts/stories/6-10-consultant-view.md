@@ -947,17 +947,20 @@ _bmad-output/implementation-artifacts/deferred-work.md  ▲ 11 条处置注记�
 | R1-F9 | P3 | CLI stub 工厂 docstring「plans 五元组」实列六元素（plan_id/archive_count/latest_activity_at/latest_report_type/latest_report_at/latest_degraded_section_count） | 勘误「六元组」（随 R1-F1 同文件顺手修——评审员②发现） |
 | R2-F1 | P3 | R1-F3 计数勘误的镜像传播漏网：sprint-status.yaml 两处「变异 13 锚」（:31 last_updated 注记+:188 6-10 行——:188 括号分项 2+5+4+2+1=14 与计数词 13 自相矛盾即 R1-F3 诊断的同族笔误原样存于治理镜像文件，R1 提交 6 文件不含该文件——「修一处漏同类处」传播破口，R2-B 发现） | 两处 13→14 同族勘误（grep 验证 0 残留） |
 | R2-F2 | P3 | R1-F4 台账「全仓统一」措辞口径失实——实际仅 src+tests 代码域统一（Story/epics 引文面 4 处 epics 原文「6.11」点号形态合法保留；R2-A 与 R2-B 双 Agent 独立发现） | 台账行补「代码域」限定+引文面保留注记 |
+| R3-F1 | P3 | Defer 表第 1 条「VO 守卫 8 格中 3 格仅断类型」计数失实——实测 8 个 raises 块中 6 块无 code 断言（仅 :244/:255 有；按函数计 4——任何口径均非 3；主会话 grep 亲验定谳） | Defer 条计数勘误（6 块+两代表格注记） |
+| R3-F2 | P3 | 验收 :392/集成 :204 teardown docstring 裸引「R2-F3」欠「6-8」前缀——本 Story 自有审查编号止于 R2-F2，裸编号误读为自有（R1-F5 伪溯源同族欠前缀形态；同文件 :17/:32/:1059 均带前缀） | 两处补「6-8 」前缀 |
+| R3-F3 | P3 | Defer 第 9 条「archived_at 降序近似合理」未含 PG `DESC` 默认 NULLS FIRST 语义——NULL-archived_at 背景行居窗首先耗 limit 名额，membership 免疫完整前提应补「NULL 行+更新行<1000」（实测当前库 NULL=0 零暴露——纯边界注记） | Defer 条补 NULLS FIRST 边界注记 |
 
 #### 已推迟 Defer（留档注记——非缺陷或先例一致）
 
-- VO 守卫 8 格中 3 格仅断异常类型未断 code（代表格有 `code=="EXCEPTION_242"` 断言、模块单异常类仅守卫 raise——替换遮蔽风险低）
+- VO 守卫 8 个 raises 块中 6 块仅断异常类型未断 code（:244/:255 两代表格有 `code=="EXCEPTION_242"` 断言、模块单异常类仅守卫 raise——替换遮蔽风险低；R3-F1 计数勘误：原「3 格」任何口径均不成立——按块计 6/按函数计 4）
 - 服务单测循环级容错格 side_effect 为按 plan_id 分派函数（Story 钦定「列表形态」）——顺序无关判别等价且更强，良性偏离注记
 - 架构验证器 C 的 rglob 零命中为文件名级匹配（Story 措辞隐含内容级）——主会话内容级 grep 实证当前零命中，当下等价留档
 - `test_generated_at_single_time_anchor` 判别力弱于命名（「单次 now」无行为可观测面——结构性不可测，注记性测试）
 - limit 覆写行为断言不判别「传入超上限被 clamp」形态（对钦定变异形态[默认 20 截断]判别成立）
 - 并发对照含未过滤 plan_count/available/degraded 键——等价性依赖 blm-planning-perf 组串行前提（R4-F2 前向约束已在册）
 - 验收 teardown 非 AssertionError 异常 print 容错（6-9 同款先例一致——行数断言 AssertionError 正确 re-raise）
-- S9 性能 skip 门计数经 `find(limit=1000)`——背景行超千级时 distinct plan 数被截断低估（archived_at 降序近似合理；量级逼近 50 阈值时改 SQL COUNT(DISTINCT)——deferred 触发条件）
+- S9 性能 skip 门计数经 `find(limit=1000)`——背景行超千级时 distinct plan 数被截断低估（archived_at 降序近似合理——R3-F3 边界注记补全：PG `DESC` 默认 NULLS FIRST，NULL-archived_at 背景行居窗首先耗 limit 名额，membership 免疫的完整前提是「NULL 行+更新时间戳行合计<1000」；实测当前库 NULL=0 零暴露；量级逼近 50 阈值时改 SQL COUNT(DISTINCT)——deferred 触发条件）
 - 集成 `_fresh_resolver_per_test` 为 async fixture（6-9 是 sync monkeypatch 形态）——asyncio_mode=auto 下可用，语义等价最小偏差
 - 集成场景④在剥掉 `-n auto --dist loadgroup` 的非标准形态下偶发时序敏感（标准门禁形态 3 次全绿——R4-F2 组串行正是免疫手段，非门禁风险）
 - CLI stub 工厂导出段默认值形态（无 latest_pdf_plan_id 显式 None 时的三键派生）与生产 ExportSection 构造面存在形态差——stub 内部自洽已由矛盾 VO 纪律约束（R1-F1 整形后两降级格显式置零）

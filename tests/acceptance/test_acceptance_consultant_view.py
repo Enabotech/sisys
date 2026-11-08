@@ -389,7 +389,7 @@ async def _save_report_row(
 
 
 async def _teardown_assets(ctx: dict[str, Any]) -> None:
-    """teardown 归档行+报告行定向 DELETE（行数断言防静默 0 行假绿——R2-F3）.
+    """teardown 归档行+报告行定向 DELETE（行数断言防静默 0 行假绿——6-8 R2-F3 纪律直系）.
 
     各步独立 try/except——单步失败不阻断后续清理；A 面归档行/报告行经 pg_session
     fixture rollback 整体回收（跳过 DELETE——零 DELETE 通道）。

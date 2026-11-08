@@ -201,7 +201,7 @@ async def _preset_three_plan(ctx: dict[str, Any]) -> dict[str, str]:
 
 
 async def _teardown_rows(ctx: dict[str, Any]) -> None:
-    """定向 DELETE 行数断言（防静默 0 行假绿——R2-F3）."""
+    """定向 DELETE 行数断言（防静默 0 行假绿——6-8 R2-F3 纪律直系）."""
     if not (ctx["_archive_ids"] or ctx["_report_ids"]):
         return
     import sqlalchemy as sa
