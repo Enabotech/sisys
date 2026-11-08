@@ -696,7 +696,7 @@
 
 #### 架构验证测试实现（四验证器——`test_analyst_view.py` 直系样板+6-8 白名单变体）
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_white_label_report.py`（验证器 A 落位[domain 实体/ports 文件 AST ClassDef 含 BrandTemplate/两 Port/BrandRenderSpec+常量 AST 断言]；验证器 B 零 publish[服务源码 token 扫描+DomainEvent 子类全集对比]；**验证器 C 白名单形态[R3 修正]——白名单=三层全量合法 brand 词族新文件集 9 个**{domain: entities/brand_template.py+ports/brand_template_repository.py；application: ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+use_cases/list_brand_templates.py；infra: models/brand_template.py+repository/brand_template_repository.py}+fonts 目录+渲染器[修改既有单列]——**集合等值比较（==）双向判别**[漏列红+多列红——`<=` 子集比较多列静默无判别]；[与 6-9/6-10 零命中形态分立注记——本 Story 非「纯三零」]；验证器 D CLI 接线[两新命令 add_parser 锚+report-generate 扩展参数锚+组合根注册锚+resolve 注入链]；SERVICE_ALLOWED_PREFIXES+FORBIDDEN_IMPORTS 照设）
+- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_white_label_report.py`（验证器 A 落位[domain 实体/ports 文件 AST ClassDef 含 BrandTemplate/两 Port/BrandRenderSpec+常量 AST 断言]；验证器 B 零 publish[服务源码 token 扫描+DomainEvent 子类全集对比]；**验证器 C 白名单形态[R3 修正·R5 计数勘误]——白名单=三层全量合法 brand 词族新文件集 8 个**{domain: entities/brand_template.py+ports/brand_template_repository.py；application: ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+use_cases/list_brand_templates.py；infra: models/brand_template.py+repository/brand_template_repository.py}+fonts 目录（资产文件名无 brand 词族不入集）+渲染器[修改既有单列]——**集合等值比较（==）双向判别**[漏列红+多列红——`<=` 子集比较多列静默无判别]；[与 6-9/6-10 零命中形态分立注记——本 Story 非「纯三零」]；验证器 D CLI 接线[两新命令 add_parser 锚+report-generate 扩展参数锚+组合根注册锚+resolve 注入链]；SERVICE_ALLOWED_PREFIXES+FORBIDDEN_IMPORTS 照设）
 - [ ] Subtask 9.2: 开发结束验收场景（S14 收尾：`_COMPLETION_SRC_FILES`[**新建 9+扩展 11**=20 个 src 文件——▲11 含 domain/exceptions/__init__.py+use_cases/generate_pdf_report.py；migration 018 单独清单项]/`_COMPLETION_TEST_FILES` 逐项 `path.is_file()` 断言——6-10 :104-123/:1233-1246 直系）
 - [ ] Subtask 9.3: 全套复跑（14 场景全绿[S1~S13 功能/性能+S14 收尾]+四目录全量+`ruff`+`mypy`+覆盖率报告）
 - [ ] Subtask 9.4: deferred-work 处置注记落档（Task 0.7 表回写+新增观察面登记评估[若实施中发现]）
@@ -737,7 +737,7 @@
 | **OD-11** | **6-10 品牌段联动兑现+回归面六项处置**：BrandSection **5 键键契约不变、值语义演进**（v1.1.0 读配置——零模板五键与 6-10 恒值逐字相等[6-10 断言前提演进为「零模板」]/有模板 configured True+呈现名派生/异常 degraded True[零 IO 恒稳承诺打破——docstring 勘误]）；呈现名单源引用预设常量（ports 同层 import 合法）；品牌段「最新行」=updated_at 降序首行（与 AC-3 行序同键——UPSERT 修订语义）；**回归面六项义务清单**（Task 6.1~6.6——docstring 勘误/CLI 提示行 :1806 更新[:1820 不动最小面]/单测三形态/验收 S3 skip 门[品牌模板表零行清点+有行 skip——共享库残留防御]/CLI 断言联动/组合根 lambda+契约锚）；**xdist 前向约束扩展**：本 Story 全部品牌模板写入方挂 blm-planning-perf 同组+teardown rowcount 断言（6-10 OD-13「新增提交型写入测试必须挂同组」约束的品牌面扩展——漏挂则与 6-10 S3 skip 门/6-7 归档面并行假红） | 6-10 OD-6 对接锚+预期演进信号兑现语义+共享库背景行风险 |
 | **OD-12** | **UPSERT by name 修订语义+logo 保留语义**：save 编排=服务侧 `get_by_name` **先行**（保留语义与 L4 键锚定的单源承载位——同名取既有 template_id+logo_object_key，L4 store 用既有 template_id 作键实现同键覆盖）→校验→[logo 在场]L4 store→实体构造→repo.save（仓储按 template_id 纯 UPSERT 落库：有则 UPDATE[template_id/name/created_at 不变+三配置字段+updated_at 前进]/无则 INSERT[新 template_id]）；**updated_at 前进=服务构造实体时 datetime.now(timezone.utc) 显式定值**（report_repository 应用侧定时戳先例 :126-139——DDL server_default 仅 INSERT 初值，两机制不混用）；并发双 INSERT 撞 UNIQUE(name)→仓储捕 IntegrityError 包装 495（CLI 单进程常态低概率，防御义务归仓储）；**409 等价语义钦定为非错误**（同名保存=模板修订预期用法——CLI 面无冲突错误语义；与「资源冲突 409」Edge Case 要求的口径差声明：REST 面 20.4 届时再评估冲突语义）；logo 保留：已有 logo 模板再存不带 --logo-path → logo_object_key 与 L4 对象**不变**（修订语义：缺席≠清除——清除归后续模板管理 Story YAGNI 注记） | 最简修订语义+CLI 面语义分立+YAGNI |
 | **OD-13** | **共享库断言体系延续+品牌面特化**：6-10 OD-13 四件套直系适配——①模板行预置 TestTenant UUID 前缀名（name UNIQUE 防撞+teardown 定位）；②**6-10 S3 skip 门**（品牌模板表零行清点——本 Story 写入方清理失败残留的兜底；预期零残留[同组串行+rowcount 断言]）；③consultant-view 品牌段全局查询背景行免疫 = 同组串行+自包含清理双保险（品牌段读「最新模板」是全局面——外来行必致 configured True 假红，skip 门是唯一兜底）；④性能场景背景量级敏感（品牌模板行>10 skip 门——list/最新行查询量级注记）；**L4 对象判别**：logo 对象键锚 template_id（TestTenant 前缀名→template_id 唯一——对象断言按键定位零背景免疫面） | 6-10 OD-13 直系+品牌段全局查询特化+S3 联动风险 |
-| **OD-14** | **架构验证器 C 白名单形态（非纯三零）**：白名单=**三层全量合法 brand 词族新文件集 9 个**（domain 2[entities/brand_template.py+ports/brand_template_repository.py]+application 4[ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+list_brand_templates.py]+infra 2[models/brand_template.py+repository/brand_template_repository.py]）+reporting/fonts/*（资产目录）+reportlab_pdf_renderer.py 扩展（既有文件单列）——**集合等值比较（==）双向判别**（R3 修正：仅枚举 infra 会自我误伤 domain/application 6 文件；`<=` 子集比较多列静默）；domain 另有 report_exceptions.py/_code_ranges.py/__init__.py 扩展（合法 domain 面——与 6-9/6-10「纯三零零命中」形态分立注记[彼零 domain 零 infra；本 Story 是 6-5a/6-5b 同构的全层 Story]）；**migration 018 合法新增**（只增红线——已合入禁改）；验证器 A/B/D 照设（A 落位含新文件 AST 断言/B 零 publish/D CLI 接线锚） | 6-8 白名单先例+全层 Story 形态+import-linter 校验面+R3 白名单自矛盾修正 |
+| **OD-14** | **架构验证器 C 白名单形态（非纯三零）**：白名单=**三层全量合法 brand 词族新文件集 8 个**（domain 2[entities/brand_template.py+ports/brand_template_repository.py]+application 4[ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+list_brand_templates.py]+infra 2[models/brand_template.py+repository/brand_template_repository.py]——8 个 .py 文件；fonts 资产文件名无 brand 词族不入集归目录单列）+reporting/fonts/*（资产目录）+reportlab_pdf_renderer.py 扩展（既有文件单列）——**集合等值比较（==）双向判别**（R3 修正：仅枚举 infra 会自我误伤 domain/application 6 文件；`<=` 子集比较多列静默）；domain 另有 report_exceptions.py/_code_ranges.py/__init__.py 扩展（合法 domain 面——与 6-9/6-10「纯三零零命中」形态分立注记[彼零 domain 零 infra；本 Story 是 6-5a/6-5b 同构的全层 Story]）；**migration 018 合法新增**（只增红线——已合入禁改）；验证器 A/B/D 照设（A 落位含新文件 AST 断言/B 零 publish/D CLI 接线锚） | 6-8 白名单先例+全层 Story 形态+import-linter 校验面+R3 白名单自矛盾修正 |
 
 ### 项目结构说明 Project Structure（本 Story 涉及面）
 
@@ -989,7 +989,6 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - `src/domain/entities/brand_template.py` + `src/domain/ports/brand_template_repository.py` - 实体+R1 端口
 - `src/application/ports/brand_template.py` + `src/application/services/brand_template_service.py` - 预设+R2 服务
 - `src/application/use_cases/save_brand_template.py` + `list_brand_templates.py` - 双用例
-- `src/application/use_cases/generate_pdf_report.py` - execute 增 brand_template_name 透传（R3 补位——传递链中间件）
 - `src/infrastructure/storage/postgresql/models/brand_template.py` + `repository/brand_template_repository.py` - 存储双件
 - `src/infrastructure/reporting/fonts/NotoSansSC[-Regular].ttf` - 字体资产（OFL——文件名随渠道二择：variable TTF 直存或 instancer 实例化命名，Task 3.2 钦定后 S14 清单同步）
 - `deploy/postgresql/alembic/versions/018_brand_templates.py` - migration
@@ -998,6 +997,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 
 **待修改的文件/To Be Modified（src 扩展 11 文件+6-10 三测试文件+migration 外 2 文档/台账）:**
 - `src/domain/exceptions/report_exceptions.py`+`_code_ranges.py`+`__init__.py` - 494/495
+- `src/application/use_cases/generate_pdf_report.py` - execute 增 brand_template_name 透传（R3 补位——传递链中间件；R5 归类勘误：6-5b 已交付文件的修改非新建）
 - `src/application/ports/pdf_report.py`+`services/pdf_report_generation_service.py` - v1.1.0 双演进
 - `src/application/ports/consultant_view.py`+`services/consultant_view_service.py` - v1.1.0 联动
 - `src/infrastructure/reporting/reportlab_pdf_renderer.py` - 品牌三件
@@ -1063,6 +1063,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 | 27 | **R3-2 导出侧资产全生命周期双不完整**：BLM 八阶段预置链+轻装配未锚（Task 0.5 仅钉模板行）；~25 次导出的 strategic_reports 行+event_outbox 行+WORM PDF（端口 delete 抛 ComplianceLockError 须 bypass_governance 裸删）+归档三面残留清理零提及 | P2 | Task 0.5 补预置 helper 锚（6-5b :600-758/:309-391 直系）+隔离表补三面清理（`_cleanup_report_rows`/`_cleanup_outbox_rows`/`_cleanup_pdf_objects` bypass 直系） |
 | 28 | **R3-3 consultant_view 升级落位双写矛盾**（Task 5 绿行「3 处版本升级含 consultant_view」vs Task 6.6 五件分离——lambda 三依赖先落而服务两参 → resolve TypeError 破坏 6-10 全测试面）+**R3-4 验证器 C 白名单自矛盾**（仅枚举 infra 2+fonts，domain 2+application 4 共 6 文件按「白名单外零 brand 词族新文件」自我误伤必红；比较方向未钉——`<=` 多列静默） | P2 | R3-3：Task 5 改「本批 2 处+consultant_view 升级预告（五件同批原子落 Task 6——R3 裁定）」；R3-4：白名单改三层全量 9 文件+fonts+渲染器单列+集合等值（==）双向判别（Subtask 9.1+OD-14 同步） |
 | 29 | R3 六项 P3：name 242 守卫晚于 L4 store（非法 name+logo 形态孤儿对象）→服务前置预检；S8 前置依赖 get_render_spec 调用位→钦定前置于聚合查询（免 BLM 预置直达 494）；渲染正例 Logo 资产须可解码（仓内 PNG 测试字节全是截断假体）→Pillow 生成（零新依赖）；T5 同模板修订跨导出追溯无裁定→OD-5 补 MVP 接受注记（PDF 产物即渲染参数固化载体）；6-10 CLI 品牌显示块 :1800-1804 硬编码「默认」联动后自相矛盾→6.2 补三值派生改造；AC-1 UPSERT 验收面无场景承载→载体声明（Task 2+Task 8②组合承载） | P3 | 六项逐处落码清偿（R3 全部 10 项零留项；另 8 条证伪不成立疑点留痕：S11 排序影响不成立/S6 两色分立正确/S3-skip 互扰不成立/五色互斥抽算通过/stsong 两串分立有意/brand_applied 单键充分/T1-T3 时间线全对/Task 6 依赖闭合） |
+| 30 | R5 终审特权发现两项（前四轮全漏）：F-1 白名单计数 9↔8 不符（Subtask 9.1+OD-14 两处——花括号枚举恰 8 个 .py，「9」疑沿用结构图 ★9 口径含 ttf 资产，而资产文件名无 brand 词族应归目录单列）；F-2 File List 段落归类错位（generate_pdf_report.py「execute 增透传」是修改动作却列于待创建段） | P3 | F-1 两处「9 个」→「8 个」+fonts 不入集注记；F-2 移行至待修改段+归类勘误注记——随收敛提交清偿（零留项） |
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
@@ -1086,13 +1087,14 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
+- [x] 文档审查修订循环完成（R1-R5 五轮收敛 v1.4.0——零 P0/P1 残留，61 项修复全清偿）
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查（循环审查工作流五轮形态——参照 6-9/6-10 周期）
 - [ ] Epic 6 收尾：6-11 done 后运行 `retrospective`（epic-6-retrospective optional）
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-08
 **更新说明/Description:**
@@ -1101,3 +1103,14 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - v1.2.0: 文档审查 Round 2（R2-A 回归核查[21 行台账逐项 git 对照+八焦点交叉 grep——主位全落地+Edit 误删零发现+新锚点抽测全中]+R2-B 组合交互推演[8 组——2 组冲突/4 组成立带注记/2 组净成立]；P1×1+P2×2+P3×9 修复 12 项全清偿：R2-B-1 字典化×零修改互拆[:282 monkeypatch 布尔→dict 例外 carve out 四处]/R2-B-2 预置直写通道 updated_at 恒值互拆[显式构造义务两处+AC-3 载体钉位]/R2-A-1 :214 S2 口径传播漏网/九项 P3[锚勘误 :470/七格术语分立/资产文件名渠道二择/File List 标题/尾位措辞/仓储构造通则/updated_at 前进单点承载/AC-7 通道分立/teardown 顺序钦定/7.2 承载位钉死]；台账 25 行）
 - v1.3.0: 文档审查 Round 3（单深度推演四板块[14 场景三轴完备/模板生命周期六时间线/14 OD 交叉互证/Task 0→9 依赖干跑]——P1×1+P2×3+P3×6 修复 10 项全清偿+8 条证伪不成立疑点留痕：R3-1 GeneratePdfReportUseCase 传递链中间件四清单缺位[--brand-template CLI→use case→服务的必需环节——execute 增 keyword-only 透传+注册零改动维持 v1.0.0，五处补位 10→11 文件 19→20 项]/R3-2 导出侧资产全生命周期双不完整[BLM 八阶段预置链 6-5b :600-758 直系+strategic_reports/event_outbox/WORM PDF bypass_governance 三面清理——端口 delete 抛 ComplianceLockError 亲验]/R3-3 consultant_view 升级双写矛盾[lambda 先落服务两参 TypeError 破坏窗口→五件同批原子落 Task 6]/R3-4 验证器 C 白名单自矛盾[仅枚举 infra 自我误伤 domain/application 6 文件→三层全量 9 文件+集合等值双向判别]/六项 P3[name 前置预检防孤儿 logo/get_render_spec 前置钦定 S8 免预置直达 494/Pillow 生成可解码 Logo/OD-5 修订跨导出 MVP 接受注记/6-10 CLI 显示块 :1800-1804 三值派生改造/AC-1 UPSERT 载体声明]；台账 25→29 行）
 - v1.3.0（R4 纯验证轮·版本不递增）：五节全过零 ✗——修复存续双向取证[R3 十项 diff↔终态双在场+R1 五大（invariant 13 处/五色 17 处/两键/get_by_name 先行 10 处/updated_at 降序 9 处）+R2 四项终态存续]/计数终核[14 场景 16 处+20 src 文件三处+OD14/锚13/台账29/矩阵22 全覆盖+版本链四段]/外部锚点 40+ 组全中[含 :282 monkeypatch 布尔/generate_pdf_report :27 单参/ComplianceLockError/6-5b 清理链五组]/红线终扫[五词零命中+三笔提交零 AI 署名]/结构终验[15 hunk 无 Edit 误删+术语终扫全一致]；唯一注记项澄清：footer v1.0.0 沿革行「13 验收场景」历史记载内联注记（成本趋零应做）
+- v1.4.0: 文档审查 Round 5 独立终审收敛（六节取证全过——周期闭合[四笔提交链无游离+行数守恒 1090→1103]/关键修复双向取证 6/6[含 invariant 独立复现实验再证——默认态双渲染 byte 不等/invariant=1 下相等]/独立快扫 30+ 锚点全中/全量等效/台账 29 行+证伪 8 条在档零未核销/红线+状态判定[ready-for-dev 维持正确]；特权发现 2 项 P3 随收敛清偿：F-1 白名单计数 9↔8 勘误[枚举恰 8 个 .py——fonts 资产文件名无 brand 词族归目录单列]/F-2 File List generate_pdf_report.py 段落归类勘误[待创建→待修改段]；收敛声明入档见下节——**零 P0/P1/P2 残留，五轮周期收敛，可进 dev-story**）
+
+### 🏁 文档审查周期收敛声明（R1-R5 五轮独立终审 v1.4.0）
+
+**周期闭合**：五轮提交链 f49e4e78（R1）→ 088a0426（R2）→ 74d70b55（R3）→ c9233a28（R4 纯验证零修复）→ R5 收敛轮（本声明落档），基线 9258b36d 之上无游离提交；story+sprint-status 全部入库，工作区 clean。
+
+**关键修复取证（R5 六节独立复核 6/6，不轻信自报）**：R1-P0 invariant 前提经独立复现实验再证（默认态双渲染 byte 不等 / `rl_config.invariant=1` 下相等——两模式产物互异）；R1-P1 get_by_name 先行三处一致+L4 键锚定闭合；R2-P1 :282 carve out 四处注记与 monkeypatch 布尔字面量代码现实逐字吻合；R2-P2 预置 updated_at 两处+6-10 `_preset_anchor` :280-292 先例真实；R3-P1 use case 透传五处补位+现状单参签名 :27 亲验；R3-P2 白名单结构图 ▲11 逐点吻合。外部锚点 30+ 组独立抽验全中；术语终态快照零未注记残留；红线双口径（文档面/提交署名）零违例。
+
+**全周期统计**：R1 37 项（P0×1+P1×8+P2×10+P3×18）+ R2 12 项（P1×1+P2×2+P3×9）+ R3 10 项（P1×1+P2×3+P3×6）+ R4 零修复纯验证 + R5 特权发现 2 项 P3——**累计 61 项修复全清偿 + 8 条证伪不成立留痕，零留项**。
+
+**收敛判定**：零 P0/P1/P2 残留（R4 五节纯验证 + R5 独立快扫复证）——文档审查周期收敛，Story 维持 `ready-for-dev`，可进 `dev-story`。
