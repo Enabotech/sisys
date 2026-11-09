@@ -1,6 +1,6 @@
 # Story 6-11: 白标报告基础（品牌模板配置——保存/复用/白标 PDF 渲染 + CLI 命令族 + 6-10 品牌段联动）
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -540,7 +540,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_brand_template_presets.py`（三套 exact set 键+每套 5 色 hex 值与冻结表逐字断言+呈现名映射+两项字体[stsong→CID 名直用/noto-sans-sc→注册名]）+`test_brand_template_service.py` 循环 A（**save 编排顺序锚**：`get_by_name` **先行**[同名取既有 template_id+logo_object_key——L4 键锚定与保留语义的单源承载位]→值域校验→logo 校验→[logo_path 在场]L4 store[logos/{既有或新 template_id}——换格式重传同键覆盖]→实体构造[无 logo_path 时 logo_object_key 沿用既有行值承载保留语义；updated_at=datetime.now(timezone.utc) 服务侧定时戳]→repo.save[仓储纯 UPSERT 落库][spec Mock await 序断言：**get_by_name→store→save**]；**校验矩阵七形态**：非法 color key/非法 font key/空 name[242 由实体抛——服务透传]/magic bytes 非 PNG-JPEG/超 2MB/路径不存在/合法全参——「校验矩阵七格」494×5+242×1+成功×1[与 AC-7「七形态=494 全触发面」分立口径——矩阵含 242/成功格，名称分立防混读——R2 注记][R2 代码审查勘误：R1-F6 拓宽像素/解析负例后矩阵终态 13 格——494×10+242×1+成功×2]） |
+| 🔴 红 | 编写 `test_brand_template_presets.py`（三套 exact set 键+每套 5 色 hex 值与冻结表逐字断言+呈现名映射+两项字体[stsong→CID 名直用/noto-sans-sc→注册名]）+`test_brand_template_service.py` 循环 A（**save 编排顺序锚**：`get_by_name` **先行**[同名取既有 template_id+logo_object_key——L4 键锚定与保留语义的单源承载位]→值域校验→logo 校验→[logo_path 在场]L4 store[logos/{既有或新 template_id}——换格式重传同键覆盖]→实体构造[无 logo_path 时 logo_object_key 沿用既有行值承载保留语义；updated_at=datetime.now(timezone.utc) 服务侧定时戳]→repo.save[仓储纯 UPSERT 落库][spec Mock await 序断言：**get_by_name→store→save**]；**校验矩阵七形态**：非法 color key/非法 font key/空 name[242 由实体抛——服务透传]/magic bytes 非 PNG-JPEG/超 2MB/路径不存在/合法全参——「校验矩阵七格」494×5+242×1+成功×1[与 AC-7「七形态=494 全触发面」分立口径——矩阵含 242/成功格，名称分立防混读——R2 注记][R2 代码审查勘误：R1-F6 拓宽像素/解析负例后矩阵终态 13 格——494×10+242×1+成功×2][R5 注：R3-F1 后现终态 14 格]） |
 | 🟢 绿 | 实现 `ports/brand_template.py` 常量+`BrandTemplateService.save_brand_template`（get_by_name 先行取既有 template_id/logo_object_key[保留语义与键锚定单源]→值域校验+**name 前置预检**[非空/≤100 在 L4 store 前服务预检——实体 __post_init__ 242 保留为最终防线；预检防「非法 name+logo 形态」store 先行产生孤儿 logo 对象——R3 裁定]→logo 校验→L4 store[logos/{template_id} 键+content_type 推断]→BrandTemplate 构造[保留语义构造时承载：无 logo_path 沿用既有键；updated_at 服务侧定时戳]→repo.save[仓储按 template_id 纯 UPSERT 落库——保留判断归服务侧单源]） |
 | 🔄 重构 | 校验函数收口（`_validate_preset_keys`/`_validate_logo_file` 两私有方法——七形态消息模板单源） |
 
@@ -993,7 +993,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - **Task 1 领域层**：BrandTemplate 实体（7 字段+242 守卫负例全枚举[frozen/空名/超长/边界恰值]）+BrandTemplateRepositoryProtocol 三方法+494/495 两异常（BusinessException 族：494 七形态伞形[构造器 field 必参+context_extra 合并]、495 layer 二元 {l2,l4}[与 491 {l0,l2} 分立——值域分立双向判别]）+六处注册义务全落（report_exceptions/_code_ranges 注释+_CLASS_TO_SUBDOMAIN/__init__ 导出/HTTP_MAP 494→400+495→500 显式/sisys-uni-exception-design.md §3.3.2/exception_handlers 测试 expected 集合同步）。变异①name 守卫停用→2 红；②494→496 码漂移→2 红。domain 全绿 3806 passed。
 - **Task 2 存储面**：018 migration（revision 018→017+UNIQUE(name)[uq_brand_templates_name]+server_default now() 仅 INSERT 初值注记）+BrandTemplateModel（七列镜像+UniqueConstraint）+PostgreSQLBrandTemplateRepository（UPSERT：SELECT by template_id→UPDATE 四字段[三配置+updated_at]/无行 INSERT+IntegrityError→495 包装[UNIQUE 撞+NOT NULL 撞双路径]+双模式 fallback[直调 get_session 防呆纪律]+list 双序 ORDER BY updated_at DESC, name ASC）。dev 库（5432）与测试库（5433）双 stamp 017+upgrade head 应用。真实 PG 12 用例全绿。变异①UPSERT 恒 INSERT→1 红；②主序反转→1 红。
 - **Task 3 渲染面**：NotoSansSC-VF.ttf 资产入仓（sha256 登记+OFL 许可+来源注记在渲染器文件头）+BrandRenderSpec 7 键 VO（hex 242 守卫+必填构造契约）+render v1.1.0 keyword-only brand 参+渲染器三件（_FONT_REGISTERED 字典化+TTFont 注册通道[_TTF_FONT_FILES 映射]+五色参数化[_brand_color_or 默认回落]+platypus.Image logo[等比缩放宽≤40mm，BytesIO 传参——ImageReader 直传走文件名分支 TypeError 实证修正]）。:282 monkeypatch carve out 机械适配（False→{}）。默认态等价（invariant=1 byte 对照）绿+6-5b 渲染测试零修改复跑绿。变异四锚全红（fontName 参数化删/表头色恒原值/logo 流删/等价断言侧注入 spec）。
-- **Task 4 应用层**：预设常量（3 套×5 色+2 字体+呈现名单源 in ports/brand_template.py）+BrandTemplateService（save 编排钦定序[get_by_name→值域+name 预检→logo 校验→L4 store→构造→repo.save]+校验矩阵七格+get_render_spec[脏键 494 防御包装]+list tuple 化）+PdfReportGenerationService v1.1.0（第十依赖 brand_template_service 可选尾参+品牌前置小步[R3 钦定前置于聚合查询]+双参渲染[brand None 走单参——既有 side_effect 零破坏]+metadata 两键[template_id 经 list 精确匹配定位——端口三方法冻结的 O(n) 取舍注记]）。变异五锚全红（hex 值/校验顺序/保留语义/metadata 漏写/brand 错传 None）。**[R2 代码审查勘误：Task 4 时点「校验矩阵七格」为实施实况；R1-F6 拓宽像素/解析负例+R1-F3/F17① 补格后终态 13 格（494×10+242×1+成功×2）]**
+- **Task 4 应用层**：预设常量（3 套×5 色+2 字体+呈现名单源 in ports/brand_template.py）+BrandTemplateService（save 编排钦定序[get_by_name→值域+name 预检→logo 校验→L4 store→构造→repo.save]+校验矩阵七格+get_render_spec[脏键 494 防御包装]+list tuple 化）+PdfReportGenerationService v1.1.0（第十依赖 brand_template_service 可选尾参+品牌前置小步[R3 钦定前置于聚合查询]+双参渲染[brand None 走单参——既有 side_effect 零破坏]+metadata 两键[template_id 经 list 精确匹配定位——端口三方法冻结的 O(n) 取舍注记]）。变异五锚全红（hex 值/校验顺序/保留语义/metadata 漏写/brand 错传 None）。**[R2 代码审查勘误：Task 4 时点「校验矩阵七格」为实施实况；R1-F6 拓宽像素/解析负例+R1-F3/F17① 补格后终态 13 格（494×10+242×1+成功×2）][R5 注：R3-F1 后现终态 14 格]**
 - **Task 5 CLI+组合根**：双用例（SaveBrandTemplateUseCase 四参 keyword-only/ListBrandTemplatesUseCase 零参）+GeneratePdfReportUseCase execute 增 brand_template_name 透传（None 单参调用——既有用例零修改；注册零改动维持 v1.0.0）+CLI 19 命令族（brand-template-save[choices 三键+两键+--logo-path 可选]/brand-template-list[零参]/report-generate --brand-template[自由名+组合守卫 post-parse 在 UUID 守卫与 bootstrap 前——markdown 组合 494]）+品牌增量打印行+组合根 4 新注册（SCOPED 仓储 session_factory 注入+service SINGLETON[SINGLETON 捕获 SCOPED 注记]+双用例）+2 处升级（pdf_renderer/pdf_report_generation_service v1.1.0+compatibility 元组）。注释措辞纪律（新块零 --format/--plan-id 字样）+切块边界断言绿。组合根冒烟 6 端口版本+resolve 全过。变异三锚（组合守卫删/透传漏传/choices 错改）+变异④版本漏升归 Task 7 补做。
 - **Task 6 consultant_view v1.1.0 联动（五件同批原子落位）**：服务增 brand_template_repository 可选尾参第三依赖+_build_brand_section async 化三形态（零模板默认[与 6-10 恒值逐字相等]/有模板派生[configured True+呈现名——呈现名单源引用预设常量]/查询异常降级[degraded True 不抛——零 IO 恒稳承诺勘误]）+ports 三处 docstring 勘误+版本声明 v1.1.0×2+组合根 lambda 三依赖+compatibility+CLI 显示块三值派生改造（「Logo: 默认|配色: 默认」硬编码→BrandSection 派生值）+提示行「执行 brand-template-save 配置品牌模板」+6-10 回归面六项（docstring/提示行/单测三形态/S3 skip 门[品牌模板表零行清点+information_schema 表存在性探测——红阶段容错注记]/CLI 断言联动×2 文件/契约拆分[service v1.1.0+use_case v1.0.0+getsource 三依赖锚]）。变异：三依赖漏注入→契约 2 红。6-10 验收 12 passed+6-10 单测全绿。
 - **Task 7 契约守护**：test_port_contract_white_label_report.py 九用例五断言族（4 新注册 spec 元数据+interface is 具体类+lambda getsource 注入链+resolve isinstance+方法签名[save 四参 keyword-only 恰形态]）+三处版本升级等值断言（v1.1.0+compatibility——pdf 系两处落新文件钉死）+pdf_use_case 注册零改动 v1.0.0+pdf 服务 lambda 十依赖锚。事件冻结：三处 56 计数复跑+event_channels.yaml/events 零 diff git 证据。变异④补做：pdf_renderer 版本改 v1.0.0→契约断言红→还原绿。
@@ -1169,12 +1169,12 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - [x] Story created with `ready-for-dev` status
 - [x] 文档审查修订循环完成（R1-R5 五轮收敛 v1.4.0——零 P0/P1 残留，61 项修复全清偿）
 - [x] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查（循环审查工作流五轮形态——参照 6-9/6-10 周期）
+- [x] 运行 `code-review` 进行代码审查（循环审查工作流五轮形态——参照 6-9/6-10 周期；2026-11-09 五轮收敛：R1 四视角 11 修复+R2 突变验证 4/4+7 修复+R3 深度推演 4 修复+R4 纯验证七维度+R5 独立终审收敛——零 P0/P1/P2 残留，v1.9.0 收敛声明在档）
 - [ ] Epic 6 收尾：6-11 done 后运行 `retrospective`（epic-6-retrospective optional）
 
 ---
 
-**故事版本/Story Version:** v1.8.0
+**故事版本/Story Version:** v1.9.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-09
 **更新说明/Description:**
@@ -1188,6 +1188,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - v1.6.0: 代码审查 Round 1（四视角并行调研[盲审对抗/边界狩猎/验收审计/运行面实测——双 Agent 独立命中 F2 读写契约虚设]+实测证据链[未迁移环境 3 FAILED 假红复现/畸形 logo RSS 1.1GB 实测/invariant 六断言/组合根 9 端口 resolve 亲验/CLI 真实链 UPSERT 探针]+C3 双评审员方案评审[测试判别力四缺口全采纳：_do_list 独立格/with_session 钦定形态/chmod-000 真链主格/假体 JPEG 必红遗漏/新写键判别锚]+落码 11 项[零 P0/P1×1+P2×2+P3×8]+defer 2+证伪留痕 40+：R1-F1 集成门三测补齐[未迁移环境 6 skipped 实测闭环]/R1-F2 仓储层 495 读路径单点包装[契约三处冻结兑现+ Raises docstring 同步+包装两格]/R1-F3 OSError 伞形守卫/R1-F5 孤儿 logo 新写键补偿[五格判别]/R1-F6 像素维度四重校验[4000px+PIL 深解析——RSS 实证+假体 JPEG 改真生成+494 触发面 B 案拓宽三处冻结文字]/R1-F7 S7/S8 skip 门补层[helper 上提三场景共用]/R1-F8 Any 删除/R1-F9 死代码/R1-F10 OSError 收窄+byte 幂等断言/R1-F17① 空文件格/R1-F14·15 计数勘误[20→21+16→21 三处口径+S14 双清单+结构图两树+验收 6 文案]；全绿证据：服务 31+仓储 17+渲染器/pdf 六文件 135+集成验收 32+验收白标 14 未迁移环境集成 6 skipped）
 - v1.7.0: 代码审查 Round 2（回归核查+传播完备性双视角——R2-A 突变验证 4/4 闭环[包装删→list 格红/补偿条件改坏→4 格红+负向锚正确保持绿/阈值爆→超限格红/伞形改窄→两格红——R1 修复质量判定可信]+R2-B 传播核查[计数口径全命中分类合规+12 组台账锚点零失实+组合交互 5 项全过]；修复 7 项 P3 全清偿[快评 5/5 优秀+2 新发现采纳]：R2-F1 验收 :974 场景 docstring 计数[R1-F14 第 7 处漏网双 Agent 命中]/R2-F2 Protocol save docstring 四重校验+494 冻结文字对齐+495 行补齐/R2-F3 校验矩阵类 docstring 七格→13 格[R1-F6 补格后实数]/R2-F4 OD-6 枚举拓宽[含单边统一]/R2-F5 service 模块 docstring 重复行[R1-F5 拼接残留——R2 抓 R1 自身破口实证]/R2-F6 Story :543/:996 七格内联勘误[历史不改写]；R2-DF1 defer：checkpoint 验收 Qdrant scroll limit=50×残留 52 点稳定假红[隔离二次红机理定谳 top-k 截断——Epic 5 存量测试资产缺陷非 6-11 回归零交集，deferred-work 登记承接二择一：filter 定向/残留清理]；R2 全量四目录 15467 passed+5 failed 甄别[analyst_view/checkpoint×2/redis_ttl 隔离绿抖动维持+archive 稳定红→R2-DF1]）
 - v1.8.0: 代码审查 Round 3 单深度推演（四板块零 P0/P1/P2——①三修复组合交互 4 组结构全正确[F6 校验先于 store 补偿结构性零触发/F2 包装位+NameError 双保险/F5 补偿 except Exception 运行时实测全吞——BaseException 是项目 DomainError 别名非内置亲证+isinstance 实测]②494/495 可达性矩阵[七形态+双 layer×三入口锚分布自洽——CLI-only 组合守卫双层封闭：文档声明+markdown use case 签名结构封闭]③弱断言四项裁定[①②③维持有据——单参零破坏真实载体是 byte 等价格非冒烟格]④DF1 同款外推[全仓 265 处 limit 逐类排查同族仅 1 处：integration checkpoint :621——56 点实测单调增长 52→56]；修复 4 项[快评 F2/F3/F4 优秀+F1 修订采纳计数同步]：R3-F1 修订既有键+校验失败防误删格[数据丢失突变体最小唯一杀手——校验格 existing 全 None 时突变体 no-op 存活；计数 13→14 格两处同步]/R3-F2 CLI 242 stub 格[可达性矩阵唯一空格——空名可达 [EXCEPTION_242] stderr 锚]/R3-F3 恒真断言升级倒挂判别[updated_at >= created_at——同源 now 下倒挂只能是实现 bug]/R3-F4 DF1 扩列 integration checkpoint :621 同族[低频抖动与 R2 时序窗归因混同线索注记]；验证：三文件 248 passed+ruff/mypy 零错）
+- v1.9.0: 代码审查 R4 纯验证+R5 独立终审收敛（R4 七维度全过零修复零提交——19 锚点终态存续+红线十类模式零违例[唯一 noqa 系 5face7b9 存量 HYG-1 在档]+提交链 3 笔连续零 AI 署名+台账/版本链/口径五处一致+全量 15464 passed 失败项全甄别归位[DF1 族/预存抖动/两新瞬态隔离绿]无 P1 事件；R5 五节独立取证收敛——周期闭合[3 笔链无游离+工作区 clean]+关键修复双向取证 10/10 零失实+独立快扫 27 锚点全中[组合根 4+3 注册 compatibility/字体 sha256 实算逐字一致/预设 15 hex/白名单 8 文件集合等值等]+门禁实跑[ruff+mypy 773 零错+红线三查零新增+定向 257 passed]+收敛判定[零 P0/P1/P2 残留]；Watch 清偿：:543/:996「终态 13 格」R5 括注[14 格现终态]+两新瞬态观察面登记[暂不立 deferred]+存量 noqa 维持；Status review→done+Next Steps code-review 勾选——**代码审查周期五轮收敛**）
 
 ### 🏁 文档审查周期收敛声明（R1-R5 五轮独立终审 v1.4.0）
 
@@ -1198,3 +1199,21 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 **全周期统计**：R1 37 项（P0×1+P1×8+P2×10+P3×18）+ R2 12 项（P1×1+P2×2+P3×9）+ R3 10 项（P1×1+P2×3+P3×6）+ R4 零修复纯验证 + R5 特权发现 2 项 P3——**累计 61 项修复全清偿 + 8 条证伪不成立留痕，零留项**。
 
 **收敛判定**：零 P0/P1/P2 残留（R4 五节纯验证 + R5 独立快扫复证）——文档审查周期收敛，Story 维持 `ready-for-dev`，可进 `dev-story`。
+
+### 🏁 代码审查周期收敛声明（R1-R5 五轮独立终审 v1.9.0 后收敛）
+
+**周期闭合**：五轮提交链 3e0ff3c9（R1 四视角 11 修复）→ a162845d（R2 回归核查+突变验证 4/4+7 修复）→ c427a14a（R3 深度推演 4 修复）→ R4 纯验证（七维度全过，零修复零提交）→ R5 收敛轮（本声明落档），基线 c6f87227 之上无游离提交；工作区 clean，三笔提交零 AI 署名亲验；版本链 v1.5.0→v1.6.0→v1.7.0→v1.8.0→v1.9.0 与轮次一一对应。
+
+**关键修复取证（R5 双向对照 10/10，不轻信自报）**：R1-F2 读包装+再抛守卫（repo :186-207/:229-246）/R1-F5 补偿条件 object_key != existing_logo_key+logger.warning 不掩盖（service :114-160）/R1-F6 像素 4000px+PIL 读头+except 消息两分（ports :122/:246/:258-269）/R1-F1 集成六门（integration :580-:819）/R3-F1 防误删双零断言格（:350-366，计数 14 格两处同步）/R3-F2 CLI 242 stub 格（:4129-4148）/R2-F2 Protocol 四重校验+Raises 冻结文字（:147/:160-165）/R1-F7 skip 门三场景（:997/:779/:1038/:1078）/R3-F3 倒挂判别（:1158）/R1-F10 byte 幂等+Pillow 真生成——台账声称与代码现实逐项吻合零失实。
+
+**独立快扫（R5 自由抽验 27 锚点全中）**：组合根 4 新注册+3 升级 compatibility 元组/HTTP_MAP 494→400·495→500+expected_types 集合/CLI 恰 19 子命令/迁移 018→017 链/字体 sha256 实算逐字一致/预设冻结 15 hex/AC-2 四重校验四段对应/契约 v1.1.0×3/@scenario 与 feature 双 14/七形态冻结文字四处/白名单 8 文件集合等值/DF1+R3-F4 扩列 :621 在档等——新发现均注记级（R4 记录行随 v1.9.0 版本行补位），零 P0-P2。
+
+**门禁**：ruff 全绿+mypy 773 文件零错+红线三查零新增违例（两行 noqa 系 5face7b9 存量，HYG-1 维持）+定向三文件 257 passed 复跑绿。
+
+**全量回归（台账登记值）**：R1 四目录 15469 passed+4 预存抖动（隔离复跑绿）；R2 15467 passed+5 failed 甄别（4 抖动维持+checkpoint archive 稳定红→R2-DF1 定谳 Epic 5 存量缺陷）；R4 终态快照 15464 passed+3 failed+1 error 全甄别归位（DF1 族/预存抖动/两新瞬态隔离绿）零 P1 事件。
+
+**R5 观察面（暂不立 deferred）**：domain_dictionary/document_version_snapshot 两新瞬态抖动（隔离绿+单次出现——后续复现两次以上或隔离红再升级登记）；测试库卫生 Watch 归 DF1 承接批（R3 记录组在档）。
+
+**全周期统计**：R1 11 项（P1×1+P2×2+P3×8）+ R2 7 项 P3 + R3 4 项 P3 + R4 零修复纯验证 + R5 Watch 清偿 2 项——累计 22 项修复全清偿 + defer 2 项在档（D1 既有装配面第五连/D2 OD-3⑦ 维持）+ DF1 族登记（Epic 5 承接），证伪留痕 100+ 条（四视角+双评审+快评+终审 Agent 报告在档）。
+
+**收敛判定**：零 P0/P1/P2 残留（R4 七维度纯验证+R5 独立快扫复证）——代码审查周期收敛，Story 状态迁移 `review`→`done`，Epic 6 收尾可进 `retrospective`。
