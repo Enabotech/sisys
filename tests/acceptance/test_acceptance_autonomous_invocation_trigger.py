@@ -18,7 +18,7 @@ import uuid
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.events.agent_events import AgentDecided
 from src.domain.events.auto_trigger_events import AutoTriggered
@@ -35,8 +35,6 @@ from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_autonomous_invocation_trigger.feature")
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"

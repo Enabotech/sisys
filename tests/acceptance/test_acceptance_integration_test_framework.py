@@ -17,7 +17,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.application.use_cases.document_processing import DocumentProcessingUseCase
 
@@ -29,9 +29,6 @@ from src.domain.events.tool_events import ToolExecuted
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_integration_test_framework.feature")
-
 
 # ===================================================================
 # Fixtures

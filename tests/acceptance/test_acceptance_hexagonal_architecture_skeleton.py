@@ -12,10 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 # 批量加载特性文件中的所有场景
-scenarios("test_acceptance_hexagonal_architecture_skeleton.feature")
 
 # ===================================================================
 # 路径常量

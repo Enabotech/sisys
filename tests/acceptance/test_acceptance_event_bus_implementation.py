@@ -16,7 +16,7 @@ import uuid
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.events.agent_events import AgentDecided
 from src.domain.events.document_events import DocumentProcessed
@@ -30,8 +30,6 @@ from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_event_bus_implementation.feature")
 
 # Redis 频道命名约定: sisys:rt:<事件类型小写>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"

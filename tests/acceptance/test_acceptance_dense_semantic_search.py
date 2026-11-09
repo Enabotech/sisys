@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.exceptions import ValidationError
 from src.infrastructure.config.embedding import EmbeddingConfig
@@ -27,8 +27,6 @@ from src.infrastructure.storage.qdrant.models import VectorPoint
 from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_dense_semantic_search.feature")
 
 # ===================================================================
 # 常量

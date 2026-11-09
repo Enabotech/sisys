@@ -177,6 +177,12 @@ def _clear_session_ctx() -> None:
 @pytest.fixture
 def context(event_loop: Any, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> Any:
     """场景级 context dict（数据面预置登记 + CLI 直调产物位 + teardown 清单）。"""
+    # 前清（markdown_report 先例——前后双清的 setup 腿）：防同 worker 先前文件的
+    # SINGLETON 连接池跨 loop 污染（snapshot_repository 等含 Redis 连接池的 SINGLETON
+    # 绑定创建时的 loop，loop 关闭后缓存残留 → 本场景 resolve 命中死池 →
+    # "attached to a different loop" / "Event loop is closed"——全量并发形态下
+    # 的 analyst_view 稳定抖动根因；前清后 resolve 重建绑本场景 loop）
+    _clear_resolver_caches()
     ctx: dict[str, Any] = {
         "_loop": event_loop,
         "_capsys_ref": capsys,

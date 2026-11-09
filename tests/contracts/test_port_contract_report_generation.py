@@ -5,7 +5,7 @@
   report_repository——Task 3 组合根三注册块）
 ②spec 元数据（interface/lifetime/tags/owner）
 ③v 前缀版本
-④getsource 注入面（report_generation_service 五依赖包含性——chain_trace +
+④getsource 注入面（report_generation_service 五依赖 resolve 调用锚定——chain_trace +
   snapshot + l0 + report_repository + event_publisher）
 ⑤resolve isinstance（端口实例类型校验）
 
@@ -49,12 +49,12 @@ class TestReportGenerationContracts:
         assert spec is not None, f"端口未注册: {port_name}"
 
     def test_report_generation_service_spec_metadata(self) -> None:
-        """②服务 spec 元数据：interface=SINGLETON 应用端口 + tags 含 report。"""
+        """②服务 spec 元数据：interface=SINGLETON 应用端口 + tags 子集断言。"""
         spec = _global_registry.get("report_generation_service")
         assert spec is not None
         assert spec.interface is ReportGenerationServicePort
         assert spec.lifetime == Lifetime.SINGLETON
-        assert "report" in spec.tags or "markdown" in spec.tags
+        assert {"report", "markdown"} <= set(spec.tags)
         assert spec.owner
 
     def test_report_repository_spec_metadata(self) -> None:
@@ -92,13 +92,14 @@ class TestReportGenerationContracts:
         assert spec.version.startswith("v")
 
     def test_service_getsource_injection_surface(self) -> None:
-        """④getsource 注入面：五依赖包含性（R2 组合律实证——str impl 不可 getsource 先收窄）。"""
+        """④getsource 注入面：五依赖 resolve 调用锚定（R2 组合律实证——注释免疫，依赖名仅存注释不通过）。"""
         spec = _global_registry.get("report_generation_service")
         assert spec is not None
         assert callable(spec.impl), "impl 必须为可调用 lambda（str 延迟 impl 无源码面）"
         source = inspect.getsource(spec.impl)
         for dependency in SERVICE_INJECTION_DEPENDENCIES:
-            assert dependency in source, f"服务注入面缺失依赖: {dependency}"
+            resolve_call = f'resolver.resolve("{dependency}")'
+            assert resolve_call in source, f"服务注入面缺失 resolve 调用: {resolve_call}"
 
     def test_resolve_service_isinstance(self) -> None:
         """⑤resolve isinstance：服务实例实现应用端口。"""

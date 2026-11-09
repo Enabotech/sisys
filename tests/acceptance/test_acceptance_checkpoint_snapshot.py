@@ -1084,14 +1084,21 @@ def persistent_note_ref_points_to_real_note(context: dict[str, Any]) -> None:
 
 @then("Redis TTL 为 2592000 秒（30 天）")
 def redis_ttl_30_days(context: dict[str, Any]) -> None:
-    """TTL 双验（实体 ttl_seconds 与 redis ttl() 秒口径——R6-20 读法钦定）。"""
+    """TTL 双验（实体 ttl_seconds 与 redis ttl() 秒口径——R6-20 读法钦定）。
+
+    ttl() 是流逝递减值（写入后每秒 -1），恒等断言在「写入→断言」间隔超 1s 时
+    （全量并发负载形态）物理性必红（2591999 != 2592000）——改为容差窗断言
+    （±下界 5s 流逝容差 + 上界封顶初值防 TTL 配置放大漏检）。"""
     snapshot = context["result"]
     assert snapshot.ttl_seconds == SNAPSHOT_TTL_SECONDS, (
         f"实体 ttl_seconds 实测={snapshot.ttl_seconds} 期望={SNAPSHOT_TTL_SECONDS}（R8-F4 落值点）"
     )
     key = _snapshot_redis_key(snapshot.session_id)
     ttl = _run_async(context["_loop"], context["_redis_client"].ttl(key))
-    assert ttl == SNAPSHOT_TTL_SECONDS, f"redis ttl() 实测={ttl} 期望={SNAPSHOT_TTL_SECONDS}（秒 int 口径——-1 永续/-2 不存在）"
+    assert SNAPSHOT_TTL_SECONDS - 5 <= ttl <= SNAPSHOT_TTL_SECONDS, (
+        f"redis ttl() 实测={ttl} 期望 [{SNAPSHOT_TTL_SECONDS - 5}, {SNAPSHOT_TTL_SECONDS}]"
+        f"（秒 int 口径——-1 永续/-2 不存在；下界 5s 为写入→断言流逝容差）"
+    )
 
 
 @then("压缩产物元数据随快照携带（compression_ratio 与 quality_score 与 token_count）")
@@ -1535,9 +1542,11 @@ def archive_row_exists_with_sp(context: dict[str, Any]) -> None:
 
 @then("Qdrant strategic_archive 集合点可检索（search_vectors 读回）")
 def qdrant_point_searchable(context: dict[str, Any]) -> None:
-    """L3 向量点断言（scroll 读回按 payload.archive_id 匹配——点 ID 为 MD5
-    哈希 int 形态，payload.archive_id 是归档语境锚）。"""
-    from qdrant_client import AsyncQdrantClient
+    """L3 向量点断言（scroll 定向过滤读回——按 payload.archive_id 过滤后匹配，点 ID 为 MD5
+    哈希 int 形态，payload.archive_id 是归档语境锚）。scroll_filter 定向过滤使断言免受共享
+    collection 残留点干扰（残留规模突破 limit 后无过滤 scroll 会截断丢点致稳定假红——
+    6.11-R2-DF1 核销修复，integration checkpoint 同款）。"""
+    from qdrant_client import AsyncQdrantClient, models
 
     env = context["_env"]
     archive_ids = [row["archive_id"] for row in context["_archive_rows"]]
@@ -1547,7 +1556,9 @@ def qdrant_point_searchable(context: dict[str, Any]) -> None:
         try:
             return await client.scroll(
                 collection_name="strategic_archive",
-                scroll_filter=None,
+                scroll_filter=models.Filter(
+                    must=[models.FieldCondition(key="archive_id", match=models.MatchAny(any=archive_ids))]
+                ),
                 limit=50,
                 with_payload=True,
             )
@@ -1944,11 +1955,13 @@ def all_20_snapshots_readable(context: dict[str, Any]) -> None:
 
 @then("每个快照 TTL 为 2592000 秒")
 def every_sampled_snapshot_ttl(context: dict[str, Any]) -> None:
-    """TTL 断言（build_snapshot 落值点——R8-F4）。"""
+    """TTL 断言（build_snapshot 落值点——R8-F4）。容差窗同 redis_ttl_30_days（ttl() 流逝递减——恒等断言负载形态必红）。"""
     for session_id in context["_perf_sessions"]:
         key = _snapshot_redis_key(session_id)
         ttl = _run_async(context["_loop"], context["_redis_client"].ttl(key))
-        assert ttl == SNAPSHOT_TTL_SECONDS, f"ttl() 实测={ttl} 期望={SNAPSHOT_TTL_SECONDS}（key={key}）"
+        assert SNAPSHOT_TTL_SECONDS - 5 <= ttl <= SNAPSHOT_TTL_SECONDS, (
+            f"ttl() 实测={ttl} 期望 [{SNAPSHOT_TTL_SECONDS - 5}, {SNAPSHOT_TTL_SECONDS}]（key={key}；下界 5s 流逝容差）"
+        )
 
 
 # ===================================================================

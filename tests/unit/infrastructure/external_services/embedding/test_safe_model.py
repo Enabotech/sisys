@@ -3,10 +3,16 @@
 验证线程安全 BGE-M3 模型包装器的正确行为。
 SafeBGE3Model 不直接继承 BGEM3FlagModel，通过内部 _model 组合，
 因此模块导入层级不触发 FlagEmbedding 加载（仅在 __init__ 实例化时触发）。
+
+patch 陷阱注记：patch("FlagEmbedding.BGEM3FlagModel") 的字符串目标解析本身
+会 import 真实 FlagEmbedding（torch 栈冷加载 ~4.5s/进程）——「拦截加载」意图
+被 patch 机制本身击穿。修复形态：先 patch.dict(sys.modules) 注入 fake 模块
+再 patch（退出自动恢复，零进程级污染），见 TestSafeBGE3ModelInit 各用例。
 """
 
 from __future__ import annotations
 
+import sys
 import threading
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -42,7 +48,7 @@ class TestSafeBGE3ModelInit:
 
     def test_init_sets_use_fp16_false(self) -> None:
         """初始化后 _model.use_fp16 被设置为 False"""
-        with patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
+        with patch.dict(sys.modules, {"FlagEmbedding": MagicMock()}), patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.target_devices = ["cuda:0"]
             mock_cls.return_value = mock_instance
@@ -52,7 +58,7 @@ class TestSafeBGE3ModelInit:
 
     def test_init_calls_half_when_use_fp16(self) -> None:
         """use_fp16=True 时初始化会调用 _model.model.half()"""
-        with patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
+        with patch.dict(sys.modules, {"FlagEmbedding": MagicMock()}), patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.target_devices = ["cuda:0"]
             mock_cls.return_value = mock_instance
@@ -62,7 +68,7 @@ class TestSafeBGE3ModelInit:
 
     def test_init_does_not_call_half_when_not_use_fp16(self) -> None:
         """use_fp16=False 时不会调用 _model.model.half()"""
-        with patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
+        with patch.dict(sys.modules, {"FlagEmbedding": MagicMock()}), patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.target_devices = ["cuda:0"]
             mock_cls.return_value = mock_instance
@@ -72,7 +78,7 @@ class TestSafeBGE3ModelInit:
 
     def test_init_calls_to_device_and_eval(self) -> None:
         """初始化会调用 _model.model.to(device) 和 _model.model.eval()"""
-        with patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
+        with patch.dict(sys.modules, {"FlagEmbedding": MagicMock()}), patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.target_devices = ["cuda:0"]
             mock_cls.return_value = mock_instance
@@ -83,7 +89,7 @@ class TestSafeBGE3ModelInit:
 
     def test_has_inference_lock(self) -> None:
         """初始化后存在 _inference_lock"""
-        with patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
+        with patch.dict(sys.modules, {"FlagEmbedding": MagicMock()}), patch("FlagEmbedding.BGEM3FlagModel") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.target_devices = ["cuda:0"]
             mock_cls.return_value = mock_instance

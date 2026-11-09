@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.exceptions.service_exceptions import ComplianceLockError
 from src.infrastructure.config.minio import MinIOConfig
@@ -31,9 +31,6 @@ from src.infrastructure.storage.minio.minio_repository import MinIORepository
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_minio_object_layer.feature")
-
 
 # ===================================================================
 # Fixtures

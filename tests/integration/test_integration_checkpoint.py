@@ -614,11 +614,21 @@ async def test_scenario1_full_chain_creation() -> None:
         assert rows[0][0] == "SP"
         assert rows[0][1].get("checkpoint_no") == "CP-1"  # R8-F3 语境锚
 
-        # Qdrant 点读回（strategic_archive collection——scroll 按 payload.archive_id 匹配；
+        # Qdrant 点读回（strategic_archive collection——scroll 定向过滤按 payload.archive_id 匹配，
+        # 免共享 collection 残留点干扰[残留规模突破 limit 后无过滤 scroll 截断丢点——6.11-R2-DF1 同族]；
         # 点 ID 经 MD5 确定性哈希转 int——vector_storage._normalize_point_id 形态）
         await chain.collect_archive_residues()
         assert chain.archive_ids, "归档行缺失（archive_id 收集面空）"
-        points, _next = await chain.qdrant_client.scroll(collection_name="strategic_archive", limit=50, with_payload=True)
+        from qdrant_client import models
+
+        points, _next = await chain.qdrant_client.scroll(
+            collection_name="strategic_archive",
+            scroll_filter=models.Filter(
+                must=[models.FieldCondition(key="archive_id", match=models.MatchAny(any=list(chain.archive_ids)))]
+            ),
+            limit=50,
+            with_payload=True,
+        )
         point_archives = {str(point.payload.get("archive_id")) for point in points}
         missing = set(chain.archive_ids) - point_archives
         assert not missing, f"Qdrant 点未读回（payload.archive_id 实测={point_archives} 缺 {missing}）"

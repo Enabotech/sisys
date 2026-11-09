@@ -129,6 +129,10 @@ def _clear_resolver_caches() -> None:
 @pytest.fixture
 def context(event_loop: Any, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> Any:
     """场景级 context dict（数据面预置登记 + CLI 直调产物位 + teardown 清单）。"""
+    # 前清（markdown_report/pdf_report 前后双清先例的 setup 腿）：防同 worker 先前文件的
+    # SINGLETON 连接池跨 loop 污染（snapshot_repository 等绑定创建时 loop，loop 关闭后
+    # 缓存残留 → 本场景 resolve 命中死池 → "attached to a different loop"）
+    _clear_resolver_caches()
     ctx: dict[str, Any] = {
         "_loop": event_loop,
         "_capsys_ref": capsys,

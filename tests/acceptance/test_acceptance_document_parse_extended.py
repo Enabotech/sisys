@@ -13,10 +13,7 @@ import tempfile
 from typing import Any, Generator
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
-
-scenarios("test_acceptance_document_parse_extended.feature")
-
+from pytest_bdd import given, scenario, then, when
 
 # ===================================================================
 # Fixtures

@@ -1299,80 +1299,80 @@ def _retrieve_blob_json(context: dict[str, Any], blob_ref: str) -> dict[str, Any
 # ===================================================================
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S1 全链执行产出 8 条思维链且全量归档可读回")
-def test_s1_full_chain_eight_chains() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "全链执行产出 8 条思维链且全量归档可读回")
+def test_full_chain_eight_chains() -> None:
     """AC-1.1 全链 8 条 + 归档成功率（OD-5 口径并入）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S2 组装映射判别力（素材独立构造期望非回声）")
-def test_s2_assembly_mapping_discriminating() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "组装映射判别力（素材独立构造期望非回声）")
+def test_assembly_mapping_discriminating() -> None:
     """AC-1.2 组装映射判别力（期望独立构造——非 Fake 回声）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S3 降级步骤思维链仍产出且信封在位")
-def test_s3_degraded_step_envelope() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "降级步骤思维链仍产出且信封在位")
+def test_degraded_step_envelope() -> None:
     """AC-1.3 降级步思维链（信封形态 + 三处降级承载）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S4 执行结果携带思维链且事件投影真实化")
-def test_s4_result_carries_chains_and_projection() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "执行结果携带思维链且事件投影真实化")
+def test_result_carries_chains_and_projection() -> None:
     """AC-2 Result 携带 + AgentDecided 投影 chain_summary 真实化。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S5 思维链归档真实落位 L2 与 L3 与 L4")
-def test_s5_archive_three_layer_placement() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "思维链归档真实落位 L2 与 L3 与 L4")
+def test_archive_three_layer_placement() -> None:
     """AC-3 EVIDENCE_PACKAGE 三层落位（L2 行/L3 点/L4 blob + WORM）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S6 决策追溯查询正向（round-trip 与 blob 深度解引用）")
-def test_s6_trace_query_roundtrip() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "决策追溯查询正向（round-trip 与 blob 深度解引用）")
+def test_trace_query_roundtrip() -> None:
     """AC-5 追溯查询正向（round-trip 等值 + include_blob 深度解引用）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S7 追溯查询负向两形态")
-def test_s7_trace_query_negative() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "追溯查询负向两形态")
+def test_trace_query_negative() -> None:
     """AC-5 负向（空清单 + 非 UUID 242——单 Scenario 双段 R2-F9）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S8 快照与事件契约零回归")
-def test_s8_snapshot_event_contract_zero_regression() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "快照与事件契约零回归")
+def test_snapshot_event_contract_zero_regression() -> None:
     """AC-6 快照七键契约 + BlmStageCompleted + 事件通道零新增。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S9 事件零新增且 ArchiveCreated 落行")
-def test_s9_event_zero_new_and_archive_created_rows() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "事件零新增且 ArchiveCreated 落行")
+def test_event_zero_new_and_archive_created_rows() -> None:
     """AC-6 ArchiveCreated 落行（真实 publisher）+ 事件类型零新增。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S10 思维链五段展示形态")
-def test_s10_to_display_five_segments() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "思维链五段展示形态")
+def test_to_display_five_segments() -> None:
     """AC-1.5 to_display 展示形态（五段顺序 + XML 标签闭合对）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S11 组装窗口 P95 小于 50 毫秒")
-def test_s11_assembly_window_p95() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "组装窗口 P95 小于 50 毫秒")
+def test_assembly_window_p95() -> None:
     """AC-7 组装窗口 P95<50ms（纯函数直调——OD-10 口径差声明）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S12 并发写入 10 个思维链")
-def test_s12_concurrent_ten_chains() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "并发写入 10 个思维链")
+def test_concurrent_ten_chains() -> None:
     """AC-7 并发 10（gather + session_context 独立 scope——R1-F7）。"""
     pass
 
 
-@scenario("test_acceptance_json_chain_of_thought.feature", "S13 开发完成清单收尾（src 与四测试目录交付件存在性）")
-def test_s13_completion_checklist() -> None:
+@scenario("test_acceptance_json_chain_of_thought.feature", "开发完成清单收尾（src 与四测试目录交付件存在性）")
+def test_completion_checklist() -> None:
     """收尾清单（交付件存在性 + 关键符号 + 四守护文件零改动）。"""
     pass
 

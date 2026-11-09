@@ -12,14 +12,12 @@ import tempfile
 from typing import Any, Generator
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.exceptions.ocr_exceptions import OCRConnectionError
 from src.domain.value_objects.parsed_document import ParsedDocument, ParsedPage
 from src.infrastructure.document_parsing.pdf_parser import PDFParser
 from src.infrastructure.document_parsing.rapidocr_adapter import RapidOCRAdapter
-
-scenarios("test_acceptance_ocr.feature")
 
 _OCR_CONFIDENCE_THRESHOLD = 0.85
 

@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,9 +42,6 @@ from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
 from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import set_session
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_event_messaging_refactor.feature")
-
 
 # ===================================================================
 # Fixtures

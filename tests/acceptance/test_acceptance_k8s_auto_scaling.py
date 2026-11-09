@@ -14,14 +14,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.monitoring.aggregator import MetricsAggregator
 from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
-
-scenarios("test_acceptance_k8s_auto_scaling.feature")
-
 
 # ===================================================================
 # Fixtures

@@ -15,7 +15,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.domain.events.saga_events import SagaStatusChanged
 from src.domain.exceptions import InvalidStateTransitionError
@@ -32,9 +32,6 @@ from src.infrastructure.storage.postgresql.session_context import (
     reset_session,
     set_session,
 )
-
-scenarios("test_acceptance_transaction_subsystem_refactor.feature")
-
 
 # ===================================================================
 # Fixtures

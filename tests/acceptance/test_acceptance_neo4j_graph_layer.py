@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_bdd import given, scenario, scenarios, then, when
+from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.neo4j import Neo4jConfig
 from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
@@ -30,8 +30,6 @@ from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 from tests.environments import get_test_env
-
-scenarios("test_acceptance_neo4j_graph_layer.feature")
 
 # ===================================================================
 # 路径常量
