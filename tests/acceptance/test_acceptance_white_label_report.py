@@ -971,7 +971,7 @@ def test_cross_plan_reuse() -> None:
 
 @scenario("test_acceptance_white_label_report.feature", "src 与四测试目录完成清单")
 def test_completion_checklist() -> None:
-    """S14：交付件存在性收尾（20 src+migration+16 测试文件）。"""
+    """S14：交付件存在性收尾（21 src+migration+21 测试文件）。"""
 
 
 # ======================================================================

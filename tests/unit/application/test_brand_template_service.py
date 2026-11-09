@@ -189,7 +189,7 @@ class TestSaveOrchestration:
 
 
 class TestValidationMatrix:
-    """校验矩阵七格（494×5+242×1+成功×1）。"""
+    """校验矩阵 13 格（494×10+242×1+成功×2——R1-F6 拓宽后口径）。"""
 
     async def test_invalid_color_scheme_key_494(self) -> None:
         """非法配色键 → 494（消息含合法键清单——调用方可理解性）。"""

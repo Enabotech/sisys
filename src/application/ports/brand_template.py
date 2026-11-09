@@ -144,7 +144,7 @@ class BrandTemplateServicePort(Protocol):
 
         编排钦定序（OD-12）：``get_by_name`` 先行（同名取既有 template_id+
         logo_object_key——保留语义与 L4 键锚定的单源承载位）→ 值域校验+name
-        前置预检 → logo 校验（magic/大小/路径）→ [logo_path 在场]L4 store
+        前置预检 → logo 四重校验（magic/大小/路径/像素）→ [logo_path 在场]L4 store
         → 实体构造（updated_at 服务侧定时戳）→ repo.save（仓储纯 UPSERT）。
 
         Args:
@@ -158,9 +158,11 @@ class BrandTemplateServicePort(Protocol):
             保存后的模板实体（七字段——首存新 template_id/修订保留原值）。
 
         Raises:
-            BrandTemplateValidationError: 494——非法预设 key/Logo magic 非法/
-                超 2MB/路径不存在。
+            BrandTemplateValidationError: 494——非法预设 key/Logo 非合法可解码
+                PNG/JPEG 图像文件（magic 非法或图像体无法解析）/超限（字节
+                2MB/像素单边 4000px）/路径不存在·不可读。
             EntityValidationError: 242——name 空值/超长（实体守卫透传）。
+            BrandTemplateStorageError: 495——L4 logo 上传失败/L2 落库失败。
         """
         ...
 
