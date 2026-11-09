@@ -51,3 +51,45 @@ class TestGeneratePdfReportUseCase:
         service.generate_pdf_report.return_value = sentinel
         result = await use_case.execute(plan_id=str(uuid.uuid4()))
         assert result is sentinel
+
+
+class TestBrandTemplatePassthrough:
+    """Story 6-11：brand_template_name 可选参透传（CLI→use case→服务的必需中间件）。"""
+
+    async def test_brand_none_single_call_unchanged(self) -> None:
+        """brand_template_name=None 走单参调用（既有调用形态零变化——可选参
+        向后兼容；注册零改动维持 v1.0.0 的运行面证据）。"""
+        plan_uuid = uuid.uuid4()
+        use_case, service = _make_use_case()
+        service.generate_pdf_report.return_value = object()
+        await use_case.execute(plan_id=str(plan_uuid))
+        service.generate_pdf_report.assert_called_once_with(plan_uuid)
+
+    async def test_brand_template_name_passthrough(self) -> None:
+        """品牌参透传（execute 的 brand_template_name → 服务同名 keyword 参
+        值级断言——传递链锚）。"""
+        plan_uuid = uuid.uuid4()
+        use_case, service = _make_use_case()
+        service.generate_pdf_report.return_value = object()
+        await use_case.execute(plan_id=str(plan_uuid), brand_template_name="商务蓝模板")
+        service.generate_pdf_report.assert_called_once_with(plan_uuid, brand_template_name="商务蓝模板")
+
+    async def test_brand_error_propagates(self) -> None:
+        """服务异常透传（494 模板不存在等——不吞不包装）。"""
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        plan_uuid = uuid.uuid4()
+        use_case, service = _make_use_case()
+        service.generate_pdf_report.side_effect = BrandTemplateValidationError(
+            field="template_name", message="品牌模板不存在: ghost"
+        )
+        with pytest.raises(BrandTemplateValidationError):
+            await use_case.execute(plan_id=str(plan_uuid), brand_template_name="ghost")
+
+    async def test_architecture_note_no_entity_validation_in_source(self) -> None:
+        """架构注记测试（getsource 零 EntityValidationError 字样——6-10 :62-69
+        直系：用例层架构注记是防回归锚）。"""
+        import inspect
+
+        source = inspect.getsource(GeneratePdfReportUseCase)
+        assert "EntityValidationError" in source, "守卫注记应在场（架构注记防回归锚）"

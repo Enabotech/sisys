@@ -20,11 +20,22 @@
   对象归档失败（``L4ObjectPort.archive`` 抛异常/返回异常态——**开新码不复用
   491**：491 值域二元 {l0,l2} 是 6-5a 冻结面且负向测试钉死，扩值域即破坏；
   最小契约变更原则取新码）
+- ``BrandTemplateValidationError``（EXCEPTION_494，400 语义，6-11）：品牌
+  模板校验伞形（七形态=全触发面：非法 color_scheme key/非法 font_preset
+  key/Logo 非合法可解码 PNG/JPEG 图像文件（magic 非法或图像体无法解析）/
+  超限（字节 2MB/像素 4000px）/路径不存在/模板不存在/参数组合非法——
+  name 空值/超长归 242 实体守卫形态非本码；message+context.field 区分）
+- ``BrandTemplateStorageError``（EXCEPTION_495，500 语义，6-11）：品牌配置
+  持久化失败（brand_templates PG 读写 layer="l2" / L4 logo 存取 layer="l4"
+  ——**与 491 同族分立**：彼为报告产物持久化二元 {l0,l2}，此为品牌配置
+  持久化二元 {l2,l4}，触发面与消费方不同）
 """
 
 from src.domain.exceptions.business_exceptions import BusinessException
 
 __all__ = [
+    "BrandTemplateStorageError",
+    "BrandTemplateValidationError",
     "PdfRenderingError",
     "ReportEvidenceStorageError",
     "ReportGenerationError",
@@ -172,3 +183,88 @@ class ReportEvidenceStorageError(BusinessException):
         if context_extra:
             context.update(context_extra)
         super().__init__(message=message, cause=cause, context=context)
+
+
+class BrandTemplateValidationError(BusinessException):
+    """品牌模板校验失败（EXCEPTION_494——400 语义，Story 6-11）。
+
+    触发场景（七形态=494 全触发面）：非法 color_scheme key（消息含合法预设键
+    清单——调用方可理解性）/非法 font_preset key/Logo 非合法可解码 PNG-JPEG
+    图像文件（magic bytes 非法或图像体无法解析——R1-F6 拓宽）/Logo 超限
+    （字节 2MB/像素单边 4000px——两正交守卫）/Logo 路径不存在（文件不可读
+    伞形）/模板不存在（输入校验失败族
+    ——与值域外同族，最少开码原则不设独立 NotFound 码）/``--brand-template``
+    与 markdown 组合非法（品牌应用仅 PDF 面支持——显式拒绝非静默忽略）；
+    name 空值/超长是 242 实体守卫形态非本码。
+    """
+
+    code = "EXCEPTION_494"
+    message = "品牌模板校验失败"
+
+    def __init__(
+        self,
+        field: str,
+        message: str | None = None,
+        cause: Exception | None = None,
+        context_extra: dict[str, str] | None = None,
+    ) -> None:
+        """构造品牌模板校验失败异常。
+
+        Args:
+            field: 校验面字段名（七形态区分键——color_scheme/font_preset/
+                logo_path/template_name/parameter_combination 族）。
+            message: 覆写消息（缺省回落类静态文案；语境化消息应含合法值域
+                或上限值——不泄露 SQL/堆栈）。
+            cause: 底层异常（可选）。
+            context_extra: 附加领域上下文（template_name/reason 等合并进 context）。
+        """
+        context: dict[str, str] = {"field": field}
+        if context_extra:
+            context.update(context_extra)
+        super().__init__(message=message, cause=cause, context=context)
+
+
+class BrandTemplateStorageError(BusinessException):
+    """品牌配置持久化失败（EXCEPTION_495——500 语义，Story 6-11）。
+
+    触发场景：brand_templates PG 行读写失败（layer="l2"——含并发双 INSERT
+    撞 UNIQUE(name) 的 IntegrityError 防御包装）或 L4 logo 对象存取失败
+    （layer="l4"）。与 491 ReportStorageError 同族分立：彼为报告产物持久化
+    （二元 {l0,l2}），此为品牌配置持久化（二元 {l2,l4}）——触发面与消费方
+    不同，且 491 值域是 6-5a 冻结面不可扩。
+    """
+
+    code = "EXCEPTION_495"
+    message = "品牌模板存储失败"
+
+    #: layer 合法值域（二元——L2 PG 行/L4 logo 对象；与 491 {l0,l2} 分立自有元组）
+    _VALID_LAYERS = ("l2", "l4")
+
+    def __init__(
+        self,
+        layer: str,
+        message: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        """构造品牌配置持久化失败异常。
+
+        Args:
+            layer: 失败存储层（"l2" PG 行读写 / "l4" logo 对象存取——二元值域）。
+            message: 覆写消息（缺省组合 layer 语境）。
+            cause: 底层异常（存储驱动/数据库驱动异常）。
+
+        Raises:
+            EntityValidationError: layer 不在二元值域（242 守卫——491 家族形态
+                同构；491 值域 l0 在本类亦非法，值域分立双向判别）。
+        """
+        from src.domain.exceptions import EntityValidationError
+
+        if layer not in self._VALID_LAYERS:
+            raise EntityValidationError(
+                message=f"layer 必须为 {self._VALID_LAYERS} 之一（二元值域——与 491 的 l0/l2 分立）",
+                context={"entity": "BrandTemplateStorageError", "field": "layer", "layer": layer},
+            )
+        self.layer = layer
+        if message is None:
+            message = f"品牌模板存储失败（{layer} 层）"
+        super().__init__(message, cause=cause, context={"layer": layer})

@@ -43,6 +43,9 @@ repos:
       - id: check-json
       - id: check-added-large-files
         args: ['--maxkb=1000']
+        exclude: '\.ttf$'
+        # 字体资产合法入仓豁免（6-11 OD-4：官方 variable TTF 17.7MB+SIL OFL 1.1
+        # 许可允许再分发——渲染必需资产非二进制垃圾；代码文件仍受 1MB 约束）
       - id: check-merge-conflict
       # - id: detect-private-key
       - id: check-case-conflict

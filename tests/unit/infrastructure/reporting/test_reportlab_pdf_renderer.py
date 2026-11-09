@@ -279,7 +279,9 @@ class TestRendererCore:
             real_register(font)
 
         monkeypatch.setattr(renderer_module.pdfmetrics, "registerFont", _spy_register)
-        monkeypatch.setattr(renderer_module, "_FONT_REGISTERED", False)
+        # 6-11 哨兵字典化机械适配（Story 6-11 AC-4 carve out 钦定唯一例外行：
+        # _FONT_REGISTERED 单布尔→按名字典——monkeypatch 值 False→空 dict）
+        monkeypatch.setattr(renderer_module, "_FONT_REGISTERED", {})
         first = _render(_make_document())
         second = _render(_make_document())
         assert first.startswith(b"%PDF") and second.startswith(b"%PDF")

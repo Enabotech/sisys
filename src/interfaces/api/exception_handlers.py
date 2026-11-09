@@ -25,6 +25,8 @@ from src.domain.exceptions import (
     ArchiveNotFoundError,
     ArchiveStorageError,
     AuthenticationError,
+    BrandTemplateStorageError,
+    BrandTemplateValidationError,
     BucketNameValidationError,
     BucketNotFoundError,
     BusinessException,
@@ -320,6 +322,8 @@ EXCEPTION_HTTP_MAP: dict[type[DomainError], int] = {
     ReportStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 491 — 报告持久化失败（layer 二元 l0/l2——Story 6.5a）
     PdfRenderingError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 492 — PDF 报告渲染失败（reportlab 异常领域包装——Story 6.5b）
     ReportEvidenceStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 493 — PDF 报告 L4 证据归档失败（Story 6.5b）
+    BrandTemplateValidationError: status.HTTP_400_BAD_REQUEST,  # 494 — 品牌模板校验伞形（七形态——Story 6.11）
+    BrandTemplateStorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,  # 495 — 品牌配置持久化失败（l2/l4 二元——Story 6.11）
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

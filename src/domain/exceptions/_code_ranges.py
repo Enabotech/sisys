@@ -208,7 +208,14 @@ CODE_RANGES: dict[str, tuple[int, int]] = {
     # EXCEPTION_493 ReportEvidenceStorageError (Story 6-5b, L4 证据对象归档
     #   失败——archive 异常态；开新码不扩 491 值域[二元值域是 6-5a 冻结面
     #   且负向测试钉死]；494-499 预留 report 域)
-    # 490-493 语义归属 business（报告失败是调用方可处理结果）；494-499 预留 report 域
+    # EXCEPTION_494 BrandTemplateValidationError (Story 6-11, 品牌模板校验
+    #   伞形——七形态=全触发面：非法 color/font key/Logo 非合法可解码 PNG-JPEG
+    #   图像文件[magic 非法或图像体无法解析]/超限[字节 2MB/像素 4000px]/
+    #   路径不存在/模板不存在/参数组合非法；400 语义；name 空值/超长归 242)
+    # EXCEPTION_495 BrandTemplateStorageError (Story 6-11, 品牌配置持久化
+    #   失败——layer 二元 {l2,l4}[PG 行/logo 对象]，与 491 {l0,l2} 同族
+    #   分立；500 语义；并发双 INSERT 撞 UNIQUE 的 IntegrityError 防御归仓储)
+    # 490-493 语义归属 business（报告失败是调用方可处理结果）；494/495 6-11 实占；496-499 预留 report 域
     "report": (490, 499),
     # 兜底（999）——未预期异常的编码，独立于所有子域
     "fallback": (999, 999),
@@ -400,6 +407,8 @@ _CLASS_TO_SUBDOMAIN: dict[str, str] = {
     "ReportStorageError": "report",
     "PdfRenderingError": "report",
     "ReportEvidenceStorageError": "report",
+    "BrandTemplateValidationError": "report",
+    "BrandTemplateStorageError": "report",
 }
 
 

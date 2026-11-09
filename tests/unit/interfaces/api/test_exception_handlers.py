@@ -32,6 +32,8 @@ from src.domain.exceptions import (
     ArchiveStorageError,
     AuthenticationError,
     BaseException,
+    BrandTemplateStorageError,
+    BrandTemplateValidationError,
     BucketNameValidationError,
     BucketNotFoundError,
     BusinessException,
@@ -385,6 +387,8 @@ class TestExceptionHttpMap:
             ReportStorageError,  # 491 — Story 6.5a 报告持久化失败（500）
             PdfRenderingError,  # 492 — Story 6.5b PDF 报告渲染失败（500）
             ReportEvidenceStorageError,  # 493 — Story 6.5b PDF 报告 L4 证据归档失败（500）
+            BrandTemplateValidationError,  # 494 — Story 6.11 品牌模板校验伞形（400）
+            BrandTemplateStorageError,  # 495 — Story 6.11 品牌配置持久化失败（500）
             UnknownError,
         }
         assert set(EXCEPTION_HTTP_MAP.keys()) == expected_types

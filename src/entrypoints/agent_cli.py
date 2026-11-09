@@ -358,6 +358,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FORMAT",
         help="报告格式（默认 markdown 向后兼容；pdf 含引文索引与 L4 WORM 归档——Story 6-5b）",
     )
+    report_generate.add_argument(
+        "--brand-template",
+        type=str,
+        required=False,
+        default=None,
+        metavar="TEMPLATE_NAME",
+        help="品牌模板名（可选——白标 PDF 渲染应用品牌三件；仅 --format pdf 支持组合，Story 6-11）",
+    )
 
     # Story 6-3: checkpoint-create 扁平子命令（Checkpoint 完整形态快照显式创建——
     # OD-5：MVP 同步链下"阶段完成即暂停等审批"物理不可达，由显式调用触发；
@@ -683,6 +691,49 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         metavar="N",
         help="分页偏移（默认 0）",
+    )
+
+    # Story 6-11: 品牌模板配置两命令（白标报告基础——预设配色 3 套×字体 2 项
+    # 的可保存可复用模板；模板名是业务键非 UUID——非空/长度校验在服务预检与
+    # 实体守卫承载，CLI 面零 UUID 守卫）
+    brand_template_save = subparsers.add_parser(
+        "brand-template-save",
+        help="保存品牌模板（配色/字体预设+可选 Logo——同名再存为修订覆盖，Story 6-11）",
+    )
+    brand_template_save.add_argument(
+        "--name",
+        type=str,
+        required=True,
+        metavar="NAME",
+        help="模板名（业务键——同名再存为修订覆盖非冲突）",
+    )
+    brand_template_save.add_argument(
+        "--color-scheme",
+        type=str,
+        required=True,
+        choices=("corporate-blue", "graphite", "burgundy"),
+        metavar="KEY",
+        help="配色预设键（corporate-blue 商务蓝/graphite 石墨灰/burgundy 酒红——每套 5 色）",
+    )
+    brand_template_save.add_argument(
+        "--font-preset",
+        type=str,
+        required=True,
+        choices=("stsong", "noto-sans-sc"),
+        metavar="KEY",
+        help="字体预设键（stsong 内置宋体/noto-sans-sc 黑体 TTF）",
+    )
+    brand_template_save.add_argument(
+        "--logo-path",
+        type=str,
+        required=False,
+        default=None,
+        metavar="PATH",
+        help="本地 Logo 图片路径（可选 PNG/JPEG ≤2MB——缺省保留既有 Logo）",
+    )
+    subparsers.add_parser(
+        "brand-template-list",
+        help="品牌模板清单（全局配置——最新修订优先排序，Story 6-11）",
     )
     return parser
 
@@ -1024,13 +1075,19 @@ async def _run_chain_trace(plan_id: str, include_blob: bool) -> object:
         await _close_connection_pools()
 
 
-async def _run_report_generate(plan_id: str, report_format: str = "markdown") -> object:
+async def _run_report_generate(
+    plan_id: str,
+    report_format: str = "markdown",
+    brand_template: str | None = None,
+) -> object:
     """执行报告生成（按 format 分发 resolve 两用例——与 _run_chain_trace 同款资源收尾）。
 
     Args:
         plan_id: 规划任务标识。
         report_format: 报告格式（markdown→report_generation_use_case /
             pdf→pdf_report_generation_use_case——OD-11 单入口分发表）。
+        brand_template: 品牌模板名（可选——6-11 仅 pdf 分支透传 use case
+            brand_template_name；组合守卫已在 CLI 执行层拦截非法组合）。
 
     Returns:
         StrategicReport 报告实体。
@@ -1038,6 +1095,8 @@ async def _run_report_generate(plan_id: str, report_format: str = "markdown") ->
     # 分发显式两分支（resolve 端口名字面保留——架构测试 CLI resolve 形态守护）
     use_case = resolve("pdf_report_generation_use_case") if report_format == "pdf" else resolve("report_generation_use_case")
     try:
+        if brand_template is not None:
+            return await use_case.execute(plan_id=plan_id, brand_template_name=brand_template)
         return await use_case.execute(plan_id=plan_id)
     finally:
         await _close_connection_pools()
@@ -1105,17 +1164,25 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
         return 1
 
 
-def _print_report_summary(result: object, report_format: str = "markdown") -> None:
-    """打印报告生成摘要（format 感知——markdown 分支含 memory_id，PDF 分支含对象键+bucket）。
+def _print_report_summary(
+    result: object,
+    report_format: str = "markdown",
+    *,
+    brand_template_name: str | None = None,
+) -> None:
+    """打印报告生成摘要（format 感知+品牌增量行——markdown 分支含 memory_id，PDF 分支含对象键+bucket）。
 
     memory_id 打印（R2-10，仅 markdown 分支）：人类用户经 memory_id +
     L0StoragePort.read 或 base 目录提示定位物理文件；PDF 分支 file_path 是
     L4 对象键逻辑路径（``.md`` 反解不适用——6-5b format 感知扩展），定位
     信息 = 对象键 + bucket（bucket 自端口常量 import——实体不携 bucket 字段）。
+    6-11 品牌增量行：brand 参在场时打印「品牌模板: {name}（已应用）」
+    （brand_template_name keyword-only——None 零品牌行，既有输出零变化）。
 
     Args:
         result: StrategicReport 实体（getattr 属性面消费——零实体 import 依赖）。
         report_format: 报告格式（markdown/pdf——分发方透传）。
+        brand_template_name: 品牌模板名（可选——在场打印品牌增量行）。
     """
     file_path = str(getattr(result, "file_path", ""))
     print("报告生成完成：")
@@ -1136,24 +1203,47 @@ def _print_report_summary(result: object, report_format: str = "markdown") -> No
     else:
         memory_id = file_path.rsplit("/", 1)[-1].removesuffix(".md") if file_path else ""
         print(f"  memory_id: {memory_id}")
+    if brand_template_name is not None:
+        print(f"  品牌模板: {brand_template_name}（已应用）")
     print(f"  正文章节数: {getattr(result, 'section_count', 0)}（降级 {getattr(result, 'degraded_section_count', 0)}）")
     print(f"  生成耗时: {getattr(result, 'generation_ms', 0)} ms")
 
 
-def _run_report_generate_cli(plan_id: str, report_format: str = "markdown") -> int:
-    """report-generate 子命令执行（五步定式——chain-query 模板；6-5b --format 分发）。
+def _run_report_generate_cli(
+    plan_id: str,
+    report_format: str = "markdown",
+    brand_template: str | None = None,
+) -> int:
+    """report-generate 子命令执行（五步定式——chain-query 模板；6-5b --format 分发+6-11 品牌参）。
 
     exit 0 判据 = 报告生成返回（持久化已落盘+事件已发布——宽容语义）；
-    plan_id 非 UUID → 守卫 exit 1；490/491/492/493 DomainError → [code]
-    stderr exit 1（双层异常定式）。
+    plan_id 非 UUID → 守卫 exit 1；``--brand-template`` 携带且 ``--format
+    markdown`` → 组合守卫 494（post-parse 检测归 CLI 层唯一落位[checkpoint-recover
+    成组约束 :2026-2032 先例]——bootstrap 前先于用例零调用）；490~493/494
+    DomainError → [code] stderr exit 1（双层异常定式）。
 
     Args:
         plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
         report_format: --format 值（markdown/pdf——分发透传，默认 markdown）。
+        brand_template: --brand-template 值（可选品牌模板名——仅 pdf 组合合法）。
 
     Returns:
         退出码（0=报告生成完成，1=业务异常/参数守卫失败）。
     """
+    # 组合守卫（品牌应用仅 PDF 面支持——Markdown 纯文本无视觉承载，组合非法
+    # 显式拒绝非静默忽略；post-parse 检测在 UUID 守卫与 bootstrap 之前——
+    # 守卫先于一切 IO 与用例调用）
+    if brand_template is not None and report_format != "pdf":
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        combo_error = BrandTemplateValidationError(
+            field="parameter_combination",
+            message="品牌模板应用仅支持 PDF 导出（--brand-template 需与 --format pdf 组合使用）",
+            context_extra={"template_name": brand_template, "reason": "参数组合非法"},
+        )
+        logger.error("报告生成失败（组合守卫）: %s", combo_error)
+        print(f"[{combo_error.code}] {combo_error.message}", file=sys.stderr)
+        return 1
     try:
         uuid_module.UUID(plan_id)
     except ValueError:
@@ -1167,13 +1257,14 @@ def _run_report_generate_cli(plan_id: str, report_format: str = "markdown") -> i
 
     try:
         _ensure_bootstrapped()
-        result = asyncio.run(_run_report_generate(plan_id, report_format))
-        _print_report_summary(result, report_format)
+        result = asyncio.run(_run_report_generate(plan_id, report_format, brand_template))
+        _print_report_summary(result, report_format, brand_template_name=brand_template)
         logger.info(
-            "报告生成完成: plan_id=%s report_id=%s format=%s",
+            "报告生成完成: plan_id=%s report_id=%s format=%s brand_template=%s",
             plan_id,
             getattr(result, "report_id", ""),
             report_format,
+            brand_template or "-",
         )
         return 0
     except DomainError as error:
@@ -1182,6 +1273,148 @@ def _run_report_generate_cli(plan_id: str, report_format: str = "markdown") -> i
         return 1
     except Exception as error:
         logger.error("报告生成异常: %s", error, exc_info=True)
+        return 1
+
+
+async def _run_brand_template_save(
+    name: str,
+    color_scheme: str,
+    font_preset: str,
+    logo_path: str | None = None,
+) -> object:
+    """执行品牌模板保存（resolve 用例——与 _run_report_generate 同款资源收尾）。
+
+    Args:
+        name: 模板名（业务键）。
+        color_scheme: 配色预设键。
+        font_preset: 字体预设键。
+        logo_path: 本地 Logo 路径（可选）。
+
+    Returns:
+        BrandTemplate 模板实体。
+    """
+    use_case = resolve("save_brand_template_use_case")
+    try:
+        return await use_case.execute(
+            name=name,
+            color_scheme=color_scheme,
+            font_preset=font_preset,
+            logo_path=logo_path,
+        )
+    finally:
+        await _close_connection_pools()
+
+
+async def _run_brand_template_list() -> object:
+    """执行品牌模板清单查询（resolve 用例——零参全局清单）。
+
+    Returns:
+        模板实体元组。
+    """
+    use_case = resolve("list_brand_templates_use_case")
+    try:
+        return await use_case.execute()
+    finally:
+        await _close_connection_pools()
+
+
+def _print_brand_template_saved(result: object) -> None:
+    """打印保存成功摘要（输出即契约——保存行+配置行+模板标识行）。
+
+    呈现名经预设常量单源映射（COLOR_SCHEME_PRESETS/FONT_PRESETS 的
+    display_name——CLI import application ports 合法）；脏键防御回落原值。
+    """
+    from src.application.ports.brand_template import COLOR_SCHEME_PRESETS, FONT_PRESETS
+
+    name = str(getattr(result, "name", ""))
+    color_preset = COLOR_SCHEME_PRESETS.get(str(getattr(result, "color_scheme", "")))
+    font_preset = FONT_PRESETS.get(str(getattr(result, "font_preset", "")))
+    color_display = color_preset.display_name if color_preset else str(getattr(result, "color_scheme", ""))
+    font_display = font_preset.display_name if font_preset else str(getattr(result, "font_preset", ""))
+    logo_state = "已上传" if getattr(result, "logo_object_key", None) else "未设置"
+    print(f"品牌模板已保存: {name}")
+    print(f"  配色: {color_display} | 字体: {font_display} | Logo: {logo_state}")
+    print(f"  模板标识: {getattr(result, 'template_id', '')}")
+
+
+def _print_brand_template_list(rows: object) -> None:
+    """打印模板清单（首行计数+逐模板行+空态提示行——行序由服务承载）。
+
+    行格式：``  {name} | 配色: {呈现名} | 字体: {呈现名} | Logo: {已配置|未设置}
+    | 更新: {YYYY-MM-DD HH:MM}``；空态后恒在提示行指向 brand-template-save
+    （与 6-10 :1806 提示行形态对齐）。
+    """
+    from src.application.ports.brand_template import COLOR_SCHEME_PRESETS, FONT_PRESETS
+
+    templates: list[Any] = list(rows) if isinstance(rows, (list, tuple)) else []
+    print(f"品牌模板: 共 {len(templates)} 个")
+    for template in templates:
+        color_preset = COLOR_SCHEME_PRESETS.get(str(getattr(template, "color_scheme", "")))
+        font_preset = FONT_PRESETS.get(str(getattr(template, "font_preset", "")))
+        color_display = color_preset.display_name if color_preset else str(getattr(template, "color_scheme", ""))
+        font_display = font_preset.display_name if font_preset else str(getattr(template, "font_preset", ""))
+        logo_state = "已配置" if getattr(template, "logo_object_key", None) else "未设置"
+        updated_at = getattr(template, "updated_at", None)
+        updated_display = updated_at.strftime("%Y-%m-%d %H:%M") if updated_at else "-"
+        print(
+            f"  {getattr(template, 'name', '')} | 配色: {color_display}"
+            f" | 字体: {font_display} | Logo: {logo_state} | 更新: {updated_display}"
+        )
+    print("提示: 执行 brand-template-save 配置品牌模板")
+
+
+def _run_brand_template_save_cli(
+    name: str,
+    color_scheme: str,
+    font_preset: str,
+    logo_path: str | None = None,
+) -> int:
+    """brand-template-save 子命令执行（四步定式——写命令无 UUID 守卫步：
+    模板名非 UUID 参数，非空/长度校验在服务预检与实体守卫承载）。
+
+    Args:
+        name: --name 原始字符串。
+        color_scheme: --color-scheme 预设键（argparse choices 已拦非法值）。
+        font_preset: --font-preset 预设键。
+        logo_path: --logo-path 路径（可选）。
+
+    Returns:
+        退出码（0=保存完成，1=业务异常）。
+    """
+    try:
+        _ensure_bootstrapped()
+        result = asyncio.run(_run_brand_template_save(name, color_scheme, font_preset, logo_path))
+        _print_brand_template_saved(result)
+        logger.info("品牌模板已保存: name=%s color_scheme=%s font_preset=%s", name, color_scheme, font_preset)
+        return 0
+    except DomainError as error:
+        logger.error("品牌模板保存失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("品牌模板保存异常: %s", error, exc_info=True)
+        return 1
+
+
+def _run_brand_template_list_cli() -> int:
+    """brand-template-list 子命令执行（四步定式——零参数全局清单）。
+
+    Returns:
+        退出码（0=清单输出完成，1=业务异常）。
+    """
+    try:
+        _ensure_bootstrapped()
+        rows = asyncio.run(_run_brand_template_list())
+        _print_brand_template_list(rows)
+        row_count = len(rows) if isinstance(rows, (list, tuple)) else 0
+        logger.info("品牌模板清单输出完成: %s 行", row_count)
+        return 0
+    except DomainError as error:
+        logger.error("品牌模板清单失败: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        logger.error("品牌模板清单异常: %s", error, exc_info=True)
         return 1
 
 
@@ -1798,12 +2031,16 @@ def _print_consultant_view(view: Any) -> None:
 
     brand = getattr(view, "brand", None)
     print("── 品牌配置 ──")
+    # 6-11 v1.1.0 三值派生（R3 补位）：显示行三段改 BrandSection 派生值——
+    # configured 态「已配置+默认」并存的呈现面自相矛盾修复（6-2 三值派生改造）
+    configured_state = "已配置" if getattr(brand, "configured", False) else "未配置"
     print(
-        f"品牌模板: {getattr(brand, 'logo_status', '未配置（系统默认）')}"
-        " | Logo: 默认 | 配色: 默认"
+        f"品牌模板: {configured_state}"
+        f" | Logo: {getattr(brand, 'logo_status', '未配置（系统默认）')}"
+        f" | 配色: {getattr(brand, 'color_scheme_status', '未配置（系统默认）')}"
         f" | 字体: {getattr(brand, 'font_status', 'STSong-Light（内置）')}"
     )
-    print("提示: 品牌模板配置归 Story 6-11（白标报告基础）")
+    print("提示: 执行 brand-template-save 配置品牌模板")
 
     export = getattr(view, "export", None)
     print("── 白标导出 ──")
@@ -2444,7 +2681,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "consultant-view":
         return _run_consultant_view_cli()
     if args.command == "report-generate":
-        return _run_report_generate_cli(args.plan_id, getattr(args, "format", "markdown"))
+        return _run_report_generate_cli(
+            args.plan_id,
+            getattr(args, "format", "markdown"),
+            getattr(args, "brand_template", None),
+        )
+    if args.command == "brand-template-save":
+        return _run_brand_template_save_cli(
+            args.name,
+            args.color_scheme,
+            args.font_preset,
+            getattr(args, "logo_path", None),
+        )
+    if args.command == "brand-template-list":
+        return _run_brand_template_list_cli()
     if args.command == "isolation-status":
         return _run_isolation_status_cli(args.agent_id)
     if args.command == "set-isolation":

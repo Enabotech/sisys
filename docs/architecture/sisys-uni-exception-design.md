@@ -762,7 +762,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 | EXCEPTION_491 | ReportStorageError | BusinessException | 500 |（Story 6.5a，报告持久化失败——L0 文件写失败 layer="l0" / L2 元数据行落库失败 layer="l2"（二元值域自有元组 `_VALID_LAYERS=("l0","l2")`——语境借鉴 284 但值域独立，284 值域 (l2,l3,l4,l5) 不含 l0 照抄即漏）；非法 layer 抛 242 守卫（家族形态同构 284）；事件发布失败不走本码（AC-5 宽容语义 warning 不回滚——上抛回滚不了已落盘 L0/L2）；context 单键={layer}）|
 | EXCEPTION_492 | PdfRenderingError | BusinessException | 500 |（Story 6.5b，PDF 报告渲染失败——reportlab 渲染异常/中文字体注册失败/未注册锚点引用 save 期抛错（``ValueError: format not resolved`` 悬空链接天然守护）等原生异常的领域包装；构造器领域参在前同构 490 形态；context 单键={plan_id}）|
 | EXCEPTION_493 | ReportEvidenceStorageError | BusinessException | 500 |（Story 6.5b，PDF 报告 L4 证据对象归档失败——``L4ObjectPort.archive`` 抛异常/返回异常态（MinIO 不可达/WORM retention 失败）；**开新码不复用 491**：491 ``_VALID_LAYERS=("l0","l2")`` 二元值域是 6-5a 冻结面且有负向测试钉死（"l4" 现为非法值抛 242），最小契约变更原则取新码；context 单键={plan_id}）|
-| EXCEPTION_494~499 | （预留 report 子域）| — | — |（后续报告域异常如需新码在此段取）|
+| EXCEPTION_494 | BrandTemplateValidationError | BusinessException | 400 |（Story 6.11，品牌模板校验伞形——七形态=全触发面：非法 color_scheme key/非法 font_preset key/Logo magic bytes 非 PNG-JPEG/超 2MB/路径不存在/模板不存在/``--brand-template``+markdown 组合非法（消息含合法预设键清单——调用方可理解性，不泄露 SQL/堆栈）；name 空值/超长归 242 实体守卫形态非本码；CLI choices 面的非法预设 key 是 argparse exit 2 硬拦截——494 值域校验经编程面 use case 直调触达；构造器 ``field`` 必参是七形态区分键；context={field, [template_name, reason]}）|
+| EXCEPTION_495 | BrandTemplateStorageError | BusinessException | 500 |（Story 6.11，品牌配置持久化失败——brand_templates PG 读写 layer="l2"/L4 logo 对象存取 layer="l4" 二元值域（与 491 ``{l0,l2}`` 同族分立：彼为报告产物持久化、此为品牌配置持久化，触发面与消费方不同——值域分立双向判别，491 的 l0 在本类非法）；并发双 INSERT 撞 UNIQUE(name) 的 IntegrityError 防御包装归仓储；**HTTP_MAP 显式注册**——BusinessException 基类兜底是 400，495→500 必须显式[491 :320 先例]；context 单键={layer}）|
+| EXCEPTION_496~499 | （预留 report 子域）| — | — |（后续报告域异常如需新码在此段取）|
 | EXCEPTION_999 | UnknownError | ExternalException | 500 |
 
 > **Story 4.1c 复用声明（2026-09-26）：** Story 4.1c（Skills 数据采集集成）**零新增异常**——

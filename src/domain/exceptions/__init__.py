@@ -115,6 +115,8 @@ from src.domain.exceptions.relevance_exceptions import (
     RelevanceEvaluationError,
 )
 from src.domain.exceptions.report_exceptions import (
+    BrandTemplateStorageError,
+    BrandTemplateValidationError,
     PdfRenderingError,
     ReportEvidenceStorageError,
     ReportGenerationError,
@@ -357,11 +359,14 @@ __all__ = [
     "RecoveryModeConflictError",
     # 报告子域异常（Story 6-5a Markdown 报告生成——490 数据源全缺[404] +
     # 491 持久化失败[layer 二元 500]；6-5b PDF 报告——492 渲染失败[500] +
-    # 493 L4 证据归档失败[500]）
+    # 493 L4 证据归档失败[500]；6-11 白标报告基础——494 品牌模板校验伞形
+    # [七形态 400] + 495 品牌配置持久化失败[layer 二元 {l2,l4} 500]）
     "ReportGenerationError",
     "ReportStorageError",
     "PdfRenderingError",
     "ReportEvidenceStorageError",
+    "BrandTemplateValidationError",
+    "BrandTemplateStorageError",
     # 档案管理异常
     "ArchiveNotFoundError",
     "ArchiveConflictError",

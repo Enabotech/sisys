@@ -27,11 +27,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from src.application.ports.brand_template import BrandTemplateServicePort
 from src.application.ports.chain_of_thought_archive import CHAIN_ARCHIVE_KIND, ChainOfThoughtArchiveServicePort
 from src.application.ports.pdf_report import (
     APPENDIX_C_TITLE,
     EVIDENCE_BUCKET_TYPE,
     PDF_OBJECT_KEY_TEMPLATE,
+    BrandRenderSpec,
     PdfRendererPort,
 )
 from src.application.services.agent_workflow_context import MVP_TENANT_ID
@@ -44,6 +46,7 @@ from src.domain.entities.strategic_archive import ArchiveType
 from src.domain.entities.strategic_report import ReportType, StrategicReport
 from src.domain.events.workflow_events import ReportGenerated
 from src.domain.exceptions import (
+    BrandTemplateValidationError,
     PdfRenderingError,
     ReportEvidenceStorageError,
     ReportGenerationError,
@@ -96,10 +99,11 @@ _EPOCH_FLOOR = datetime.min.replace(tzinfo=timezone.utc)
 
 
 class PdfReportGenerationService:
-    """PDF 报告生成服务（``PdfReportGenerationServicePort`` 实现——六段编排）。
+    """PDF 报告生成服务（``PdfReportGenerationServicePort`` 实现——六段编排+品牌前置小步）。
 
-    九依赖 keyword-only 注入（R2 具体应用端口组合 R1 基础端口 L3/L4/
-    DocumentRepository + 既有应用端口）；collection/tenant_id 是服务构造
+    v1.1.0 十依赖 keyword-only 注入（R2 具体应用端口组合 R1 基础端口 L3/L4/
+    DocumentRepository + 既有应用端口 + 6-11 品牌模板服务[可选尾插——
+    brand_template_name 在场时必装]）；collection/tenant_id 是服务构造
     参数（配置态注入非依赖态——测试覆写注入通道，生产走组合根默认值）。
     服务无状态（SINGLETON 并发共享安全——引文解析局部累积清单与 6-5a
     附录 B 登记清单同纪律，禁持每次调用的可变实例态——AC-7）。
@@ -117,10 +121,12 @@ class PdfReportGenerationService:
         l3_vector: L3VectorPort,
         document_repository: DocumentRepositoryPort,
         archive_service: StrategicArchiveService,
+        brand_template_service: BrandTemplateServicePort | None = None,
         collection: str = "documents",
         tenant_id: str = str(MVP_TENANT_ID),
     ) -> None:
-        """初始化服务（九依赖 + 两配置参数）。
+        """初始化服务（v1.1.0 十依赖 + 两配置参数——brand_template_service
+        尾插可选参保持既有九参构造兼容[测试轻装配/旧调用方]）。
 
         Args:
             chain_archive_service: chain 归档服务（聚合主源）。
@@ -133,6 +139,9 @@ class PdfReportGenerationService:
             document_repository: documents 仓储（引文解析②find）。
             archive_service: 战略档案服务（query_archive——assumptions 读径；
                 注入具体类：application 同层引用合法）。
+            brand_template_service: 品牌模板服务（6-11 v1.1.0 第十依赖——
+                brand_template_name 在场时 get_render_spec 组装+template_id
+                定位；None 兼容旧装配[品牌参恒走 None 零品牌路径]）。
             collection: 引文检索 collection（默认 "documents"——与 chunk
                 索引写侧 collection 字面量对齐，非 BLM_SEARCH_COLLECTION
                 env 传导（env 覆写只影响检索服务侧））。
@@ -148,25 +157,62 @@ class PdfReportGenerationService:
         self._l3_vector = l3_vector
         self._document_repository = document_repository
         self._archive_service = archive_service
+        self._brand_template_service = brand_template_service
         self._collection = collection
         self._tenant_id = tenant_id
 
-    async def generate_pdf_report(self, plan_id: uuid.UUID) -> StrategicReport:
-        """按 plan_id 生成 PDF 报告（六段编排——AC-1）。
+    async def generate_pdf_report(
+        self,
+        plan_id: uuid.UUID,
+        *,
+        brand_template_name: str | None = None,
+    ) -> StrategicReport:
+        """按 plan_id 生成 PDF 报告（六段编排+品牌前置小步——AC-1/AC-4）。
+
+        品牌增量三段（v1.1.0）：``brand_template_name`` 非 None 时①前置组装
+        BrandRenderSpec（**前置于聚合查询**——R3 钦定：后置则裸 plan 先撞
+        490 非 494 场景结构性红；「导出前置校验语义」——品牌失败不降级为
+        非白标导出）→ ②渲染双参（render(document, brand=spec)）→ ③metadata
+        品牌两键（brand_template_id/brand_applied——template_id 经
+        list_brand_templates 精确匹配定位：端口三方法冻结无按名取 id 通道，
+        模板全局量级个位数 O(n) 纯读可接受；找不到=并发删除极端窗 494
+        诚实失败）。
 
         Args:
             plan_id: 规划任务标识。
+            brand_template_name: 品牌模板名（None=默认态零品牌路径——v1.0.0
+                行为等价）。
 
         Returns:
             StrategicReport 实体（report_type=PDF、file_path=L4 对象键逻辑路径）。
 
         Raises:
+            BrandTemplateValidationError: 494——模板不存在/预设键脏（前置
+                校验语义——聚合零调用）。
             ReportGenerationError: 490——数据源全缺（chain total==0 两形态同判）。
             PdfRenderingError: 492——渲染失败（reportlab 原生异常领域包装）。
             ReportEvidenceStorageError: 493——L4 证据归档失败。
             ReportStorageError: 491（layer="l2"）——L2 元数据行落库失败。
         """
         started = time.perf_counter()
+        # ⓪ 品牌前置小步（R3 钦定前置于聚合查询——S8 免 BLM 预置直达 494）
+        brand_spec: BrandRenderSpec | None = None
+        brand_template_id: str | None = None
+        if brand_template_name is not None:
+            if self._brand_template_service is None:
+                raise BrandTemplateValidationError(
+                    field="brand_template_name",
+                    message=f"品牌模板服务未装配（brand_template_name={brand_template_name} 需 v1.1.0 十依赖装配）",
+                )
+            brand_spec = await self._brand_template_service.get_render_spec(brand_template_name)
+            templates = await self._brand_template_service.list_brand_templates()
+            matched = next((t for t in templates if t.name == brand_template_name), None)
+            if matched is None:
+                raise BrandTemplateValidationError(
+                    field="template_name",
+                    message=f"品牌模板不存在: {brand_template_name}（保存后已被删除）",
+                )
+            brand_template_id = str(matched.template_id)
         # ① 聚合主源（空档案 total==0 → 490——两形态同判）
         trace = await self._chain_archive_service.query_chain_trace(plan_id)
         if trace.total == 0:
@@ -180,9 +226,13 @@ class PdfReportGenerationService:
         aggregation = aggregate_report_document(str(plan_id), trace.records, snapshot, started)
         document = self._append_citation_section(aggregation.document, citations)
         report_id = uuid.uuid4()
-        # ④ 渲染（492 包装）
+        # ④ 渲染（492 包装——v1.1.0 双参：brand None 态走单参调用[零破坏]，
+        # 品牌态双参传 brand kwarg）
         try:
-            pdf_bytes = self._pdf_renderer.render(document)
+            if brand_spec is None:
+                pdf_bytes = self._pdf_renderer.render(document)
+            else:
+                pdf_bytes = self._pdf_renderer.render(document, brand=brand_spec)
         except Exception as error:
             raise PdfRenderingError(plan_id=str(plan_id), cause=error) from error
         # ⑤ L4 WORM 归档（493 包装）——Story 钦定顺序：渲染→L4→实体构造→L2 save
@@ -220,6 +270,10 @@ class PdfReportGenerationService:
         ]
         if citation_degraded:
             metadata["citation_degraded"] = True
+        # v1.1.0 品牌两键（JSONB 顶层自由扩展——无品牌导出零品牌键）
+        if brand_template_id is not None:
+            metadata["brand_template_id"] = brand_template_id
+            metadata["brand_applied"] = True
         try:
             await self._report_repository.save(report, metadata=metadata)
         except Exception as error:

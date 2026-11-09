@@ -2143,22 +2143,25 @@ def bootstrap() -> None:
     # report_repository（SCOPED v1.0.0）的两 SCOPED 无混态最简捕获（6-8 三 SCOPED+
     # 一 SINGLETON/6-9 两 SINGLETON+一 SCOPED 后的最简形态）——CLI 一次性进程 +
     # 测试双清下无故障面（三连注记先例）；未来 7-2 长驻 REST 面改 SCOPED 触发器注记。
-    # 两依赖全既有注册名消费（零新仓储成员/零 infra 面——OD-11 纯三零第二连）。
+    # Story 6-11 v1.1.0：增第三依赖 brand_template_repository（SCOPED v1.0.0）——
+    # 三 SCOPED 捕获+1 注记；品牌段读配置面激活（对接锚兑现），use_case 维持 v1.0.0。
     from src.application.ports.consultant_view import ConsultantViewPort
     from src.application.services.consultant_view_service import ConsultantViewService
 
     register_port(
         name="consultant_view_service",
-        version="v1.0.0",
+        version="v1.1.0",
         interface=ConsultantViewPort,
         impl=lambda resolver: ConsultantViewService(
             archive_repository=resolver.resolve("archive_repository"),
             report_repository=resolver.resolve("report_repository"),
+            brand_template_repository=resolver.resolve("brand_template_repository"),
         ),
         module="src.application.services.consultant_view_service",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("consultant", "view", "application"),
+        compatibility=("v1.0.0",),
     )
 
     from src.application.use_cases.get_consultant_view import GetConsultantViewUseCase
@@ -3645,17 +3648,25 @@ def bootstrap() -> None:
 
     register_port(
         name="pdf_renderer",
-        version="v1.0.0",
+        # Story 6-11：render 增 keyword-only brand 可选参（端口签名演进——
+        # impl 类直传不变；默认 None 走既有路径，compatibility 元组承载
+        # v1.0.0 调用方零破坏——hybrid_search_service :1844-1861 元组先例）
+        version="v1.1.0",
         interface=PdfRendererPort,
         impl=ReportLabPdfRenderer,
         module="src.infrastructure.reporting.reportlab_pdf_renderer",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("report", "pdf", "infrastructure"),
+        compatibility=("v1.0.0",),
     )
     register_port(
         name="pdf_report_generation_service",
-        version="v1.0.0",
+        # Story 6-11：v1.1.0 增第十依赖 brand_template_service（SINGLETON→
+        # SINGLETON 同态无捕获注记；lambda 9 参→10 参）+ generate_pdf_report
+        # 增 keyword-only brand_template_name 可选参（导出前置校验语义——
+        # compatibility 元组承载 v1.0.0 调用方零破坏）
+        version="v1.1.0",
         interface=PdfReportGenerationServicePort,
         impl=lambda resolver: PdfReportGenerationService(
             chain_archive_service=resolver.resolve("chain_of_thought_archive_service"),
@@ -3672,11 +3683,13 @@ def bootstrap() -> None:
                 _SessionScopedDocumentRepository(resolver.resolve("document_repository"), resolver.resolve("session_factory")),
             ),
             archive_service=resolver.resolve("strategic_archive_service"),
+            brand_template_service=resolver.resolve("brand_template_service"),
         ),
         module="src.application.services.pdf_report_generation_service",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("report", "pdf", "application"),
+        compatibility=("v1.0.0",),
     )
     register_port(
         name="pdf_report_generation_use_case",
@@ -3689,6 +3702,72 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("report", "pdf", "use_case", "application"),
+    )
+
+    # === Story 6-11: 白标报告基础（品牌模板配置——预设常量+UPSERT 修订+
+    # L4 logo 通道+CLI 两命令；consultant_view v1.1.0 联动归 Task 6 原子批）===
+    # brand_template_repository：SCOPED 仓储带 session_factory 注入
+    # （report_repository :3550-3559 直系形态——6-4 CR1-F1 后第一天带 factory）
+    from src.domain.ports.brand_template_repository import BrandTemplateRepositoryProtocol
+    from src.infrastructure.storage.postgresql.repository.brand_template_repository import (
+        PostgreSQLBrandTemplateRepository,
+    )
+
+    register_port(
+        name="brand_template_repository",
+        version="v1.0.0",
+        interface=BrandTemplateRepositoryProtocol,
+        impl=lambda resolver: PostgreSQLBrandTemplateRepository(session_factory=resolver.resolve("session_factory")),
+        module="src.infrastructure.storage.postgresql.repository.brand_template_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="foundation-team",
+        tags=("brand", "template", "gateway", "application"),
+    )
+    from src.application.ports.brand_template import BrandTemplateServicePort
+    from src.application.services.brand_template_service import BrandTemplateService
+
+    # SINGLETON 捕获 SCOPED 依赖声明（consultant_view :2141-2146 三连注记先例
+    # 形态）：brand_template_repository（SCOPED v1.0.0）单捕获——CLI 一次性
+    # 进程+测试双清下无故障面；未来 7-2 长驻 REST 面改 SCOPED 触发器注记。
+    register_port(
+        name="brand_template_service",
+        version="v1.0.0",
+        interface=BrandTemplateServicePort,
+        impl=lambda resolver: BrandTemplateService(
+            brand_template_repository=resolver.resolve("brand_template_repository"),
+            l4_object=resolver.resolve("l4_object"),
+        ),
+        module="src.application.services.brand_template_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("brand", "template", "application"),
+    )
+    from src.application.use_cases.list_brand_templates import ListBrandTemplatesUseCase
+    from src.application.use_cases.save_brand_template import SaveBrandTemplateUseCase
+
+    register_port(
+        name="save_brand_template_use_case",
+        version="v1.0.0",
+        interface=SaveBrandTemplateUseCase,
+        impl=lambda resolver: SaveBrandTemplateUseCase(
+            brand_service=resolver.resolve("brand_template_service"),
+        ),
+        module="src.application.use_cases.save_brand_template",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("brand", "template", "use_case", "application"),
+    )
+    register_port(
+        name="list_brand_templates_use_case",
+        version="v1.0.0",
+        interface=ListBrandTemplatesUseCase,
+        impl=lambda resolver: ListBrandTemplatesUseCase(
+            brand_service=resolver.resolve("brand_template_service"),
+        ),
+        module="src.application.use_cases.list_brand_templates",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("brand", "template", "use_case", "application"),
     )
 
     # === 事件处理器注册（register_handlers）===

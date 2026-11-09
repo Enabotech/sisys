@@ -31,7 +31,7 @@ find 1000 行截断双风险——「DISTINCT+JOIN LATERAL 单查询化 / SQL �
 
 服务无状态（SINGLETON 并发共享——AC-7 约束；禁持每次调用的可变实例态）。
 
-端口版本：(v1.0.0)
+端口版本：(v1.1.0——Story 6-11 品牌段读配置面：服务增第三依赖+三形态值语义；签名零变)
 """
 
 from __future__ import annotations
@@ -53,6 +53,7 @@ from src.application.ports.consultant_view import (
 )
 from src.domain.entities.strategic_archive import StrategicArchive
 from src.domain.ports.archive_repository import ArchiveQuery, ArchiveRepositoryPort
+from src.domain.ports.brand_template_repository import BrandTemplateRepositoryProtocol
 from src.domain.ports.report_repository import ReportRepositoryProtocol
 
 __all__ = ["ConsultantViewService"]
@@ -75,10 +76,14 @@ class ConsultantViewService(ConsultantViewPort):
         *,
         archive_repository: ArchiveRepositoryPort,
         report_repository: ReportRepositoryProtocol,
+        brand_template_repository: BrandTemplateRepositoryProtocol | None = None,
     ) -> None:
-        """两依赖 keyword-only 构造（服务无状态——SINGLETON 并发共享安全）."""
+        """三依赖 keyword-only 构造（v1.1.0 增 brand_template_repository 第三依赖
+        [可选尾参 None=旧两参装配兼容——品牌段走零模板默认态]；服务无状态
+        ——SINGLETON 并发共享安全）."""
         self._archive_repository = archive_repository
         self._report_repository = report_repository
+        self._brand_template_repository = brand_template_repository
 
     async def build_consultant_view(self) -> ConsultantView:
         """构建三段聚合顾问视图（零参数——全局多项目面板；段级容错不抛）.
@@ -90,7 +95,7 @@ class ConsultantViewService(ConsultantViewPort):
         # 单时间锚派生（6-8/6-9 单锚直系第三连）：入口取一次 now
         now = datetime.now(UTC)
         projects_section, summaries, file_paths, projects_degraded = await self._build_projects_section()
-        brand_section = self._build_brand_section()
+        brand_section = await self._build_brand_section()
         export_section = self._build_export_section(summaries, file_paths, projects_degraded)
         build_degraded = projects_degraded or export_section.degraded or brand_section.degraded
         return ConsultantView(
@@ -170,19 +175,38 @@ class ConsultantViewService(ConsultantViewPort):
         )
         return section, summaries, file_paths, degraded
 
-    def _build_brand_section(self) -> BrandSection:
-        """品牌段构建（V1 恒系统默认态零 IO 静态段——纯常量构造）.
+    async def _build_brand_section(self) -> BrandSection:
+        """品牌段构建（v1.1.0 读配置面——三形态）.
 
-        值级断言语义=「V1 交付时点品牌面未配置事实」：6-11 实施后 configured 可
-        True、status 可为已配置值（预期演进信号非 flake）；届时本段演进读配置面
-        ——端口版本 v1.1.0 触发器注记（OD-6）。
+        三形态（6-11 v1.1.0 兑现 OD-6 对接锚）：零模板/第三依赖缺席→五键全
+        默认值（与 6-10 恒值逐字相等——6-10 断言前提演进为「零模板」）；
+        有模板→最新行[list 首行=仓储 updated_at 降序行序单源]派生 configured
+        True+三状态呈现名（呈现名单源引用预设常量[import application 同层
+        合法]）；查询异常→degraded True+默认值不抛（段级容错——v1.1.0
+        「零 IO 恒稳」承诺勘误为「零模板/降级态下 False——读配置面激活降级
+        语义」）。品牌段「最新行」与 AC-3 行序同键（updated_at 降序——UPSERT
+        修订语义）。
         """
+        if self._brand_template_repository is None:
+            return BrandSection()
+        from src.application.ports.brand_template import COLOR_SCHEME_PRESETS, FONT_PRESETS
+
+        try:
+            templates = await self._brand_template_repository.list_templates()
+        except Exception as error:  # 段级容错（品牌段级）：读配置面激活降级语义
+            logger.warning("顾问视图品牌段降级: error=%s: %s", type(error).__name__, error)
+            return BrandSection(degraded=True)
+        if not templates:
+            return BrandSection()
+        latest = templates[0]
+        color_preset = COLOR_SCHEME_PRESETS.get(latest.color_scheme)
+        font_preset = FONT_PRESETS.get(latest.font_preset)
         return BrandSection(
             degraded=False,
-            configured=False,
-            logo_status=BRAND_STATUS_UNCONFIGURED,
-            color_scheme_status=BRAND_STATUS_UNCONFIGURED,
-            font_status=BRAND_FONT_STATUS,
+            configured=True,
+            logo_status="已配置" if latest.logo_object_key else "未设置",
+            color_scheme_status=color_preset.display_name if color_preset else BRAND_STATUS_UNCONFIGURED,
+            font_status=font_preset.display_name if font_preset else BRAND_FONT_STATUS,
         )
 
     def _build_export_section(

@@ -14,7 +14,9 @@ ConsultantView 顶层无 plan_id 键（全局视图零输入的 VO 投影——�
 8 键/6-9 AnalystView 6 键的分立点，OD-1）；build_consultant_view 零参数签名是
 视图族首个全局端口（多项目管理面板本义跨 plan——语义正当性）。
 
-端口版本：(v1.0.0)
+端口版本：(v1.1.0——Story 6-11 品牌段读配置面激活：BrandSection 值语义演进
+[键契约 5 键不变]——有模板 configured True+呈现名派生/零模板与降级态默认值；
+服务增 brand_template_repository 第三依赖，build_consultant_view 签名零变)
 """
 
 from __future__ import annotations
@@ -25,12 +27,14 @@ from typing import Protocol, runtime_checkable
 from src.domain.exceptions import EntityValidationError
 
 #: 品牌未配置状态文案（logo_status 与 color_scheme_status 共用——OD-6 品牌面恰两常量；
-#: 6-11 实施后本常量消费面演进读配置，届时端口版本 v1.1.0 触发器注记）
+#: 6-11 v1.1.0 已兑现：消费面演进为读配置——零模板/降级态回落本常量，
+#: 有模板时 logo_status ∈ {"已配置","未设置"}、color_scheme_status=预设呈现名）
 BRAND_STATUS_UNCONFIGURED: str = "未配置（系统默认）"
 
 #: 品牌字体状态文案（与渲染器冻结字体 _FONT_NAME = "STSong-Light"（reportlab_pdf_renderer.py:60）
 #: 事实单源对齐——字面量承载禁 import infra：application 禁依赖 infrastructure
-#: （依赖方向矩阵 SERVICE_ALLOWED_PREFIXES 白名单外）；6-11 对接触发器对称注记）
+#: （依赖方向矩阵 SERVICE_ALLOWED_PREFIXES 白名单外）；6-11 v1.1.0 已兑现：
+#: 有模板时 font_status=FONT_PRESETS 呈现名[同层 import 合法]，本常量是零模板/降级态回落值）
 BRAND_FONT_STATUS: str = "STSong-Light（内置）"
 
 #: 面板归档清单查询上限（ArchiveQuery limit 覆写单源——默认 20 截断防御：不覆写则
@@ -119,13 +123,13 @@ class ProjectsSection:
 
 @dataclass(frozen=True)
 class BrandSection:
-    """品牌段（5 键——V1 恒系统默认态零 IO 静态段，6-11 对接锚）.
+    """品牌段（5 键——6-11 v1.1.0 读配置面已兑现：三形态值语义）.
 
-    值级断言语义=「V1 交付时点品牌面未配置事实」（词族 brand/white_label/logo
-    src+tests+configs 零命中亲验——6-11 backlog 未实施）；6-11 实施后 configured
-    可 True、logo_status 可为已配置值——断言红是预期演进信号非 flake（6-9「23 工具
-    事实断言」语义直系第二连）；degraded 恒 False 是结构性承诺（零 IO 恒稳——与
-    6-9 toolbox 静态恒在段镜像对称）。
+    键契约 5 键不变、值语义演进（对接锚兑现注记）：有模板→configured True+
+    logo_status ∈ {"已配置","未设置"}+配色/字体呈现名（预设常量单源）；零模板
+    →五键全默认值（与 6-10 恒值逐字相等——6-10 断言前提演进为「零模板」）；
+    查询异常→degraded True+默认值不抛（「degraded 恒 False 零 IO 恒稳」承诺
+    勘误为「零模板/降级态下 False——读配置面激活降级语义」）。
     """
 
     degraded: bool = False
@@ -191,7 +195,7 @@ class ConsultantViewPort(Protocol):
     plan_id 形态的分立点：多项目管理面板本义跨 plan，视图族首个零 plan_id 输入
     端口）；消费方：GetConsultantViewUseCase（零参透传——零输入零守卫面 OD-3）+
     CLI consultant-view 子命令（经组合根 consultant_view_use_case 注册名 resolve）。
-    端口版本：(v1.0.0)
+    端口版本：(v1.1.0——Story 6-11 品牌段读配置面：服务增第三依赖+三形态值语义；签名零变)
     """
 
     async def build_consultant_view(self) -> ConsultantView:

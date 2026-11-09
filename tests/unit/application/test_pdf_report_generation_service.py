@@ -31,6 +31,7 @@ from src.application.ports.chain_of_thought_archive import (
 from src.application.ports.pdf_report import (
     EVIDENCE_BUCKET_TYPE,
     PDF_OBJECT_KEY_TEMPLATE,
+    BrandRenderSpec,
     PdfRendererPort,
 )
 from src.application.services.agent_workflow_context import MVP_TENANT_ID
@@ -686,3 +687,164 @@ class TestSixStageOrchestration:
         await service.generate_pdf_report(PLAN_ID)
         assert l3.get_point.call_args.args[0] == "documents"
         assert document_repo.find.call_args.args[0].tenant_id == str(MVP_TENANT_ID)
+
+
+# ======================================================================
+# Story 6-11 Task 4 循环 C：v1.1.0 品牌编排（brand_template_name 可选参）
+# ======================================================================
+
+
+def _make_brand_service_mock(
+    *,
+    spec: Any = None,
+    rows: list[Any] | None = None,
+) -> Any:
+    """品牌模板服务 mock（get_render_spec 返回 spec/list 返回模板行）。"""
+    from unittest.mock import AsyncMock
+
+    from src.application.ports.brand_template import BrandTemplateServicePort
+
+    brand_service = AsyncMock(spec=BrandTemplateServicePort)
+    if spec is not None:
+        brand_service.get_render_spec.return_value = spec
+    else:
+        brand_service.get_render_spec.return_value = BrandRenderSpec(
+            font_name="NotoSansSC",
+            title_color="#37474F",
+            header_bg_color="#ECEFF1",
+            grid_color="#B0BEC5",
+            callout_bg_color="#F5F7F8",
+            callout_text_color="#455A64",
+            logo=None,
+        )
+    brand_service.list_brand_templates.return_value = tuple(rows or [])
+    return brand_service
+
+
+class TestBrandOrchestrationV110:
+    """v1.1.0 品牌编排（brand_template_name 前置于聚合查询+双参渲染+metadata 两键）。"""
+
+    async def test_brand_none_zero_change(self) -> None:
+        """brand_template_name=None 既有路径零变化（get_render_spec 零调用
+        +render 单参语义+metadata 零品牌键——v1.0.0 兼容运行面）。"""
+        service, mocks = _make_service()
+        await service.generate_pdf_report(PLAN_ID)
+        assert "brand_template_service" not in mocks  # 默认 _make_service 无品牌依赖参与
+        metadata = _saved_metadata(mocks)
+        assert "brand_template_id" not in metadata
+        assert "brand_applied" not in metadata
+
+    async def test_brand_template_name_full_flow(self) -> None:
+        """品牌参在场：get_render_spec 前置调用+render 双参调用锚[call_args
+        kwargs brand=spec]+metadata 品牌两键。"""
+        spec = BrandRenderSpec(
+            font_name="NotoSansSC",
+            title_color="#37474F",
+            header_bg_color="#ECEFF1",
+            grid_color="#B0BEC5",
+            callout_bg_color="#F5F7F8",
+            callout_text_color="#455A64",
+            logo=None,
+        )
+        from src.domain.entities.brand_template import BrandTemplate
+
+        template = BrandTemplate(
+            template_id=uuid.uuid4(),
+            name="brand-flow-template",
+            color_scheme="graphite",
+            font_preset="noto-sans-sc",
+        )
+        brand_service = _make_brand_service_mock(spec=spec, rows=[template])
+        chain = AsyncMock(spec=ChainOfThoughtArchiveServicePort)
+        chain.query_chain_trace.return_value = _make_trace_view(
+            [
+                "performance_gap",
+                "market_insight_trend",
+                "market_insight_market_customer",
+                "market_insight_competition",
+                "market_insight_self",
+                "market_insight_opportunity",
+                "market_insight_opportunity_gap",
+                "market_insight_synthesis",
+            ]
+        )
+        renderer = MagicMock(spec=PdfRendererPort)
+        renderer.render.return_value = b"%PDF-brand-mock"
+        report_repo = AsyncMock(spec=ReportRepositoryProtocol)
+
+        async def _save(report: Any, metadata: dict | None = None) -> Any:
+            return report
+
+        report_repo.save.side_effect = _save
+        service = PdfReportGenerationService(
+            chain_archive_service=chain,
+            snapshot_repository=AsyncMock(spec=SnapshotRepositoryProtocol),
+            report_repository=report_repo,
+            event_publisher=AsyncMock(spec=EventPublisher),
+            pdf_renderer=renderer,
+            l4_object=AsyncMock(spec=L4ObjectPort),
+            l3_vector=AsyncMock(spec=L3VectorPort),
+            document_repository=AsyncMock(spec=DocumentRepositoryPort),
+            archive_service=AsyncMock(spec=StrategicArchiveService),
+            brand_template_service=brand_service,
+        )
+        report = await service.generate_pdf_report(PLAN_ID, brand_template_name="brand-flow-template")
+        assert report.file_path.startswith("reports/")
+        brand_service.get_render_spec.assert_awaited_once_with("brand-flow-template")
+        # render 双参调用锚（kwargs brand=spec）
+        render_call = renderer.render.call_args
+        assert render_call.kwargs.get("brand") is spec
+        # metadata 品牌两键（brand_template_id 直推预置 template_id）
+        call = report_repo.save.call_args
+        assert call is not None
+        metadata = call.kwargs.get("metadata")
+        assert isinstance(metadata, dict)
+        assert metadata["brand_template_id"] == str(template.template_id)
+        assert metadata["brand_applied"] is True
+
+    async def test_brand_spec_494_passthrough_before_aggregation(self) -> None:
+        """get_render_spec 抛 494 → 透传且聚合零调用（前置校验语义——S8 免
+        BLM 预置直达 494 的编排层前提；后置实现则裸 plan 先撞 490）。"""
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        brand_service = _make_brand_service_mock()
+        brand_service.get_render_spec.side_effect = BrandTemplateValidationError(
+            field="template_name", message="品牌模板不存在: ghost"
+        )
+        chain = AsyncMock(spec=ChainOfThoughtArchiveServicePort)
+        service = PdfReportGenerationService(
+            chain_archive_service=chain,
+            snapshot_repository=AsyncMock(spec=SnapshotRepositoryProtocol),
+            report_repository=AsyncMock(spec=ReportRepositoryProtocol),
+            event_publisher=AsyncMock(spec=EventPublisher),
+            pdf_renderer=MagicMock(spec=PdfRendererPort),
+            l4_object=AsyncMock(spec=L4ObjectPort),
+            l3_vector=AsyncMock(spec=L3VectorPort),
+            document_repository=AsyncMock(spec=DocumentRepositoryPort),
+            archive_service=AsyncMock(spec=StrategicArchiveService),
+            brand_template_service=brand_service,
+        )
+        with pytest.raises(BrandTemplateValidationError):
+            await service.generate_pdf_report(PLAN_ID, brand_template_name="ghost")
+        chain.query_chain_trace.assert_not_awaited()
+
+    async def test_brand_template_deleted_during_export_494(self) -> None:
+        """spec 组装成功但 list 找不到 name 行（并发删除极端窗）→ 494
+        诚实失败（metadata 的 template_id 需真实行——找不到不静默记名）。"""
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        brand_service = _make_brand_service_mock(rows=[])  # get_render_spec 成功但 list 空
+        service = PdfReportGenerationService(
+            chain_archive_service=AsyncMock(spec=ChainOfThoughtArchiveServicePort),
+            snapshot_repository=AsyncMock(spec=SnapshotRepositoryProtocol),
+            report_repository=AsyncMock(spec=ReportRepositoryProtocol),
+            event_publisher=AsyncMock(spec=EventPublisher),
+            pdf_renderer=MagicMock(spec=PdfRendererPort),
+            l4_object=AsyncMock(spec=L4ObjectPort),
+            l3_vector=AsyncMock(spec=L3VectorPort),
+            document_repository=AsyncMock(spec=DocumentRepositoryPort),
+            archive_service=AsyncMock(spec=StrategicArchiveService),
+            brand_template_service=brand_service,
+        )
+        with pytest.raises(BrandTemplateValidationError):
+            await service.generate_pdf_report(PLAN_ID, brand_template_name="vanished")

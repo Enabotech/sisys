@@ -1,6 +1,6 @@
 # Story 6-11: 白标报告基础（品牌模板配置——保存/复用/白标 PDF 渲染 + CLI 命令族 + 6-10 品牌段联动）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -62,7 +62,7 @@
 **Given** 顾问持有本地 Logo 图片文件（PNG/JPEG）
 **When** `brand-template-save` 携带 `--logo-path` 执行
 **Then** Logo 经 **L4 `store()`（非 WORM `archive()`）** 上传至新 bucket_type `"brand-assets"`（三段物理桶名 `{prefix}-brand-assets-{tenant_id}`——与 raw-documents/archive-evidence 并列；**resolve 通道组合根未传 tenant_id——物理桶恒 `{prefix}-brand-assets-default` 共享桶**[6-5b 集成共享桶先例]，隔离靠对象键锚 template_id；**测试前置桶自愈**：store 对缺桶抛 NoSuchBucket 且 src 零生产建桶——bucket_exists 探测+make_bucket 自愈且**勿带 object_lock**[WORM 锁破坏 logo 覆盖与 teardown 清理——与 archive-evidence 的 object_lock=True 建桶先例分立]；**勿入 archive-evidence WORM 桶**：logo 需可替换覆盖，WORM 7 年 retention 反语义——裁定依据），对象键锚 template_id 单键覆盖 `logos/{template_id}`（无 ext 后缀——content_type 承载 image/png|image/jpeg；换格式重传同键覆盖零垃圾对象）；PG 行 logo_object_key 回填该键（**documents 先例同构**：document_upload_service.py:151 PG 元数据行持 MinIO object key 双写）
-**And** 格式守卫（服务层校验，**先于 L4 调用**）：①magic bytes 判定（stdlib 前 8 字节：PNG `\x89PNG\r\n\x1a\n`/JPEG `\xFF\xD8\xFF`——非二者 → 494，消息含合法格式说明）；②大小上限 2MB（`os.path.getsize`——超限 → 494，防误传大图渲染 OOM）；③路径不存在 → 494（文件不可读伞形）
+**And** 格式守卫（服务层校验，**先于 L4 调用**）：①magic bytes 判定（stdlib 前 8 字节：PNG `\x89PNG\r\n\x1a\n`/JPEG `\xFF\xD8\xFF`——非二者 → 494，消息含合法格式说明）；②大小上限 2MB（`os.path.getsize`——超限 → 494，防误传大图渲染 OOM）；③路径不存在/不可读 → 494（isfile 否定+getsize/open 的 OSError 族伞形——R1-F3 补强：chmod-000 真实语义链红在 open 位）；④像素维度上限 4000px+图像体可解析（PIL 惰性读头——超限/`UnidentifiedImageError` → 494，R1-F6 补强：2MB 字节上限不约束解码内存[实测 9000×9000 白底 PNG 仅 258KB 而渲染峰值 RSS 1.1GB；10×20000 → LayoutError]——保存期 fail-fast 前移渲染期 492）
 **And** logo 省略形态：`--logo-path` 缺席 → logo_object_key=None（模板可无 logo——配色/字体独立生效；已有 logo 的模板再存不带 --logo-path → **保留原 logo**钦定[修订语义：缺席≠清除，清除归后续模板管理 Story]）
 
 **验证标准/Validation Criteria:**
@@ -70,6 +70,8 @@
 - [ ] magic bytes 负例（文本文件/空文件 → 494 且 L4 零调用——spec Mock await_count==0 断言）
 - [ ] 大小上限负例（>2MB 构造文件 → 494）
 - [ ] 路径不存在负例（→494）
+- [ ] 不可读负例（chmod-000 真文件[geteuid==0 动态 skip]+getsize TOCTOU 补充格 → 494「不可读」——R1-F3）
+- [ ] 像素/解析负例（1×4001 PNG 超限 → 494；PNG magic+垃圾体图像体不可解析 → 494；4000×4000 恰值通过边界格——R1-F6）
 - [ ] 省略保留语义（带 logo 保存→不带 --logo-path 再存→logo_object_key 不变+L4 零新调用）
 
 ### AC-3: 模板列表与复用入口（CLI brand-template-list + report-generate 同入口扩展）
@@ -137,7 +139,7 @@
 **Given** 本 Story 新增校验与存储失败语义（report 域预留码段 494-499 六码全空亲验——_code_ranges.py:199-212）
 **When** 异常路径触发
 **Then** 两枚新异常（`src/domain/exceptions/report_exceptions.py` 扩展——BusinessException 基类族与 490-493 同构）：
-- `BrandTemplateValidationError`（**EXCEPTION_494**，400 语义——校验伞形）：非法 color_scheme key/非法 font_preset key/Logo magic bytes 非法/大小超限/路径不存在/模板不存在/`--brand-template`+markdown 组合非法（message+context.field 区分**七形态=494 全触发面**；name 空值/超长是 242 实体守卫形态非 494——CLI stderr `[EXCEPTION_242]`；**CLI choices 面的非法预设 key 是 argparse exit 2 硬拦截**——494 值域校验经编程面 use case 直调触达，验收 S2 钦定编程面形态）
+- `BrandTemplateValidationError`（**EXCEPTION_494**，400 语义——校验伞形）：非法 color_scheme key/非法 font_preset key/Logo 非合法可解码 PNG/JPEG 图像文件（magic bytes 非法或图像体无法解析——R1-F6 拓宽）/超限（字节 2MB/像素单边 4000px——两正交守卫）/路径不存在（含不可读伞形）/模板不存在/`--brand-template`+markdown 组合非法（message+context.field 区分**七形态=494 全触发面**；name 空值/超长是 242 实体守卫形态非 494——CLI stderr `[EXCEPTION_242]`；**CLI choices 面的非法预设 key 是 argparse exit 2 硬拦截**——494 值域校验经编程面 use case 直调触达，验收 S2 钦定编程面形态）
 - `BrandTemplateStorageError`（**EXCEPTION_495**，500 语义）：brand_templates PG 读写失败/L4 logo 存取失败（与 491 ReportStorageError 同族分立——彼为报告产物持久化、此为品牌配置持久化，触发面与消费方不同）
 **And** 复用面零改动：242（实体不变量守卫——BrandTemplate `__post_init__`）/492（渲染失败——品牌渲染异常包装）零新增改动；**完整注册义务清单**（CLAUDE.md 4 项强制 Checklist+3 项扩展）：定义文件+_code_ranges.py 子域映射[4 项强制]+`__init__.py` 暴露+子域码段校验+`_CLASS_TO_SUBDOMAIN` 注册+`EXCEPTION_HTTP_MAP` 映射+sisys-uni-exception-design.md §3.3.2 编码分配表更新[扩展 3 项]——**HTTP_MAP 机理注记：495→500 必须显式注册**（BusinessException 基类兜底是 400，先例 491 :320；494→400 与基类一致但族惯例全显式注册[report_exceptions 显式注册先例]）+8 项测试（2 类×4 维度[构造/context/to_dict/HTTP 映射]自定结构+既有 Registration 7 测复跑零碰撞——`tests/unit/domain/exceptions/` 全绿+`test_exception_handlers.py`）
 
@@ -401,14 +403,14 @@
 
 > **目的：** 在进入代码实现前，明确实体契约、预设常量、BrandRenderSpec 键契约、端口演进、018 表结构、验收场景与六边形架构边界，并处置 deferred-work 锚定义务（L129 六轮处置+L13/L17/L107/L117+L170/L127/L369/L370/L395/L396/L402/L403/L409 逐条对表——Task 0.7 落档）。
 
-- [ ] Subtask 0.1: 冻结 BrandTemplate 实体 7 字段契约+BrandRenderSpec 7 键契约（Task 0.1 冻结表落 Dev Agent Record——实现禁增删键）
-- [ ] Subtask 0.2: 冻结预设常量（COLOR_SCHEME_PRESETS 三套 5 色 hex 值逐字钦定+FONT_PRESETS 两项[stsong/noto-sans-sc]+呈现名映射+TTF 资产钦定[来源/许可/放置路径/sha256 登记]——Task 0.2 冻结表）
-- [ ] Subtask 0.3: 定义端口契约（R1 仓储 Protocol 三方法+R2 服务 Port 三方法+三处 v1.1.0 演进签名+4 新注册名与组合根落位锚[6-5b 注册块 :3692 块尾邻位+consultant_view 块 :2177 后]+018 表结构 DDL 冻结）+ 契约测试文件骨架
-- [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_white_label_report.feature`（14 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态]；epics L2537-2545 架构测试三项落位对账：品牌模板配置测试→S1~S4/品牌应用测试→S5~S7/模板复用测试→S13；S1 保存主链/S2 值域守卫[编程面 use case 直调——CLI choices 是 exit 2 硬拦截 494 不可经 CLI 触达]/S3 Logo 格式/S4 列表空态[前置零行清点有行 skip——背景行防御]/S5 白标导出主链/S6 品牌准确四件套[font_preset 钦定 noto-sans-sc——stsong 与默认同字体恒真]/S7 默认态回归[断言形态=metadata 零品牌键对照+对象键通道不变+6-5b 既有测试零修改——不写两次导出 byte 相等]/S8 模板不存在/S9 参数组合守卫/S10 consultant-view 联动/S11 保存性能/S12 导出性能/S13 跨 plan 复用/S14 收尾完成清单）
-- [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_white_label_report.py`（6-10 R6 合规形态第七连：三件套[_run_async+模块级 event_loop+context dict]+三清+CLI 直调 helper[brand-template-save/list+report-generate 三清先例 :457-476 直系]+**模块级零新词族 import 硬纪律**[src 符号延迟到步骤函数内]+模板行预置走 `resolve("brand_template_repository").save(entity)` 直写通道[6-10 `_save_archive_row` :301-335 直系；**多模板行预置实体显式 updated_at 构造**——6-10 `_preset_anchor` :280-292 单一 now 基准+微秒偏移同款：直写绕过服务定时戳而 PG now() 是事务开始时间同事务恒值，隐式构造致排序退化 tie-break]+teardown 定向 DELETE rowcount 断言+L4 logo 对象登记清理+**brand-assets 桶自愈建桶**[bucket_exists 探测→make_bucket 勿带 object_lock——store 对缺桶抛 NoSuchBucket，src 零生产建桶，6-5b 验收探测+自愈先例直系]+**BLM 产物预置 helper**[导出场景 Given：`_assemble_archive_only` 九依赖轻装配+`_archive_steps` 八阶段逐段 compose_and_archive_step_chain——6-5b 验收 :600-758 直系；归档三面残留清理（档案行/Qdrant 点/WORM blob）:309-391 直系]+**渲染正例 Logo 用 Pillow 生成最小合法 PNG**[仓内既有 PNG 测试字节是截断假体——magic 8 字节可过但 ImageReader 渲染 492；Pillow 已是项目依赖零新依赖；magic 负例用文本/截断字节]+**导出副产物三面清理**[strategic_reports 行 `_cleanup_report_rows` :283-306+event_outbox 行 `_cleanup_outbox_rows` :258-281+WORM PDF 对象**裸 client remove_objects(bypass_governance_mode=True)**——端口 delete 对锁定对象抛 ComplianceLockError，6-5b `_cleanup_pdf_objects` :393-412 直系]+**pytestmark xdist_group("blm-planning-perf")**+P95 双场景[保存 200ms/导出 60s——20 轮 sorted[ceil(0.95n)-1] 公式]）；运行验收测试，确认失败（🔴 红阶段验证——逐场景红形态见 Task 0.6 符号表：CLI 直调场景为 argparse exit 2→SystemExit 捕获→exit_code 断言 AssertionError 形态[6-10 :470 行内注释亲注先例（helper :457-476）——R2 勘误：exit-2 亲注在 :470 行内注释非 :465-468 docstring]，含预置/服务类延迟 import 的场景为 ImportError 形态）
-- [ ] Subtask 0.6: 定义逐场景红锚符号表（14 场景逐场景标注「首个新词族触达点」——**CLI 直调无预置场景**[S1 保存 When 直调/S3 格式守卫 When 直调/S4 列表 When 直调]：argparse invalid choice/unrecognized **exit 2**→SystemExit 捕获→exit_code 断言 AssertionError[6-10 :470 行内注释亲注先例——helper :457-476]；**含预置或服务类延迟 import 场景**[S2 编程面 Given 预置/S5/S6/S7/S10/S11/S12/S13 的 Given 预置 helper 或服务类 import]：ImportError 形态；**S8 模板不存在**[report-generate 既有命令+--brand-template 未注册]：unrecognized arguments exit 2（与 S9 同机理）；**S9 组合守卫**[纯参数面无预置]：exit 2；**S14**：_COMPLETION 文件不存在 AssertionError[6-10 S12 直系]）
-- [ ] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L129 六轮处置[6-11 分支消费+批量分支注销+锚位收敛 Epic 7]+13 条逐条对表注记[既有锚 12 条+新增观察面 #13]）
-- [ ] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@9258b36d，实施前复核）
+- [x] Subtask 0.1: 冻结 BrandTemplate 实体 7 字段契约+BrandRenderSpec 7 键契约（Task 0.1 冻结表落 Dev Agent Record——实现禁增删键）
+- [x] Subtask 0.2: 冻结预设常量（COLOR_SCHEME_PRESETS 三套 5 色 hex 值逐字钦定+FONT_PRESETS 两项[stsong/noto-sans-sc]+呈现名映射+TTF 资产钦定[来源/许可/放置路径/sha256 登记]——Task 0.2 冻结表）
+- [x] Subtask 0.3: 定义端口契约（R1 仓储 Protocol 三方法+R2 服务 Port 三方法+三处 v1.1.0 演进签名+4 新注册名与组合根落位锚[6-5b 注册块 :3692 块尾邻位+consultant_view 块 :2177 后]+018 表结构 DDL 冻结）+ 契约测试文件骨架
+- [x] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_white_label_report.feature`（14 场景钉死——**每场景 Then 均有可执行断言**[6-9 先例形态]；epics L2537-2545 架构测试三项落位对账：品牌模板配置测试→S1~S4/品牌应用测试→S5~S7/模板复用测试→S13；S1 保存主链/S2 值域守卫[编程面 use case 直调——CLI choices 是 exit 2 硬拦截 494 不可经 CLI 触达]/S3 Logo 格式/S4 列表空态[前置零行清点有行 skip——背景行防御]/S5 白标导出主链/S6 品牌准确四件套[font_preset 钦定 noto-sans-sc——stsong 与默认同字体恒真]/S7 默认态回归[断言形态=metadata 零品牌键对照+对象键通道不变+6-5b 既有测试零修改——不写两次导出 byte 相等]/S8 模板不存在/S9 参数组合守卫/S10 consultant-view 联动/S11 保存性能/S12 导出性能/S13 跨 plan 复用/S14 收尾完成清单）
+- [x] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_white_label_report.py`（6-10 R6 合规形态第七连：三件套[_run_async+模块级 event_loop+context dict]+三清+CLI 直调 helper[brand-template-save/list+report-generate 三清先例 :457-476 直系]+**模块级零新词族 import 硬纪律**[src 符号延迟到步骤函数内]+模板行预置走 `resolve("brand_template_repository").save(entity)` 直写通道[6-10 `_save_archive_row` :301-335 直系；**多模板行预置实体显式 updated_at 构造**——6-10 `_preset_anchor` :280-292 单一 now 基准+微秒偏移同款：直写绕过服务定时戳而 PG now() 是事务开始时间同事务恒值，隐式构造致排序退化 tie-break]+teardown 定向 DELETE rowcount 断言+L4 logo 对象登记清理+**brand-assets 桶自愈建桶**[bucket_exists 探测→make_bucket 勿带 object_lock——store 对缺桶抛 NoSuchBucket，src 零生产建桶，6-5b 验收探测+自愈先例直系]+**BLM 产物预置 helper**[导出场景 Given：`_assemble_archive_only` 九依赖轻装配+`_archive_steps` 八阶段逐段 compose_and_archive_step_chain——6-5b 验收 :600-758 直系；归档三面残留清理（档案行/Qdrant 点/WORM blob）:309-391 直系]+**渲染正例 Logo 用 Pillow 生成最小合法 PNG**[仓内既有 PNG 测试字节是截断假体——magic 8 字节可过但 ImageReader 渲染 492；Pillow 已是项目依赖零新依赖；magic 负例用文本/截断字节]+**导出副产物三面清理**[strategic_reports 行 `_cleanup_report_rows` :283-306+event_outbox 行 `_cleanup_outbox_rows` :258-281+WORM PDF 对象**裸 client remove_objects(bypass_governance_mode=True)**——端口 delete 对锁定对象抛 ComplianceLockError，6-5b `_cleanup_pdf_objects` :393-412 直系]+**pytestmark xdist_group("blm-planning-perf")**+P95 双场景[保存 200ms/导出 60s——20 轮 sorted[ceil(0.95n)-1] 公式]）；运行验收测试，确认失败（🔴 红阶段验证——逐场景红形态见 Task 0.6 符号表：CLI 直调场景为 argparse exit 2→SystemExit 捕获→exit_code 断言 AssertionError 形态[6-10 :470 行内注释亲注先例（helper :457-476）——R2 勘误：exit-2 亲注在 :470 行内注释非 :465-468 docstring]，含预置/服务类延迟 import 的场景为 ImportError 形态）
+- [x] Subtask 0.6: 定义逐场景红锚符号表（14 场景逐场景标注「首个新词族触达点」——**CLI 直调无预置场景**[S1 保存 When 直调/S3 格式守卫 When 直调/S4 列表 When 直调]：argparse invalid choice/unrecognized **exit 2**→SystemExit 捕获→exit_code 断言 AssertionError[6-10 :470 行内注释亲注先例——helper :457-476]；**含预置或服务类延迟 import 场景**[S2 编程面 Given 预置/S5/S6/S7/S10/S11/S12/S13 的 Given 预置 helper 或服务类 import]：ImportError 形态；**S8 模板不存在**[report-generate 既有命令+--brand-template 未注册]：unrecognized arguments exit 2（与 S9 同机理）；**S9 组合守卫**[纯参数面无预置]：exit 2；**S14**：_COMPLETION 文件不存在 AssertionError[6-10 S12 直系]）
+- [x] Subtask 0.7: deferred-work 锚定义务处置落档（OD-8 表——L129 六轮处置[6-11 分支消费+批量分支注销+锚位收敛 Epic 7]+13 条逐条对表注记[既有锚 12 条+新增观察面 #13]）
+- [x] Subtask 0.8: 关键代码锚点行号复核（并行会话提交会使行号漂移——锚点表基准 HEAD@9258b36d，实施前复核）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕（两张 VO 键契约冻结表+预设冻结表+端口/表结构冻结+场景钉死+锚定义务）
@@ -438,10 +440,10 @@
 | 🟢 绿 | 实现 `BrandTemplateValidationError`(EXCEPTION_494)+`BrandTemplateStorageError`(EXCEPTION_495)（BusinessException 族——490-493 同构；同步 `_code_ranges.py` report 行注释+`_CLASS_TO_SUBDOMAIN`+`__init__.py` 导出+sisys-uni-exception-design.md §3.3.2） |
 | 🔄 重构 | 消息模板统一（合法预设键清单入消息——调用方可理解性） |
 
-- [ ] Subtask 1.1: 🔴 红 — 循环 A+B 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实体+仓储 Protocol+两异常最小实现（Protocol 三方法签名与 Task 0.3 冻结逐字一致）
-- [ ] Subtask 1.3: 🔄 重构 — docstring+类型注解收口
-- [ ] Subtask 1.4: 🟡 变异 — 守卫突变实证（删 name 非空守卫 → 空名构造绿 → 还原红；494 code 改 496 → 唯一性测试红——证明断言活着）
+- [x] Subtask 1.1: 🔴 红 — 循环 A+B 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实体+仓储 Protocol+两异常最小实现（Protocol 三方法签名与 Task 0.3 冻结逐字一致）
+- [x] Subtask 1.3: 🔄 重构 — docstring+类型注解收口
+- [x] Subtask 1.4: 🟡 变异 — 守卫突变实证（删 name 非空守卫 → 空名构造绿 → 还原红；494 code 改 496 → 唯一性测试红——证明断言活着）
 
 **完成标准/Definition of Done:**
 - [ ] 实体+Protocol+两异常实现完成，契约与 Task 0.1/0.3 冻结表逐字一致
@@ -473,10 +475,10 @@
 | 🟢 绿 | 实现 `PostgreSQLBrandTemplateRepository(BrandTemplateRepositoryProtocol)`（session_factory 注入+ContextVar session 优先 fallback 双模式——report_repository :103-124 直系；UPSERT 语义：按实体 template_id 落库[有行 UPDATE/无行 INSERT]+IntegrityError→BrandTemplateStorageError 495 包装） |
 | 🔄 重构 | 映射函数收口+`__all__` |
 
-- [ ] Subtask 2.1: 🔴 红 — 循环 A/B 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — migration+Model+仓储最小实现
-- [ ] Subtask 2.3: 🔄 重构 — docstring（UPSERT 语义+双模式 fallback 注记）
-- [ ] Subtask 2.4: 🟡 变异 — UPSERT 突变实证（改 save 为恒 INSERT → 同名二存 template_id 变异断言红；list 排序键反转 → 双序断言红——还原绿）
+- [x] Subtask 2.1: 🔴 红 — 循环 A/B 失败测试
+- [x] Subtask 2.2: 🟢 绿 — migration+Model+仓储最小实现
+- [x] Subtask 2.3: 🔄 重构 — docstring（UPSERT 语义+双模式 fallback 注记）
+- [x] Subtask 2.4: 🟡 变异 — UPSERT 突变实证（改 save 为恒 INSERT → 同名二存 template_id 变异断言红；list 排序键反转 → 双序断言红——还原绿）
 
 **完成标准/Definition of Done:**
 - [ ] migration+Model+仓储实现完成（`alembic upgrade head` 幂等）
@@ -515,10 +517,10 @@
 | 🟢 绿 | 实现零破坏路径（brand None 早退——全部 spec 驱动分支 None 态走原值；若等价红[invariant 前提下非确定源已钉死，等价红只剩实现侵入过深一种归因]则收口——绿=重构完成的判据） |
 | 🔄 重构 | 等价语义 docstring（v1.1.0 向后兼容承诺——compatibility 元组的运行面证据） |
 
-- [ ] Subtask 3.1: 🔴 红 — 循环 A/B/C 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — VO+签名+渲染器三件+TTF 资产落地（资产获取义务：Google Noto Sans SC **官方仓 google/fonts ofl/notosanssc 仅分发 variable TTF**[NotoSansSC[wght].ttf ~17MB，默认实例=Regular wght 400，TrueType glyf 表——reportlab TTFont 可载入]——**无官方静态单字重 TTF 分发物**[R1 事实核验]；钦定官方 variable TTF 直用或 fontTools varLib.instancer 静态实例化；**非 OTF/CFF**[reportlab TTFont 不支持 CFF outline——noto-cjk 官方 repo 的 OTF/OTC 全系不可用；实施时 registerFont 成功+中文渲染正常双验证恰好覆盖 variable 载入风险]；SIL OFL 1.1 许可[可再分发嵌入]；放置 `src/infrastructure/reporting/fonts/`；文件头 docstring 登记 sha256+入仓体积注记）
-- [ ] Subtask 3.3: 🔄 重构 — 渲染器代码优化（色键映射单源+Image 缩放纯函数化）
-- [ ] Subtask 3.4: 🟡 变异 — 三件突变实证（fontName 参数化删除断言侧 → 字体断言红；header_bg 色改恒原值 → 色断言红；logo Image 流删除断言侧 → XObject 断言红；等价断言侧 brand None 改走空 spec → 等价红[空 spec 必填键构造 TypeError 或默认值≠渲染器默认——Task 0.1 构造契约判别前提]——还原全绿）
+- [x] Subtask 3.1: 🔴 红 — 循环 A/B/C 失败测试
+- [x] Subtask 3.2: 🟢 绿 — VO+签名+渲染器三件+TTF 资产落地（资产获取义务：Google Noto Sans SC **官方仓 google/fonts ofl/notosanssc 仅分发 variable TTF**[NotoSansSC[wght].ttf ~17MB，默认实例=Regular wght 400，TrueType glyf 表——reportlab TTFont 可载入]——**无官方静态单字重 TTF 分发物**[R1 事实核验]；钦定官方 variable TTF 直用或 fontTools varLib.instancer 静态实例化；**非 OTF/CFF**[reportlab TTFont 不支持 CFF outline——noto-cjk 官方 repo 的 OTF/OTC 全系不可用；实施时 registerFont 成功+中文渲染正常双验证恰好覆盖 variable 载入风险]；SIL OFL 1.1 许可[可再分发嵌入]；放置 `src/infrastructure/reporting/fonts/`；文件头 docstring 登记 sha256+入仓体积注记）
+- [x] Subtask 3.3: 🔄 重构 — 渲染器代码优化（色键映射单源+Image 缩放纯函数化）
+- [x] Subtask 3.4: 🟡 变异 — 三件突变实证（fontName 参数化删除断言侧 → 字体断言红；header_bg 色改恒原值 → 色断言红；logo Image 流删除断言侧 → XObject 断言红；等价断言侧 brand None 改走空 spec → 等价红[空 spec 必填键构造 TypeError 或默认值≠渲染器默认——Task 0.1 构造契约判别前提]——还原全绿）
 
 **完成标准/Definition of Done:**
 - [ ] VO+签名+渲染器三件+资产实现完成，7 键契约与 Task 0.1 冻结逐键一致
@@ -558,10 +560,10 @@
 | 🟢 绿 | 实现 v1.1.0（注入第十依赖 brand_template_service[现状九依赖+两配置参数→v1.1.0 十依赖，组合根 lambda 9 参→10 参]+`generate_pdf_report(plan_id, *, brand_template_name=None)`——**get_render_spec 前置于聚合查询**[R3 钦定：「导出前置校验语义」落位兑现——后置则 S8 裸 plan 先撞 490 非 494 场景结构性红；前置则 S8 免 BLM 预置直达 494]→渲染双参→metadata 增两键） |
 | 🔄 重构 | 品牌段编排 docstring（六段→六段+品牌前置小步说明+「品牌失败不降级为非白标导出」诚实语义注记） |
 
-- [ ] Subtask 4.1: 🔴 红 — 循环 A/B/C 失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 常量+服务+v1.1.0 编排最小实现
-- [ ] Subtask 4.3: 🔄 重构 — 校验/组装收口+docstring
-- [ ] Subtask 4.4: 🟡 变异 — 突变实证五锚（预设 hex 改值 → 值级断言红；校验顺序换[先 L4 后校验] → L4 零调用断言红；logo 保留语义删[无 logo 再存清空] → 保留断言红；metadata 品牌键漏写 → 两键断言红；brand 参错传 None → 双参调用锚红——还原全绿）
+- [x] Subtask 4.1: 🔴 红 — 循环 A/B/C 失败测试
+- [x] Subtask 4.2: 🟢 绿 — 常量+服务+v1.1.0 编排最小实现
+- [x] Subtask 4.3: 🔄 重构 — 校验/组装收口+docstring
+- [x] Subtask 4.4: 🟡 变异 — 突变实证五锚（预设 hex 改值 → 值级断言红；校验顺序换[先 L4 后校验] → L4 零调用断言红；logo 保留语义删[无 logo 再存清空] → 保留断言红；metadata 品牌键漏写 → 两键断言红；brand 参错传 None → 双参调用锚红——还原全绿）
 
 **完成标准/Definition of Done:**
 - [ ] 常量+服务+v1.1.0 编排实现完成（预设 hex 与 Task 0.2 冻结逐字一致）
@@ -601,10 +603,10 @@
 | 🟢 绿 | 实现（add_argument[default=None metavar=TEMPLATE_NAME help 品牌模板名]+分发透传+`_print_report_summary` 品牌增量行[`品牌模板: {name}（已应用）`——brand 参在场时]+组合守卫 post-parse 检测） |
 | 🔄 重构 | 参数 help 文案（与 6-5b --format help 风格对齐——含 Story 注记） |
 
-- [ ] Subtask 5.1: 🔴 红 — 循环 A/B/C 失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 双用例+组合根+两新命令+扩展参数最小实现
-- [ ] Subtask 5.3: 🔄 重构 — CLI 输出/注释措辞收口
-- [ ] Subtask 5.4: 🟡 变异 — 突变实证四锚（组合守卫删除断言侧 → markdown+brand 组合直通红；透传漏传 brand 参 → 参数锚红；choices 语义错改枚举 → 自由名格红；版本漏升 v1.1.0 → 契约断言红[Task 7 预跑]——还原全绿）
+- [x] Subtask 5.1: 🔴 红 — 循环 A/B/C 失败测试
+- [x] Subtask 5.2: 🟢 绿 — 双用例+组合根+两新命令+扩展参数最小实现
+- [x] Subtask 5.3: 🔄 重构 — CLI 输出/注释措辞收口
+- [x] Subtask 5.4: 🟡 变异 — 突变实证四锚（组合守卫删除断言侧 → markdown+brand 组合直通红；透传漏传 brand 参 → 参数锚红；choices 语义错改枚举 → 自由名格红；版本漏升 v1.1.0 → 契约断言红[Task 7 预跑]——还原全绿）
 
 **完成标准/Definition of Done:**
 - [ ] 双用例+4 注册块+两新命令+扩展参数实现完成（17 命令族→19——加法闭合）
@@ -630,12 +632,12 @@
 
 #### 6-10 回归面义务清单（逐项勾选——预期演进信号兑现非删除）
 
-- [ ] 6.1: `consultant_view.py` 三处 docstring 注记勘误（触发器兑现+v1.1.0 语义）
-- [ ] 6.2: CLI 提示行更新：agent_cli.py:1806 `提示: 品牌模板配置归 Story 6-11（白标报告基础）` → `提示: 执行 brand-template-save 配置品牌模板`（:1820 导出提示行**不动**——最小面裁定）+**CLI 品牌显示块三值改派生[R3 补位]**：:1800-1804 consultant-view 显示行「Logo: 默认 | 配色: 默认」两段硬编码改 BrandSection 派生值[logo_status/color_scheme_status 直引]——v1.1.0 后 configured 态「已配置+默认」并存自相矛盾（6-10 交付呈现面语义破损）
-- [ ] 6.3: 6-10 单测更新：`_build_brand` 行为断言改三形态 Mock（6-10 原断言「与常量恒等」→ 零模板形态保留恒等+两新形态）
-- [ ] 6.4: 6-10 验收 S3 前置更新：品牌模板表零行清点（有行 pytest.skip——共享库背景残留防御；断言本体零改动）
-- [ ] 6.5: 6-10 CLI 单测/验收提示行断言联动更新（「归 Story 6-11」→ 新文案 in lines）+品牌显示块断言联动（6.2 派生改造对应行）
-- [ ] 6.6: 组合根 consultant_view lambda 两依赖→三依赖+契约测试 getsource 注入链锚更新（增 `'"brand_template_repository"'` 字面量锚）+**版本断言拆分**（test_port_contract_consultant_view.py:30-33 PORT_NAMES 两名循环——service 期望 v1.1.0/use_case 维持 v1.0.0，机械改断言值会致 use_case 假红）
+- [x] 6.1: `consultant_view.py` 三处 docstring 注记勘误（触发器兑现+v1.1.0 语义）
+- [x] 6.2: CLI 提示行更新：agent_cli.py:1806 `提示: 品牌模板配置归 Story 6-11（白标报告基础）` → `提示: 执行 brand-template-save 配置品牌模板`（:1820 导出提示行**不动**——最小面裁定）+**CLI 品牌显示块三值改派生[R3 补位]**：:1800-1804 consultant-view 显示行「Logo: 默认 | 配色: 默认」两段硬编码改 BrandSection 派生值[logo_status/color_scheme_status 直引]——v1.1.0 后 configured 态「已配置+默认」并存自相矛盾（6-10 交付呈现面语义破损）
+- [x] 6.3: 6-10 单测更新：`_build_brand` 行为断言改三形态 Mock（6-10 原断言「与常量恒等」→ 零模板形态保留恒等+两新形态）
+- [x] 6.4: 6-10 验收 S3 前置更新：品牌模板表零行清点（有行 pytest.skip——共享库背景残留防御；断言本体零改动）
+- [x] 6.5: 6-10 CLI 单测/验收提示行断言联动更新（「归 Story 6-11」→ 新文案 in lines）+品牌显示块断言联动（6.2 派生改造对应行）
+- [x] 6.6: 组合根 consultant_view lambda 两依赖→三依赖+契约测试 getsource 注入链锚更新（增 `'"brand_template_repository"'` 字面量锚）+**版本断言拆分**（test_port_contract_consultant_view.py:30-33 PORT_NAMES 两名循环——service 期望 v1.1.0/use_case 维持 v1.0.0，机械改断言值会致 use_case 假红）
 
 **完成标准/Definition of Done:**
 - [ ] v1.1.0 品牌段三形态全绿+6-10 三文件（ports/service 单测/CLI 单测/验收）回归更新后全绿
@@ -650,10 +652,10 @@
 
 > **性质说明：** 端口契约测试+三处版本升级断言+事件冻结计数复跑+6-5b/6-10 冻结面全量回归——本 Task 不新增生产码。
 
-- [ ] Subtask 7.1: 补全 `tests/contracts/test_port_contract_white_label_report.py`（Task 5 骨架两断言外补全五断言族全量：4 新注册名 registered+spec 元数据[版本/lifetime/owner/tags 含 brand]+interface is 具体类+lambda getsource 注入链[依赖注册名带引号字面量锚]+resolve 可达 isinstance 注入链非 None+方法签名键集[save_brand_template 四参 keyword-only/get_render_spec 单参]）
-- [ ] Subtask 7.2: 版本升级断言（pdf_renderer/pdf_report_generation_service/consultant_view_service spec.version=="v1.1.0"+compatibility 元组含 "v1.0.0"——**既有契约测试必须更新仅 test_port_contract_consultant_view.py:33 一处**[版本等值断言唯一所在，拆分 service v1.1.0/use_case v1.0.0]；test_port_contract_pdf_report.py 仅 `startswith("v")` 无等值断言——**pdf 系两处等值断言（pdf_renderer/pdf_report_generation_service v1.1.0）落本 Story 新契约文件承载**[R2 钉死：既有 pdf 契约测试不改]；SERVICE_INJECTION_DEPENDENCIES 可选增列 brand_template_service 成十依赖[防「九依赖」注释漂移，非红面]）
-- [ ] Subtask 7.3: 事件冻结复跑（三处 `_FROZEN_EVENT_COUNT=56` 契约测试零修改全绿+event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 证据）
-- [ ] Subtask 7.4: 全量回归（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——显式四目录；6-5a/6-5b/6-8/6-9/6-10 五 Story 验收文件零失败）
+- [x] Subtask 7.1: 补全 `tests/contracts/test_port_contract_white_label_report.py`（Task 5 骨架两断言外补全五断言族全量：4 新注册名 registered+spec 元数据[版本/lifetime/owner/tags 含 brand]+interface is 具体类+lambda getsource 注入链[依赖注册名带引号字面量锚]+resolve 可达 isinstance 注入链非 None+方法签名键集[save_brand_template 四参 keyword-only/get_render_spec 单参]）
+- [x] Subtask 7.2: 版本升级断言（pdf_renderer/pdf_report_generation_service/consultant_view_service spec.version=="v1.1.0"+compatibility 元组含 "v1.0.0"——**既有契约测试必须更新仅 test_port_contract_consultant_view.py:33 一处**[版本等值断言唯一所在，拆分 service v1.1.0/use_case v1.0.0]；test_port_contract_pdf_report.py 仅 `startswith("v")` 无等值断言——**pdf 系两处等值断言（pdf_renderer/pdf_report_generation_service v1.1.0）落本 Story 新契约文件承载**[R2 钉死：既有 pdf 契约测试不改]；SERVICE_INJECTION_DEPENDENCIES 可选增列 brand_template_service 成十依赖[防「九依赖」注释漂移，非红面]）
+- [x] Subtask 7.3: 事件冻结复跑（三处 `_FROZEN_EVENT_COUNT=56` 契约测试零修改全绿+event_channels.yaml/DEFAULT_MAPPINGS 零 diff git 证据）
+- [x] Subtask 7.4: 全量回归（`SISYS_USE_TEST_PORTS=1 poetry run pytest tests/unit tests/integration tests/contracts tests/acceptance`——显式四目录；6-5a/6-5b/6-8/6-9/6-10 五 Story 验收文件零失败）
 
 **完成标准/Definition of Done:**
 - [ ] 契约测试五断言族全绿+三处版本断言绿
@@ -676,10 +678,10 @@
 | 🟢 绿 | 步骤实现（真实服务三件套直调+TestTenant 模板名前缀+**多模板行预置显式 updated_at 构造**[单 now 基准+微秒偏移——同事务 server_default now() 恒值致排序退化]+**teardown 顺序钦定：L4 对象清理先行、PG 行清理后行**[行清理 rowcount 断言 assert-raise 中断会跳过后续对象清理——防孤儿泄漏]+teardown 定向 DELETE rowcount 断言；**动态跳过**：PG/MinIO 不可用 pytest.skip） |
 | 🔄 重构 | 场景 docstring（口径差声明三段落+背景行免疫注记） |
 
-- [ ] Subtask 8.1: 🔴 红 — 五场景失败测试
-- [ ] Subtask 8.2: 🟢 绿 — 步骤实现+清理链
-- [ ] Subtask 8.3: 🔄 重构 — docstring+口径注记
-- [ ] Subtask 8.4: 🟡 变异 — 端到端突变 1 锚（品牌导出链 brand 参丢弃[服务透传改 None] → 场景③④红——证明端到端断言活着）
+- [x] Subtask 8.1: 🔴 红 — 五场景失败测试
+- [x] Subtask 8.2: 🟢 绿 — 步骤实现+清理链
+- [x] Subtask 8.3: 🔄 重构 — docstring+口径注记
+- [x] Subtask 8.4: 🟡 变异 — 端到端突变 1 锚（品牌导出链 brand 参丢弃[服务透传改 None] → 场景③④红——证明端到端断言活着）
 
 **完成标准/Definition of Done:**
 - [ ] 五场景全绿（真实 PG+MinIO+渲染）
@@ -696,10 +698,10 @@
 
 #### 架构验证测试实现（四验证器——`test_analyst_view.py` 直系样板+6-8 白名单变体）
 
-- [ ] Subtask 9.1: 创建 `tests/unit/architecture/test_white_label_report.py`（验证器 A 落位[domain 实体/ports 文件 AST ClassDef 含 BrandTemplate/两 Port/BrandRenderSpec+常量 AST 断言]；验证器 B 零 publish[服务源码 token 扫描+DomainEvent 子类全集对比]；**验证器 C 白名单形态[R3 修正·R5 计数勘误]——白名单=三层全量合法 brand 词族新文件集 8 个**{domain: entities/brand_template.py+ports/brand_template_repository.py；application: ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+use_cases/list_brand_templates.py；infra: models/brand_template.py+repository/brand_template_repository.py}+fonts 目录（资产文件名无 brand 词族不入集）+渲染器[修改既有单列]——**集合等值比较（==）双向判别**[漏列红+多列红——`<=` 子集比较多列静默无判别]；[与 6-9/6-10 零命中形态分立注记——本 Story 非「纯三零」]；验证器 D CLI 接线[两新命令 add_parser 锚+report-generate 扩展参数锚+组合根注册锚+resolve 注入链]；SERVICE_ALLOWED_PREFIXES+FORBIDDEN_IMPORTS 照设）
-- [ ] Subtask 9.2: 开发结束验收场景（S14 收尾：`_COMPLETION_SRC_FILES`[**新建 9+扩展 11**=20 个 src 文件——▲11 含 domain/exceptions/__init__.py+use_cases/generate_pdf_report.py；migration 018 单独清单项]/`_COMPLETION_TEST_FILES` 逐项 `path.is_file()` 断言——6-10 :104-123/:1233-1246 直系）
-- [ ] Subtask 9.3: 全套复跑（14 场景全绿[S1~S13 功能/性能+S14 收尾]+四目录全量+`ruff`+`mypy`+覆盖率报告）
-- [ ] Subtask 9.4: deferred-work 处置注记落档（Task 0.7 表回写+新增观察面登记评估[若实施中发现]）
+- [x] Subtask 9.1: 创建 `tests/unit/architecture/test_white_label_report.py`（验证器 A 落位[domain 实体/ports 文件 AST ClassDef 含 BrandTemplate/两 Port/BrandRenderSpec+常量 AST 断言]；验证器 B 零 publish[服务源码 token 扫描+DomainEvent 子类全集对比]；**验证器 C 白名单形态[R3 修正·R5 计数勘误]——白名单=三层全量合法 brand 词族新文件集 8 个**{domain: entities/brand_template.py+ports/brand_template_repository.py；application: ports/brand_template.py+services/brand_template_service.py+use_cases/save_brand_template.py+use_cases/list_brand_templates.py；infra: models/brand_template.py+repository/brand_template_repository.py}+fonts 目录（资产文件名无 brand 词族不入集）+渲染器[修改既有单列]——**集合等值比较（==）双向判别**[漏列红+多列红——`<=` 子集比较多列静默无判别]；[与 6-9/6-10 零命中形态分立注记——本 Story 非「纯三零」]；验证器 D CLI 接线[两新命令 add_parser 锚+report-generate 扩展参数锚+组合根注册锚+resolve 注入链]；SERVICE_ALLOWED_PREFIXES+FORBIDDEN_IMPORTS 照设）
+- [x] Subtask 9.2: 开发结束验收场景（S14 收尾：`_COMPLETION_SRC_FILES`[**新建 9+扩展 12**=21 个 src 文件——▲12 含 domain/exceptions/__init__.py+use_cases/generate_pdf_report.py+interfaces/api/exception_handlers.py[R1 代码审查勘误：原「9+11=20」漏列 exception_handlers.py——AC-7 HTTP_MAP 注册义务的正确交付件]；migration 018 单独清单项]/`_COMPLETION_TEST_FILES` 逐项 `path.is_file()` 断言——6-10 :104-123/:1233-1246 直系）
+- [x] Subtask 9.3: 全套复跑（14 场景全绿[S1~S13 功能/性能+S14 收尾]+四目录全量+`ruff`+`mypy`+覆盖率报告）
+- [x] Subtask 9.4: deferred-work 处置注记落档（Task 0.7 表回写+新增观察面登记评估[若实施中发现]）
 
 **完成标准/Definition of Done:**
 - [ ] 架构四验证器全绿（白名单集精确）
@@ -770,6 +772,7 @@ src/
 │   └── reporting/
 │       ├── fonts/NotoSansSC[-Regular].ttf                  ★ 新建（OFL 字体资产——文件名随渠道二择：直用 NotoSansSC[wght].ttf 或 instancer 静态实例化命名[Task 3.2 钦定后 S14 清单同步]）
 │       └── reportlab_pdf_renderer.py                       ▲ 品牌应用三件+TTFont 注册（Task 3）
+├── interfaces/api/exception_handlers.py                     ▲ HTTP_MAP 494/495 两行（Task 1——▲ 第 12 个扩展文件[R1 代码审查勘误补列]）
 ├── entrypoints/agent_cli.py                                ▲ 两新命令+report-generate 扩展（Task 5/6）
 └── composition_root.py                                     ▲ 4 新注册块+3 版本升级（Task 5/6）
 
@@ -786,11 +789,16 @@ tests/
 │   │   ├── test_brand_template_service.py                  ★ 新建（Task 4）
 │   │   ├── test_pdf_report_generation_service.py           ▲ 品牌段扩展（Task 4）
 │   │   ├── test_consultant_view_service.py                 ▲ v1.1.0 三形态更新（Task 6——6-10 文件）
-│   │   └── use_cases/test_save_brand_template.py+test_list_brand_templates.py ★ 新建（Task 5）
+│   │   └── use_cases/
+│   │       ├── test_save_brand_template.py+test_list_brand_templates.py ★ 新建（Task 5）
+│   │       └── test_generate_pdf_report_use_case.py        ▲ 品牌透传三用例（Task 5——6-5b 文件[R1 勘误补列]）
+│   ├── infrastructure/reporting/test_reportlab_pdf_renderer.py ▲ :282 carve out 一行机械适配（Task 3——6-5b 文件[R1 勘误补列]）
 │   ├── interfaces/cli/test_agent_cli.py                    ▲ 三命令段扩展（Task 5/6）
+│   ├── interfaces/api/test_exception_handlers.py           ▲ HTTP_MAP expected 集合同步（Task 1[R1 勘误补列]）
 │   └── architecture/test_white_label_report.py             ★ 新建（Task 9——epics 钦定名采纳）
 ├── integration/test_integration_white_label_report.py      ★ 新建（Task 8，OD-9 偏离声明）
 ├── contracts/test_port_contract_white_label_report.py      ★ 新建（Task 7；三处既有版本断言更新）
+├── contracts/test_port_contract_consultant_view.py         ▲ 版本拆分+三依赖锚（Task 6——6-10 文件[R1 勘误补列]）
 └── acceptance/
     ├── test_acceptance_white_label_report.feature/.py      ★ 新建（Task 0/9，R6 模板）
     └── test_acceptance_consultant_view.py                  ▲ S3 skip 门+提示行断言更新（Task 6——6-10 文件）
@@ -971,6 +979,27 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 | S8（模板不存在）+S9（组合守卫） | report-generate 既有命令+`--brand-template` 未注册 → argparse unrecognized arguments **exit 2**（纯参数面；S8 若 Given 有预置步骤则预置 import 先触发 ImportError——实施时按 Given 设计二择其一并在符号表钉死；**绿形态注记[R3]**：get_render_spec 前置于聚合查询——S8 免 BLM 预置直达 494[message 含模板名]，后置实现则裸 plan 先撞 490 场景结构性红） |
 | S14（收尾清单） | `_COMPLETION_SRC_FILES` 文件不存在 AssertionError（6-10 S12 形态直系） |
 
+#### Task 0 实施记录（dev-story 2026-11-08）
+
+- **锚点复核（Subtask 0.8）**：基准 9258b36d → HEAD c6f87227 间 5 笔提交全部 docs-only（story+sprint-status 两文件）——`git diff --name-only` 非 md/yaml 零命中，**代码锚点零漂移**；四视角调研 Agent（渲染链/存储链+组合根/CLI+契约/6-10 联动+验收模板）独立复核一致。
+- **TTF 资产钦定落档（Subtask 0.2 补充）**：外网（raw.githubusercontent.com/jsdelivr）连接重置不可达；改用本地官方分发物 `/mnt/c/Windows/Fonts/NotoSansSC-VF.ttf`（Google 官方 Noto Sans SC variable TTF，17,773,244 字节，sfnt 0x00010000 TrueType glyf 非 CFF，SIL OFL 1.1 许可允许再分发嵌入）——**双验证亲测通过**：①`pdfmetrics.registerFont(TTFont("NotoSansSC", path))` 成功；②中文渲染正常（pypdf 提取「战略规划品牌白标测试：石黑茶」完整）；放置 `src/infrastructure/reporting/fonts/NotoSansSC-VF.ttf`，sha256=`763146584cf0710223441356b4395e279021b0806c196614377a7a0174ae074a`（渲染器文件头 docstring 登记义务 Task 3 承载）。fontTools 非项目依赖（pypi 镜像可达但零新依赖纪律）→ instancer 静态实例化路线排除，钦定 variable TTF 直用（默认实例 Regular wght 400）；文件名保留 `-VF` 后缀（诚实标注 variable 形态——S14 清单与渲染器 docstring 同步该名）。
+- **红阶段验证（Subtask 0.5 DoD）**：14 场景全红（14 failed in 22s，服务四件全部在位零 skip）；红形态三型实测与符号表吻合——S1 `exit=2 stderr=usage: sisys-agent ... invalid choice: 'brand-template-save'` → exit_code 断言 AssertionError；S2 `ModuleNotFoundError: No module named 'src.application.ports.brand_template'`（Given 延迟 import 触发）；S14 `AssertionError: src 交付件缺失[品牌模板实体]`。
+- **Given 设计钉死（符号表 S8 二择+S7 补注）**：S8 Given 设计为零预置（免 BLM 预置——绿形态 get_render_spec 前置直达 494 承载 R3 裁定），红形态=unrecognized arguments exit 2（与 S9 同机理）；S7 Given 钦定「BLM 完成+品牌模板已保存」组合形态（库有模板但未指定品牌导出=默认态——与 S6 对照腿语义互补；红锚由模板预置的 ImportError 触发）；S12 复用 S5 同文本 Given（pytest-bdd 同文本单绑定纪律——重复绑定已排除）。
+- **_COMPLETION_TEST_FILES 计数钉死**：16 项（12 新建+4 扩展——扩展含 6-10 三测试文件族与 6-5b pdf 服务单测）。**[R1 代码审查勘误：实交 21 项（12 新建+9 扩展）——漏列 5 个扩展文件：test_generate_pdf_report_use_case/test_reportlab_pdf_renderer/test_port_contract_consultant_view/test_exception_handlers/test_report_exceptions；S14 清单与结构图测试树已同步补列]**
+- **deferred-work 处置（Subtask 0.7）**：13 条义务覆盖 14 个物理行全部追加注记落档（L129 六轮+分支消费注销/L13 第四轮/L17 第八轮/L107 不触发/L117+L170 顺延 Epic 8/L127 第五轮/L369+L370 顺延 Epic 7/L395 维持/L396 维持+兑现核对/L402+L403 第四连/L409 注记追加）——行数守恒 409 行。
+
+#### Task 1~9 实施记录（dev-story 2026-11-08）
+
+- **Task 1 领域层**：BrandTemplate 实体（7 字段+242 守卫负例全枚举[frozen/空名/超长/边界恰值]）+BrandTemplateRepositoryProtocol 三方法+494/495 两异常（BusinessException 族：494 七形态伞形[构造器 field 必参+context_extra 合并]、495 layer 二元 {l2,l4}[与 491 {l0,l2} 分立——值域分立双向判别]）+六处注册义务全落（report_exceptions/_code_ranges 注释+_CLASS_TO_SUBDOMAIN/__init__ 导出/HTTP_MAP 494→400+495→500 显式/sisys-uni-exception-design.md §3.3.2/exception_handlers 测试 expected 集合同步）。变异①name 守卫停用→2 红；②494→496 码漂移→2 红。domain 全绿 3806 passed。
+- **Task 2 存储面**：018 migration（revision 018→017+UNIQUE(name)[uq_brand_templates_name]+server_default now() 仅 INSERT 初值注记）+BrandTemplateModel（七列镜像+UniqueConstraint）+PostgreSQLBrandTemplateRepository（UPSERT：SELECT by template_id→UPDATE 四字段[三配置+updated_at]/无行 INSERT+IntegrityError→495 包装[UNIQUE 撞+NOT NULL 撞双路径]+双模式 fallback[直调 get_session 防呆纪律]+list 双序 ORDER BY updated_at DESC, name ASC）。dev 库（5432）与测试库（5433）双 stamp 017+upgrade head 应用。真实 PG 12 用例全绿。变异①UPSERT 恒 INSERT→1 红；②主序反转→1 红。
+- **Task 3 渲染面**：NotoSansSC-VF.ttf 资产入仓（sha256 登记+OFL 许可+来源注记在渲染器文件头）+BrandRenderSpec 7 键 VO（hex 242 守卫+必填构造契约）+render v1.1.0 keyword-only brand 参+渲染器三件（_FONT_REGISTERED 字典化+TTFont 注册通道[_TTF_FONT_FILES 映射]+五色参数化[_brand_color_or 默认回落]+platypus.Image logo[等比缩放宽≤40mm，BytesIO 传参——ImageReader 直传走文件名分支 TypeError 实证修正]）。:282 monkeypatch carve out 机械适配（False→{}）。默认态等价（invariant=1 byte 对照）绿+6-5b 渲染测试零修改复跑绿。变异四锚全红（fontName 参数化删/表头色恒原值/logo 流删/等价断言侧注入 spec）。
+- **Task 4 应用层**：预设常量（3 套×5 色+2 字体+呈现名单源 in ports/brand_template.py）+BrandTemplateService（save 编排钦定序[get_by_name→值域+name 预检→logo 校验→L4 store→构造→repo.save]+校验矩阵七格+get_render_spec[脏键 494 防御包装]+list tuple 化）+PdfReportGenerationService v1.1.0（第十依赖 brand_template_service 可选尾参+品牌前置小步[R3 钦定前置于聚合查询]+双参渲染[brand None 走单参——既有 side_effect 零破坏]+metadata 两键[template_id 经 list 精确匹配定位——端口三方法冻结的 O(n) 取舍注记]）。变异五锚全红（hex 值/校验顺序/保留语义/metadata 漏写/brand 错传 None）。
+- **Task 5 CLI+组合根**：双用例（SaveBrandTemplateUseCase 四参 keyword-only/ListBrandTemplatesUseCase 零参）+GeneratePdfReportUseCase execute 增 brand_template_name 透传（None 单参调用——既有用例零修改；注册零改动维持 v1.0.0）+CLI 19 命令族（brand-template-save[choices 三键+两键+--logo-path 可选]/brand-template-list[零参]/report-generate --brand-template[自由名+组合守卫 post-parse 在 UUID 守卫与 bootstrap 前——markdown 组合 494]）+品牌增量打印行+组合根 4 新注册（SCOPED 仓储 session_factory 注入+service SINGLETON[SINGLETON 捕获 SCOPED 注记]+双用例）+2 处升级（pdf_renderer/pdf_report_generation_service v1.1.0+compatibility 元组）。注释措辞纪律（新块零 --format/--plan-id 字样）+切块边界断言绿。组合根冒烟 6 端口版本+resolve 全过。变异三锚（组合守卫删/透传漏传/choices 错改）+变异④版本漏升归 Task 7 补做。
+- **Task 6 consultant_view v1.1.0 联动（五件同批原子落位）**：服务增 brand_template_repository 可选尾参第三依赖+_build_brand_section async 化三形态（零模板默认[与 6-10 恒值逐字相等]/有模板派生[configured True+呈现名——呈现名单源引用预设常量]/查询异常降级[degraded True 不抛——零 IO 恒稳承诺勘误]）+ports 三处 docstring 勘误+版本声明 v1.1.0×2+组合根 lambda 三依赖+compatibility+CLI 显示块三值派生改造（「Logo: 默认|配色: 默认」硬编码→BrandSection 派生值）+提示行「执行 brand-template-save 配置品牌模板」+6-10 回归面六项（docstring/提示行/单测三形态/S3 skip 门[品牌模板表零行清点+information_schema 表存在性探测——红阶段容错注记]/CLI 断言联动×2 文件/契约拆分[service v1.1.0+use_case v1.0.0+getsource 三依赖锚]）。变异：三依赖漏注入→契约 2 红。6-10 验收 12 passed+6-10 单测全绿。
+- **Task 7 契约守护**：test_port_contract_white_label_report.py 九用例五断言族（4 新注册 spec 元数据+interface is 具体类+lambda getsource 注入链+resolve isinstance+方法签名[save 四参 keyword-only 恰形态]）+三处版本升级等值断言（v1.1.0+compatibility——pdf 系两处落新文件钉死）+pdf_use_case 注册零改动 v1.0.0+pdf 服务 lambda 十依赖锚。事件冻结：三处 56 计数复跑+event_channels.yaml/events 零 diff git 证据。变异④补做：pdf_renderer 版本改 v1.0.0→契约断言红→还原绿。
+- **Task 8 集成五场景**：真实链（独立引擎+共享 default 桶[对象键锚 template_id 定位]+自愈建桶[勿带 object_lock]+多行预置显式 updated_at[单 now 基准+微秒偏移]+teardown 顺序钦定[L4 对象先行 PG 行后行+brand 行 rowcount 断言殿后]）——①保存主链[PG 行七字段+L4 逐字节]②UPSERT 修订[template_id 稳定+updated_at 前进点名断言]③白标导出端到端[metadata 品牌两键+WORM 对象键通道]④品牌准确四件套[字体资源 NotoSansSC+首页 Image XObject+双色 fp_str+对照腿零图像零品牌色]⑤性能双段[保存 20 轮 P95<200ms+导出 20 轮 P95<60s+L2 行数累计 20]。实施攻坚两留痕：pytest-asyncio auto 模式下探测协程化（自建 loop→RuntimeError 双循环冲突）；每测试三清（SINGLETON 缓存绑定旧 loop→InterfaceError——驱逐后 resolve 惰性重建）。变异：use case brand 参丢弃→场景③④双红→还原绿。
+- **Task 9 架构+收尾**：四验证器（A 落位[八文件+VO/端口/常量 AST+domain 零第三方+服务/用例白名单方向]/B 零 publish[+DomainEvent 子类全集 AST 比对]/C 白名单形态[三层全量 8 .py 集合等值==双向判别+fonts 目录单列+渲染器三件运行面锚]/D CLI 接线[缩进敏感 add_parser 锚+--brand-template 参数+四注册+三升级块 v1.1.0+compatibility]）。14 验收场景全绿（S1~S13+S14 收尾——S8 补「exit code 为 1」独立步骤绑定）。新增文件覆盖率：service 98%+repo 96%+实体/VO 100%（补异常分支用例：L4 store 495/save 协议外 495/495 透传/三方法无 factory RuntimeError）。四目录全量两轮：第一轮 15452 passed+2 预存抖动[analyst_view Redis 跨循环+checkpoint_snapshot Qdrant 最终一致——均与 6-11 无因果面，隔离复跑+单场景双跑+整文件复跑三重绿定谳]。
+
 ### 完成清单 Completion Notes List
 
 - [x] 故事需求从 `epics_v1.0.md` L2518-2561 提取（AC 三要素+性能三项+测试文件名钦定逐行对账）
@@ -978,32 +1007,34 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - [x] 前一个故事学习经验整合（6-10 对接锚+6-5b 渲染链双直系）
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成（四冻结面[双 VO 键契约含构造契约/预设 3 套×5 色+2 字体/端口+018 DDL/CLI 参数]+14 OD 裁定+14 场景）
-- [x] 项目结构对齐统一规范（新建 9+扩展 11+migration 018——白名单形态）
+- [x] 项目结构对齐统一规范（新建 9+扩展 12+migration 018——白名单形态[R1 代码审查勘误：11→12 补列 interfaces/api/exception_handlers.py]）
 
 ### 文件清单 File List
 
-**创建的文件/Created Files:**
+**创建的文件/Created Files（dev-story 实施交付）：**
 - `_bmad-output/implementation-artifacts/stories/6-11-white-label-report-basic.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
 - `src/domain/entities/brand_template.py` + `src/domain/ports/brand_template_repository.py` - 实体+R1 端口
 - `src/application/ports/brand_template.py` + `src/application/services/brand_template_service.py` - 预设+R2 服务
 - `src/application/use_cases/save_brand_template.py` + `list_brand_templates.py` - 双用例
 - `src/infrastructure/storage/postgresql/models/brand_template.py` + `repository/brand_template_repository.py` - 存储双件
-- `src/infrastructure/reporting/fonts/NotoSansSC[-Regular].ttf` - 字体资产（OFL——文件名随渠道二择：variable TTF 直存或 instancer 实例化命名，Task 3.2 钦定后 S14 清单同步）
-- `deploy/postgresql/alembic/versions/018_brand_templates.py` - migration
+- `src/infrastructure/reporting/fonts/NotoSansSC-VF.ttf` - 字体资产（variable TTF 直用钦定——sha256=76314658...ae074a，OFL 1.1）
+- `deploy/postgresql/alembic/versions/018_brand_templates.py` - migration（dev 5432+测试 5433 双库已应用）
 - unit 7 个新测试文件：`tests/unit/domain/entities/test_brand_template.py` + `tests/unit/infrastructure/storage/test_brand_template_repository.py` + `tests/unit/infrastructure/reporting/test_reportlab_pdf_renderer_brand.py` + `tests/unit/application/test_brand_template_presets.py` + `test_brand_template_service.py` + `tests/unit/application/use_cases/test_save_brand_template.py` + `test_list_brand_templates.py`
 - unit/architecture 1+integration 1+contracts 1+acceptance 2：`tests/unit/architecture/test_white_label_report.py` + `tests/integration/test_integration_white_label_report.py` + `tests/contracts/test_port_contract_white_label_report.py` + `tests/acceptance/test_acceptance_white_label_report.feature/.py`（合计 **12 个测试新文件**）
 
-**待修改的文件/To Be Modified（src 扩展 11 文件+6-10 三测试文件+migration 外 2 文档/台账）:**
+**修改的文件/Modified Files（src 扩展 12+6-10/6-5b 测试文件+文档台账——[R1 代码审查勘误：11→12 补列 exception_handlers.py；测试扩展实为 9 文件]）：**
 - `src/domain/exceptions/report_exceptions.py`+`_code_ranges.py`+`__init__.py` - 494/495
-- `src/application/use_cases/generate_pdf_report.py` - execute 增 brand_template_name 透传（R3 补位——传递链中间件；R5 归类勘误：6-5b 已交付文件的修改非新建）
-- `src/application/ports/pdf_report.py`+`services/pdf_report_generation_service.py` - v1.1.0 双演进
-- `src/application/ports/consultant_view.py`+`services/consultant_view_service.py` - v1.1.0 联动
-- `src/infrastructure/reporting/reportlab_pdf_renderer.py` - 品牌三件
-- `src/entrypoints/agent_cli.py`+`src/composition_root.py` - CLI+注册
-- 6-10 三测试文件（S3 skip 门+提示行断言+服务单测三形态）
-- `_bmad-output/implementation-artifacts/deferred-work.md`+`docs/architecture/sisys-uni-exception-design.md` - 台账与编码表
+- `src/application/use_cases/generate_pdf_report.py` - execute 增 brand_template_name 透传（None 单参调用零破坏）
+- `src/application/ports/pdf_report.py`+`services/pdf_report_generation_service.py` - v1.1.0 双演进（BrandRenderSpec+render 双参+品牌前置小步+metadata 两键）
+- `src/application/ports/consultant_view.py`+`services/consultant_view_service.py` - v1.1.0 联动（三处 docstring 勘误+三依赖+品牌段三形态）
+- `src/infrastructure/reporting/reportlab_pdf_renderer.py` - 品牌三件（TTFont 通道+五色参数化+platypus.Image+哨兵字典化+字体资产 docstring 登记）
+- `src/interfaces/api/exception_handlers.py` - HTTP_MAP 494→400+495→500 两行（AC-7 注册义务——[R1 勘误补列]）
+- `src/entrypoints/agent_cli.py`+`src/composition_root.py` - CLI 两新命令+--brand-template 扩展+组合守卫+4 新注册+3 处 v1.1.0 升级
+- 6-10 测试文件：`tests/unit/application/test_consultant_view_service.py`（三形态+第三依赖工厂）+`tests/acceptance/test_acceptance_consultant_view.py`（S3 skip 门+提示行/显示块断言联动）
+- 6-5b 测试文件：`tests/unit/infrastructure/reporting/test_reportlab_pdf_renderer.py`（:282 monkeypatch carve out 一行机械适配）+`tests/unit/application/test_pdf_report_generation_service.py`（品牌编排四用例扩展）+`tests/unit/application/use_cases/test_generate_pdf_report_use_case.py`（品牌透传三用例）
+- `tests/unit/domain/exceptions/test_report_exceptions.py`（494/495 八项族承载——[R1 勘误补列]）
+- `tests/unit/interfaces/cli/test_agent_cli.py`（三命令段扩展+6-10 显示块断言联动）+`tests/contracts/test_port_contract_consultant_view.py`（版本拆分+三依赖锚）+`tests/unit/interfaces/api/test_exception_handlers.py`（HTTP_MAP expected 集合同步）
+- `_bmad-output/implementation-artifacts/deferred-work.md`+`docs/architecture/sisys-uni-exception-design.md` - 台账 14 行处置注记与 §3.3.2 编码表
 
 ---
 
@@ -1067,20 +1098,40 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** （待 dev-story 完成后）
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-11-09（Round 1——五轮循环第一轮）
+**审查模式:** full（盲审对抗 + 边界狩猎 + 验收审计 + 运行面实测四视角并行 + C3 双评审员方案评审）
 
 #### 需决策 Decision Needed
 
-- [ ] （待审查后落档）
+- （无——Round 1 零 decision_needed）
 
 #### 已修复 Patch
 
-- [ ] （待审查后落档）
+- [x] **R1-F1【P1】** 集成测试三保存路径测试缺 `_require_services` 门——未迁移 PG 环境 3 FAILED 假红（A1+A4 双源实证：UndefinedTableError 不含「不可用」子串永不命中兜底 skip）→ 三测试 try 内首句补门（对齐 :666/:711/:807 惯例，兜底保留）；修复后未迁移环境实测 6 skipped [tests/integration/test_integration_white_label_report.py]
+- [x] **R1-F2【P2】** 495「PG 读写失败」契约面虚设——读路径永不产生 495 且 CLI 单测 stub 绿证了不可达行为（A1+A2 双源）→ **仓储层单点包装**（`_do_get_by_name`/`_do_list` 协议外异常兜底→495 layer=l2，`except BrandTemplateStorageError: raise` 再抛守卫）——契约三处冻结「读写」+`_persist`「防御义务归仓储」同位+全部消费方单点受益（服务三读位/pdf 品牌块/consultant_view 容错链）；impl+Protocol docstring Raises 同步；包装单测两格（with_session 注入 OperationalError——code/layer/cause 三锚）；C3 裁定：仓储层 vs 服务层四问全支持仓储层 [src/infrastructure/.../brand_template_repository.py + src/domain/ports/brand_template_repository.py]
+- [x] **R1-F3【P2】** validate_logo_file getsize/open 无 OSError 守卫——权限不可读形态裸逃「伞形」承诺（A2）→ except OSError → 494「不可读」（真实语义链红在 open 位——stat 只需父目录 +x；chmod-000 主格+geteuid==0 动态 skip+monkeypatch getsize TOCTOU 补充格）[src/application/ports/brand_template.py]
+- [x] **R1-F5【P3】** 孤儿 logo 补偿窗口——store 成功后 repo.save 失败新写键永久孤儿（A1+A2 双源）→ **本次新写键 best-effort 补偿 delete**（条件 `object_key != existing_logo_key`——首存/修订无既有 logo 两形态自动覆盖；修订既有键不补偿[删除即丢 PG 行引用的 logo]；补偿失败 logger.warning 不掩盖原始异常——Saga 补偿形态 C3 裁定不违红线）；补偿五格单测（双分支 kwargs 锚/朴素条件判别锚/不掩盖锚）[src/application/services/brand_template_service.py]
+- [x] **R1-F6【P3】** Logo 像素维度无上限+magic 浅校验——实测 10×20000 PNG 渲染 LayoutError、9000×9000 渲染峰值 RSS 1.1GB（A2 实验实证）→ **保存期 PIL 惰性读头四重校验**（LOGO_MAX_DIMENSION=4000px——字节与像素正交守卫；UnidentifiedImageError→494 顺带根除「PNG magic+垃圾体」浅校验绕过；except 与 F3 分立消息两分）+假体 JPEG 正例改 Pillow 真生成（评审员②抓出的方案级必红遗漏——全仓唯一假体 JPEG）+6 新格（1×4001 超限/magic+垃圾体/4000 恰值边界/空文件/chmod-000/getsize）+494 触发面 B 案拓宽（七形态计数不变——「非合法可解码图像文件」「超限（字节/像素）」）三处冻结文字同步 [src/application/ports/brand_template.py + report_exceptions.py + _code_ranges.py]
+- [x] **R1-F7【P3】** 6-10 验收 S7/S8 无残留 skip 门（S3 有门——OD-13 防御不对称，A2）→ `_count_brand_rows` 上提模块级 `_skip_if_brand_templates_residual` helper（S3 改调用纯移动）+S7/S8 两 then 首部接入同门 [tests/acceptance/test_acceptance_consultant_view.py]
+- [x] **R1-F8【P3】** `statement: Any` 非必要类型放宽（A1，mypy 实验已证可删）→ 删注解+孤儿 Any import [brand_template_repository.py:215]
+- [x] **R1-F9【P3】** 测试死代码恒假三元（`if False else`）→ 收敛直调（grep 定位非行号——A1 行号锚点 :736-746 勘误为 :761，评审员①定谳）[test_pdf_report_generation_service.py]
+- [x] **R1-F10【P3】** 损坏 logo 负例恒真形态+TTF 幂等断言冒烟级（A1+A4）→ `pytest.raises(OSError)` 收窄（reportlab 4.5.1+Pillow 12 实测 UnidentifiedImageError⊂OSError——「解码失败族 vs 实现 bug」分立）+幂等双渲染补 byte 相等断言（invariant fixture 显式请求+`_FONT_REGISTERED` 置空隔离——防「跳过+跳过」空转）[test_reportlab_pdf_renderer_brand.py]
+- [x] **R1-F17①【P3】** AC-2 空文件负例缺格（A3）→ b"" 文件 → 494 格落 TestValidationMatrix [test_brand_template_service.py]
+- [x] **R1-F14/F15【P3 文档】** File List/S14/结构图三处 src 口径漏 exception_handlers.py（20→21 实为 9+12）+S14 测试清单「4 扩展」实为 9（16→21）+test_report_exceptions.py 连 File List 都未列（A3）→ 三处口径同修+S14 双清单补 6 条目（is_file 断言自动增强）+结构图 src 树补 interfaces/ 行（▲ 第 12 个）+测试树补 4 行+验收文件 6 处计数文案——台账历史行不改写（内联勘误标注）[Story + test_acceptance_white_label_report.py]
 
 #### 已推迟 Defer
 
-- [ ] （待审查后落档）
+- [x] **R1-D1【P2→defer】** CLI 裸跑不加载 .env——组合根引擎空密码连库 InvalidPasswordError（A4 定性：全 CLI 命令同构既有装配面，非 6-11 引入）→ **已有 6.8-R1-DF1 台账条目同根因**（python -m 形态 .env 失效三层根因 6-8 在档）——不重复登记，追加「6-11 代码审查 R1 第五连处置注记」（同链复现佐证：InvalidPasswordError 与 embedding 201 同根因两呈现；触发条件不变）
+- [x] **R1-D2【P3 维持】** 生产零建桶——OD-3⑦ 已显式裁定取舍（测试面自愈建桶），A2 复核维持留痕不动
+
+#### 记录组（不落码留痕）
+
+- A4 观察项：`brand-template-list` 非空态仍输出空态提示行（:1363 无条件打印+consultant-view 同款两处一致——与验收钉死行为一致，记录不改）
+- 弱断言四项维持：`test_single_argument_call_unchanged` 冒烟级/`with_logo` 透传恒真/验收 `assert COLOR_SCHEME_PRESETS and FONT_PRESETS` 近恒真/`created_at is not None` schema 恒真（无害）——记录在案
+- AC-6 skip 门构造格（「预置残留行→skip 触发」）：skip 门本体实测在位（S3/S7/S8 三场景），构造格留档载体替代理由（金字塔分布——清点 helper 逻辑三处共用已有在线验证）
+- AC-5 textColor 载体：产物内容流色值断言（:291-299）强于 `_style` spy 单元级断言——载体替代理由（A3 论证成立）
+- R1-F16 关闭：test_brand_template_presets.py ruff format 实测 already formatted（A3 发现在当前态不成立——可能为早期状态漂移，留痕）
+- 证伪留痕 40+ 条（四视角 Agent 报告在档：洗白嫌疑八文件全排除/UPSERT 三契约在位/组合根接线运行时亲验/冻结面 15 hex 零漂移/8 AC 全承载/勾选零虚报）
 
 ---
 
@@ -1088,15 +1139,15 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 
 - [x] Story created with `ready-for-dev` status
 - [x] 文档审查修订循环完成（R1-R5 五轮收敛 v1.4.0——零 P0/P1 残留，61 项修复全清偿）
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查（循环审查工作流五轮形态——参照 6-9/6-10 周期）
 - [ ] Epic 6 收尾：6-11 done 后运行 `retrospective`（epic-6-retrospective optional）
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-11-08
-**最后更新/Last Updated:** 2026-11-08
+**最后更新/Last Updated:** 2026-11-09
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（四 Agent 并行调研[报告导出与品牌对接面/品牌配置持久化模式/CLI 组合根契约验收模板/治理面与范围边界]+主会话亲验 20 组锚点；OD-1~OD-14 十四裁定；13 验收场景钉死[R4 注记：历史沿革记载——创建期口径，R1 起现行口径统一为 14 场景]；6-10 对接锚兑现义务清单六项）
 - v1.1.0: 文档审查 Round 1（D1 四视角调研[渲染链/持久化 L4/CLI 组合根/治理面]+D2 三视角审查[一致性计数/测试判别力/契约科学性]+主会话亲验三重实验——byte 等价 invariant 实证/排他实验/epics 亲验；P0×1+P1×8+P2×10+P3×18 修复 37 项全清偿：byte 等价 invariant 前置[reproducible builds 对标]/五色键口径统一/metadata 顶层两键/save 编排 get_by_name 先行/排序统一 updated_at/S6 钦定 noto/S2 钦定编程面/建桶自愈/契约版本断言拆分/共享桶口径/SRC 9+10/14 场景/494 七形态重枚举/切块三注记/构造契约必填/updated_at 责任位/轮次勘误/红锚条件化/variable TTF 渠道+18 项 P3；Docs Review Fixes 表 21 行落档）
@@ -1104,6 +1155,8 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - v1.3.0: 文档审查 Round 3（单深度推演四板块[14 场景三轴完备/模板生命周期六时间线/14 OD 交叉互证/Task 0→9 依赖干跑]——P1×1+P2×3+P3×6 修复 10 项全清偿+8 条证伪不成立疑点留痕：R3-1 GeneratePdfReportUseCase 传递链中间件四清单缺位[--brand-template CLI→use case→服务的必需环节——execute 增 keyword-only 透传+注册零改动维持 v1.0.0，五处补位 10→11 文件 19→20 项]/R3-2 导出侧资产全生命周期双不完整[BLM 八阶段预置链 6-5b :600-758 直系+strategic_reports/event_outbox/WORM PDF bypass_governance 三面清理——端口 delete 抛 ComplianceLockError 亲验]/R3-3 consultant_view 升级双写矛盾[lambda 先落服务两参 TypeError 破坏窗口→五件同批原子落 Task 6]/R3-4 验证器 C 白名单自矛盾[仅枚举 infra 自我误伤 domain/application 6 文件→三层全量 9 文件+集合等值双向判别]/六项 P3[name 前置预检防孤儿 logo/get_render_spec 前置钦定 S8 免预置直达 494/Pillow 生成可解码 Logo/OD-5 修订跨导出 MVP 接受注记/6-10 CLI 显示块 :1800-1804 三值派生改造/AC-1 UPSERT 载体声明]；台账 25→29 行）
 - v1.3.0（R4 纯验证轮·版本不递增）：五节全过零 ✗——修复存续双向取证[R3 十项 diff↔终态双在场+R1 五大（invariant 13 处/五色 17 处/两键/get_by_name 先行 10 处/updated_at 降序 9 处）+R2 四项终态存续]/计数终核[14 场景 16 处+20 src 文件三处+OD14/锚13/台账29/矩阵22 全覆盖+版本链四段]/外部锚点 40+ 组全中[含 :282 monkeypatch 布尔/generate_pdf_report :27 单参/ComplianceLockError/6-5b 清理链五组]/红线终扫[五词零命中+三笔提交零 AI 署名]/结构终验[15 hunk 无 Edit 误删+术语终扫全一致]；唯一注记项澄清：footer v1.0.0 沿革行「13 验收场景」历史记载内联注记（成本趋零应做）
 - v1.4.0: 文档审查 Round 5 独立终审收敛（六节取证全过——周期闭合[四笔提交链无游离+行数守恒 1090→1103]/关键修复双向取证 6/6[含 invariant 独立复现实验再证——默认态双渲染 byte 不等/invariant=1 下相等]/独立快扫 30+ 锚点全中/全量等效/台账 29 行+证伪 8 条在档零未核销/红线+状态判定[ready-for-dev 维持正确]；特权发现 2 项 P3 随收敛清偿：F-1 白名单计数 9↔8 勘误[枚举恰 8 个 .py——fonts 资产文件名无 brand 词族归目录单列]/F-2 File List generate_pdf_report.py 段落归类勘误[待创建→待修改段]；收敛声明入档见下节——**零 P0/P1/P2 残留，五轮周期收敛，可进 dev-story**）
+- v1.5.0: dev-story 实施完成 in-progress→review（Task 0~9 全勾：14/14 验收场景全绿+集成五场景 6 用例+四目录全量两轮 15452/15458 passed+2 skipped+2 预存抖动[analyst_view Redis 跨循环+checkpoint_snapshot Qdrant 最终一致——均与 6-11 零因果面，隔离复跑+单场景双跑+整文件复跑三重绿定谳，组内流量放大共享设施时序窗形态登记代码审查轮复核]+新增文件覆盖率 service 98%/仓储 96%/实体与 VO 100%+整体 91%+mypy 773 零错+ruff 全仓过+变异锚 14 处全实证[实体 2/仓储 2/渲染器 4/服务 5/CLI 3+Task7 补 1/集成 1]+三红线 grep 归零[ports helper 三处裸 ValueError 实施中自查发现并修复为 494 直抛]+:282 monkeypatch carve out 机械适配+deferred-work 14 行处置注记+TTF 资产入仓[外网不可达改本地官方分发物双验证];实施攻坚四留痕：pytest-bdd 同文本单绑定纪律/S8 补 exit code 为 1 独立步骤绑定/pytest-asyncio auto 模式探测协程化[自建 loop 双循环冲突]/每测试三清[SINGLETON 缓存绑定旧 loop→InterfaceError 驱逐重建]——详注见 Dev Agent Record Task 1~9 实施记录）
+- v1.6.0: 代码审查 Round 1（四视角并行调研[盲审对抗/边界狩猎/验收审计/运行面实测——双 Agent 独立命中 F2 读写契约虚设]+实测证据链[未迁移环境 3 FAILED 假红复现/畸形 logo RSS 1.1GB 实测/invariant 六断言/组合根 9 端口 resolve 亲验/CLI 真实链 UPSERT 探针]+C3 双评审员方案评审[测试判别力四缺口全采纳：_do_list 独立格/with_session 钦定形态/chmod-000 真链主格/假体 JPEG 必红遗漏/新写键判别锚]+落码 11 项[零 P0/P1×1+P2×2+P3×8]+defer 2+证伪留痕 40+：R1-F1 集成门三测补齐[未迁移环境 6 skipped 实测闭环]/R1-F2 仓储层 495 读路径单点包装[契约三处冻结兑现+ Raises docstring 同步+包装两格]/R1-F3 OSError 伞形守卫/R1-F5 孤儿 logo 新写键补偿[五格判别]/R1-F6 像素维度四重校验[4000px+PIL 深解析——RSS 实证+假体 JPEG 改真生成+494 触发面 B 案拓宽三处冻结文字]/R1-F7 S7/S8 skip 门补层[helper 上提三场景共用]/R1-F8 Any 删除/R1-F9 死代码/R1-F10 OSError 收窄+byte 幂等断言/R1-F17① 空文件格/R1-F14·15 计数勘误[20→21+16→21 三处口径+S14 双清单+结构图两树+验收 6 文案]；全绿证据：服务 31+仓储 17+渲染器/pdf 六文件 135+集成验收 32+验收白标 14 未迁移环境集成 6 skipped）
 
 ### 🏁 文档审查周期收敛声明（R1-R5 五轮独立终审 v1.4.0）
 

@@ -128,17 +128,56 @@ def _make_report_repo(
     return repo
 
 
+def _make_brand_repo(
+    *,
+    rows: tuple[Any, ...] = (),
+    error: Exception | None = None,
+) -> mock.AsyncMock:
+    """品牌模板仓储 Mock（spec=BrandTemplateRepositoryProtocol——6-11 v1.1.0 第三依赖）.
+
+    rows 返回序即行级 updated_at 降序契约（首行=最新模板——品牌段派生单源）。
+    """
+    from src.domain.ports.brand_template_repository import BrandTemplateRepositoryProtocol
+
+    repo = mock.AsyncMock(spec=BrandTemplateRepositoryProtocol)
+    if error is not None:
+        repo.list_templates.side_effect = error
+    else:
+        repo.list_templates.return_value = list(rows)
+    return repo
+
+
+def _make_brand_template(**overrides: Any) -> Any:
+    """品牌模板实体构造 helper（呈现名派生断言的期望独立构造源）."""
+    from src.domain.entities.brand_template import BrandTemplate
+
+    defaults: dict[str, Any] = {
+        "template_id": uuid_module.uuid4(),
+        "name": "test-品牌模板",
+        "color_scheme": "corporate-blue",
+        "font_preset": "noto-sans-sc",
+        "logo_object_key": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+    defaults.update(overrides)
+    return BrandTemplate(**defaults)
+
+
 def _make_service(
     *,
     archive_repo: mock.AsyncMock | None = None,
     report_repo: mock.AsyncMock | None = None,
+    brand_repo: mock.AsyncMock | None = None,
 ) -> Any:
-    """两依赖注入服务构造（keyword-only——ExecutiveViewService/AnalystViewService 同风格）."""
+    """三依赖注入服务构造（keyword-only——6-11 v1.1.0 增 brand_template_repository
+    第三依赖[可选尾参 None=旧两参装配兼容，品牌段走零模板默认态]）."""
     from src.application.services.consultant_view_service import ConsultantViewService
 
     return ConsultantViewService(
         archive_repository=archive_repo or _make_archive_repo(),
         report_repository=report_repo or _make_report_repo(),
+        brand_template_repository=brand_repo or _make_brand_repo(),
     )
 
 
@@ -184,7 +223,8 @@ class TestThreeSectionAggregation:
         assert view.build_degraded is False
 
     async def test_brand_section_constant_anchor(self) -> None:
-        """品牌段行为锚：返回值与品牌两常量恒等（V1 无配置面变异不可构造——行为断言足额 R1）."""
+        """品牌段行为锚（零模板形态）：五键与品牌两常量恒等——6-10 断言前提演进为
+        「零模板」（v1.1.0 读配置面激活后，6-10 交付断言在零模板前提下继续成立）."""
         from src.application.ports.consultant_view import BRAND_FONT_STATUS, BRAND_STATUS_UNCONFIGURED
 
         service = _make_service()
@@ -193,6 +233,56 @@ class TestThreeSectionAggregation:
         assert view.brand.color_scheme_status == BRAND_STATUS_UNCONFIGURED
         assert view.brand.font_status == BRAND_FONT_STATUS
         assert view.brand.degraded is False
+        assert view.brand.configured is False
+
+    async def test_brand_section_configured_true_from_latest_template(self) -> None:
+        """品牌段读配置形态（6-11 v1.1.0）：有模板→configured True+三状态呈现名
+        直推（最新行[list 首行=updated_at 降序仓储行序单源]+logo 在场已配置）."""
+        service = _make_service(
+            brand_repo=_make_brand_repo(
+                rows=(
+                    _make_brand_template(
+                        name="最新模板",
+                        color_scheme="corporate-blue",
+                        font_preset="noto-sans-sc",
+                        logo_object_key="logos/latest",
+                    ),
+                    _make_brand_template(name="旧模板", color_scheme="graphite", font_preset="stsong"),
+                )
+            )
+        )
+        view = await service.build_consultant_view()
+        assert view.brand.configured is True
+        assert view.brand.logo_status == "已配置"
+        assert view.brand.color_scheme_status == "商务蓝"
+        assert view.brand.font_status == "Noto Sans SC（黑体）"
+        assert view.brand.degraded is False
+
+    async def test_brand_section_latest_without_logo_unconfigured_logo(self) -> None:
+        """有模板但最新行无 logo→logo_status 未设置（配色/字体仍派生——三要素独立）。"""
+        service = _make_service(
+            brand_repo=_make_brand_repo(
+                rows=(_make_brand_template(color_scheme="graphite", font_preset="stsong", logo_object_key=None),)
+            )
+        )
+        view = await service.build_consultant_view()
+        assert view.brand.configured is True
+        assert view.brand.logo_status == "未设置"
+        assert view.brand.color_scheme_status == "石墨灰"
+        assert view.brand.font_status == "STSong-Light（内置宋体）"
+
+    async def test_brand_section_query_error_degraded(self) -> None:
+        """品牌段查询异常形态：degraded True+默认值+不抛（段级容错——v1.1.0
+        零 IO 恒稳承诺打破的结构性勘误：读配置面激活降级语义）."""
+        from src.application.ports.consultant_view import BRAND_FONT_STATUS, BRAND_STATUS_UNCONFIGURED
+
+        service = _make_service(brand_repo=_make_brand_repo(error=RuntimeError("brand table down")))
+        view = await service.build_consultant_view()
+        assert view.brand.degraded is True
+        assert view.brand.configured is False
+        assert view.brand.logo_status == BRAND_STATUS_UNCONFIGURED
+        assert view.brand.color_scheme_status == BRAND_STATUS_UNCONFIGURED
+        assert view.brand.font_status == BRAND_FONT_STATUS
 
     async def test_generated_at_single_time_anchor(self) -> None:
         """单时间锚：generated_at ISO 字符串非空（顶层唯一时间键——6-8/6-9 直系第三连）."""

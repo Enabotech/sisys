@@ -3811,8 +3811,8 @@ class TestConsultantViewExecution:
         assert "  11111111-1111-4111-8111-111111111111 | 归档: 3 | 最新活动: 2026-11-08 10:00" in lines
         assert "    最新报告: pdf（2026-11-08 10:00，降级小节 2）" in lines, "两行形态（信息密度呈现拆两行）"
         assert "    最新报告: 无" not in lines, "有报告行不降无报告行"
-        assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in lines
-        assert "提示: 品牌模板配置归 Story 6-11（白标报告基础）" in lines, "品牌注记行恒在（6-11 对接锚呈现面）"
+        assert "品牌模板: 未配置 | Logo: 未配置（系统默认） | 配色: 未配置（系统默认） | 字体: STSong-Light（内置）" in lines
+        assert "提示: 执行 brand-template-save 配置品牌模板" in lines, "品牌提示行恒在（6-11 v1.1.0 新文案）"
         assert "可交付: 2 项目有报告 | 最新 PDF: 1 项目" in lines
         assert "  最新 PDF: 11111111-1111-4111-8111-111111111111" in lines
         assert "  对象键: reports/plan/rid.pdf" in lines
@@ -3839,7 +3839,7 @@ class TestConsultantViewExecution:
         brand_separator = lines.index("── 品牌配置 ──")
         project_body = lines[head + 1 : brand_separator]
         assert project_body == [], f"空态项目计数行与品牌段之间应无任何行（实测 {project_body!r}）"
-        assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in lines
+        assert "品牌模板: 未配置 | Logo: 未配置（系统默认） | 配色: 未配置（系统默认） | 字体: STSong-Light（内置）" in lines
         assert "可交付: 0 项目有报告 | 最新 PDF: 0 项目" in lines
         assert "  最新 PDF: 无" in lines, "零 PDF 定位行降无"
 
@@ -3931,3 +3931,343 @@ class TestConsultantViewExecution:
 
         assert exit_code == 1
         assert "[EXCEPTION_" in capsys.readouterr().err
+
+
+# ===================================================================
+# Story 6-11: brand-template-save / brand-template-list 两新命令 +
+# report-generate --brand-template 同入口扩展（17→19 命令族）
+# ===================================================================
+
+
+class _StubBrandTemplate:
+    """品牌模板实体替身（getattr 属性面消费——零实体 import 依赖）。"""
+
+    def __init__(self, *, name: str = "商务蓝模板", template_id=None, logo_object_key=None) -> None:
+        import uuid as uuid_mod
+
+        self.name = name
+        self.template_id = template_id or uuid_mod.uuid4()
+        self.color_scheme = "corporate-blue"
+        self.font_preset = "noto-sans-sc"
+        self.logo_object_key = logo_object_key
+        self.updated_at = None
+
+
+class _StubSaveBrandTemplateUseCase:
+    """SaveBrandTemplateUseCase 替身（记录调用+可注入异常）。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.result = _StubBrandTemplate()
+
+    async def execute(self, *, name: str, color_scheme: str, font_preset: str, logo_path=None) -> object:
+        """替身 execute（记录调用）。"""
+        self.calls.append({"name": name, "color_scheme": color_scheme, "font_preset": font_preset, "logo_path": logo_path})
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+class _StubListBrandTemplatesUseCase:
+    """ListBrandTemplatesUseCase 替身（零参 execute）。"""
+
+    def __init__(self, rows=None) -> None:
+        self.calls: list[dict] = []
+        self.error: Exception | None = None
+        self.rows = rows if rows is not None else []
+
+    async def execute(self) -> object:
+        """替身 execute（记录调用）。"""
+        self.calls.append({})
+        if self.error is not None:
+            raise self.error
+        return tuple(self.rows)
+
+
+class _StubReportGenerateBrandUseCase(_StubReportGenerateUseCase):
+    """report-generate 品牌态替身（plan_id+brand_template_name 双参记录）。
+
+    继承基桩（is-a 关系——v1.1.0 增参形态的 LSP 兼容覆写：增带默认值的
+    keyword-only 参数；兼容 _patch_report_generate_entry 单一签名注入）。
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = []
+
+    async def execute(self, *, plan_id: str, brand_template_name: str | None = None) -> object:
+        """替身 execute（记录双参——透传断言锚）。"""
+        self.calls.append({"plan_id": plan_id, "brand_template_name": brand_template_name})
+        return self.result
+
+
+def _patch_brand_save_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubSaveBrandTemplateUseCase) -> None:
+    """brand-template-save 入口替身注入（每命令族专用 patcher 纪律）。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+def _patch_brand_list_entry(monkeypatch: pytest.MonkeyPatch, stub: _StubListBrandTemplatesUseCase) -> None:
+    """brand-template-list 入口替身注入。"""
+    monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+    monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+
+
+class TestBrandTemplateSaveParser:
+    """brand-template-save 参数解析（--name/--color-scheme/--font-preset/--logo-path）。"""
+
+    def test_full_args_parsed(self) -> None:
+        """全参解析（四参数键+choices 值域面）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(
+            [
+                "brand-template-save",
+                "--name",
+                "商务蓝模板",
+                "--color-scheme",
+                "corporate-blue",
+                "--font-preset",
+                "noto-sans-sc",
+                "--logo-path",
+                "/tmp/logo.png",
+            ]
+        )
+        assert args.command == "brand-template-save"
+        assert args.name == "商务蓝模板"
+        assert args.color_scheme == "corporate-blue"
+        assert args.font_preset == "noto-sans-sc"
+        assert args.logo_path == "/tmp/logo.png"
+
+    def test_logo_path_optional_default_none(self) -> None:
+        """--logo-path 可选（缺省 None——logo 缺席=保留语义）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(
+            ["brand-template-save", "--name", "x", "--color-scheme", "graphite", "--font-preset", "stsong"]
+        )
+        assert args.logo_path is None
+
+    def test_missing_name_exits_two(self) -> None:
+        """缺 --name → exit 2（必填）。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["brand-template-save", "--color-scheme", "graphite", "--font-preset", "stsong"])
+        assert exc_info.value.code == 2
+
+    def test_invalid_color_scheme_exits_two(self) -> None:
+        """非法 --color-scheme → argparse choices 硬拦截 exit 2（第一道 UX 面
+        ——深层 494 值域校验经编程面 use case 直调触达）。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["brand-template-save", "--name", "x", "--color-scheme", "neon-pink", "--font-preset", "stsong"])
+        assert exc_info.value.code == 2
+
+    def test_invalid_font_preset_exits_two(self) -> None:
+        """非法 --font-preset → exit 2。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(
+                ["brand-template-save", "--name", "x", "--color-scheme", "graphite", "--font-preset", "comic-sans"]
+            )
+        assert exc_info.value.code == 2
+
+    def test_block_boundary_getsource_no_format_words(self) -> None:
+        """切块边界断言（getsource 块内禁 --format/--plan-id 字样——6-9 教训
+        第四连：措辞纪律防切块断言边界污染）。"""
+        import inspect
+
+        source = inspect.getsource(agent_cli.build_parser)
+        block = source.split('add_parser(\n        "brand-template-save"')[1].split("add_parser(")[0]
+        assert "--format" not in block and "--plan-id" not in block
+
+
+class TestBrandTemplateListParser:
+    """brand-template-list 参数解析（零参数全局清单）。"""
+
+    def test_zero_args_parsed(self) -> None:
+        """零参解析（全局模板清单——CLI 族第二个零参数命令）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["brand-template-list"])
+        assert args.command == "brand-template-list"
+
+    def test_any_argument_exits_two(self) -> None:
+        """任意参数 → exit 2（零参数面）。"""
+        parser = agent_cli.build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["brand-template-list", "--anything"])
+        assert exc_info.value.code == 2
+
+
+class TestBrandTemplateSaveExecution:
+    """brand-template-save 执行入口（五步定式——写命令模板）。"""
+
+    def test_success_output_contract(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """成功输出契约（保存行+配置行+模板标识行）。"""
+        stub = _StubSaveBrandTemplateUseCase()
+        _patch_brand_save_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(
+            [
+                "brand-template-save",
+                "--name",
+                "商务蓝模板",
+                "--color-scheme",
+                "corporate-blue",
+                "--font-preset",
+                "noto-sans-sc",
+            ]
+        )
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "品牌模板已保存: 商务蓝模板" in out.splitlines()
+        assert "配色: 商务蓝 | 字体: Noto Sans SC（黑体） | Logo: 未设置" in out
+        assert f"模板标识: {stub.result.template_id}" in out
+        # 透传值级断言
+        assert stub.calls == [
+            {"name": "商务蓝模板", "color_scheme": "corporate-blue", "font_preset": "noto-sans-sc", "logo_path": None}
+        ]
+
+    def test_success_with_logo_uploaded_wording(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path
+    ) -> None:
+        """带 logo 成功（Logo: 已上传 形态——服务返回体携带 logo_object_key）。"""
+        logo = tmp_path / "logo.png"
+        logo.write_bytes(b"\x89PNG\r\n\x1a\nstub")
+        stub = _StubSaveBrandTemplateUseCase()
+        stub.result = _StubBrandTemplate(name="x", logo_object_key="logos/uploaded")
+        _patch_brand_save_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(
+            [
+                "brand-template-save",
+                "--name",
+                "x",
+                "--color-scheme",
+                "graphite",
+                "--font-preset",
+                "stsong",
+                "--logo-path",
+                str(logo),
+            ]
+        )
+        assert exit_code == 0
+        assert "Logo: 已上传" in capsys.readouterr().out
+
+    def test_domain_error_494_stderr_exit_one(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """DomainError：[EXCEPTION_494] stderr + exit 1（双层异常定式）。"""
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        stub = _StubSaveBrandTemplateUseCase()
+        stub.error = BrandTemplateValidationError(field="logo_path", message="Logo 文件非法")
+        _patch_brand_save_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(
+            ["brand-template-save", "--name", "x", "--color-scheme", "graphite", "--font-preset", "stsong"]
+        )
+        assert exit_code == 1
+        assert "[EXCEPTION_494]" in capsys.readouterr().err
+
+    def test_unexpected_error_exit_one(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """意外异常：exit 1（双层定式第二层）。"""
+        stub = _StubSaveBrandTemplateUseCase()
+        stub.error = RuntimeError("意外故障")
+        _patch_brand_save_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(
+            ["brand-template-save", "--name", "x", "--color-scheme", "graphite", "--font-preset", "stsong"]
+        )
+        assert exit_code == 1
+
+
+class TestBrandTemplateListExecution:
+    """brand-template-list 执行入口。"""
+
+    def test_rows_output_contract(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """多行输出契约（首行计数+逐模板行呈现名+行序 updated_at 降序由服务
+        返回序承载——CLI 只呈现）。"""
+        rows = [
+            _StubBrandTemplate(name="模板甲"),
+            _StubBrandTemplate(name="模板乙"),
+        ]
+        stub = _StubListBrandTemplatesUseCase(rows=rows)
+        _patch_brand_list_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["brand-template-list"])
+        assert exit_code == 0
+        out_lines = capsys.readouterr().out.splitlines()
+        assert "品牌模板: 共 2 个" in out_lines
+        row_lines = [line for line in out_lines if line.startswith("  ")]
+        assert len(row_lines) == 2
+        assert any("模板甲" in line and "配色: 商务蓝" in line for line in row_lines)
+
+    def test_empty_state_output(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空态输出（共 0 个+恒在提示行——指向 brand-template-save）。"""
+        stub = _StubListBrandTemplatesUseCase(rows=[])
+        _patch_brand_list_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["brand-template-list"])
+        assert exit_code == 0
+        out = capsys.readouterr().out
+        assert "品牌模板: 共 0 个" in out
+        assert "提示: 执行 brand-template-save 配置品牌模板" in out
+
+    def test_domain_error_stderr_exit_one(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """DomainError 495：stderr + exit 1。"""
+        from src.domain.exceptions import BrandTemplateStorageError
+
+        stub = _StubListBrandTemplatesUseCase()
+        stub.error = BrandTemplateStorageError(layer="l2")
+        _patch_brand_list_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["brand-template-list"])
+        assert exit_code == 1
+        assert "[EXCEPTION_495]" in capsys.readouterr().err
+
+
+class TestReportGenerateBrandTemplate:
+    """report-generate --brand-template 同入口扩展（6-5b OD-11 兑现）。"""
+
+    def test_brand_template_param_optional_default_none(self) -> None:
+        """--brand-template 可选默认 None（自由名非枚举——模板名非 choices）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["report-generate", "--plan-id", "p1"])
+        assert getattr(args, "brand_template", None) is None
+
+    def test_brand_template_free_name_parsed(self) -> None:
+        """--brand-template 自由名解析（choices 不限——模板名非枚举值）。"""
+        parser = agent_cli.build_parser()
+        args = parser.parse_args(["report-generate", "--plan-id", "p1", "--format", "pdf", "--brand-template", "任意自定义名"])
+        assert args.brand_template == "任意自定义名"
+
+    def test_combination_guard_markdown_brand_494(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """组合守卫：--brand-template+--format markdown → [EXCEPTION_494]
+        stderr exit 1（post-parse 检测归 CLI 层唯一落位——bootstrap 前，
+        守卫先于用例零调用）。"""
+        stub = _StubReportGenerateBrandUseCase()
+        _patch_report_generate_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(
+            ["report-generate", "--plan-id", str(uuid.uuid4()), "--format", "markdown", "--brand-template", "any"]
+        )
+        assert exit_code == 1
+        assert "[EXCEPTION_494]" in capsys.readouterr().err
+        assert not stub.calls
+
+    def test_brand_template_passthrough(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """透传格：--brand-template X → use case 调用参数锚（X 入参+品牌增量行）。"""
+        stub = _StubReportGenerateBrandUseCase()
+        _patch_report_generate_entry(monkeypatch, stub)
+        plan_id = str(uuid.uuid4())
+        exit_code = agent_cli.main(
+            ["report-generate", "--plan-id", plan_id, "--format", "pdf", "--brand-template", "商务蓝模板"]
+        )
+        assert exit_code == 0
+        assert stub.calls == [{"plan_id": plan_id, "brand_template_name": "商务蓝模板"}]
+        out = capsys.readouterr().out
+        assert "品牌模板: 商务蓝模板（已应用）" in out
+
+    def test_default_format_zero_change(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """默认格：无 --brand-template → 既有调用形态零变化（None 透传）。"""
+        stub = _StubReportGenerateBrandUseCase()
+        _patch_report_generate_entry(monkeypatch, stub)
+        plan_id = str(uuid.uuid4())
+        exit_code = agent_cli.main(["report-generate", "--plan-id", plan_id, "--format", "pdf"])
+        assert exit_code == 0
+        assert stub.calls == [{"plan_id": plan_id, "brand_template_name": None}]
+        assert "品牌模板:" not in capsys.readouterr().out.split("报告生成完成")[0]

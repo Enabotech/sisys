@@ -769,13 +769,21 @@ def test_brand_section_defaults() -> None:
 
 @then("品牌段 5 键五值级恒默认态")
 def verify_brand_defaults(context: dict[str, Any]) -> None:
-    """S3：品牌段零 IO 静态恒在——五值级恒等（V1 时点事实断言——6-11 演进信号语义）."""
+    """S3：品牌段零模板形态恒默认态——五值级恒等（6-11 v1.1.0 前提演进为「零模板」）.
+
+    6-11 skip 门（Task 6.4）：断言本体零改动；前置品牌模板表零行清点——
+    有行 pytest.skip（共享库背景残留防御[预期零残留：同组串行+自包含清理]，
+    6-10 OD-13 skip 门先例直系；6-11 写入方挂同组+teardown rowcount 断言）。
+    清点 helper 已上提模块级（R1-F7——S7/S8 复用同门补 OD-13 防御不对称）。
+    """
+    _skip_if_brand_templates_residual(context, "S3")
+
     from src.application.ports.consultant_view import BRAND_FONT_STATUS, BRAND_STATUS_UNCONFIGURED
 
     view = context["view"]
     brand = view.brand
-    assert brand.degraded is False, "品牌段无降级面（零 IO 恒稳——结构性承诺）"
-    assert brand.configured is False, "configured 恒 False（V1——6-11 实施后红是预期演进信号非 flake）"
+    assert brand.degraded is False, "品牌段无降级面（零模板/降级语义——v1.1.0 勘误后零模板前提）"
+    assert brand.configured is False, "configured 零模板恒 False（v1.1.0 读配置面——有模板形态归 6-11 S10）"
     assert brand.logo_status == BRAND_STATUS_UNCONFIGURED == "未配置（系统默认）"
     assert brand.color_scheme_status == BRAND_STATUS_UNCONFIGURED == "未配置（系统默认）"
     assert brand.font_status == BRAND_FONT_STATUS == "STSong-Light（内置）", (
@@ -986,9 +994,48 @@ def run_cli_consultant_view_step(context: dict[str, Any]) -> None:
     _run_cli_consultant_view(context)
 
 
+def _skip_if_brand_templates_residual(context: dict[str, Any], scene: str) -> None:
+    """品牌模板表零行清点 skip 门（模块级 helper——S3/S7/S8 三场景共用，R1-F7 上提）。
+
+    有行 pytest.skip（共享库背景残留防御——残留时 CLI 品牌行走「已配置」
+    三值派生分支，零模板断言结构性假红；information_schema 探测使未迁移
+    环境表不存在时返 0 不误 skip——6-10 OD-13 四层防御的 S7/S8 补层）。
+    """
+    from sqlalchemy import text as sa_text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from tests.environments import get_test_env
+
+    async def _count_brand_rows() -> int:
+        env = get_test_env()
+        engine = create_async_engine(
+            f"postgresql+asyncpg://{env.postgres.username}:{env.postgres.password}"
+            f"@{env.postgres.host}:{env.postgres.port}/{env.postgres.database}"
+        )
+        try:
+            async with engine.connect() as conn:
+                exists = await conn.execute(
+                    sa_text("SELECT 1 FROM information_schema.tables WHERE table_name = 'brand_templates'")
+                )
+                if exists.scalar() is None:
+                    return 0
+                rows = await conn.execute(sa_text("SELECT COUNT(*) FROM brand_templates"))
+                return int(rows.scalar() or 0)
+        finally:
+            await engine.dispose()
+
+    brand_rows = context["_loop"].run_until_complete(_count_brand_rows())
+    if brand_rows > 0:
+        pytest.skip(f"品牌模板表存在 {brand_rows} 行背景残留——{scene} 零模板前提破坏免疫跳过")
+
+
 @then("预置三 plan 逐行输出与品牌两行与导出段行均在 stdout")
 def verify_cli_full_output(context: dict[str, Any]) -> None:
-    """S7：包含断言（预置行逐行 in stdout——不断言完整输出集，背景行计入输出 OD-13③）."""
+    """S7：包含断言（预置行逐行 in stdout——不断言完整输出集，背景行计入输出 OD-13③）.
+
+    品牌零行清点门（R1-F7）：品牌两行断言依赖零模板前提——残留行免疫跳过。
+    """
+    _skip_if_brand_templates_residual(context, "S7")
     stdout = context["cli_stdout"]
     preset = context["preset"]
     assert context["cli_exit_code"] == 0, f"exit code 应 0（实测 {context['cli_exit_code']}）"
@@ -999,8 +1046,8 @@ def verify_cli_full_output(context: dict[str, Any]) -> None:
         assert f"{plan_id} | 归档: {count} |" in stdout, (
             f"预置 plan {plan_id[:8]} 项目行（归档 {count}）应在 stdout（包含断言——背景行免疫）"
         )
-    assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in stdout
-    assert "提示: 品牌模板配置归 Story 6-11（白标报告基础）" in stdout, "品牌段注记行恒在（6-11 对接锚呈现面）"
+    assert "品牌模板: 未配置 | Logo: 未配置（系统默认） | 配色: 未配置（系统默认） | 字体: STSong-Light（内置）" in stdout
+    assert "提示: 执行 brand-template-save 配置品牌模板" in stdout, "品牌提示行恒在（6-11 v1.1.0 新文案）"
     assert "最新 PDF:" in stdout, "导出段最新 PDF 定位行在位"
 
 
@@ -1024,11 +1071,15 @@ def test_cli_format_and_permanent_lines() -> None:
 
 @then("项目计数行格式与品牌两行与提示行恒在")
 def verify_cli_format_lines(context: dict[str, Any]) -> None:
-    """S8：格式断言（`项目: 共 ` 前缀+` 个` 后缀模式+品牌两行+提示行恒在——不断言总行数）."""
+    """S8：格式断言（`项目: 共 ` 前缀+` 个` 后缀模式+品牌两行+提示行恒在——不断言总行数）.
+
+    品牌零行清点门（R1-F7）：品牌两行断言依赖零模板前提——残留行免疫跳过。
+    """
+    _skip_if_brand_templates_residual(context, "S8")
     stdout = context["cli_stdout"]
     assert "项目: 共 " in stdout and " 个" in stdout, "项目计数行格式模式（真库任意行数）"
-    assert "品牌模板: 未配置（系统默认） | Logo: 默认 | 配色: 默认 | 字体: STSong-Light（内置）" in stdout
-    assert "提示: 品牌模板配置归 Story 6-11（白标报告基础）" in stdout
+    assert "品牌模板: 未配置 | Logo: 未配置（系统默认） | 配色: 未配置（系统默认） | 字体: STSong-Light（内置）" in stdout
+    assert "提示: 执行 brand-template-save 配置品牌模板" in stdout
     assert "提示: 执行 report-generate --plan-id <uuid> --format pdf 生成白标 PDF" in stdout
 
 

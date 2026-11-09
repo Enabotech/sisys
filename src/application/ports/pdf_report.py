@@ -58,14 +58,18 @@
   层注入同款可测试性形态，不走注册表覆写）。
 """
 
+import re
 import uuid
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from src.domain.entities.strategic_report import StrategicReport
+from src.domain.exceptions import EntityValidationError
 from src.domain.value_objects.markdown_report import MarkdownReportDocument
 
 __all__ = [
     "APPENDIX_C_TITLE",
+    "BrandRenderSpec",
     "EVIDENCE_BUCKET_TYPE",
     "PDF_OBJECT_KEY_TEMPLATE",
     "PdfRendererPort",
@@ -81,6 +85,59 @@ PDF_OBJECT_KEY_TEMPLATE: str = "reports/{plan_id}/{report_id}.pdf"
 #: 附录 C 冻结标题（增量冻结表钦定——编排层组装与渲染层锚点特判的单源常量）
 APPENDIX_C_TITLE: str = "附录 C 引文索引"
 
+#: 6 位 hex 色格式（BrandRenderSpec 五色键守卫——``^#[0-9A-Fa-f]{6}$``）
+_HEX_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+@dataclass(frozen=True)
+class BrandRenderSpec:
+    """白标渲染规格 VO（Story 6-11——渲染器直消费形态，7 键冻结契约）。
+
+    「静态值域=冻结常量」单源在 application ports（COLOR_SCHEME_PRESETS/
+    FONT_PRESETS 供给预设键→本 VO 的组装归应用服务 ``get_render_spec``）；
+    渲染器（infrastructure）import 本 VO 合法（依赖方向矩阵 infra→application
+    ✓ 允许）。**logo 是 bytes 非对象键**：L4 读取归应用服务，渲染器零 IO
+    纯函数纪律保持（6-5b OD-3 同源双渲染纪律延续）。
+
+    构造契约（R1 钦定）：五色键+font_name **必填**（缺省构造 TypeError——
+    必填即判别保证：默认值不得与渲染器默认参数同值是默认态等价突变锚的
+    判别前提，必填形态从根上排除同值默认风险）；logo 唯一可选默认 None。
+
+    Attributes:
+        font_name: 字体注册名（CID 名直用如 "STSong-Light"/TTF 注册名如
+            "NotoSansSC"——TTF 注册通道归渲染器 ``_ensure_font`` 幂等承载）。
+        title_color: H1/H2 标题文字色（6 位 hex——新能力，渲染器默认无
+            textColor 即黑）。
+        header_bg_color: 表头行底色（渲染器默认 #E8E8E8）。
+        grid_color: 表格网格线色（渲染器默认 #BBBBBB）。
+        callout_bg_color: callout 底色（渲染器默认 #F2F2F2）。
+        callout_text_color: callout 文字色（渲染器默认 #444444）。
+        logo: Logo 图片字节（PNG/JPEG——None 表示无 Logo[零品牌 logo 流]；
+            品牌三要素中配色/字体独立生效）。
+
+    Raises:
+        EntityValidationError: 五色键任一非 6 位 hex 格式（242——application
+            VO 抛 242 先例[consultant_view.py:66-91 等六文件]）。
+    """
+
+    font_name: str
+    title_color: str
+    header_bg_color: str
+    grid_color: str
+    callout_bg_color: str
+    callout_text_color: str
+    logo: bytes | None = None
+
+    def __post_init__(self) -> None:
+        """构造期 hex 格式守卫（五色键逐键——fail-loud）。"""
+        for key in ("title_color", "header_bg_color", "grid_color", "callout_bg_color", "callout_text_color"):
+            value: str = getattr(self, key)
+            if not _HEX_COLOR_PATTERN.match(value):
+                raise EntityValidationError(
+                    message=f"{key} 必须为 6 位 hex 颜色（如 #1F4E79）",
+                    context={"vo": "BrandRenderSpec", "field": key, "value": value},
+                )
+
 
 @runtime_checkable
 class PdfRendererPort(Protocol):
@@ -89,15 +146,26 @@ class PdfRendererPort(Protocol):
     同步方法（reportlab 纯 CPU 渲染无 I/O——量级评估：亚秒级 CPU 段在
     并发下互斥执行放大有限，不经 to_thread）；bytes 返回端口先例
     ``PdfPageRendererPort.render_page``；引文附录已在编排层组装进
-    document VO——渲染器单参纯渲染，与 ``render_markdown_report`` 同
+    document VO——渲染器纯渲染，与 ``render_markdown_report`` 同
     入参对称（OD-3 同源双渲染）。
+
+    端口版本 v1.1.0（Story 6-11）：增 keyword-only 可选参 ``brand``
+    （默认 None 走既有路径——零品牌调用等价回归[invariant=1 测试前置下
+    byte 级对照]；既有单参调用零破坏——兼容性元组 ("v1.0.0",)）。
     """
 
-    def render(self, document: MarkdownReportDocument) -> bytes:
-        """渲染双渲染共用 IR 为 PDF bytes。
+    def render(
+        self,
+        document: MarkdownReportDocument,
+        *,
+        brand: BrandRenderSpec | None = None,
+    ) -> bytes:
+        """渲染双渲染共用 IR 为 PDF bytes（品牌可选应用）。
 
         Args:
             document: 6-5a 聚合产物（附录 C 已组装）。
+            brand: 白标渲染规格（None=默认态——字体 STSong-Light/默认四色/
+                零 logo 流，产物与 v1.0.0 单参调用等价）。
 
         Returns:
             PDF 文件字节流。
@@ -107,24 +175,37 @@ class PdfRendererPort(Protocol):
 
 @runtime_checkable
 class PdfReportGenerationServicePort(Protocol):
-    """PDF 报告生成服务端口（六段编排——与 ReportGenerationServicePort 并列）。
+    """PDF 报告生成服务端口（六段编排+品牌前置小步——与 ReportGenerationServicePort 并列）。
 
     编排六段：①chain 归档主源聚合复用（``aggregate_report_document``——
     6-5a 聚合公开化）→ ②latest 快照辅源（容错）→ ③引文聚合（三段链）
     → ④PDF 渲染 → ⑤L4 WORM 归档 + L2 元数据行 → ⑥ReportGenerated 事件
     （report_type="pdf"）。
+
+    端口版本 v1.1.0（Story 6-11）：增 keyword-only 可选参
+    ``brand_template_name``（默认 None 零品牌路径——兼容性元组 ("v1.0.0",)；
+    白标导出经 ``get_render_spec`` 组装 BrandRenderSpec 双参渲染+metadata
+    品牌两键）。
     """
 
-    async def generate_pdf_report(self, plan_id: uuid.UUID) -> StrategicReport:
-        """按 plan_id 生成 PDF 报告。
+    async def generate_pdf_report(
+        self,
+        plan_id: uuid.UUID,
+        *,
+        brand_template_name: str | None = None,
+    ) -> StrategicReport:
+        """按 plan_id 生成 PDF 报告（品牌模板可选应用）。
 
         Args:
             plan_id: 规划任务标识。
+            brand_template_name: 品牌模板名（None=默认态——v1.0.0 行为等价；
+                非 None 时前置组装渲染规格，品牌失败不降级为非白标导出）。
 
         Returns:
             StrategicReport 实体（report_type=PDF、file_path=对象键逻辑路径）。
 
         Raises:
+            BrandTemplateValidationError: 494——品牌模板不存在/预设键脏。
             ReportGenerationError: 490——数据源全缺（chain total==0）。
             PdfRenderingError: 492——PDF 渲染失败。
             ReportEvidenceStorageError: 493——L4 证据归档失败。

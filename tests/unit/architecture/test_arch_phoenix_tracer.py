@@ -51,8 +51,10 @@ _APPLICATION_ALLOWED_THIRD_PARTY = {"opentelemetry"}
 _FORBIDDEN_OTEL_SUBMODULE_PREFIXES = ("opentelemetry.sdk", "opentelemetry.exporter", "opentelemetry.instrumentation")
 
 #: application 全层第三方基线白名单（R1-F6——全目录默认拒绝：新增第三方包
-#: 必须显式修此清单过架构测试[有意识决策]，防静默渗入）
-_APPLICATION_LAYER_ALLOWED_THIRD_PARTY = {"opentelemetry", "pydantic", "yaml"}
+#: 必须显式修此清单过架构测试[有意识决策]，防静默渗入；PIL 为 6-11 代码审查
+#: R1-F6 显式扩入——pillow 是 pyproject 主依赖[Document Processing]，保存期
+#: logo 像素维度/解码校验 fail-fast 前移渲染期 492，测试面已广泛使用同库）
+_APPLICATION_LAYER_ALLOWED_THIRD_PARTY = {"opentelemetry", "pydantic", "yaml", "PIL"}
 
 #: 全层基线存量豁免文件（相对 application/ 路径——grandfather 清单，新文件
 #: 不得追加；redis 治理归宿见 5-7 R1-DF5）
