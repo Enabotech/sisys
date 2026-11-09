@@ -5,11 +5,13 @@
   ——保留语义与 L4 键锚定的单源承载位）→ 值域校验+name 前置预检 → logo 校验 →
   [logo_path 在场]L4 store → 实体构造（updated_at 服务侧定时戳）→ repo.save
   （仓储纯 UPSERT 落库——spec Mock await 序断言：get_by_name→store→save）
-- 校验矩阵（494×10+242×1+成功×2——与 AC-7「七形态=494 全触发面」分立口径：
-  矩阵含 242/成功格；R1-F6 拓宽像素/解析两负例+空文件/不可读伞形补格）：非法
+- 校验矩阵（494×11+242×1+成功×2——与 AC-7「七形态=494 全触发面」分立口径：
+  矩阵含 242/成功格；R1-F6 拓宽像素/解析两负例+空文件/不可读伞形补格+R3-F1
+  修订既有键校验失败防误删格）：非法
   color key/非法 font key/空 name[242 由实体抛——服务预检透传]/magic bytes 非
   PNG-JPEG/空文件[magic 族输入边界]/超 2MB/路径不存在/不可读伞形[chmod-000+
-  getsize 权限]/像素超限/图像体无法解析[magic 合法+垃圾体]/合法全参/4000px
+  getsize 权限]/像素超限/图像体无法解析[magic 合法+垃圾体]/修订既有键+校验失败
+  [store/delete 双零——数据丢失突变体防线]/合法全参/4000px
   恰值边界
 - 预检先于 L4（非法 name/color+logo 形态 store 零调用——防孤儿 logo 对象）
 - 保留语义：已有 logo 模板再存不带 --logo-path → logo_object_key 不变+L4 零新调用
@@ -189,7 +191,7 @@ class TestSaveOrchestration:
 
 
 class TestValidationMatrix:
-    """校验矩阵 13 格（494×10+242×1+成功×2——R1-F6 拓宽后口径）。"""
+    """校验矩阵 14 格（494×11+242×1+成功×2——R1-F6 拓宽+R3-F1 防误删格后口径）。"""
 
     async def test_invalid_color_scheme_key_494(self) -> None:
         """非法配色键 → 494（消息含合法键清单——调用方可理解性）。"""
@@ -344,6 +346,24 @@ class TestValidationMatrix:
             name="边界模板", color_scheme="graphite", font_preset="stsong", logo_path=str(boundary)
         )
         assert saved.logo_object_key is not None
+
+    async def test_validation_failure_existing_logo_no_delete(self, tmp_path: Any) -> None:
+        """修订既有键+校验失败（494 先于 L4）→ store/delete 双零调用（R3-F1——
+        「校验失败路径补偿误删 existing_logo_key」数据丢失突变体的最小唯一杀手：
+        校验格 existing 全 None 形态下该突变体 no-op 存活）。"""
+        fake = tmp_path / "fake.txt"
+        fake.write_bytes("plain text not an image".encode("utf-8"))
+        template_id = uuid_module.uuid4()
+        existing = _make_template(name="修订模板", template_id=template_id, logo_object_key=f"logos/{template_id}")
+        service, mocks = _make_service(existing=existing)
+        with pytest.raises(BrandTemplateValidationError) as exc_info:
+            await service.save_brand_template(
+                name="修订模板", color_scheme="graphite", font_preset="stsong", logo_path=str(fake)
+            )
+        assert exc_info.value.code == "EXCEPTION_494"
+        mocks["l4"].store.assert_not_awaited()
+        # 校验失败路径补偿不得误删既有 logo（数据丢失防线——R3-F1 判别锚）
+        mocks["l4"].delete.assert_not_awaited()
 
 
 class TestOrphanLogoCompensation:

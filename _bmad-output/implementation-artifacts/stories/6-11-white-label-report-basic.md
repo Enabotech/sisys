@@ -1150,6 +1150,18 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 
 **R2 全量回归**：四目录 15467 passed+5 failed（analyst_view/checkpoint×2/redis_ttl 隔离复跑 38 passed——抖动维持原判定；checkpoint archive 二次稳定红→机理定谳 R2-DF1 预存缺陷）。
 
+#### Round 3 修复记录（单深度推演轮 2026-11-09）
+
+**R3 四板块推演**（零 P0/P1/P2）：①三修复组合交互 4 组全部结构正确（F6 校验先于 store 补偿零触发/F2 包装在 get_by_name 位+NameError 双保险/F5 补偿 except Exception 运行时实测全吞 bare raise 恒原始异常/F6×F2 无交互）②494/495 触发面可达性矩阵（七形态+双 layer×三入口——锚分布与文档口径自洽：CLI-only 组合守卫双层封闭[S3 亲验+markdown use case 签名结构封闭]/金字塔分布 unit 载体声明一致）③弱断言四项裁定（①②③维持有据——单参零破坏真实载体是 byte 等价格/frozen 语言级保证/P95 门禁承载；④一行清偿）④DF1 同款外推（全仓 265 处 limit 逐类排查——同族仅 1 处漏网：integration checkpoint :621 同款 scroll+56 点实测单调增长）。
+
+**R3 修复 4 项清偿**（快评 F2/F3/F4 优秀+F1 修订采纳[计数同步两处]）：
+- R3-F1：TestValidationMatrix 补「修订既有键+校验失败」格（494+store/delete 双零断言——「校验失败路径补偿误删 existing_logo_key」数据丢失突变体的最小唯一杀手；类 docstring 与文件头计数同步 13→14 格/494×10→494×11）
+- R3-F2：CLI brand-template-save 补 242 stub 格（空名 → [EXCEPTION_242] stderr exit 1——可达性矩阵唯一空格；杀「CLI 层提前拦截」与「except 域收窄」两突变体）
+- R3-F3：验收 :1157 恒真断言升级（保留 is not None+增 updated_at >= created_at 倒挂判别——同源 now 赋值下倒挂只能是实现 bug）
+- R3-F4：deferred-work R2-DF1 条目扩列 integration checkpoint :621 同族实例（56 点实测+低频抖动与 R2 时序窗归因混同线索注记——非再定谳）
+
+**R3 记录组**：弱断言①②③维持（各自真实载体论证）；测试库卫生 Watch（Qdrant collection 累积 6335:82 个/event_outbox 92 行——除 DF1 族外零断言暴露，归 DF1 承接批评估）；「模块内 BaseException=DomainError 别名遮蔽」可读性观察（运行时实测非内置——不入发现）。
+
 ---
 
 ### 下一步 Next Steps
@@ -1162,7 +1174,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 
 ---
 
-**故事版本/Story Version:** v1.7.0
+**故事版本/Story Version:** v1.8.0
 **创建日期/Created:** 2026-11-08
 **最后更新/Last Updated:** 2026-11-09
 **更新说明/Description:**
@@ -1175,6 +1187,7 @@ docs/architecture/sisys-uni-exception-design.md             ▲ §3.3.2 编码�
 - v1.5.0: dev-story 实施完成 in-progress→review（Task 0~9 全勾：14/14 验收场景全绿+集成五场景 6 用例+四目录全量两轮 15452/15458 passed+2 skipped+2 预存抖动[analyst_view Redis 跨循环+checkpoint_snapshot Qdrant 最终一致——均与 6-11 零因果面，隔离复跑+单场景双跑+整文件复跑三重绿定谳，组内流量放大共享设施时序窗形态登记代码审查轮复核]+新增文件覆盖率 service 98%/仓储 96%/实体与 VO 100%+整体 91%+mypy 773 零错+ruff 全仓过+变异锚 14 处全实证[实体 2/仓储 2/渲染器 4/服务 5/CLI 3+Task7 补 1/集成 1]+三红线 grep 归零[ports helper 三处裸 ValueError 实施中自查发现并修复为 494 直抛]+:282 monkeypatch carve out 机械适配+deferred-work 14 行处置注记+TTF 资产入仓[外网不可达改本地官方分发物双验证];实施攻坚四留痕：pytest-bdd 同文本单绑定纪律/S8 补 exit code 为 1 独立步骤绑定/pytest-asyncio auto 模式探测协程化[自建 loop 双循环冲突]/每测试三清[SINGLETON 缓存绑定旧 loop→InterfaceError 驱逐重建]——详注见 Dev Agent Record Task 1~9 实施记录）
 - v1.6.0: 代码审查 Round 1（四视角并行调研[盲审对抗/边界狩猎/验收审计/运行面实测——双 Agent 独立命中 F2 读写契约虚设]+实测证据链[未迁移环境 3 FAILED 假红复现/畸形 logo RSS 1.1GB 实测/invariant 六断言/组合根 9 端口 resolve 亲验/CLI 真实链 UPSERT 探针]+C3 双评审员方案评审[测试判别力四缺口全采纳：_do_list 独立格/with_session 钦定形态/chmod-000 真链主格/假体 JPEG 必红遗漏/新写键判别锚]+落码 11 项[零 P0/P1×1+P2×2+P3×8]+defer 2+证伪留痕 40+：R1-F1 集成门三测补齐[未迁移环境 6 skipped 实测闭环]/R1-F2 仓储层 495 读路径单点包装[契约三处冻结兑现+ Raises docstring 同步+包装两格]/R1-F3 OSError 伞形守卫/R1-F5 孤儿 logo 新写键补偿[五格判别]/R1-F6 像素维度四重校验[4000px+PIL 深解析——RSS 实证+假体 JPEG 改真生成+494 触发面 B 案拓宽三处冻结文字]/R1-F7 S7/S8 skip 门补层[helper 上提三场景共用]/R1-F8 Any 删除/R1-F9 死代码/R1-F10 OSError 收窄+byte 幂等断言/R1-F17① 空文件格/R1-F14·15 计数勘误[20→21+16→21 三处口径+S14 双清单+结构图两树+验收 6 文案]；全绿证据：服务 31+仓储 17+渲染器/pdf 六文件 135+集成验收 32+验收白标 14 未迁移环境集成 6 skipped）
 - v1.7.0: 代码审查 Round 2（回归核查+传播完备性双视角——R2-A 突变验证 4/4 闭环[包装删→list 格红/补偿条件改坏→4 格红+负向锚正确保持绿/阈值爆→超限格红/伞形改窄→两格红——R1 修复质量判定可信]+R2-B 传播核查[计数口径全命中分类合规+12 组台账锚点零失实+组合交互 5 项全过]；修复 7 项 P3 全清偿[快评 5/5 优秀+2 新发现采纳]：R2-F1 验收 :974 场景 docstring 计数[R1-F14 第 7 处漏网双 Agent 命中]/R2-F2 Protocol save docstring 四重校验+494 冻结文字对齐+495 行补齐/R2-F3 校验矩阵类 docstring 七格→13 格[R1-F6 补格后实数]/R2-F4 OD-6 枚举拓宽[含单边统一]/R2-F5 service 模块 docstring 重复行[R1-F5 拼接残留——R2 抓 R1 自身破口实证]/R2-F6 Story :543/:996 七格内联勘误[历史不改写]；R2-DF1 defer：checkpoint 验收 Qdrant scroll limit=50×残留 52 点稳定假红[隔离二次红机理定谳 top-k 截断——Epic 5 存量测试资产缺陷非 6-11 回归零交集，deferred-work 登记承接二择一：filter 定向/残留清理]；R2 全量四目录 15467 passed+5 failed 甄别[analyst_view/checkpoint×2/redis_ttl 隔离绿抖动维持+archive 稳定红→R2-DF1]）
+- v1.8.0: 代码审查 Round 3 单深度推演（四板块零 P0/P1/P2——①三修复组合交互 4 组结构全正确[F6 校验先于 store 补偿结构性零触发/F2 包装位+NameError 双保险/F5 补偿 except Exception 运行时实测全吞——BaseException 是项目 DomainError 别名非内置亲证+isinstance 实测]②494/495 可达性矩阵[七形态+双 layer×三入口锚分布自洽——CLI-only 组合守卫双层封闭：文档声明+markdown use case 签名结构封闭]③弱断言四项裁定[①②③维持有据——单参零破坏真实载体是 byte 等价格非冒烟格]④DF1 同款外推[全仓 265 处 limit 逐类排查同族仅 1 处：integration checkpoint :621——56 点实测单调增长 52→56]；修复 4 项[快评 F2/F3/F4 优秀+F1 修订采纳计数同步]：R3-F1 修订既有键+校验失败防误删格[数据丢失突变体最小唯一杀手——校验格 existing 全 None 时突变体 no-op 存活；计数 13→14 格两处同步]/R3-F2 CLI 242 stub 格[可达性矩阵唯一空格——空名可达 [EXCEPTION_242] stderr 锚]/R3-F3 恒真断言升级倒挂判别[updated_at >= created_at——同源 now 下倒挂只能是实现 bug]/R3-F4 DF1 扩列 integration checkpoint :621 同族[低频抖动与 R2 时序窗归因混同线索注记]；验证：三文件 248 passed+ruff/mypy 零错）
 
 ### 🏁 文档审查周期收敛声明（R1-R5 五轮独立终审 v1.4.0）
 

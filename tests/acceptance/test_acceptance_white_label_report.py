@@ -1155,6 +1155,7 @@ def then_pg_row_seven_fields(context: dict[str, Any]) -> None:
     assert record["font_preset"] == "noto-sans-sc"
     assert record["logo_object_key"] == f"logos/{record['template_id']}"
     assert record["created_at"] is not None and record["updated_at"] is not None
+    assert record["updated_at"] >= record["created_at"], "时间戳倒挂（服务 now 同源赋值下倒挂只能是实现 bug——R3-F3 倒挂判别）"
     context["preset"]["template_id"] = str(record["template_id"])
     context["preset"]["logo_object_key"] = str(record["logo_object_key"])
     context["_brand_template_ids"].append(str(record["template_id"]))

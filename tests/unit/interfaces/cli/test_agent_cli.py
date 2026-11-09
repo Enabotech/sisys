@@ -4126,6 +4126,27 @@ class TestBrandTemplateSaveExecution:
             {"name": "商务蓝模板", "color_scheme": "corporate-blue", "font_preset": "noto-sans-sc", "logo_path": None}
         ]
 
+    def test_empty_name_exit_1_stderr_242(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """空名：exit 1 + stderr [EXCEPTION_242]（R3-F2——本命令 242 专属锚补格：
+        argparse required 只管旗标在场，空串必达 use case；杀「CLI 层加空名
+        守卫提前拦截」与「except 域收窄排除校验子类」两突变体）。"""
+        stub = _StubSaveBrandTemplateUseCase()
+        from src.domain.exceptions import EntityValidationError
+
+        stub.error = EntityValidationError(
+            message="品牌模板名不可为空",
+            context={"use_case": "SaveBrandTemplateUseCase", "field": "name"},
+        )
+        _patch_brand_save_entry(monkeypatch, stub)
+
+        exit_code = agent_cli.main(
+            ["brand-template-save", "--name", "", "--color-scheme", "corporate-blue", "--font-preset", "stsong"]
+        )
+
+        assert exit_code == 1
+        stderr = capsys.readouterr().err
+        assert "[EXCEPTION_242]" in stderr
+
     def test_success_with_logo_uploaded_wording(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path
     ) -> None:
