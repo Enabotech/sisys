@@ -607,7 +607,7 @@ def given_tavily_key_unset(context: dict[str, Any]) -> None:
     tavily 未注册且核心适配器已注册；with-Key 阳性对照防探针恒报未注册的假阴性。
     bootstrap 全为惰性 lambda 注册（纯 dict 操作），无 DB/Redis 依赖；耗时大头是
     子进程冷启动 import 链（litellm/torch 栈——D13 同族），经
-    LITELLM_LOCAL_MODEL_COST_MAP=1 阻断 litellm import 期出网拉取价目表
+    LITELLM_LOCAL_MODEL_COST_MAP=True 阻断 litellm import 期出网拉取价目表
     （D13 短期缓解先例——.env.example 同款样例项）。
     """
     import os
@@ -648,9 +648,9 @@ def given_tavily_key_unset(context: dict[str, Any]) -> None:
             # 会把本地 .env 的 TAVILY_API_KEY 写回 os.environ——pop 的键被复活，
             # 「KEY 缺失」场景失真。LITELLM_MODE != DEV 是 litellm 官方关闭该副作用的
             # 开关，使子进程环境回到「.env 不参与」的本测试原设计假设；
-            # LITELLM_LOCAL_MODEL_COST_MAP=1 阻断 import 期出网拉取价目表（D13 缓解
+            # LITELLM_LOCAL_MODEL_COST_MAP=True 阻断 import 期出网拉取价目表（D13 缓解
             # 先例——双子进程各省一次网络 RTT）
-            env={**os.environ, "LITELLM_MODE": "PRODUCTION", "LITELLM_LOCAL_MODEL_COST_MAP": "1"},
+            env={**os.environ, "LITELLM_MODE": "PRODUCTION", "LITELLM_LOCAL_MODEL_COST_MAP": "True"},
         )
         assert result.returncode == 0, f"条件注册探针失败:\n{result.stdout}\n{result.stderr}"
         assert "PORTS=" in result.stdout

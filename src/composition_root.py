@@ -1531,13 +1531,17 @@ def bootstrap() -> None:
     # Workflow Engine — Prefect 工作流引擎适配器
     from src.domain.ports.workflow_engine import WorkflowEnginePort
     from src.infrastructure.config.prefect import PrefectConfig
-    from src.infrastructure.workflow.prefect_engine import PrefectEngine
 
     register_port(
         name="workflow_engine",
         version="v1.0.0",
         interface=WorkflowEnginePort,
-        impl=lambda resolver: PrefectEngine(
+        # 惰性 import（bootstrap 冷启动优化——prefect 宽树 ~2.2s；crawler 端口
+        # __import__ 同款先例：首次 resolve 时才拉入，探针/注册态断言零影响）
+        impl=lambda resolver: __import__(
+            "src.infrastructure.workflow.prefect_engine",
+            fromlist=["PrefectEngine"],
+        ).PrefectEngine(
             PrefectConfig.from_env(),
             resolver.resolve("event_publisher"),
         ),
@@ -1549,7 +1553,6 @@ def bootstrap() -> None:
 
     # Agent Engine — LangGraph Agent 编排引擎适配器
     from src.domain.ports.agent_engine import AgentEnginePort
-    from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
     from src.infrastructure.config.langgraph import LangGraphConfig
 
     register_port(
@@ -1561,7 +1564,11 @@ def bootstrap() -> None:
         # 不要求注册顺序）。
         # Story 6-1：尾部增 blm_planning_service 注入（SpBlmGraph 分派前置——
         # 同款硬前置语义；version v1.0.0→v1.1.0 增量注入位）
-        impl=lambda resolver: LangGraphEngine(
+        # 惰性 import（bootstrap 冷启动优化——langgraph ~0.25s；crawler __import__ 先例）
+        impl=lambda resolver: __import__(
+            "src.infrastructure.agent_orch.langgraph_engine",
+            fromlist=["LangGraphEngine"],
+        ).LangGraphEngine(
             LangGraphConfig.from_env(),
             resolver.resolve("event_publisher"),
             workflow_service=resolver.resolve("agent_workflow_service"),
@@ -1628,9 +1635,6 @@ def bootstrap() -> None:
     from src.domain.services.cost_calculator import CostCalculator
     from src.domain.services.udmr_service import UDMRService
     from src.infrastructure.config.udmr import UDMRConfig, build_cost_calculator
-    from src.infrastructure.external_services.llm.cloud_health_checker import (
-        CloudHealthChecker,
-    )
     from src.infrastructure.monitoring.static_token_estimator import StaticTokenEstimator
     from src.infrastructure.routing.udmr_policy import StaticUdmrPolicy
 
@@ -1655,7 +1659,12 @@ def bootstrap() -> None:
         name="cloud_health_checker",
         version="v1.0.0",
         interface=HealthCheckPort,
-        impl=lambda resolver: CloudHealthChecker(
+        # 惰性 import（bootstrap 冷启动优化——litellm 宽树 ~1.8s+出网方差；与
+        # llm_client 端口成对下沉——任一 eager 都会拉入 litellm；crawler 先例）
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.llm.cloud_health_checker",
+            fromlist=["CloudHealthChecker"],
+        ).CloudHealthChecker(
             cloud_configs=UDMRConfig.from_env().cloud_configs,
             timeout=UDMRConfig.from_env().llm_timeout,
             cache_ttl=UDMRConfig.from_env().healthcheck_interval,
@@ -2217,13 +2226,17 @@ def bootstrap() -> None:
     # === LLM Client Port ===
     from src.domain.ports.llm_client import LLMClientPort
     from src.infrastructure.config.llm import build_default_llm_config
-    from src.infrastructure.external_services.llm import LitellmLLMClient
 
     register_port(
         name="llm_client",
         version="v1.1.0",  # 升级: UDMR SSOT 接线（审计修复 F1——UDMR 云端配置优先）
         interface=LLMClientPort,
-        impl=lambda resolver: LitellmLLMClient(build_default_llm_config()),
+        # 惰性 import（bootstrap 冷启动优化——直模块绕过 llm/__init__ 聚合；
+        # 与 cloud_health_checker 成对下沉；crawler __import__ 同款先例）
+        impl=lambda resolver: __import__(
+            "src.infrastructure.external_services.llm.litellm_llm_client",
+            fromlist=["LitellmLLMClient"],
+        ).LitellmLLMClient(build_default_llm_config()),
         module="src.infrastructure.external_services.llm.litellm_llm_client",
         lifetime=Lifetime.SINGLETON,
         owner="foundation-team",

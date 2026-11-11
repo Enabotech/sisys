@@ -529,8 +529,11 @@ def bootstrap_and_check_registration(ds_context: dict[str, Any]):
         cwd=ROOT,
         # litellm import 期 DEV 模式（默认）无条件 load_dotenv：python -c 子进程按
         # REPL 语义从 cwd 找到本地 .env，pop 的键会被复活（同 AC-24 根因，
-        # 本地 .env 当前无 EPO/GCP 键故未爆——防未来配置触发同款失真）
-        env={**os.environ, "LITELLM_MODE": "PRODUCTION"},
+        # 本地 .env 当前无 EPO/GCP 键故未爆——防未来配置触发同款失真；
+        # LITELLM_LOCAL_MODEL_COST_MAP=True 阻断 litellm import 期出网拉取价目表
+        # （litellm 契约只认字面 "true"——.env.example:260 同款；PRODUCTION 模式
+        # 不再 load_dotenv，.env 的同名 True 配置带不进子进程故显式补设）
+        env={**os.environ, "LITELLM_MODE": "PRODUCTION", "LITELLM_LOCAL_MODEL_COST_MAP": "True"},
     )
     assert result.returncode == 0, f"registration probe failed:\n{result.stdout}\n{result.stderr}"
     ds_context["probe_verified"] = True

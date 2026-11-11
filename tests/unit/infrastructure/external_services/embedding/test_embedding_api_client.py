@@ -241,7 +241,9 @@ class TestEmbeddingAPIClientErrorHandling:
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
 
         with patch("httpx.AsyncClient.post", return_value=mock_resp):
-            client = EmbeddingAPIClient(api_config)
+            # 单次直达：本格断言「错误包装形态」非重试行为——默认重试耗尽会白付
+            # 指数退避真实等待（1+2=3s，重试语义归 TestEmbeddingAPIClientRetry 承载）
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=1)
             with pytest.raises(EmbeddingAPIError, match="HTTP 500"):
                 await client.embed_query("测试文本")
 
@@ -249,7 +251,8 @@ class TestEmbeddingAPIClientErrorHandling:
     async def test_timeout_raises_timeout_error(self, api_config: EmbeddingConfig) -> None:
         """httpx.TimeoutException 包装为 TimeoutError (EXCEPTION_302)"""
         with patch("httpx.AsyncClient.post", side_effect=httpx.TimeoutException("timeout")):
-            client = EmbeddingAPIClient(api_config)
+            # 单次直达（同上——错误包装形态断言，重试行为归 Retry 类）
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=1)
             with pytest.raises(TimeoutError, match="超时"):
                 await client.embed_query("测试文本")
 
@@ -257,7 +260,8 @@ class TestEmbeddingAPIClientErrorHandling:
     async def test_network_error_raises_network_error(self, api_config: EmbeddingConfig) -> None:
         """httpx.NetworkError 包装为 NetworkError (EXCEPTION_102)"""
         with patch("httpx.AsyncClient.post", side_effect=httpx.NetworkError("connection refused")):
-            client = EmbeddingAPIClient(api_config)
+            # 单次直达（同上——错误包装形态断言，重试行为归 Retry 类）
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=1)
             with pytest.raises(NetworkError, match="网络错误"):
                 await client.embed_query("测试文本")
 
@@ -403,7 +407,7 @@ class TestEmbeddingAPIClientRetry:
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=MagicMock(), response=mock_resp)
 
         with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=3)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=3, retry_min_wait=0.01, retry_max_wait=0.02)
             with pytest.raises(EmbeddingAPIError, match="HTTP 500"):
                 await client.embed_query("测试文本")
             # 重试 3 次 → 共 3 次调用
@@ -419,7 +423,7 @@ class TestEmbeddingAPIClientRetry:
         )
 
         with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2, retry_min_wait=0.01, retry_max_wait=0.02)
             with pytest.raises(EmbeddingAPIError, match="HTTP 503"):
                 await client.embed_query("测试文本")
             assert mock_post.call_count == 2
@@ -431,7 +435,7 @@ class TestEmbeddingAPIClientRetry:
             "httpx.AsyncClient.post",
             side_effect=httpx.TimeoutException("timeout"),
         ) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2, retry_min_wait=0.01, retry_max_wait=0.02)
             with pytest.raises(TimeoutError, match="超时"):
                 await client.embed_query("测试文本")
             assert mock_post.call_count == 2
@@ -443,7 +447,7 @@ class TestEmbeddingAPIClientRetry:
             "httpx.AsyncClient.post",
             side_effect=httpx.NetworkError("connection refused"),
         ) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2, retry_min_wait=0.01, retry_max_wait=0.02)
             with pytest.raises(NetworkError, match="网络错误"):
                 await client.embed_query("测试文本")
             assert mock_post.call_count == 2
@@ -456,7 +460,7 @@ class TestEmbeddingAPIClientRetry:
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("Bad Request", request=MagicMock(), response=mock_resp)
 
         with patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=3)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=3, retry_min_wait=0.01, retry_max_wait=0.02)
             with pytest.raises(EmbeddingAPIError, match="HTTP 400"):
                 await client.embed_query("测试文本")
             assert mock_post.call_count == 1  # 仅首次，不重试
@@ -472,7 +476,7 @@ class TestEmbeddingAPIClientRetry:
         mock_resp_ok = _make_mock_response(_fake_dense_response())
 
         with patch("httpx.AsyncClient.post", side_effect=[mock_resp_fail, mock_resp_ok]) as mock_post:
-            client = EmbeddingAPIClient(api_config, retry_max_attempts=2)
+            client = EmbeddingAPIClient(api_config, retry_max_attempts=2, retry_min_wait=0.01, retry_max_wait=0.02)
             result = await client.embed_query("测试文本")
             assert len(result) == 1024
             assert mock_post.call_count == 2
