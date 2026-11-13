@@ -190,10 +190,10 @@ development_status:
   epic-6-retrospective: done
 
   # ===========================================================================
-  # Epic 7: 多触点用户界面与 API 集成 - 📋 待开始
+  # Epic 7: 多触点用户界面与 API 集成 - 🚧 进行中
   # ===========================================================================
-  epic-7: backlog
-  7-1-cli-command-interface: backlog
+  epic-7: in-progress
+  7-1-cli-command-interface: ready-for-dev
   7-2-rest-api-interface: backlog
   7-3-api-gateway-unified-entry: backlog
   7-4-health-dashboard: backlog
@@ -412,7 +412,7 @@ development_status:
 #   - Epic 4: 13 stories (✅ done — 4-1 + 4-1a~4-1f 补充 6 + 4-2~4-7；Story 4.8/4.9 已迁移至 Epic 5 为 5.11/5.12)
 #   - Epic 5: 12 stories (✅ done 2026-10-30 + 终局审查五轮收敛 + 遗留项核销 R1~R5 收口 2026-10-31；retro 见 epic-5-retro-2026-10-31.md)
 #   - Epic 6: 12 stories (✅ done 2026-11-09 + 收尾核销例行盘点+授权动账四项划线；retro 见 epic-6-retro-2026-11-09.md)
-#   - Epic 7: 8 stories (📋 backlog)
+#   - Epic 7: 8 stories (🚧 1 ready-for-dev, 7 backlog)
 #   - Epic 8: 6 stories (📋 backlog)
 #   - Epic 9-14: 38 stories (📋 backlog, V1)
 #   - Epic 15-20: 24 stories (📋 backlog, V2)
@@ -424,20 +424,20 @@ development_status:
 # Status Summary:
 #   Stories:
 #     - Done: 105  (Epic 0:12 + Epic 1:23 + Epic 2:9 + Epic 3:14 + Epic 4:13 + Epic 5:12 + Epic 6:12 + Epic 90:8 + Epic 91:2)
-#     - Ready for Dev: 3 (0-17, 0-18, 0-30)
+#     - Ready for Dev: 4 (0-17, 0-18, 0-30, 7-1)
 #     - In Progress: 0
 #     - Review: 0
-#     - Backlog: 93 (Epic 7-22)
+#     - Backlog: 92 (Epic 7-22)
 #   Epics:
 #     - Done: 8 (Epic 1, Epic 2, Epic 3, Epic 4, Epic 5, Epic 6, Epic 90, Epic 91)
-#     - In Progress: 1 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30)
-#     - Backlog: 16 (Epic 7-20, Epic 21, Epic 22)
+#     - In Progress: 2 (Epic 0 — Iteration 1 剩余 0-17/0-18/0-30; Epic 7 — 7-1 ready-for-dev)
+#     - Backlog: 15 (Epic 8-20, Epic 21, Epic 22)
 #   Retrospectives:
 #     - Done: 6 (Epic 1, Epic 2, Epic 3, Epic 4, Epic 5, Epic 6)
 #     - Optional: 19
 #
 # Next Steps:
-#   1. Start Epic 7 — Story 7-1 create-story（前置留项清单承载 REST 族回头清单，见 epic-6-retro-2026-11-09.md 行动项 1）
+#   1. Epic 7 已启动 — 7-1 create-story 完成 2026-11-13（前置留项清单十行对表已承载，见 7-1-cli-command-interface.md「锚定义务清单」；下一步 dev-story 实施）
 #   2. Option: Complete Epic 0 Iteration 1 remaining stories (0-17 / 0-18 / 0-30)
 #   3. Option: uspto/GCP 数据源 Key——锚位改锚待定夺（Epic 7 零专利数据源消费，见 epic-6-retro-2026-11-09.md 行动项 3）
 # =============================================================================
