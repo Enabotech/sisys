@@ -1272,8 +1272,8 @@ class TestExceptionHandlersRegistration:
         app = FastAPI()
         _ = ExceptionHandlers(app)
         # 验证关键异常类型的处理器已注册
-        from fastapi.exceptions import RequestValidationError  # noqa: N817
-        from pydantic import ValidationError  # noqa: N814
+        from fastapi.exceptions import RequestValidationError
+        from pydantic import ValidationError
 
         assert RequestValidationError in app.exception_handlers
         assert ValidationError in app.exception_handlers

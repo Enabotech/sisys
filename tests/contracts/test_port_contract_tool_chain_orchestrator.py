@@ -32,7 +32,7 @@ class _RealResolver:
     本测试仅做 isinstance 校验，不会真正执行方法，因此真实 Resolver 足够。
     """
 
-    def resolve(self, name: str) -> Any:  # noqa: D401
+    def resolve(self, name: str) -> Any:
         from src.domain.ports.resolver import resolve as _resolve
 
         return _resolve(name)

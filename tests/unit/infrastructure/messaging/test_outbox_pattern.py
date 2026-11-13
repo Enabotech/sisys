@@ -188,7 +188,7 @@ class TestDomainLayerIsolation:
                 continue
             tree = ast.parse(py_file.read_text())
             for node in ast.walk(tree):
-                if isinstance(node, (ast.Import, ast.ImportFrom)):  # noqa: UP038
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
                     if isinstance(node, ast.ImportFrom):
                         if node.module and "outbox" in node.module.lower() and "entities" in node.module.lower():
                             pytest.fail(f"Domain file {py_file} imports from infrastructure.entities")

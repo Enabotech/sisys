@@ -410,7 +410,7 @@ class TestArgoCDHarborIntegration:
                 if isinstance(robots, list) and len(robots) > 0:
                     return  # 找到 robot_test_deployment，测试通过
 
-        except Exception:  # noqa: S110
+        except Exception:
             pass  # API 调用失败，继续检查其他方法
 
         # 方法 3: 检查机器人账号配置文件
@@ -625,7 +625,7 @@ class TestArgoCDHarborIntegrationE2E:
             "deploy/kubernetes/apps/sisys/prod/kustomization.yaml",
         ]
 
-        import os  # noqa: PLC041
+        import os
 
         found_overlays = [p for p in kustomize_paths if os.path.exists(p)]
 
