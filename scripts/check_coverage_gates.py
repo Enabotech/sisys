@@ -67,6 +67,7 @@ def main():
         ("src/domain", 90, "核心业务逻辑"),
         ("src/application", 85, "用例编排"),
         ("src/infrastructure", 75, "基础设施适配"),
+        ("src/interfaces", 85, "接口层（epics 钦定 ≥85%——Story 7-1 Task 7 门禁条目固化）"),
         ("src", 80, "系统整体"),
     ]
 

@@ -112,6 +112,30 @@ def _ensure_bootstrapped() -> None:
     bootstrap()
 
 
+def load_env(dotenv_path: str | None = None) -> None:
+    """显式加载 .env（Story 7-1——6.8-R1-DF1 核销，OD-7 三选一定谳）。
+
+    三层根因修复：入口显式 load_dotenv（python -m 形态下 dotenv 的
+    find_dotenv 从 site-packages 向上遍历永不经过仓库目录——仓库根以
+    ``Path(__file__)`` 上溯显式定位）；override=False 保护既有环境变量
+    （测试形态 env 优先不受影响）；SISYS_USE_TEST_PORTS=1 时跳过（.env 被
+    git 追踪，测试进程内注入会泄漏非端口键污染同 worker 后续场景）。
+
+    Args:
+        dotenv_path: 显式 .env 路径（缺省仓库根探测——src/entrypoints 上溯两级）
+    """
+    import os
+    from pathlib import Path
+
+    if os.environ.get("SISYS_USE_TEST_PORTS") == "1":
+        return  # 测试形态守卫（R1-19）
+    from dotenv import load_dotenv
+
+    path = Path(dotenv_path) if dotenv_path else Path(__file__).resolve().parents[2] / ".env"
+    if path.is_file():
+        load_dotenv(dotenv_path=str(path), override=False)
+
+
 def _parse_role(role_str: str) -> AgentRole:
     """角色字符串 → AgentRole 枚举（守卫转换）
 
@@ -173,6 +197,34 @@ def _parse_agent_uuid(value: str) -> uuid_module.UUID:
         raise ValidationError(
             message=f"agent-id 必须为合法 UUID 字符串: {normalized!r}",
             context={"agent_id": normalized},
+        ) from None
+
+
+def _validate_plan_uuid(plan_id: str, command: str) -> str:
+    """plan_id 守卫 + canonical 归一（Story 7-1——6.9-R1-DF1 核销）。
+
+    校验通过返回 ``str(uuid_module.UUID(plan_id))`` 小写 canonical 形态：
+    大写/无连字符等宽松形态归一后下传（服务层键拼接恒小写 canonical，
+    原始串下传即键 miss → 静默空态 exit 0 欺骗性成功——本归一即其修复）；
+    非法输入统一 ``EntityValidationError`` 242（九处内联守卫单点收敛，
+    消息与 context 键面不变——行为只增强不破坏）。
+
+    Args:
+        plan_id: --plan-id 原始字符串
+        command: 命令名（异常 context 携带——错误定位）
+
+    Returns:
+        canonical 小写 UUID 字符串
+
+    Raises:
+        EntityValidationError: 242——非 UUID 形态
+    """
+    try:
+        return str(uuid_module.UUID(plan_id))
+    except (ValueError, TypeError, AttributeError):
+        raise EntityValidationError(
+            message="plan_id 必须为 UUID 字符串",
+            context={"command": command, "field": "plan_id", "plan_id": plan_id},
         ) from None
 
 
@@ -880,8 +932,32 @@ def _print_workflow_summary(result: object) -> None:
         print(f"失败原因: {getattr(evidence, 'failure_reason')}")
 
 
+def _task_controller(agent_id_raw: str, task: str, dry_run: bool = False) -> Any:
+    """run-task controller（守卫→dry_run 分叉→幂等 bootstrap→异步执行——OD-14/OD-12）。
+
+    dry_run=True 返回动作清单（守卫后、bootstrap 前短路——零 resolve 零副作用）；
+    False 返回工作流 result（json/table 渲染源——禁经 ``_print_*``）。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+        task: --task 原始字符串
+        dry_run: --dry-run 旗标（client 语义）
+
+    Returns:
+        动作清单（dry_run）或工作流 result
+
+    Raises:
+        ValidationError: 201——非法 agent_id（守卫先于一切 IO）
+    """
+    agent_id = _parse_agent_uuid(agent_id_raw)
+    if dry_run:
+        return [f"将派发任务至 Agent {agent_id}: {task!r}"]
+    _ensure_bootstrapped()
+    return asyncio.run(_run_task(agent_id, task))
+
+
 def _run_task_cli(agent_id_raw: str, task: str) -> int:
-    """run-task 子命令执行（守卫 → bootstrap → 执行 → 摘要输出）。
+    """run-task 子命令执行（controller+``_print`` 薄壳——Story 7-1 OD-14 抽取形态）。
 
     退出码契约（CLI 契约定稿）：成功与失败完成态均 exit 0（工作流正常走完
     语义——status 可观测锚点在摘要输出）；443/441/444/445 等业务异常 exit 1。
@@ -893,17 +969,8 @@ def _run_task_cli(agent_id_raw: str, task: str) -> int:
     Returns:
         退出码（0=工作流正常走完（含失败完成态），1=业务异常）
     """
-    # UUID 守卫（先于 bootstrap——输入错误无需初始化端口注册表）
     try:
-        agent_id = _parse_agent_uuid(agent_id_raw)
-    except ValidationError as error:
-        logger.error("%s", error)
-        print(f"[{error.code}] {error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        result = asyncio.run(_run_task(agent_id, task))
+        result = _task_controller(agent_id_raw, task)
         _print_workflow_summary(result)
         logger.info(
             "Agent 工作流执行完成: status=%s",
@@ -977,17 +1044,8 @@ def _run_blm_plan_cli(agent_id_raw: str, task: str, plan_id: str | None) -> int:
     Returns:
         退出码（0=规划正常完成（含部分降级），1=业务异常）
     """
-    # UUID 守卫（先于 bootstrap——argparse type= 禁 uuid.UUID 纪律）
     try:
-        agent_id = _parse_agent_uuid(agent_id_raw)
-    except ValidationError as error:
-        logger.error("%s", error)
-        print(f"[{error.code}] {error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        result = asyncio.run(_run_blm_planning(agent_id, task, plan_id))
+        result = _blm_plan_controller(agent_id_raw, task, plan_id)
         _print_blm_progress(result)
         logger.info(
             "BLM 规划执行完成: plan_id=%s degraded=%d",
@@ -1002,6 +1060,32 @@ def _run_blm_plan_cli(agent_id_raw: str, task: str, plan_id: str | None) -> int:
     except Exception as error:
         logger.error("BLM 规划执行异常: %s", error, exc_info=True)
         return 1
+
+
+def _blm_plan_controller(agent_id_raw: str, task: str, plan_id: str | None, dry_run: bool = False) -> Any:
+    """blm-plan controller（守卫→dry_run 分叉→幂等 bootstrap→异步执行——OD-14/OD-12）。
+
+    Args:
+        agent_id_raw: --agent-id 原始字符串
+        task: --task 原始字符串
+        plan_id: --plan-id 可选（缺省 None——用例内新铸；传入时经 canonical
+            守卫归一——plan_id 命令族第十处收口[6.9-R1-DF1 同族补齐]）
+        dry_run: --dry-run 旗标（client 语义——动作清单零 resolve）
+
+    Returns:
+        动作清单（dry_run）或规划 result
+
+    Raises:
+        ValidationError: 201——非法 agent_id（守卫先于 bootstrap）
+        EntityValidationError: 242——非法 plan_id（canonical 守卫归一）
+    """
+    agent_id = _parse_agent_uuid(agent_id_raw)
+    if plan_id is not None:
+        plan_id = _validate_plan_uuid(plan_id, "blm-plan")
+    if dry_run:
+        return [f"将执行 BLM 规划（Agent {agent_id}，plan_id={plan_id or '自动生成'}）"]
+    _ensure_bootstrapped()
+    return asyncio.run(_run_blm_planning(agent_id, task, plan_id))
 
 
 async def _run_checkpoint_create(
@@ -1136,14 +1220,10 @@ def _run_chain_query_cli(plan_id: str, include_blob: bool) -> int:
         退出码（0=查询返回（含空清单），1=业务异常/参数守卫失败）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "chain-query", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("决策追溯查询失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        plan_id = _validate_plan_uuid(plan_id, "chain-query")
+    except EntityValidationError as error:
+        logger.error("决策追溯查询失败（参数守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
 
     try:
@@ -1209,17 +1289,62 @@ def _print_report_summary(
     print(f"  生成耗时: {getattr(result, 'generation_ms', 0)} ms")
 
 
+def _report_generate_controller(
+    plan_id: str,
+    report_format: str = "markdown",
+    brand_template: str | None = None,
+    dry_run: bool = False,
+) -> Any:
+    """report-generate controller（守卫族→dry_run 分叉→幂等 bootstrap→异步执行——OD-14/OD-12）。
+
+    守卫序：组合守卫 494（brand×format）先于 UUID 守卫（既有顺序保持）；
+    report_format 值域 242 插于两者之间（R1-F3——统一面无 argparse choices，
+    controller 层补值域防 ``== "pdf"`` 二值分发静默落 markdown）。
+
+    Args:
+        plan_id: --plan-id 原始字符串
+        report_format: --report-format 值（markdown/pdf——Typer 面拆分 OD-13）
+        brand_template: --brand-template 值（仅 pdf 组合合法）
+        dry_run: --dry-run 旗标（client 语义——产物写入型动作清单）
+
+    Returns:
+        动作清单（dry_run）或报告生成 result
+
+    Raises:
+        BrandTemplateValidationError: 494——brand_template 与非 pdf 组合
+        EntityValidationError: 242——report_format 值域外 / 非法 plan_id
+    """
+    if brand_template is not None and report_format != "pdf":
+        from src.domain.exceptions import BrandTemplateValidationError
+
+        raise BrandTemplateValidationError(
+            field="parameter_combination",
+            message="品牌模板应用仅支持 PDF 导出（--brand-template 需与 --report-format pdf 组合；兼容入口 --format pdf）",
+            context_extra={"template_name": brand_template, "reason": "参数组合非法"},
+        )
+    if report_format not in ("markdown", "pdf"):
+        raise EntityValidationError(
+            message=f"--report-format 值域非法（markdown|pdf）: {report_format!r}",
+            context={"command": "report-generate", "field": "report_format", "report_format": report_format},
+        )
+    plan_id = _validate_plan_uuid(plan_id, "report-generate")
+    if dry_run:
+        return [f"将生成 {report_format} 报告并写 L0/L2（plan_id={plan_id}）"]
+    _ensure_bootstrapped()
+    return asyncio.run(_run_report_generate(plan_id, report_format, brand_template))
+
+
 def _run_report_generate_cli(
     plan_id: str,
     report_format: str = "markdown",
     brand_template: str | None = None,
 ) -> int:
-    """report-generate 子命令执行（五步定式——chain-query 模板；6-5b --format 分发+6-11 品牌参）。
+    """report-generate 子命令执行（controller+``_print`` 薄壳——Story 7-1 OD-14 抽取形态）。
 
     exit 0 判据 = 报告生成返回（持久化已落盘+事件已发布——宽容语义）；
     plan_id 非 UUID → 守卫 exit 1；``--brand-template`` 携带且 ``--format
     markdown`` → 组合守卫 494（post-parse 检测归 CLI 层唯一落位[checkpoint-recover
-    成组约束 :2026-2032 先例]——bootstrap 前先于用例零调用）；490~493/494
+    成组约束先例]——bootstrap 前先于用例零调用）；490~493/494
     DomainError → [code] stderr exit 1（双层异常定式）。
 
     Args:
@@ -1230,34 +1355,8 @@ def _run_report_generate_cli(
     Returns:
         退出码（0=报告生成完成，1=业务异常/参数守卫失败）。
     """
-    # 组合守卫（品牌应用仅 PDF 面支持——Markdown 纯文本无视觉承载，组合非法
-    # 显式拒绝非静默忽略；post-parse 检测在 UUID 守卫与 bootstrap 之前——
-    # 守卫先于一切 IO 与用例调用）
-    if brand_template is not None and report_format != "pdf":
-        from src.domain.exceptions import BrandTemplateValidationError
-
-        combo_error = BrandTemplateValidationError(
-            field="parameter_combination",
-            message="品牌模板应用仅支持 PDF 导出（--brand-template 需与 --format pdf 组合使用）",
-            context_extra={"template_name": brand_template, "reason": "参数组合非法"},
-        )
-        logger.error("报告生成失败（组合守卫）: %s", combo_error)
-        print(f"[{combo_error.code}] {combo_error.message}", file=sys.stderr)
-        return 1
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "report-generate", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("报告生成失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        result = asyncio.run(_run_report_generate(plan_id, report_format, brand_template))
+        result = _report_generate_controller(plan_id, report_format, brand_template)
         _print_report_summary(result, report_format, brand_template_name=brand_template)
         logger.info(
             "报告生成完成: plan_id=%s report_id=%s format=%s brand_template=%s",
@@ -1449,14 +1548,10 @@ def _run_checkpoint_create_cli(
     # EntityValidationError 走 [{code}] {message} 统一形态——与 DomainError 分支
     # 一致，R1 审查 FR-18：禁字面前缀假统一）
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "checkpoint-create", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("Checkpoint 创建失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        plan_id = _validate_plan_uuid(plan_id, "checkpoint-create")
+    except EntityValidationError as error:
+        logger.error("Checkpoint 创建失败（参数守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
 
     try:
@@ -1518,8 +1613,28 @@ def _print_checkpoint_summary_table(summaries: list[Any]) -> None:
         print(" | ".join(value.ljust(widths[column]) for column, value in enumerate(row)))
 
 
+def _checkpoint_list_controller(plan_id: str, dry_run: bool = False) -> Any:
+    """checkpoint-list controller（守卫→dry_run 分叉→幂等 bootstrap→异步执行——OD-14/OD-12）。
+
+    Args:
+        plan_id: --plan-id 原始字符串
+        dry_run: --dry-run 旗标（client 语义——动作清单零 resolve）
+
+    Returns:
+        动作清单（dry_run）或 Checkpoint 摘要列表
+
+    Raises:
+        EntityValidationError: 242——非法 plan_id（守卫先于 bootstrap）
+    """
+    plan_id = _validate_plan_uuid(plan_id, "checkpoint-list")
+    if dry_run:
+        return [f"将查询 Checkpoint 清单（plan_id={plan_id}）"]
+    _ensure_bootstrapped()
+    return asyncio.run(_run_checkpoint_list(plan_id))
+
+
 def _run_checkpoint_list_cli(plan_id: str) -> int:
-    """checkpoint-list 子命令执行（五步定式——_run_checkpoint_create_cli 直系样板）。
+    """checkpoint-list 子命令执行（controller+``_print`` 薄壳——Story 7-1 OD-14 抽取形态）。
 
     Args:
         plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
@@ -1528,19 +1643,7 @@ def _run_checkpoint_list_cli(plan_id: str) -> int:
         退出码（0=清单查询成功（空清单亦 0——枚举面非错误），1=业务异常）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "checkpoint-list", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("Checkpoint 清单失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        summaries = asyncio.run(_run_checkpoint_list(plan_id))
+        summaries = _checkpoint_list_controller(plan_id)
         if summaries:
             _print_checkpoint_summary_table(summaries)
         else:
@@ -1593,14 +1696,10 @@ def _run_checkpoint_show_cli(plan_id: str, checkpoint_no: str) -> int:
         退出码（0=视图查询成功，1=业务异常）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "checkpoint-show", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("Checkpoint 详情失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        plan_id = _validate_plan_uuid(plan_id, "checkpoint-show")
+    except EntityValidationError as error:
+        logger.error("Checkpoint 详情失败（参数守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
 
     try:
@@ -1691,8 +1790,30 @@ def _print_traceability_tree(tree: Any, *, stage_filter: str | None = None) -> N
                 )
 
 
+def _trace_tree_controller(plan_id: str, depth: str, stage: str | None, dry_run: bool = False) -> Any:
+    """trace-tree controller（守卫→dry_run 分叉→幂等 bootstrap→异步执行——OD-14/OD-12）。
+
+    Args:
+        plan_id: --plan-id 原始字符串
+        depth: --depth 原始字符串（本层 int 转换——DR3-7 签名钦定）
+        stage: --stage 客户端过滤参数（渲染层消费——controller 透传不使用）
+        dry_run: --dry-run 旗标（client 语义——读命令退化态：守卫+动作回显）
+
+    Returns:
+        动作清单（dry_run）或追溯树 result
+
+    Raises:
+        EntityValidationError: 242——非法 plan_id
+    """
+    plan_id = _validate_plan_uuid(plan_id, "trace-tree")
+    if dry_run:
+        return [f"将查询追溯树（plan_id={plan_id} depth={depth}）"]
+    _ensure_bootstrapped()
+    return asyncio.run(_run_trace_tree(plan_id, int(depth)))
+
+
 def _run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int:
-    """trace-tree 子命令执行（五步定式——_run_checkpoint_show_cli 直系样板）。
+    """trace-tree 子命令执行（controller+``_print`` 薄壳——Story 7-1 OD-14 抽取形态）。
 
     Args:
         plan_id: --plan-id 原始字符串（UUID 守卫先于 bootstrap）。
@@ -1704,19 +1825,7 @@ def _run_trace_tree_cli(plan_id: str, depth: str, stage: str | None) -> int:
         用法错误由 argparse 原生承载）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "trace-tree", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("溯源树查询失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
-        return 1
-
-    try:
-        _ensure_bootstrapped()
-        tree = asyncio.run(_run_trace_tree(plan_id, int(depth)))
+        tree = _trace_tree_controller(plan_id, depth, stage)
         _print_traceability_tree(tree, stage_filter=stage)
         logger.info("溯源树查询完成: plan_id=%s depth=%s stage=%s", plan_id, depth, stage)
         return 0
@@ -1831,14 +1940,10 @@ def _run_executive_view_cli(plan_id: str) -> int:
         用法错误由 argparse 原生承载）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "executive-view", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("高管简化视图查询失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        plan_id = _validate_plan_uuid(plan_id, "executive-view")
+    except EntityValidationError as error:
+        logger.error("高管简化视图查询失败（参数守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
 
     try:
@@ -1950,14 +2055,10 @@ def _run_analyst_view_cli(plan_id: str) -> int:
         用法错误由 argparse 原生承载）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "analyst-view", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("分析师视图查询失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
+        plan_id = _validate_plan_uuid(plan_id, "analyst-view")
+    except EntityValidationError as error:
+        logger.error("分析师视图查询失败（参数守卫）: %s", error)
+        print(f"[{error.code}] {error.message}", file=sys.stderr)
         return 1
 
     try:
@@ -2218,6 +2319,83 @@ def _print_recovery_outcome(outcome: Any) -> None:
     print(f"  recovery_record_session_id: {getattr(outcome, 'recovery_record_session_id', '')}")
 
 
+def _checkpoint_recover_controller(
+    plan_id: str,
+    checkpoint_no: str,
+    correction_type: str | None,
+    previous_value: str | None,
+    new_value: str | None,
+    applied_by: str | None,
+    mode_raw: str | None,
+    confirm: bool,
+    confirmed_by: str | None,
+    dry_run: bool = False,
+) -> Any:
+    """checkpoint-recover controller（守卫族全前移→dry_run 分叉→双态执行——OD-14/OD-12）。
+
+    守卫族（全前移 controller 顶部——dry-run 短路不跳过任何守卫）：UUID 242 →
+    四参成组 242 → ``--mode`` 值域 242（**Story 7-1 前移**：原在 confirm 分支
+    内 :2303-2306 形态，dry-run 短路会跳过——OD-12 钦定②）→ 审批人 242
+    （confirm 必填——dry-run×--yes 同样校验）。dry_run 动作清单随 confirm
+    位切换（评估态/执行态措辞分叉——OD-12 钦定①）。
+
+    Args:
+        plan_id: --plan-id 原始字符串
+        checkpoint_no: --checkpoint-no 原始字符串
+        correction_type: --correction-type（四参数成组）
+        previous_value: --previous-value（四参数成组）
+        new_value: --new-value（四参数成组）
+        applied_by: --applied-by（四参数成组；--confirmed-by 缺省链兜底）
+        mode_raw: --mode 原始字符串（replay|override）
+        confirm: 确认旗标（Typer 面 --yes / 兼容入口 --confirm 等价注入）
+        confirmed_by: --confirmed-by（confirm 路径必填）
+        dry_run: --dry-run 旗标（client 语义——全局短路零 resolve）
+
+    Returns:
+        动作清单（dry_run）或评估视图 view（confirm=False）/ 执行结果 outcome
+
+    Raises:
+        EntityValidationError: 242——守卫族任一失败
+    """
+    plan_id = _validate_plan_uuid(plan_id, "checkpoint-recover")
+    correction = _parse_correction_group(correction_type, previous_value, new_value, applied_by)
+    explicit_mode = None
+    if mode_raw is not None:
+        if mode_raw not in ("replay", "override"):
+            raise EntityValidationError(
+                message="--mode 值域非法（replay|override）",
+                context={"command": "checkpoint-recover", "field": "mode", "mode": mode_raw},
+            )
+        from src.domain.entities.checkpoint import RecoveryMode
+
+        explicit_mode = RecoveryMode(mode_raw)
+    # is None 判缺省（代码审查 R1-F9）：显式空串原样保留不静默兜底
+    effective_confirmed_by = confirmed_by if confirmed_by is not None else (applied_by or "")
+    if confirm and not effective_confirmed_by:
+        raise EntityValidationError(
+            message="confirm 执行必须提供 --confirmed-by（或 --applied-by）——审批人身份不可缺省空",
+            context={"command": "checkpoint-recover", "field": "confirmed_by", "confirmed_by": ""},
+        )
+    if dry_run:
+        if confirm:
+            return ["应用修正（如有）", "落恢复记录", "发布恢复事件", "输出恢复结果"]
+        return ["输出恢复影响评估（评估模式——不落记录/不发事件/不应用修正）"]
+    if not confirm:
+        _ensure_bootstrapped()
+        return asyncio.run(_run_checkpoint_recovery_view(plan_id, checkpoint_no))
+    _ensure_bootstrapped()
+    return asyncio.run(
+        _run_checkpoint_recover(
+            plan_id,
+            checkpoint_no=checkpoint_no,
+            correction=correction,
+            mode=explicit_mode,
+            confirmed_by=effective_confirmed_by,
+            created_via="cli",
+        )
+    )
+
+
 def _run_checkpoint_recover_cli(
     plan_id: str,
     checkpoint_no: str,
@@ -2229,7 +2407,7 @@ def _run_checkpoint_recover_cli(
     confirm: bool,
     confirmed_by: str | None,
 ) -> int:
-    """checkpoint-recover 子命令执行（两态——OD-5 CLI 同步确认形态）。
+    """checkpoint-recover 子命令执行（controller+双态渲染薄壳——Story 7-1 OD-14 抽取形态）。
 
     无 --confirm = dry-run（影响评估输出 + exit 0 + 三零——不调执行引擎仅
     resolve ②步视图）；有 --confirm = 执行 AC-3 全链。exit 0 口径：dry-run
@@ -2250,72 +2428,17 @@ def _run_checkpoint_recover_cli(
         退出码（0=评估完成/恢复记录落库成功，1=业务异常）。
     """
     try:
-        uuid_module.UUID(plan_id)
-    except ValueError:
-        validation_error = EntityValidationError(
-            message="plan_id 必须为 UUID 字符串",
-            context={"command": "checkpoint-recover", "field": "plan_id", "plan_id": plan_id},
-        )
-        logger.error("Checkpoint 恢复失败（参数守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
-        return 1
-
-    # 四参数成组守卫（CLI 层唯一落位——post-parse 检测+真实异常构造）
-    try:
-        correction = _parse_correction_group(correction_type, previous_value, new_value, applied_by)
-    except DomainError as error:
-        logger.error("Checkpoint 恢复失败（修正参数成组守卫）: %s", error)
-        print(f"[{error.code}] {error.message}", file=sys.stderr)
-        return 1
-
-    # 两态参数校验面一致：confirmed_by 缺省链（dry-run 不要求；confirm 必填）。
-    # is None 判缺省（代码审查 R1-F9）：显式空串 "" 原样保留——不静默滑入
-    # --applied-by 兜底（审批人身份被静默替换），由 confirm 守卫 242 fail-loud
-    effective_confirmed_by = confirmed_by if confirmed_by is not None else (applied_by or "")
-
-    if not confirm:
-        try:
-            _ensure_bootstrapped()
-            view = asyncio.run(_run_checkpoint_recovery_view(plan_id, checkpoint_no))
+        if not confirm:
+            view = _checkpoint_recover_controller(
+                plan_id, checkpoint_no, correction_type, previous_value, new_value, applied_by, mode_raw, confirm, confirmed_by
+            )
+            # correction 幂等重建（渲染参数——controller 守卫段已构造验证）
+            correction = _parse_correction_group(correction_type, previous_value, new_value, applied_by)
             _print_recovery_assessment(view, mode_raw, correction, confirmed_by)
             logger.info("Checkpoint 恢复评估完成（dry-run）: plan_id=%s checkpoint_no=%s", plan_id, checkpoint_no)
             return 0
-        except DomainError as error:
-            logger.error("Checkpoint 恢复评估失败: %s", error)
-            print(f"[{error.code}] {error.message}", file=sys.stderr)
-            return 1
-        except Exception as error:
-            logger.error("Checkpoint 恢复评估异常: %s", error, exc_info=True)
-            return 1
-
-    # confirm 路径守卫（CLI 层与用例层双落位——纯恢复场景无修正兜底时要求显式提供）
-    if not effective_confirmed_by:
-        validation_error = EntityValidationError(
-            message="confirm 执行必须提供 --confirmed-by（或 --applied-by）——审批人身份不可缺省空",
-            context={"command": "checkpoint-recover", "field": "confirmed_by", "confirmed_by": ""},
-        )
-        logger.error("Checkpoint 恢复失败（审批人守卫）: %s", validation_error)
-        print(f"[{validation_error.code}] {validation_error.message}", file=sys.stderr)
-        return 1
-
-    # --mode 转换层位钦定：CLI 层 str-Enum 按值构造 → 全链 entities 枚举
-    explicit_mode = None
-    if mode_raw is not None:
-        from src.domain.entities.checkpoint import RecoveryMode
-
-        explicit_mode = RecoveryMode(mode_raw)
-
-    try:
-        _ensure_bootstrapped()
-        outcome = asyncio.run(
-            _run_checkpoint_recover(
-                plan_id,
-                checkpoint_no=checkpoint_no,
-                correction=correction,
-                mode=explicit_mode,
-                confirmed_by=effective_confirmed_by,
-                created_via="cli",
-            )
+        outcome = _checkpoint_recover_controller(
+            plan_id, checkpoint_no, correction_type, previous_value, new_value, applied_by, mode_raw, confirm, confirmed_by
         )
         _print_recovery_outcome(outcome)
         logger.info(
@@ -2332,6 +2455,30 @@ def _run_checkpoint_recover_cli(
     except Exception as error:
         logger.error("Checkpoint 恢复异常: %s", error, exc_info=True)
         return 1
+
+
+def _instantiate_controller(role_raw: str, dry_run: bool = False) -> Any:
+    """instantiate controller（Typer 面——守卫→dry_run 分叉→幂等 bootstrap→异步执行）。
+
+    Story 7-1 OD-14/OD-12：Typer 新前端统一走 ``_ensure_bootstrapped`` 幂等
+    守卫形态（兼容入口 ``_run_instantiate_cli`` 保留 ``bootstrap()`` 直调
+    例外——零回归铁律，见端口表例外注记）。
+
+    Args:
+        role_raw: --role 原始字符串
+        dry_run: --dry-run 旗标（client 语义——动作清单零 resolve）
+
+    Returns:
+        动作清单（dry_run）或实例化 result（含 agent_id）
+
+    Raises:
+        AgentRoleNotSupportedError: 441——非法角色（守卫先于 bootstrap）
+    """
+    role = _parse_role(role_raw)
+    if dry_run:
+        return [f"将实例化 {role.value} 角色 Agent"]
+    _ensure_bootstrapped()
+    return asyncio.run(_instantiate(role))
 
 
 def _run_instantiate_cli(role_raw: str) -> int:
@@ -2629,6 +2776,7 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         退出码（0=成功，1=业务异常，2=用法错误——argparse 自动）
     """
+    load_env()  # 显式 .env 加载（6.8-R1-DF1 核销——双入口复用单函数）
     parser = build_parser()
     args = parser.parse_args(argv)
 

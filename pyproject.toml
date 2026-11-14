@@ -153,11 +153,13 @@ asyncpg-stubs = "^0.31.2"
 striprtf = "^0.0.32"
 
 [project.scripts]
+sisys = "src.entrypoints.cli_main:main"
 crawler = "plugins.crawler.cli:app"
 sisys-ocr = "src.entrypoints.ocr_cli:main"
 sisys-agent = "src.entrypoints.agent_cli:main"
 
 [tool.poetry.scripts]
+sisys = "src.entrypoints.cli_main:main"
 sisys-ocr = "src.entrypoints.ocr_cli:main"
 sisys-agent = "src.entrypoints.agent_cli:main"
 

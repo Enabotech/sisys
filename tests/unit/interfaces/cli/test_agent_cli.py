@@ -1299,12 +1299,35 @@ class TestBlmPlanExecution:
         assert "降级" in capsys.readouterr().out
 
     def test_plan_id_passthrough(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-        """--plan-id 透传到用例（execute 第三参数）。"""
+        """--plan-id（合法 UUID）透传到用例（execute 第三参数——canonical 形态）。
+
+        R1-F1 适配：原用例以 "plan-77" 非 UUID 断言原样透传——plan_id 守卫
+        补齐后非法值 242 拒绝，透传语义以合法 UUID 断言承载。
+        """
         stub = _StubBlmPlanningUseCase()
         _patch_blm_plan_entry(monkeypatch, stub)
         agent_id = uuid.uuid4()
-        agent_cli.main(["blm-plan", "-a", str(agent_id), "-t", "任务", "--plan-id", "plan-77"])
-        assert stub.calls[0][2] == "plan-77"
+        plan_id = str(uuid.uuid4())
+        agent_cli.main(["blm-plan", "-a", str(agent_id), "-t", "任务", "--plan-id", plan_id])
+        assert stub.calls[0][2] == plan_id
+
+    def test_plan_id_canonical_normalized(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--plan-id 大写形态经 canonical 守卫归一后下传（6.9-R1-DF1 族级收口第十处）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+        plan_id = uuid.uuid4()
+        exit_code = agent_cli.main(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务", "--plan-id", str(plan_id).upper()])
+        assert exit_code == 0
+        assert stub.calls[0][2] == str(plan_id)
+
+    def test_plan_id_invalid_rejected(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--plan-id 非 UUID 形态 242 拒绝（守卫先于 bootstrap——R1-F1）。"""
+        stub = _StubBlmPlanningUseCase()
+        _patch_blm_plan_entry(monkeypatch, stub)
+        exit_code = agent_cli.main(["blm-plan", "-a", str(uuid.uuid4()), "-t", "任务", "--plan-id", "plan-77"])
+        assert exit_code == 1
+        assert "EXCEPTION_242" in capsys.readouterr().err
+        assert stub.calls == []
 
 
 # ===================================================================
@@ -2167,6 +2190,76 @@ class TestCheckpointListExecution:
         assert exit_code == 1
         assert not stub.calls, "守卫失败后不得触达用例"
         assert "[EXCEPTION_242]" in capsys.readouterr().err
+
+
+class TestPlanUuidCanonicalNormalization:
+    """plan_id canonical 归一（Story 7-1 Task 2 循环 A——6.9-R1-DF1 核销）。
+
+    现状：9 处内联守卫仅校验不归一——大写/无连字符形态过守卫后原始串流入
+    服务层键拼接，写侧恒小写 canonical → 键 miss → 静默空态 exit 0（欺骗性
+    成功）。修复：守卫归一传 ``str(UUID(plan_id))`` 小写 canonical。
+    """
+
+    def test_uppercase_plan_id_resolves_canonical_form(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """大写 plan-id → resolve 收到 canonical 小写形态（键命中根因——现状收原始大写）。"""
+        stub = _StubListUseCase([_StubSummaryView(checkpoint_no="CP-1")])
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        canonical = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", canonical.upper()])
+
+        assert exit_code == 0, f"大写形态应归一命中非报错: {capsys.readouterr()}"
+        assert stub.calls, "归一后应触达用例"
+        assert stub.calls[0]["plan_id"] == canonical, (
+            f"resolve 收到 {stub.calls[0]['plan_id']!r}——应归一为 canonical 小写 {canonical!r}"
+        )
+
+    def test_no_hyphen_plan_id_resolves_canonical_form(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """无连字符 plan-id → 归一为 canonical 连字符小写形态。"""
+        stub = _StubListUseCase([_StubSummaryView(checkpoint_no="CP-1")])
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        canonical = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", canonical.replace("-", "")])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["plan_id"] == canonical, (
+            f"无连字符形态应归一为 {canonical!r}（实测 {stub.calls[0]['plan_id'] if stub.calls else None!r}）"
+        )
+
+    def test_canonical_input_behavior_unchanged(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """canonical 输入行为不变（归一只增强不破坏——值级等价断言）。"""
+        stub = _StubListUseCase([_StubSummaryView(checkpoint_no="CP-1")])
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        canonical = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["checkpoint-list", "--plan-id", canonical])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["plan_id"] == canonical
+
+    def test_normalization_covers_trace_tree_chain(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """归一覆盖 trace-tree 命令族（9 处内联共享守卫单点收敛的代表性验证）。"""
+        stub = _StubListUseCase([])
+        monkeypatch.setattr(agent_cli, "bootstrap", lambda: None)
+        monkeypatch.setattr(agent_cli, "resolve", lambda name: stub)
+        canonical = str(uuid.uuid4())
+
+        exit_code = agent_cli.main(["chain-query", "--plan-id", canonical.upper()])
+
+        assert exit_code == 0
+        assert stub.calls and stub.calls[0]["plan_id"] == canonical, "chain-query 同族归一（共享守卫）"
 
 
 class TestCheckpointShowParser:
