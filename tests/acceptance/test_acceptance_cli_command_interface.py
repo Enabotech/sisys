@@ -200,7 +200,6 @@ def context(
         "_search_collections": [],
         "_snapshot_ids": [],
         "_plan_ids": [],
-        "_agent_ids": [],
         "_created_collections": [],
         # 断言暂存位
         "durations": [],
@@ -213,7 +212,9 @@ def context(
 
 def _teardown_chain(ctx: dict[str, Any]) -> None:
     """场景清理链（登记面逐项自清理——禁 delete/truncate，走服务自清理通道）。"""
-    if not any(ctx.get(key) for key in ("_upload_doc_ids", "_search_collections", "_snapshot_ids", "_plan_ids")):
+    if not any(
+        ctx.get(key) for key in ("_upload_doc_ids", "_search_collections", "_snapshot_ids", "_plan_ids", "_created_collections")
+    ):
         return
     try:
         _run_async(ctx["_loop"], _cleanup_registered_async(ctx))
@@ -387,6 +388,7 @@ async def _preset_search_collection_async(ctx: dict[str, Any]) -> str:
         await storage.upsert_points(name, points)
     finally:
         await embed.close()
+        await qdrant.close()  # 预置自建 QdrantManager 连接池关闭（R2-β：原仅关 embed 泄漏 client）
     ctx["_created_collections"].append(name)
     return name
 

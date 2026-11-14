@@ -30,10 +30,6 @@ from src.interfaces.cli.formatters import DryRunOption, FormatOption, MockOption
 
 agent_app = typer.Typer(help="Agent 实例化与任务执行（instantiate / run-task）")
 
-plan_app = typer.Typer(help="BLM 规划生成 / 报告导出 / 追溯树（generate / report / trace-tree）")
-
-checkpoint_app = typer.Typer(help="Checkpoint 清单与恢复（list / recover）")
-
 
 class TraceDepth(str, enum.Enum):
     """追溯深度值域枚举（1-4——R1-F10：typer Enum 注解解析层拒绝非数字/越域）。

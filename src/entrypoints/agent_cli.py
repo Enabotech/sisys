@@ -1807,7 +1807,10 @@ def _trace_tree_controller(plan_id: str, depth: str, stage: str | None, dry_run:
     """
     plan_id = _validate_plan_uuid(plan_id, "trace-tree")
     if dry_run:
-        return [f"将查询追溯树（plan_id={plan_id} depth={depth}）"]
+        # depth 经 R1-F10 Enum 化后为 (str,Enum) 成员——f-string 直嵌输出类名
+        # 形态（R2 抓漏），取 str 值保持动作文本机器可读（与执行路径 int(depth) 同源）
+        depth_value = getattr(depth, "value", depth)
+        return [f"将查询追溯树（plan_id={plan_id} depth={depth_value}）"]
     _ensure_bootstrapped()
     return asyncio.run(_run_trace_tree(plan_id, int(depth)))
 

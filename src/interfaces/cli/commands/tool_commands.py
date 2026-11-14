@@ -110,7 +110,10 @@ def _list_controller(
     """
     tenant_uuid = _validate_uuid(tenant_id, field="tenant_id") if tenant_id else None
     if dry_run:
-        return [f"将查询工具元数据清单（category={category} tenant={tenant_uuid} offset={offset} limit={limit}）"]
+        # 可选参数缺席渲染「（全部）」而非 None 字样（R2-β 观感修复）
+        category_text = category if category else "（全部）"
+        tenant_text = str(tenant_uuid) if tenant_uuid else "（全部租户）"
+        return [f"将查询工具元数据清单（category={category_text} tenant={tenant_text} offset={offset} limit={limit}）"]
     from src.application.ports.tool_execution_service import ToolListQuery
 
     service = get_resolver().resolve("tool_execution_service")

@@ -472,3 +472,4 @@
 - **R1-DF2 集成测试 PG 行+L5 归档残留无端口删除通道**：`test_integration_cli_unified_entry.py` 的 upload PG 行与 archive_plan L2/L5 残留无合规删除端口 API（document_repository/archive_repository 均无 delete；纪律禁手写 SQL delete）——MinIO 对象已补 `l4_object.delete` 定向清理（R1-T1），Qdrant collection 名为服务内部派生不可外部枚举。V1=接受测试端口库残留（租户前缀隔离不假红）。触发锚：仓储删除端口立项（或租户级清理通道服务化）。
 - **R1-DF3 守卫异常码跨面不一致（242 vs 201）**：同为 UUID 校验，agent_id 族 `_parse_agent_uuid` 报 201、plan_id/tool/tenant 族报 242（agent_cli 旧守卫兼容先例保留——AC-5 零回归铁律）。统一归 7-x CLI 治理专项（需同步 agent_cli 202 单测基线与验收场景码面）。
 - **R1-DF4 AC-2 非法 `--format` exit 2 验收场景**：F2 choices 化后行为已由单测锁定（`test_f2_invalid_format_rejected_exit_2`），验收场景增量价值低（BDD 双文件成本）——归 7-2 REST 族入口标准化时统一补充输入面异常场景。
+- **R1-DF5 非 editable 安装形态 .env 探测 miss**：`load_env` 以 `Path(__file__).parents[2]` 锚定仓库根（agent_cli.py），site-packages 安装形态下静默 miss .env（dev/editable 形态正确）。触发锚：CLI 分发安装立项（pyinstaller/wheel 打包形态）。

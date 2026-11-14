@@ -82,6 +82,27 @@ def get_app() -> typer.Typer:
     return _assembled_app
 
 
+def _flush_and_exit(signum: int) -> None:
+    """信号路径刷盘+退出（flush 异常安全——R2-β 修复）。
+
+    stdout 管道已断（pipe 消费方提前关闭）时 ``sys.stdout.flush()`` 抛
+    BrokenPipeError——若不防护，os._exit 不可达且退出码契约（128+signum）
+    降级为穿透 traceback。flush 失败不阻断退出（与 tracer 段降级语义一致）。
+
+    Args:
+        signum: 信号编号（退出码 128+signum）
+    """
+    try:
+        sys.stdout.flush()
+    except Exception:  # 信号路径降级（flush 失败不阻断退出）
+        pass
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
+    os._exit(128 + signum)
+
+
 def handle_termination_signal(signum: int, frame: Any) -> None:
     """SIGTERM/SIGINT 优雅退出 handler（5-7 R1-DF6 核销——OD-9 最小处置）。
 
@@ -110,9 +131,7 @@ def handle_termination_signal(signum: int, frame: Any) -> None:
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os._exit(128 + signum)  # 无运行 loop（bootstrap 前信号）——同步面已处理，按信号码直退
+        _flush_and_exit(signum)  # 无运行 loop（bootstrap 前信号）——同步面已处理，按信号码直退
         return
 
     async def _graceful_exit() -> None:
@@ -122,9 +141,7 @@ def handle_termination_signal(signum: int, frame: Any) -> None:
         try:
             await _close_connection_pools()
         finally:
-            sys.stdout.flush()
-            sys.stderr.flush()
-            os._exit(128 + signum)
+            _flush_and_exit(signum)
 
     asyncio.run_coroutine_threadsafe(_graceful_exit(), loop)
 
