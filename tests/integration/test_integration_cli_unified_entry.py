@@ -26,7 +26,10 @@ import pytest
 
 from src.domain.ports.resolver import get_resolver
 
-pytestmark = [pytest.mark.integration, pytest.mark.database]
+# xdist_group 收敛单 worker（R4 定谳：CLI 直调链[bootstrap+asyncio.run+MinIO/PG 双写]在
+# 全仓四目录并发下与其他 database worker 争用偶发红——隔离/集成目录复跑恒绿，
+# 按 4-1f pestel 先例机制闭环，收敛组内串行消除跨 worker 争用）
+pytestmark = [pytest.mark.integration, pytest.mark.database, pytest.mark.xdist_group("cli-integration-chain")]
 
 
 def _tenant_id() -> str:
