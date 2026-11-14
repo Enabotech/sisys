@@ -469,7 +469,7 @@ class TestR1ContractAssertions:
             assert exit_code == 2, f"--depth {bad_depth} 应解析层 exit 2: exit={exit_code}"
 
     def test_f5_depth_default_full_tree(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """--depth 缺省 4（全深度——与兼容入口一致，R1-F5）。"""
+        """--depth 缺省 4（全深度——与兼容入口一致，R1-F5；R3 强锁升级）。"""
         import uuid as uuid_module
 
         exit_code = cli_main.main(
@@ -478,7 +478,56 @@ class TestR1ContractAssertions:
         captured = capsys.readouterr()
         assert exit_code == 0, captured.err
         envelope = json.loads(captured.out)
-        assert envelope["data"]["actions"], "缺省深度动作清单缺失"
+        action = envelope["data"]["actions"][0]
+        # R3 补锁：值断言（缺省改坏即红）+ 类名禁令（R2-P1 枚举泄漏复发防线）
+        assert "depth=4" in action, f"缺省深度应为 4（全深度）: {action!r}"
+        assert "TraceDepth" not in action, f"动作文本枚举类名泄漏（R2-P1 复发）: {action!r}"
+
+    def test_f10_explicit_depth_rendered(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """--depth 显式 2 动作文本回显（R3 补锁——合法值面）。"""
+        import uuid as uuid_module
+
+        exit_code = cli_main.main(
+            ["plan", "trace-tree", "--plan-id", str(uuid_module.uuid4()), "--depth", "2", "--dry-run", "--format", "json"]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 0, captured.err
+        action = json.loads(captured.out)["data"]["actions"][0]
+        assert "depth=2" in action and "TraceDepth" not in action, f"显式深度回显漂移: {action!r}"
+
+    def test_f3_invalid_report_format_242(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """--report-format 非法值 242（R3 补锁——原 F3 修复全仓零锁，docx 静默落 markdown 带副作用）。"""
+        import uuid as uuid_module
+
+        for bad_format in ("docx", "PDF"):
+            exit_code = cli_main.main(
+                ["plan", "report", "--plan-id", str(uuid_module.uuid4()), "--report-format", bad_format, "--dry-run"]
+            )
+            captured = capsys.readouterr()
+            assert exit_code == 1, f"--report-format {bad_format} 应 242 拒绝（大小写敏感）: exit={exit_code}"
+            assert "EXCEPTION_242" in captured.err, f"守卫定式缺失: {captured.err!r}"
+
+    def test_f14_494_message_neutral_param_name(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """494 组合守卫文案含统一面参数名 --report-format（R3 补锁——F14 中性措辞锚）。"""
+        import uuid as uuid_module
+
+        exit_code = cli_main.main(
+            [
+                "plan",
+                "report",
+                "--plan-id",
+                str(uuid_module.uuid4()),
+                "--report-format",
+                "markdown",
+                "--brand-template",
+                "tpl",
+                "--dry-run",
+            ]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 1
+        assert "EXCEPTION_494" in captured.err
+        assert "--report-format" in captured.err, f"494 文案应引用统一面参数名（R1-F14）: {captured.err!r}"
 
     def test_f7_recover_json_assessment_view(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         """recover 评估态 json data 白名单（R1-F7——assessment 摘要真值非类名占位）。"""

@@ -274,7 +274,11 @@ class TestUploadCommand:
         envelope = json.loads(captured.out)
         assert envelope["command"] == "sisys document upload"
         assert envelope["data"]["document_id"] == "11111111-1111-1111-1111-111111111111"
-        assert "filename" in envelope["data"] and "tenant_id" in envelope["data"]
+        # R3 升级：set 相等锁白名单（原 membership 断言对加键钝感）+ status 值锁
+        assert set(envelope["data"]) == {"document_id", "filename", "tenant_id", "document_type", "status"}, (
+            f"upload 白名单漂移: {sorted(envelope['data'])}"
+        )
+        assert envelope["data"]["status"] == "uploaded"
 
 
 class TestSearchCommand:
@@ -311,6 +315,22 @@ class TestSearchCommand:
         assert "将" in captured.out
         assert not search.calls
 
+    def test_search_kernel_cleanup_called(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """search 异步内核 finally 关池 spy（R3 补锁——R1-F8 原零断言）。"""
+        import uuid as uuid_module
+
+        _patch_services(monkeypatch)
+        cleanup_calls: list[str] = []
+
+        async def _spy_cleanup() -> None:
+            cleanup_calls.append("cleanup")
+
+        monkeypatch.setattr(document_commands, "run_cleanup_async", _spy_cleanup)
+        exit_code = cli_main.main(["document", "search", "--query", "战略", "--tenant-id", str(uuid_module.uuid4())])
+        capsys.readouterr()
+        assert exit_code == 0
+        assert cleanup_calls == ["cleanup"], f"内核 finally 应恰一次关池: {cleanup_calls}"
+
 
 class TestVersionListCommand:
     """version list 存量接线（--tenant-id 改名+定式对齐）。"""
@@ -324,6 +344,31 @@ class TestVersionListCommand:
         assert exit_code == 0, captured.err
         assert version.list_calls, "version list 未触达服务"
         assert str(version.list_calls[0]["document_id"]) == doc_id
+
+    def test_version_list_json_envelope_whitelist(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """version list json data 白名单 set 相等（R3 补锁——原 json 面零覆盖）。"""
+        _patch_services(monkeypatch)
+        exit_code = cli_main.main(
+            [
+                "document",
+                "version",
+                "list",
+                "--id",
+                "77777777-7777-7777-7777-777777777777",
+                "--tenant-id",
+                "t7",
+                "--format",
+                "json",
+            ]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 0, captured.err
+        data = json.loads(captured.out)["data"]
+        assert set(data) == {"document_id", "versions"}, f"version list 白名单漂移: {sorted(data)}"
+        first = data["versions"][0]
+        assert set(first) == {"version", "created_by", "created_at", "diff_summary"}, f"versions 项白名单漂移: {sorted(first)}"
 
     def test_version_list_invalid_uuid_242_stderr(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -339,6 +384,19 @@ class TestVersionListCommand:
 class TestVersionSnapshotCommand:
     """version snapshot 存量保形（Typer 化挂载——第 14 命令注记）。"""
 
+    def test_snapshot_description_required_exit_2(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--description 缺省不传 → exit 2（R3 补锁——F6 必填语义而非参数存在性）。"""
+        import uuid as uuid_module
+
+        _patch_services(monkeypatch)
+        exit_code = cli_main.main(
+            ["document", "version", "snapshot", "--id", str(uuid_module.uuid4()), "--tenant-id", "t8", "--user", "cli7"]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 2, f"缺 --description 应解析层 exit 2（必填语义）: exit={exit_code} err={captured.err!r}"
+
     def test_snapshot_calls_service(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -352,6 +410,33 @@ class TestVersionSnapshotCommand:
         assert exit_code == 0, captured.err
         assert version.snapshot_calls, "snapshot 未触达服务"
         assert version.snapshot_calls[0]["created_by"] == "cli7"
+
+    def test_snapshot_json_envelope_whitelist(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """snapshot json data 白名单 set 相等（R3 补锁——原 json 面零覆盖）。"""
+        _patch_services(monkeypatch)
+        exit_code = cli_main.main(
+            [
+                "document",
+                "version",
+                "snapshot",
+                "--id",
+                "88888888-8888-8888-8888-888888888888",
+                "--tenant-id",
+                "t8",
+                "--user",
+                "cli7",
+                "--description",
+                "初始",
+                "--format",
+                "json",
+            ]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 0, captured.err
+        data = json.loads(captured.out)["data"]
+        assert set(data) == {"snapshot_id", "document_id", "version", "created_by"}, f"snapshot 白名单漂移: {sorted(data)}"
 
     def test_snapshot_invalid_uuid_242_stderr(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

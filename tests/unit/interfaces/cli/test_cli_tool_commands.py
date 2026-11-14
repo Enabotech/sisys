@@ -205,6 +205,58 @@ class TestToolRunCommand:
         assert "EXCEPTION_242" in captured.err, f"双缺应 242 fail-loud: {captured.err!r}"
         assert not stub.execute_calls
 
+    def test_run_json_status_enum_value(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """--format json：status 枚举 .value 值断言（R3 补锁——原 json 面零覆盖）。"""
+        import uuid as uuid_module
+
+        _patch_service(monkeypatch)
+        exit_code = cli_main.main(
+            [
+                "tool",
+                "run",
+                "--tool-id",
+                str(uuid_module.uuid4()),
+                "--input",
+                "{}",
+                "--tenant-id",
+                str(uuid_module.uuid4()),
+                "--format",
+                "json",
+            ]
+        )
+        captured = capsys.readouterr()
+        assert exit_code == 0, captured.err
+        data = json.loads(captured.out)["data"]
+        assert data["status"] == "success", f"ToolResultStatus 枚举值泄漏类名前缀: {data['status']!r}"
+        assert "." not in data["status"]
+
+    def test_run_kernel_cleanup_called(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """异步内核 finally 关池 spy（R3 补锁——R1-F8 原零断言）。"""
+        import uuid as uuid_module
+
+        _patch_service(monkeypatch)
+        cleanup_calls: list[str] = []
+
+        async def _spy_cleanup() -> None:
+            cleanup_calls.append("cleanup")
+
+        monkeypatch.setattr(tool_commands, "run_cleanup_async", _spy_cleanup)
+        exit_code = cli_main.main(
+            [
+                "tool",
+                "run",
+                "--tool-id",
+                str(uuid_module.uuid4()),
+                "--input",
+                "{}",
+                "--tenant-id",
+                str(uuid_module.uuid4()),
+            ]
+        )
+        capsys.readouterr()
+        assert exit_code == 0
+        assert cleanup_calls == ["cleanup"], f"内核 finally 应恰一次关池: {cleanup_calls}"
+
     def test_run_dry_run_action_semantics(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         """--dry-run：工具名+入参回显+Schema 摘要+「将执行」语义（Task 3.7 钦定）。"""
         import uuid as uuid_module

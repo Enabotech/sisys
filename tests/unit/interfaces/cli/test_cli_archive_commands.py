@@ -19,9 +19,11 @@ class _StubArchive:
     """归档实体替身。"""
 
     def __init__(self, archive_id: str, plan_id: str) -> None:
+        from src.domain.entities.strategic_archive import ArchiveType
+
         self.archive_id = archive_id
         self.plan_id = plan_id
-        self.archive_type = "strategy_snapshot"
+        self.archive_type = ArchiveType.ASSUMPTION  # 真实枚举（R3——纯 str 替身掩蔽枚举泄漏形态）
         self.created_at = "2026-11-13T00:00:00"
 
 
@@ -51,6 +53,24 @@ def _patch_service(monkeypatch: pytest.MonkeyPatch) -> _StubArchiveService:
 
 class TestArchiveQueryCommand:
     """archive query 命令（ArchiveQuery Query Object 调用形态）。"""
+
+    def test_query_kernel_cleanup_called(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """query 异步内核 finally 关池 spy（R3 补锁——R1-F8 原零断言）。"""
+        import uuid as uuid_module
+
+        _patch_service(monkeypatch)
+        cleanup_calls: list[str] = []
+
+        async def _spy_cleanup() -> None:
+            cleanup_calls.append("cleanup")
+
+        monkeypatch.setattr(archive_commands, "run_cleanup_async", _spy_cleanup)
+        exit_code = cli_main.main(
+            ["archive", "query", "--plan-id", str(uuid_module.uuid4()), "--tenant-id", str(uuid_module.uuid4())]
+        )
+        capsys.readouterr()
+        assert exit_code == 0
+        assert cleanup_calls == ["cleanup"], f"内核 finally 应恰一次关池: {cleanup_calls}"
 
     def test_query_calls_with_archive_query(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         """query 经 ArchiveQuery 调用（plan_id/limit 映射）。"""
@@ -82,7 +102,7 @@ class TestArchiveQueryCommand:
         assert "[EXCEPTION_" in captured.err
 
     def test_query_json_envelope(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-        """--format json：archives 白名单（archive_id/plan_id/archive_type/created_at）。"""
+        """--format json：archives 白名单 set 相等 + 枚举 .value 值断言（R3 升级）。"""
         import uuid as uuid_module
 
         _patch_service(monkeypatch)
@@ -94,7 +114,8 @@ class TestArchiveQueryCommand:
         envelope = json.loads(captured.out)
         assert envelope["command"] == "sisys archive query"
         first = envelope["data"]["archives"][0]
-        assert {"archive_id", "plan_id", "archive_type", "created_at"} <= set(first)
+        assert set(first) == {"archive_id", "plan_id", "archive_type", "created_at"}, f"白名单漂移: {sorted(first)}"
+        assert first["archive_type"] == "assumption", f"ArchiveType 枚举值泄漏类名前缀: {first['archive_type']!r}"
 
     def test_query_dry_run_zero_service(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         """--dry-run：读命令退化态（零 service）。"""

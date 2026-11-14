@@ -178,3 +178,20 @@ class TestSignalHandler:
         original_term = signal.getsignal(signal.SIGTERM)
         cli_main.register_signal_handlers()
         assert signal.getsignal(signal.SIGTERM) is original_term, "测试形态下不应注册（信号劫持）"
+
+    def test_flush_and_exit_survives_broken_pipe(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """stdout flush 抛 BrokenPipeError 时退出码契约保真（R3 补锁——R2 flush 防护）。"""
+        import io
+
+        from src.entrypoints import cli_main
+
+        exits: list[int] = []
+
+        def _broken_flush() -> None:
+            raise BrokenPipeError("pipe closed")
+
+        monkeypatch.setattr(cli_main.sys, "stdout", type("BrokenOut", (), {"flush": _broken_flush})())
+        monkeypatch.setattr(cli_main.sys, "stderr", io.StringIO())
+        monkeypatch.setattr(cli_main.os, "_exit", lambda code: exits.append(code))
+        cli_main._flush_and_exit(signal.SIGTERM)
+        assert exits == [128 + signal.SIGTERM], f"flush 失败应不阻断按码退出: {exits}"

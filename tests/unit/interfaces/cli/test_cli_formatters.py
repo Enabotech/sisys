@@ -30,12 +30,13 @@ class TestBuildEnvelope:
     """统一信封构造（Task 0.3 冻结表骨架）。"""
 
     def test_envelope_has_four_base_keys(self) -> None:
-        """基本信封含 ok/command/data/mock 四键。"""
+        """基本信封恰含 ok/command/data/mock 四键（R3 升级——集合相等锁反额外键）。"""
         envelope = build_envelope(command="sisys document upload", data={"document_id": "d1"})
         assert envelope["ok"] is True
         assert envelope["command"] == "sisys document upload"
         assert envelope["data"] == {"document_id": "d1"}
         assert envelope["mock"] is False
+        assert set(envelope) == {"ok", "command", "data", "mock"}, f"信封骨架白名单漂移: {sorted(envelope)}"
 
     def test_mock_envelope_contains_echo(self) -> None:
         """mock 信封含 mock=true 与 echo 参数回显。"""
@@ -76,6 +77,31 @@ class TestRenderJson:
         )
         parsed = json.loads(render_json(envelope))
         assert parsed == envelope
+
+    def test_json_default_enum_to_value(self) -> None:
+        """非 str 混入纯 Enum 走 default → .value 字符串（R3 补锁——F15 分支）。"""
+        import enum
+
+        class _PureEnum(enum.Enum):
+            LEVEL = "high"
+
+        envelope = build_envelope(command="sisys x", data={"level": _PureEnum.LEVEL})
+        parsed = json.loads(render_json(envelope))
+        assert parsed["data"]["level"] == "high", f"纯 Enum 未走 .value 分支: {parsed['data']['level']!r}"
+
+    def test_json_default_datetime_str_fallback(self) -> None:
+        """datetime 走 default → str() 兜底（R3 补锁——F15 兜底腿）。"""
+        from datetime import datetime
+
+        stamp = datetime(2026, 11, 14, 12, 0, 0)
+        parsed = json.loads(render_json(build_envelope(command="sisys x", data={"at": stamp})))
+        assert parsed["data"]["at"] == "2026-11-14 12:00:00", f"datetime str 兜底形态漂移: {parsed['data']['at']!r}"
+
+    def test_dispatch_table_empty_list_state(self) -> None:
+        """table 态空清单渲染空态行（R3 补锁——F11 分支原零覆盖）。"""
+        rendered = format_result("table", command="sisys tool list", data={"total": 0, "tools": []})
+        assert "(empty)" in rendered, f"空态表头缺失: {rendered!r}"
+        assert "（空清单）" in rendered, f"空态文案缺失: {rendered!r}"
 
 
 class TestRenderTable:
