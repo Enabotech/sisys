@@ -193,7 +193,7 @@ development_status:
   # Epic 7: 多触点用户界面与 API 集成 - 🚧 进行中
   # ===========================================================================
   epic-7: in-progress
-  7-1-cli-command-interface: review
+  7-1-cli-command-interface: done
   7-2-rest-api-interface: backlog
   7-3-api-gateway-unified-entry: backlog
   7-4-health-dashboard: backlog

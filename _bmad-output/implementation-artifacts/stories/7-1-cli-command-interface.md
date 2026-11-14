@@ -1,6 +1,6 @@
 # Story 7-1: CLI 命令行接口（统一入口与七原则合规）
 
-**Status:** `review`
+**Status:** `done`（代码审查周期五轮收敛 2026-11-14——R1 26 项修复/R2 回归+交叉清偿/R3 14 项补锁/R4 xdist_group 闭环/R5 终审收敛声明入档；全量 15532 零失败）
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -1226,6 +1226,15 @@ MockOption = Annotated[bool, typer.Option("--mock", help="模拟执行：零副�
 
 **R3 单深度推演（断言覆盖矩阵）**：27 原子项（R1/R2 行为修复+冻结表契约）断言锁定态 **强 9/弱 4/未锁 14**——缺口三类：①R2 刚修项零锁（depth 文本）②json 渲染面覆盖不均（tool run/archive/snapshot/version-list 四面零 json 用例——archive 替身纯 str 掩蔽形态复发）③白名单语义锁偏弱（`<=` 子集/OR 式对加键钝感）。**补锁 14 项全落地**：F5+R2-P1 合并强锁（depth=4 值断言+TraceDepth 禁令）/F10 显式值腿/F3 242 专测（docx+PDF 大小写敏感腿）/F4 tool run json+archive 真实枚举替身/F6 缺省 exit 2 专测/F8 三命令 run_cleanup_async spy/F11 空清单/F15 Enum default+datetime 兜底/F9 flush 防护（BrokenPipe 模拟）/F14 参数名锚/B16 五面 set 相等化（upload/version list/snapshot 新增+archive 升级）/B17 信封集合相等。**突变实证**：depth D4→D2 注入→test_f5 红→还原绿（新断言活着）；修复面 424 passed 全绿。剩余未锁项说明：R2-P2 teardown 守卫（fixture 自体无断言可红——登记注记）/checkpoint list `<=` 升级（既有断言形态已足，F7 双态 set 相等已锁主面）。
 
+**R4 纯验证（七维度快扫——零提交轮含 1 处机制闭环）**：ruff/mypy（783 files no issues）/import-linter 5 kept/红线终扫（预存 4 处命中均甄别未触碰——R4 提交信息称 3 处系计数微差，勘误在案）/BDD 38=38=38 三方一致/锚点抽验全中（F1 :1084/F3 :1325-1329/R2-P1 :1812-1813）/e2e 22+1skip。唯一发现：upload 集成链全仓四目录并发下偶发红（隔离+集成目录复跑恒绿——跨 worker PG/MinIO 争用形态，R1 后第二次复现）→ 按 4-1f pestel 先例机制闭环：文件挂 `xdist_group("cli-integration-chain")` 收敛单 worker 串行（856e3915）。全量 15531 passed+1 偶发（待 R5 复核——已复核闭环见下）。
+
+**收敛声明（R5 独立终审 2026-11-14）**
+1. **周期概览**：四轮循环——R1 五视角调研+26 项修复（P1×9/P2×11/P3×4，F13 撤销改修表）/R2 回归核查+新代码面快扫（26 项零 MISSING+交叉缺陷 P1×1+P2×1+P3×5 当场清偿+台账对账勘误）/R3 断言覆盖矩阵（27 原子项审计→14 项补锁+突变实证）/R4 纯验证（七维度快扫+upload 集成链偶发红 xdist_group 机制闭环）；提交链 f3fc8f0e/91f56d4f/32c9859d/856e3915 无游离（06b048e6 为 argocd 自动动账）。
+2. **R5 验证面**：六项关键修复双向核验 6/6（F1 守卫前置于 dry_run 分叉/F2·F10 Enum/F7 confirm 位分叉/R2-P1·P3/R3 断言族 10 用例/R4 xdist_group）；冻结表五处与代码现实一致；deferred R1-DF1~DF5 逐条带触发锚；红线三查零新增（4 处预存命中均甄别未触碰）。
+3. **收敛判据达成**：全量四目录 **15532 passed + 6 skipped 零失败**（580s）——R4 遗留「upload 集成链偶发红」经全仓并发复跑实证闭环（15531+1 偶发→15532 全绿）；e2e 22+1skip 与基线一致。
+4. **残留清单**：①文书三件随本声明同批清偿（版本 footer/本节 Round 4 段落/下一步刷新）；②台账化余项不阻断：R1-DF1~DF5（7-x/7-2 承接）、正文清单⑤~⑨、Review D-1~D-4（环境达标自动恢复）。
+5. **周期判定：收敛**。
+
 **执行状态**：C3 双评审（甲合格[REVISE×5+REJECT×1]/乙不合格[RISK×4+P0 组合冲突]）→ 修正指令全采纳修订 → 甲定向复评**「优秀——放行修码」** → 修码完成：
 - 生产码 F1-F12/F14/F15 全落地（F13 撤销改修表）；F2/F10 实施中途按用户选型关切**改用 typer 原生 Enum 注解**（OutputFormat/TraceDepth 枚举——命令定义面 100% typer 形态，click 仅保留框架异常边界 cli_main.py UsageError catch 无替代）；F5 depth 缺省 4；F6 description 必填；F7 confirm 位分叉+enum_value；F8 三命令 finally；F9 两处 128+signum+flush；F11 空清单；F12 双通道复用 _resolve_tenant_id+echo 补 tenant；F14 文案；F15 default Enum 分支
 - 测试 T1-T7 全落地（T1 MinIO 段清理+Qdrant/PG/L5 归 R1-DF2；T5 二次定谳=total==len(tools) 不变量——「静态种子非空」调研判断被实测证伪，测试端口库 tool 表可空）；F1/F6 计划内红适配（passthrough 改合法 UUID+归一/242 两新用例；矩阵补 --description）；零锁定断言族 9 项新增（TestR1ContractAssertions 7 用例+tool 枚举/env 断言 3 用例）
@@ -1240,12 +1249,12 @@ MockOption = Annotated[bool, typer.Option("--mock", help="模拟执行：零副�
 
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查（🔄 进行中——Round 1 已完成调研与方案，待评审+修码）
+- [x] 运行 `code-review` 进行代码审查（✅ 五轮周期收敛 2026-11-14——R1 26 项修复/R2 回归+交叉清偿/R3 14 项补锁/R4 xdist_group 闭环/R5 终审收敛声明入档；全量 15532 零失败）
 - [ ] 7-2 create-story（REST 族留项清单另半边承载——锚定义务清单 #1/#2/#4/#5/#10 随 7-2 处置）
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.5.3
 **创建日期/Created:** 2026-11-13
 **最后更新/Last Updated:** 2026-11-14
 **更新说明/Description:**
@@ -1255,4 +1264,7 @@ MockOption = Annotated[bool, typer.Option("--mock", help="模拟执行：零副�
 - v1.3.0: 文档审查 Round 3 单深度推演（AC 可满足性逐条+Task 0→7 依赖干跑+5 长链推演，12 项：P0×1[Task 1 绿步与 OD-16 结构矛盾+占位未覆盖 entrypoints 侧+六模块断言对象未钦定——重写绿步三模块+cli_commands 三组占位+断言对象=组装后 app]+P1×3[并发命令集 plan generate 子进程无法接收进程内 LLM 替身结构性不可绿——重组无 LLM 混合面+seeded argv 通道/SIGTERM 机制与载体双未定义——signal.signal 同步 handler+Phoenix 同步直调+run_coroutine_threadsafe 调度+复用组合根 shutdown():3832 本缺口预留/test_document_commands.py 4 处断言必破适配义务零声明——OD-10 背书列明]+P2×4[recover dry-run 清单三钦定——分支措辞随 --yes/mode 校验前移守卫段/遵循 --format/data 载荷白名单原则+租户校验层位+SISYS_TENANT_ID 新约定注记/红锚时点分段/工具 run dry-run 清单]+P3×4[Task 7 仪式红声明/AC-2③ 弱断言注记/trace-tree 预置先例锚/短旗标归冻结表]）
 - v1.3.1: 文档审查 Round 4 纯验证（七维度快扫全过零发现零提交）+ Round 5 独立终审（六节取证：周期闭合无游离提交/10 项双向抽验+约 40 锚全中/红线终扫旧值零存活——条件收敛清偿：P1×1[Task 3 DoD 三参数复验点虚指补行]+P3×3[:2298→:2303-2306 锚位更正/租户第三桶 tool list 可选/Task 7 软锚台账化]）+收敛声明入档——周期判定收敛，维持 ready-for-dev
 - v1.4.0: dev-story 实施完成（Task 0~7 全循环：四张冻结表+38 场景验收红→36 passed 2 skipped 环境动态跳/统一入口+formatter 三件+dispatch 四路分发三钩子注入/UUID 归一 9 处收敛+7 命令 controller 抽取 202 基线零回归/document+tool+archive 新命令+集成真实链 6.4-DF2 核销/load_dotenv+SIGTERM 双核销/架构验证 28 项+P95 六模块达标+并发 10 子进程零失败+E2E 22 passed/deferred-work 6 注记+4 划线行数守恒/关键发现：Typer 命令返回 int 必 exit 2 须 raise typer.Exit、同文本双装饰器 pytest-bdd fixture 死锁、dispatch pretty 分支 bootstrap 缺失子进程暴露、LiteLLM stdout 污染 redirect 隔离、register_signal_handlers 测试形态守卫防 xdist 劫持）
-- v1.5.0: 代码审查 Round 1（C1 五视角并行调研[契约对照/边缘正确性/架构红线/回归测试质量/运行实测]+主会话亲验 → P0×0/P1×9/P2×12/P3×15 → C2 26 项修复方案入档 → C3 双评审[甲合格 REVISE×5+REJECT×1/乙不合格 组合互拆+回归面缺失]修正指令全采纳 → 甲定向复评「优秀」→ 修码落地：值域校验族[--format/--depth typer 原生 Enum 化（用户选型关切——命令定义面 100% typer，click 仅框架异常边界）/--report-format 242 守卫/plan generate plan_id canonical 守卫第十处收口]/枚举 .value 族[enum_value helper 7 行 8 属性位+json default Enum 分支]/recover to_view confirm 分叉白名单对表/F5 depth 缺省 4/F6 description 必填/F8 三命令 finally 关池/F9 两处 128+signum+flush/F12 tool run 双通道复用 _resolve_tenant_id/F13 撤销定谳[租户 UUID 化与全仓 TestTenant 约定矛盾——修表收窄非空守卫+deferred 7-x]/测试面 T1-T7+计划内红适配+TestR1ContractAssertions 零锁定断言族 9 项/冻结表五处同步+R1-DF1~4 登记；T5 二次定谳[total==len(tools) 不变量——调研「静态种子」判断实测证伪]；修码事故 2 起[Edit 重复行/替身误删 append——均即时抓回]）
+- v1.5.0: 代码审查 Round 1（C1 五视角并行调研[契约对照/边缘正确性/架构红线/回归测试质量/运行实测]+主会话亲验 → P0×0/P1×9/P2×12/P3×15 → C2 26 项修复方案入档 → C3 双评审[甲合格 REVISE×5+REJECT×1/乙不合格 组合互拆+回归面缺失]修正指令全采纳 → 甲定向复评「优秀」→ 修码落地：值域校验族[--format/--depth typer 原生 Enum 化（用户选型关切——命令定义面 100% typer，click 仅框架异常边界）/--report-format 242 守卫/plan generate plan_id canonical 守卫第十处收口]/枚举 .value 族[enum_value helper 7 行 8 属性位+json default Enum 分支]/recover to_view confirm 分叉白名单对表/F5 depth 缺省 4/F6 description 必填/F8 三命令 finally 关池/F9 两处 128+signum+flush/F12 tool run 双通道复用 _resolve_tenant_id/F13 撤销定谳[租户 UUID 化与全仓 TestTenant 约定矛盾——修表收窄非空守卫+deferred 7-x]/测试面 T1-T7+计划内红适配+TestR1ContractAssertions 零锁定断言族 10 用例/冻结表五处同步+R1-DF1~5 登记；T5 二次定谳[total==len(tools) 不变量——调研「静态种子」判断实测证伪]；修码事故 2 起[Edit 重复行/替身误删 append——均即时抓回]）
+- v1.5.1: 代码审查 Round 2 回归核查+新代码面快扫（α 26 项修复逐项 LANDMARK 零 MISSING+三面实跑全绿[CLI 414/e2e 22+1skip/验收 36+2skip]+Qdrant 真清理无新红；β 快扫抓 R1 修复自身的修复：P1×1[trace-tree dry-run 动作文本 depth=TraceDepth.D4 枚举类名泄漏——F10×F4 交叉缺陷三态全中，修：value 提取]+P2×1[验收 S05 Qdrant 清理不可达——teardown 守卫键组缺 _created_collections，修：补键]+P3×5[F10 编辑残留重复 Typer 实例/flush 未包异常防护[修：_flush_and_exit]/preset qdrant client 未 close/dry-run None 观感/_agent_ids 死键]——全部当场清偿；台账对账勘误 R1-DF4 改道声明+清单⑤~⑨ 正文登记形态+R1-DF5 补录）
+- v1.5.2: 代码审查 Round 3 断言覆盖矩阵（27 原子项审计：强 9/弱 4/未锁 14——缺口三类[R2 刚修项零锁/json 渲染面覆盖不均/白名单语义锁偏弱]；补锁 14 项全落地[F5+R2-P1 合并强锁/F3 242 专测/F4 tool run json+archive 真实枚举/F6 缺省 exit 2/F8 三命令 spy/F11/F15/F9 flush 防护/F14/B16 五面 set 相等/B17 信封集合相等]；突变实证 depth D4→D2 注入红→还原绿；修复面 424 passed）
+- v1.5.3: 代码审查 Round 4 纯验证+R5 独立终审收敛（R4 七维度快扫：ruff/mypy 783 files/import-linter 5 kept/红线终扫 4 处预存甄别/BDD 38=38=38/锚点抽验全中/e2e 22+1skip；唯一发现 upload 集成链全仓并发偶发红→xdist_group("cli-integration-chain") 机制闭环[4-1f pestel 先例]；R5 六节终审：周期闭合无游离/六项修复双向核验 6/6/全量 15532 passed 零失败[R4 修复经全仓并发复跑实证闭环]/台账完整/红线零新增——**周期判定：收敛**，收敛声明入档，Status review→done）
