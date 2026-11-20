@@ -290,7 +290,9 @@ class TestValidationMatrix:
             def _raise_permission_error(file: Any, mode: str = "rb") -> Any:
                 raise PermissionError(13, "Permission denied", str(file))
 
-            monkeypatch.setattr("src.application.ports.brand_template.open", _raise_permission_error)
+            # raising=False：被测模块命名空间未绑定 open（builtins 查找），注入模块
+            # globals 遮蔽 builtins——validate_logo_file 内 open() 即命中本 fake
+            monkeypatch.setattr("src.application.ports.brand_template.open", _raise_permission_error, raising=False)
         else:
             logo.chmod(0o000)
         service, _ = _make_service()
