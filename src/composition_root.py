@@ -1170,13 +1170,19 @@ def bootstrap() -> None:
     )
 
     # Document Repository — PostgreSQL 文档元数据持久化
+    # Story 7-1：impl 字符串→lambda（session_factory 注入——save/find 双模式
+    # session 的 CLI/后台 fallback 装配位，archive/report 仓储族先例对齐；
+    # 请求路径行为不变——ContextVar 活动会话优先分支）
     from src.domain.ports.document_repository import DocumentRepositoryPort
+    from src.infrastructure.storage.postgresql.repository.document_repository import PostgreSQLDocumentRepository
 
     register_port(
         name="document_repository",
         version="v1.1.0",
         interface=DocumentRepositoryPort,
-        impl="src.infrastructure.storage.postgresql.repository.document_repository.PostgreSQLDocumentRepository",
+        impl=lambda resolver: PostgreSQLDocumentRepository(
+            session_factory=resolver.resolve("session_factory"),
+        ),
         module="src.infrastructure.storage.postgresql.repository.document_repository",
         lifetime=Lifetime.SCOPED,
         owner="doc-team",

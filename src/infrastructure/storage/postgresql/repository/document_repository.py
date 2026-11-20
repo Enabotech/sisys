@@ -12,6 +12,7 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.entities.document import Document, DocumentType, ParseStatus
 from src.domain.exceptions import DocumentVersionConflictError
@@ -22,6 +23,7 @@ from src.infrastructure.storage.postgresql.models.document_version import (
     DocumentVersionSnapshotModel,
 )
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.session_context import get_session, session_context
 
 
 class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
@@ -30,10 +32,43 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
     继承 PostgreSQLAdapter[Document, DocumentModel]，
     通过 _to_entity/_to_model 隔离领域层与 ORM 层。
     使用 DocumentQuery 值对象支持租户隔离和结构化过滤。
+
+    Story 7-1：save/find 双模式 session（请求路径优先——ContextVar 活动会话；
+    CLI/后台路径经注入 session_factory 走独立会话 commit——archive/report
+    仓储双模式族先例对齐，CLI 统一入口 document 命令面的可达性前提）。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
+        """初始化文档仓储。
+
+        Args:
+            session_factory: 会话工厂（可选——CLI/后台路径 fallback 依赖；
+                None 时维持严格 ContextVar 模式（无活动会话 206——旧行为）
+        """
         super().__init__(DocumentModel)
+        self._session_factory = session_factory
+
+    def _has_active_session(self) -> bool:
+        """ContextVar 活动会话探测（双模式分流——请求路径判定）。"""
+        try:
+            get_session()
+        except RuntimeError:
+            return False
+        return True
+
+    async def save(self, entity: Document) -> Document:
+        """保存文档（双模式 session——请求事务路径优先，CLI 独立会话 commit）。
+
+        Args:
+            entity: 文档实体
+
+        Returns:
+            持久化后的文档实体
+        """
+        if self._has_active_session() or self._session_factory is None:
+            return await super().save(entity)
+        async with session_context(self._session_factory):
+            return await super().save(entity)
 
     def _to_entity(self, model: DocumentModel) -> Document:
         """将 ORM 模型转换为领域实体"""
@@ -88,7 +123,7 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
         raise NotImplementedError("Document 删除尚未得到领域支持")
 
     async def find(self, query: DocumentQuery) -> Document | None:
-        """按条件查询单个文档
+        """按条件查询单个文档（双模式 session——请求事务路径优先，CLI 独立会话）。
 
         Args:
             query: 查询条件（必须包含 tenant_id + document_id）
@@ -96,6 +131,13 @@ class PostgreSQLDocumentRepository(PostgreSQLAdapter[Document, DocumentModel]):
         Returns:
             Document 实体或 None
         """
+        if self._has_active_session() or self._session_factory is None:
+            return await self._do_find(query)
+        async with session_context(self._session_factory):
+            return await self._do_find(query)
+
+    async def _do_find(self, query: DocumentQuery) -> Document | None:
+        """在当前上下文 session 上执行单文档查询（find 查询体——双模式共用）。"""
         stmt = select(DocumentModel).where(
             DocumentModel.tenant_id == query.tenant_id,
         )

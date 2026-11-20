@@ -1,185 +1,104 @@
-"""文档版本管理 CLI 命令
+"""document 命令组（upload / parse）
 
-提供文档版本快照的创建和列表查询功能。
+typer 命令定义层（参数解析 → 守卫归一 → CommandContext 组装 → 共享短路
+执行器）；编排与端口消费归 ``controllers/document_controller.py``
+（commands 只定义参数、controller 只编排——职责分界）。
+
+存量处置（Task 3）：原 version 命令族（argparse 未接线存量，185 行）随本
+重写移除——§4.3.1 钦定命令面 defer 7-1-DF5/OD-7 归宿；端口
+``document_version_service`` 与事件处理器不动。
 """
 
 from __future__ import annotations
 
-import argparse
-import asyncio
-import logging
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
-from src.domain.ports.registry import _global_registry
-from src.domain.ports.resolver import Resolver
+import typer
 
-logger = logging.getLogger(__name__)
-
-
-def _get_service():
-    """从依赖注入容器获取 DocumentVersionService 实例"""
-    resolver = Resolver(_global_registry)
-    return resolver.resolve("document_version_service")
-
-
-def build_version_parser(subparsers: Any) -> None:
-    """构建文档版本管理子命令解析器
-
-    Args:
-        subparsers: argparse 子命令解析器
-    """
-    version_parser = subparsers.add_parser(
-        "version",
-        help="文档版本管理",
-        description="管理文档版本快照，包括创建和查询版本历史",
-    )
-
-    version_subparsers = version_parser.add_subparsers(
-        dest="version_action",
-        help="版本管理操作",
-    )
-
-    # snapshot 子命令
-    snapshot_parser = version_subparsers.add_parser(
-        "snapshot",
-        help="创建文档版本快照",
-        description="创建文档版本快照，记录操作者、时间戳和差异摘要",
-    )
-    snapshot_parser.add_argument(
-        "--id",
-        required=True,
-        help="文档唯一标识符（UUID）",
-    )
-    snapshot_parser.add_argument(
-        "--tenant",
-        default="default",
-        help="租户标识符（默认: default）",
-    )
-    snapshot_parser.add_argument(
-        "--user",
-        default="cli",
-        help="操作者标识（默认: cli）",
-    )
-    snapshot_parser.add_argument(
-        "--description",
-        default="",
-        help="变更描述",
-    )
-
-    # list 子命令
-    list_parser = version_subparsers.add_parser(
-        "list",
-        help="列出版本历史",
-        description="查询文档的版本历史列表",
-    )
-    list_parser.add_argument(
-        "--id",
-        required=True,
-        help="文档唯一标识符（UUID）",
-    )
-    list_parser.add_argument(
-        "--tenant",
-        default="default",
-        help="租户标识符（默认: default）",
-    )
+from src.interfaces.cli import _params
+from src.interfaces.cli.controllers.base import CommandContext, ensure_session, execute_command, to_decimal
+from src.interfaces.cli.controllers.document_controller import (
+    PORT_NAME,
+    PORT_NAME_PARSE,
+    DocumentUploadCommand,
+    normalize_parse_id,
+    require_upload_file,
+    run_parse,
+    run_upload,
+)
 
 
-def handle_version(args: argparse.Namespace) -> int:
-    """处理文档版本管理命令
+def build_app(resolve: Callable[[str], Any]) -> typer.Typer:
+    """构造 document 命令组（挂载 upload/parse 两命令——12 命令冻结矩阵）。
 
     Args:
-        args: 命令行参数
+        resolve: 端口解析函数（工厂注入）
 
     Returns:
-        退出码（0=成功，1=错误）
+        document 模块 typer.Typer 子应用
     """
-    if args.version_action == "snapshot":
-        return _handle_snapshot(args)
-    elif args.version_action == "list":
-        return _handle_list(args)
-    else:
-        print("请指定版本管理操作: snapshot 或 list")
-        print("使用 'sisys document version --help' 查看帮助")
-        return 1
+    document_app = typer.Typer(help="文档管理（upload 上传 / parse 解析）")
 
-
-def _handle_snapshot(args: argparse.Namespace) -> int:
-    """处理创建版本快照命令
-
-    Args:
-        args: 命令行参数
-
-    Returns:
-        退出码
-    """
-    from uuid import UUID
-
-    try:
-        document_id = UUID(args.id)
-    except ValueError:
-        print(f"错误: 无效的文档 ID: {args.id}")
-        return 1
-
-    try:
-        service = _get_service()
-        snapshot = asyncio.run(
-            service.create_snapshot(
-                document_id=document_id,
-                tenant_id=args.tenant,
-                created_by=args.user,
-                change_description=args.description,
-            )
+    @document_app.command("upload")
+    def upload(
+        file: Path = typer.Option(..., "--file", help="上传文件路径"),
+        business_domain: str = typer.Option("", "--business-domain", help="业务域标注"),
+        yes: _params.YesOption = False,
+        dry_run: _params.DryRunOption = False,
+        mock: _params.MockOption = False,
+        fmt: _params.FormatOption = _params.OutputFormat.TABLE,
+        session: _params.SessionOption = "",
+        cost_budget: _params.CostBudgetOption = None,
+    ) -> int:
+        """上传文档至文档服务（真实落库并输出 document_id）。"""
+        require_upload_file(file)
+        command = DocumentUploadCommand(file=file, business_domain=business_domain)
+        ctx = CommandContext(
+            command="document upload",
+            port_name=PORT_NAME,
+            parameters=command.to_parameters(),
+            fmt=fmt.value,
+            dry_run=dry_run,
+            mock=mock,
+            yes=yes,
+            cost_budget=to_decimal(cost_budget),
+            session=ensure_session(session),
         )
-        print("版本快照创建成功:")
-        print(f"  文档 ID: {snapshot.document_id}")
-        print(f"  版本号: {snapshot.version}")
-        print(f"  快照 ID: {snapshot.snapshot_id}")
-        print(f"  创建者: {snapshot.created_by}")
-        print(f"  差异摘要: {snapshot.diff_summary}")
-        return 0
-    except ValueError as e:
-        print(f"错误: 参数无效: {e}")
-        return 1
-    except Exception as e:
-        print(f"错误: 创建版本快照失败: {e}")
-        return 1
-
-
-def _handle_list(args: argparse.Namespace) -> int:
-    """处理列出版本历史命令
-
-    Args:
-        args: 命令行参数
-
-    Returns:
-        退出码
-    """
-    from uuid import UUID
-
-    try:
-        document_id = UUID(args.id)
-    except ValueError:
-        print(f"错误: 无效的文档 ID: {args.id}")
-        return 1
-
-    try:
-        service = _get_service()
-        versions = asyncio.run(
-            service.list_versions(
-                document_id=document_id,
-                tenant_id=args.tenant,
-            )
+        return execute_command(
+            ctx,
+            resolve,
+            lambda r: run_upload(file, business_domain=business_domain, fmt=fmt.value, resolve=r),
         )
-        if not versions:
-            print("该文档暂无版本历史")
-            return 0
 
-        print(f"文档 {args.id} 版本历史:")
-        print("-" * 80)
-        for v in versions:
-            created = v.created_at.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  版本 {v.version:3d} | {created} | {v.created_by:<20s} | {v.diff_summary}")
-        return 0
-    except Exception as e:
-        print(f"错误: 查询版本历史失败: {e}")
-        return 1
+    @document_app.command("parse")
+    def parse(
+        document_id: str = typer.Option(..., "--id", help="文档标识（UUID）"),
+        yes: _params.YesOption = False,
+        dry_run: _params.DryRunOption = False,
+        mock: _params.MockOption = False,
+        fmt: _params.FormatOption = _params.OutputFormat.TABLE,
+        session: _params.SessionOption = "",
+        cost_budget: _params.CostBudgetOption = None,
+    ) -> int:
+        """解析已上传文档（真实解析链）。"""
+        normalized_id = normalize_parse_id(document_id)
+        ctx = CommandContext(
+            command="document parse",
+            port_name=PORT_NAME_PARSE,
+            parameters={"document_id": normalized_id},
+            fmt=fmt.value,
+            dry_run=dry_run,
+            mock=mock,
+            yes=yes,
+            cost_budget=to_decimal(cost_budget),
+            session=ensure_session(session),
+        )
+        return execute_command(
+            ctx,
+            resolve,
+            lambda r: run_parse(normalized_id, fmt=fmt.value, resolve=r),
+        )
+
+    return document_app

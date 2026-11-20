@@ -70,6 +70,8 @@ class ToolMetadata:
     triggers: tuple[str, ...] = ()
     # Story 4.1b 扩展（向后兼容默认空 tuple）
     data_sources: tuple[DataSourceRef, ...] = ()
+    # Story 7-1 P7 扩展（向后兼容默认空 tuple——tool schema 输入示例数据通路）
+    input_examples: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

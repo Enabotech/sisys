@@ -127,14 +127,25 @@ class TestPortRegistration:
         assert spec.lifetime.value in ("singleton", "scoped", "transient")
 
     def test_document_repository_impl_points_to_correct_class(self) -> None:
-        """document_repository 实现指向正确的类"""
+        """document_repository 实现指向正确的类（Story 7-1：lambda 工厂注入 session_factory）"""
         from src.domain.ports.registry import _global_registry
 
         spec = _global_registry.get("document_repository")
         assert spec is not None
         impl = spec.impl
-        assert isinstance(impl, str)
-        assert "PostgreSQLDocumentRepository" in impl
+        assert callable(impl), "impl 应为 lambda 工厂（session_factory 双模式装配——Story 7-1）"
+        from src.infrastructure.storage.postgresql.repository.document_repository import PostgreSQLDocumentRepository
+
+        class _FactoryResolver:
+            """零 IO 分发替身（lambda 消费的 session_factory 单依赖）。"""
+
+            def resolve(self, name: str) -> object:
+                if name == "session_factory":
+                    return object()
+                raise KeyError(name)
+
+        instance = impl(_FactoryResolver())
+        assert isinstance(instance, PostgreSQLDocumentRepository)
 
 
 class TestEventChannelRegistration:

@@ -154,6 +154,7 @@ striprtf = "^0.0.32"
 
 [project.scripts]
 crawler = "plugins.crawler.cli:app"
+sisys = "src.entrypoints.main_cli:main"
 sisys-ocr = "src.entrypoints.ocr_cli:main"
 sisys-agent = "src.entrypoints.agent_cli:main"
 

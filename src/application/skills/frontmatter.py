@@ -22,6 +22,7 @@ from typing import Any
 import yaml
 
 from src.application.ports.skill_loader import ToolMetadata
+from src.domain.exceptions import ValidationError
 from src.domain.exceptions.base_exceptions import DomainError
 from src.domain.value_objects.data_source import DataSourceApiType, DataSourceRef
 
@@ -148,7 +149,51 @@ def parse_frontmatter(raw_text: str) -> tuple[dict[str, Any], str]:
                     },
                 )
 
+    # input_examples 字段校验（P7——Story 7-1）：1-5 条参数 JSON 示例
+    # （非 list/零条/超 5 条/非 str 项 → ValidationError 201 族校验异常——
+    # 值域校验语义，区别于 FrontmatterParseError 的结构解析语义）
+    if "input_examples" in meta:
+        meta["input_examples"] = _normalize_input_examples(meta["input_examples"])
+
     return meta, body
+
+
+_INPUT_EXAMPLES_MIN = 1
+_INPUT_EXAMPLES_MAX = 5
+
+
+def _normalize_input_examples(raw: Any) -> tuple[str, ...]:
+    """input_examples 归一化（list/str → 1-5 条 str 元组）。
+
+    Args:
+        raw: YAML 解析后的原始值（list[str] 或单值 str）
+
+    Returns:
+        归一化元组（str 单值兼容单元素——LIST_FIELDS 归一风格）
+
+    Raises:
+        ValidationError: EXCEPTION_201——非 list/str 类型、零条、超 5 条、非 str 项
+    """
+    field = "input_examples"
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list | tuple):
+        raise ValidationError(
+            message=f"{field} 必须是 list 或 string（1-5 条参数 JSON 示例）",
+            context={"field": field, "actual_type": type(raw).__name__},
+        )
+    for item in raw:
+        if not isinstance(item, str):
+            raise ValidationError(
+                message=f"{field} 每项必须是字符串（参数 JSON 示例形态）",
+                context={"field": field, "actual_type": type(item).__name__},
+            )
+    if not (_INPUT_EXAMPLES_MIN <= len(raw) <= _INPUT_EXAMPLES_MAX):
+        raise ValidationError(
+            message=f"{field} 必须为 1-5 条示例（当前 {len(raw)} 条）",
+            context={"field": field, "count": len(raw)},
+        )
+    return tuple(raw)
 
 
 def _parse_data_source_refs(raw: Any) -> tuple[DataSourceRef, ...]:
@@ -250,6 +295,7 @@ def normalize_metadata(
         depends_on=meta.get("depends_on", ()),
         triggers=meta.get("triggers", ()),
         data_sources=_parse_data_source_refs(meta.get("data_sources")),
+        input_examples=meta.get("input_examples", ()),
     )
 
 
