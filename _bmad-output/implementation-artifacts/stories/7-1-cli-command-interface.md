@@ -48,7 +48,7 @@
 - `sisys document parse --id <doc-id>` → 真实解析链
 - `sisys agent run <role> --task <text> --mock --yes --cost-budget <amount>` → Mock 响应模式返回结构化结果
 - `sisys plan generate --agent-id <id> --task <text> --mock --yes --cost-budget <amount>` → Mock 响应模式
-- `sisys checkpoint recover --id <cp-id> --yes --cost-budget <amount>` → 真实恢复链
+- `sisys checkpoint recover --plan-id <uuid> --checkpoint-no <CP-N> --yes --cost-budget <amount>` → 真实恢复链（R3-3 参数形态勘正：`--id <cp-id>` 单参数形态与端口签名不匹配——checkpoint 域无 UUID 查询 API，落地为 `--plan-id`+`--checkpoint-no` 复合定位；验收 given 前置经 `checkpoint_use_case`（CreateCheckpointUseCase，:2496）直创 checkpoint（`retrieved_docs` 空列表 CLI 路径构造先例，docstring 明示））
 
 **验证标准/Validation Criteria:**
 - [ ] document upload/parse 验收场景走真实服务（真实临时文件 → 真实落库 → teardown 定向清理）
@@ -66,7 +66,7 @@
 - `--format json|table|pretty`：全命令支持，默认 `table`
 - Agent 专用（tool run / tool chain run / agent run / plan generate / checkpoint recover）：`--session <id>`（缺省自动生成 UUID）、`--timeout <seconds>`（缺省 300）、`--cost-budget <amount>`
 
-**全局参数实现机制冻结（R1-F1，P0 修复）：** 全局参数与 Agent 专用参数经**共享 Annotated 类型在各命令签名逐一声明**（typer 标准形态，前置/尾置形态均可解析）；**禁止 `@app.callback()` 承载全局参数**——click group callback 参数在子命令之后的尾置形态（如 `sisys document upload --file x --yes`）实测 exit 2（typer 0.24.2/click 8.4.2 验证），而本 Story 全部用法示例均为尾置形态。共享注解定义于 `src/interfaces/cli/_params.py`（Annotated 类型单一来源，Task 4「四命令共享 Agent 参数注解 DRY」推广至全部全局参数）。
+**全局参数实现机制冻结（R1-F1，P0 修复）：** 全局参数与 Agent 专用参数经**共享 Annotated 类型在各命令签名逐一声明**（typer 标准形态，前置/尾置形态均可解析）；**禁止 `@app.callback()` 承载全局参数**——click group callback 参数在子命令之后的尾置形态（如 `sisys document upload --file x --yes`）实测 exit 2（typer 0.24.2/click 8.4.2 验证），而本 Story 全部用法示例均为尾置形态。共享注解定义于 `src/interfaces/cli/_params.py`（Annotated 类型单一来源，Task 4「四命令共享 Agent 参数注解 DRY」推广至全部全局参数）。**豁免边界（R3-6）：** `--version` 顶层选项经 `app.callback(invoke_without_command=True)` 承载（实测顶层 exit 0）——豁免于上述禁令：version 是顶层前置形态选项（`sisys --version` 无子命令上下文，无尾置可达性问题），与跨子命令全局参数不同类。
 
 **参数互斥/优先级契约（R1-F24）：** `--dry-run` 与 `--mock` 同给时 **`--dry-run` 优先**（最外层短路：打印解析结果与端口名后即返回，不进入 mock 短路），不报互斥错误。
 
@@ -112,13 +112,13 @@
 | agent | `run <role>` | `agent_workflow_use_case`（:3178） |
 | plan | `generate` | `blm_planning_use_case`（:3518，`execute(agent_id, task, plan_id)`） |
 | checkpoint | `list --plan-id` | `checkpoint_list_use_case`（:2524） |
-| checkpoint | `show --id` | `checkpoint_use_case`（:2496） |
-| checkpoint | `recover --id [--mode]` | `checkpoint_recovery_use_case`（:2508） |
+| checkpoint | `show --plan-id [--checkpoint-no <CP-N>]` | `checkpoint_recovery_use_case`（:2508——RecoverCheckpointUseCase 预览面，`execute(plan_id, checkpoint_no)`→`CheckpointRecoveryView` 详情视图；缺省 checkpoint_no 取最新一条。R3-1 勘正：原写 `show --id`→`checkpoint_use_case`(:2496) 系端口错位——该端口实为 CreateCheckpointUseCase 纯创建零查询，无 `--id` 查询可达面） |
+| checkpoint | `recover --plan-id --checkpoint-no [--mode replay\|override] [--confirmed-by <id>]` | `checkpoint_recovery_execute_use_case`（:2536——ExecuteCheckpointRecoveryUseCase 执行面，`execute(plan_id, checkpoint_no, correction, mode, confirmed_by, created_via)`；`confirmed_by` 非空强制——空串→242 用例守卫。R3-2 勘正：原写 `recover --id [--mode]`→checkpoint_recovery_use_case(:2508) 系预览/执行面错位——:2508 无 mode 无恢复副作用。`--confirmed-by` 缺省取 `--session` 标识；`--dry-run` 面消费 :2508 预览视图天然对齐） |
 | archive | `query --plan-id` | `blm_chain_trace_use_case`（:2567） |
 
 **验证标准/Validation Criteria:**
 - [ ] 12 命令 `--help` 全部 exit 0
-- [ ] 轻量真实链验收：`tool list` / `tool schema` / `checkpoint list` / `archive query` 真实服务执行
+- [ ] 轻量真实链验收：`tool list` / `tool schema` / `checkpoint list` / `archive query` 真实服务执行——**名实注记（R3-9）：**「轻量」指命令逻辑轻（查询/展示类），bootstrap 仍装配全组合根（五存储可达性），动态 skip 机制照常生效，不可绕 bootstrap
 - [ ] P1 审计断言：契约测试逐一断言 **13 端口**（12 命令消费 13 端口——含 skill_loader）注册面可达（接线断言清单）
 
 ### AC-6: CLI 七原则合规承载（FR-IF-01）
@@ -142,12 +142,12 @@
 **Given** sisys CLI 接收用户/Agent 输入
 **When** 输入非规范形态
 **Then** 守卫契约生效：
-- **UUID canonical 归一**（6.9-R1-DF1 新面清偿）：`--plan-id`/`--id` 等 UUID 参数经共享守卫 `str(uuid.UUID(value))` 归一——大写/URN/无连字符等非 canonical 形态归一后正确命中（与存量 agent_cli 宽松守卫静默空态形成对照）；非 UUID 守卫按参数族分契约：**实体 ID 族（`--plan-id`、checkpoint `--id` 等 plan/checkpoint 实体标识）→ EntityValidationError 242、agent-id 族（`--agent-id`）→ ValidationError 201**（agent_cli 既有分工，R1-F18/_parse_agent_uuid 先例），均 exit 1；**UUID 守卫仅适用 UUID 族参数——`<tool-id>` 为 slug 禁套守卫（见 AC-5 注记）**
-- **.env 入口加载**（6.8-R1-DF1 新面清偿，方案一定谳）：`src/entrypoints/main_cli.py` 在 bootstrap 前显式 `load_dotenv`（显式路径，`usecwd=False`）——`python -m src.entrypoints.main_cli` 形态下 .env 注入不再依赖 litellm import 副作用。**路径推导与可测注入（R2-11）：** 显式路径 = 模块级常量 `ENV_FILE = Path(__file__).resolve().parents[2] / ".env"`（仓库根推导，main_cli.py 位于 src/entrypoints/ 下两层）；集成测试 Task 7.4 经 monkeypatch 该常量指向临时 .env 文件注入（不改仓库根 .env，零污染），单测顺序守卫同锚该常量
+- **UUID canonical 归一**（6.9-R1-DF1 新面清偿）：`--plan-id` 等 UUID 参数经共享守卫 `str(uuid.UUID(value))` 归一——大写/URN/无连字符等非 canonical 形态归一后正确命中（与存量 agent_cli 宽松守卫静默空态形成对照）；非 UUID 守卫按参数族分契约：**实体 ID 族（`--plan-id`）→ EntityValidationError 242、agent-id 族（`--agent-id`）→ ValidationError 201**（agent_cli 既有分工，R1-F18/_parse_agent_uuid 先例），均 exit 1；`--checkpoint-no` 为 "CP-N" 编号非 UUID（不套 UUID 守卫，格式校验仅前缀锚定）；**UUID 守卫仅适用 UUID 族参数——`<tool-id>` 为 slug 禁套守卫（见 AC-5 注记）**
+- **.env 入口加载**（6.8-R1-DF1 新面清偿，方案一定谳）：`src/entrypoints/main_cli.py` 在 bootstrap 前显式 `load_dotenv`（显式路径，`usecwd=False`）——`python -m src.entrypoints.main_cli` 形态下 .env 注入不再依赖 litellm import 副作用。**路径推导与可测注入（R2-11）：** 显式路径 = 模块级常量 `ENV_FILE = Path(__file__).resolve().parents[2] / ".env"`（仓库根推导，main_cli.py 位于 src/entrypoints/ 下两层）；集成测试 Task 7.4 经 monkeypatch 该常量指向临时 .env 文件注入（不改仓库根 .env，零污染），单测顺序守卫同锚该常量。**调用位置钉死（R3-5）：** `load_dotenv(ENV_FILE)` 必须在 `main()` 函数体内、bootstrap 之前调用——**禁止模块级 import 副作用形态**（模块级执行会使 pytest 收集期即加载、monkeypatch 不可达、in-process 二次直调不再执行，顺序守卫断言形态崩坏）
 - 枚举值（--format/--mode 等）由 typer choice 守卫 → exit 2
 
 **验证标准/Validation Criteria:**
-- [ ] 大写 UUID 输入 → 归一后真实查询命中（非静默空态）验收场景
+- [ ] 大写 UUID 输入 → 归一后真实查询命中（非静默空态）验收场景——**前置数据链（R3-7）：** 经 `checkpoint_use_case`（:2496）直创一条 checkpoint 后，以大写 `--plan-id` 形态执行 `checkpoint list` 断言命中
 - [ ] 非 UUID → plan-id 族 EXCEPTION_242 / agent-id 族 EXCEPTION_201，均 exit 1
 - [ ] 单测断言 main_cli 中 load_dotenv 先于 bootstrap 调用（顺序守卫）
 - [ ] 非法 `--format`/`--mode` 值 → exit 2
@@ -187,7 +187,7 @@
 - [ ] **Mock DTO 契约**：`--mock` 短路返回结构固定（`{"mock": true, "command": "<命令名>", "parameters": {...}, "session": "<id>"}`），三格式化器均可渲染
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [x] **本 Story 零新增端口**——仅消费既有端口（AC-5 表 **13 端口**名已核验组合根行号：12 命令消费 13 端口，含 R1-F3 补登记的 `skill_loader`——tool schema 的 input_examples 运行时数据通路）
+- [x] **本 Story 零新增端口**——仅消费既有端口（AC-5 表 **13 端口**名已核验组合根行号：12 命令消费 13 端口，含 R1-F3 补登记的 `skill_loader`——tool schema 的 input_examples 运行时数据通路；**R3-1/2 勘正后成员**：checkpoint 族=list(:2524)/recovery 预览(:2508)/recovery 执行(:2536) 三端口，`checkpoint_use_case`(:2496 创建面) 移出命令消费清单——仅作验收 given 前置创建链使用（非 CLI 命令消费面），成员变更总数不变）
 - [ ] 端口消费契约测试：`tests/contracts/test_port_contract_unified_cli.py`——逐一断言 13 端口注册面可达且 isinstance 契约成立（**对齐既有零 IO 先例形态**：`test_port_contract_agent_checkpoint.py` 的 `_global_registry.get(name)` 直查——契约测试不执行 IO、不 bootstrap，R1-F21 形态对齐；防注册名漂移——6.4-DF2 同族守卫诉求在 CLI 消费面的落地）
 - [ ] 控制器依赖注入方向（DC-2）：`src/interfaces/cli` **禁止 import `src.composition_root`**（importlinter 传导禁令，.importlinter:72-78 注释钦定）；采用 `create_cli_app(resolve: Callable[[str], Any]) -> typer.Typer` 工厂——resolve 函数由 `src/entrypoints/main_cli.py` 装配层传入，interfaces 层零组合根知识
 - [ ] 跨模块调用仅依赖抽象：controllers 类型注解引用 application 层用例类/Protocol（interfaces → application 方向合法）
@@ -205,11 +205,11 @@
 
 | 异常 | code | 触发场景（本 Story） | 既有锚 |
 |------|------|---------------------|--------|
-| `EntityValidationError` | EXCEPTION_242 | 实体 ID 族（`--plan-id`、checkpoint `--id`）非 UUID 守卫（R1-F18 统一形态——chain-query 先例 agent_cli.py:1129-1141，6.9-R1-DF1 命令族契约） | business_exceptions.py:106 |
+| `EntityValidationError` | EXCEPTION_242 | 实体 ID 族（`--plan-id`）非 UUID 守卫（R1-F18 统一形态——chain-query 先例 agent_cli.py:1129-1141，6.9-R1-DF1 命令族契约）；checkpoint recover `--confirmed-by` 空串（:2536 ExecuteCheckpointRecoveryUseCase 用例层守卫，CLI 只呈现——R3-2 承载注记） | business_exceptions.py:106 |
 | `ValidationError` | EXCEPTION_201 | `--agent-id` 非 UUID 守卫（`_parse_agent_uuid` 先例 agent_cli.py:156-173）；Agent 模式 `--yes` 缺 `--cost-budget` 拒绝；frontmatter `input_examples` 校验失败 | business_exceptions.py:20 |
 | （用例透传） | 482 等 | plan 重跑守卫等由用例层抛出，CLI 只呈现 | blm_planning 既有 |
 
-> **守卫分工注记：** CLI 层双 UUID 守卫契约与 agent_cli 既有分工一致——实体 ID 族（plan-id/checkpoint-id）走 242、agent-id 走 201（ocr_cli D8 清偿后模式：int 转换→201 先例）；新统一入口按参数族对应采用，禁止混用；`<tool-id>` 为 slug 不入 UUID 守卫族。
+> **守卫分工注记：** CLI 层双 UUID 守卫契约与 agent_cli 既有分工一致——实体 ID 族（plan-id）走 242、agent-id 走 201（ocr_cli D8 清偿后模式：int 转换→201 先例）；新统一入口按参数族对应采用，禁止混用；`<tool-id>` 为 slug、`--checkpoint-no` 为 CP-N 编号，均不入 UUID 守卫族。
 
 - [ ] 消息安全性：CLI stderr 呈现复用 agent_cli 既有格式 `[{code}] {message}`（不泄露堆栈/SQL）
 - [ ] 退出码映射：DomainError → exit 1 / typer 用法错误 → exit 2 / 成功 → exit 0
@@ -294,6 +294,8 @@
 ### TDD 循环约束（适用于每个 Task）
 
 > **每个 Task 必须依次执行以下步骤，禁止跳过或颠倒顺序：**
+>
+> **变异步骤适用性（R3-10）：** 变异注入适用于含生产代码交付的实现 Task（1-6）；纯测试/验证 Task（0/7/8/9）无生产代码可突变，以断言判别力自证（对被测生产面突变注入验证，如 Task 8 架构断言可对临时注入的违规 import 验证测试红）。
 
 | 阶段 | 动作 | 完成标志 |
 |------|------|----------|
@@ -472,7 +474,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_framework.py`（stub resolve 直注 create_cli_app：六模块子 app 挂载/--help 自描述/--format 值域 exit 2/**全局参数尾置形态解析**（R2-A1 时序注：循环 A 时刻命令组未交付，以工厂内任一已挂载子命令验证尾置机制，各命令组尾置断言随 Task 3-6 落地——R1-F1 P0 回归锚）/缺省 --format 输出=table 渲染/--dry-run 输出静态端口名且 resolve 零调用/--mock 短路 JSON/--yes 缺 budget→201+exit 1） |
-| 🟢 绿 | 实现 `src/interfaces/cli/main.py`（typer 工厂+**共享 Annotated 参数注解（`_params.py` 单一来源，禁 @app.callback() 承载全局参数——尾置形态实测 exit 2）**+退出码处理）最小代码 |
+| 🟢 绿 | 实现 `src/interfaces/cli/main.py`（typer 工厂+**共享 Annotated 参数注解（`_params.py` 单一来源，禁 @app.callback() 承载全局参数——尾置形态实测 exit 2）**+退出码处理）最小代码——**六模块挂载形态（R3-4）：工厂内联六模块空 Typer 骨架组（`--help` 自描述即可达挂载断言），Task 3-6 逐组以 commands/ 包实现替换骨架，挂载断言两时点可满足** |
 | 🟡 变异 | 删六模块挂载→help 断言红；删 budget 守卫→拒绝断言红；还原绿 |
 | 🔄 重构 | 类型注解/中文 docstring/参数 DRY |
 
@@ -594,7 +596,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_checkpoint_archive_commands.py`（list --plan-id 归一守卫/show --id/recover --mode 值域/archive query --plan-id→blm_chain_trace_use_case 调用契约/空态 exit 0 输出） |
+| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_checkpoint_archive_commands.py`（list --plan-id 归一守卫/show --plan-id+--checkpoint-no 复合定位→:2508 预览视图调用契约/recover --plan-id+--checkpoint-no+--confirmed-by→:2536 执行面调用契约+--mode 值域/archive query --plan-id→blm_chain_trace_use_case 调用契约/空态 exit 0 输出——R3-3 参数形态同步） |
 | 🟢 绿 | 实现 `commands/checkpoint_commands.py`+`archive_commands.py`+`controllers/checkpoint_controller.py`+`archive_controller.py`（消费 checkpoint 三用例+blm_chain_trace_use_case） |
 | 🟡 变异 | recover mode 值域放宽→exit 2 断言红；还原绿 |
 | 🔄 重构 | 四命令与既有命令组风格统一 |
@@ -659,7 +661,7 @@
 | 🟢 绿 | 编写/补齐对应 BDD 步骤实现，全场景转绿 |
 | 🔄 重构 | 收敛场景命名、统一断言表达 |
 
-- [ ] Subtask 9.1: 性能场景 — 20 轮 `--dry-run` 采样 P95 < 500ms 断言（**子进程直调 `.venv/bin/sisys` 或 `python -m src.entrypoints.main_cli`，禁 poetry run 包装**——R1-F6 口径）
+- [ ] Subtask 9.1: 性能场景 — 20 轮 `--dry-run` 采样 P95 < 500ms 断言（**子进程直调 `.venv/bin/sisys` 或 `python -m src.entrypoints.main_cli`，禁 poetry run 包装**——R1-F6 口径；**P95 取法（R3-8）：** 20 轮耗时升序排序取第 `ceil(0.95×20)=19` 个（1-based）；父进程 `time.monotonic()` 差值测子进程 wall time，规避墙钟回拨）
 - [ ] Subtask 9.2: 并发场景 — 10 并发轻量子进程（--help/--dry-run 面）全部 exit 0
 - [ ] Subtask 9.3: 收尾场景 1 — src 完成清单逐项确认；场景 2 — 四测试目录完成清单逐项确认
 - [ ] Subtask 9.4: 运行 `pytest tests/unit tests/integration tests/acceptance tests/contracts`（四目录全量）+ `ruff check` + `mypy` 收尾校验；全量回归甄别失败项（DF 族/预存抖动形态对照 epic-6 先例归位）
@@ -710,6 +712,7 @@
 | OD-5 | tests/e2e 空置——E2E 语义由验收（in-process 真实服务全链）承载；epics「E2E 测试覆盖率≥80%」（:2636）指标同由验收场景覆盖承载，无独立 e2e 目录测量（R1-F20 点名） | 维持四目录口径 |
 | OD-6 | system/config 辅助模块命令组 defer（sisys system auth/monitor/route/health、sisys config 族） | 7-4/后续 |
 | OD-7 | interface-design §4.3 完整命令清单超出 12 命令冻结矩阵的命令面 defer（document search/version/delete、agent status/arbitrate、plan export/review、archive timeline/diff、checkpoint --modifications）——12 命令=路线图「6 服务模块命令骨架」最小集（R1-F7 边界声明；P1 原则以 6 模块覆盖承载） | 后续命令扩展 Story（7-1-DF5） |
+| OD-8 | checkpoint show/recover 参数形态偏离钦定文本（§4.3.5 钦定 `--id <cp-id>` 单参数；落地为 `--plan-id`+`--checkpoint-no` 复合定位）——checkpoint 域端口无 UUID 单参查询 API（R3-1/2 实测：唯一查询入参形态=plan_id+checkpoint_no），钦定单参数形态在当前端口面不可实现；`--confirmed-by` 参数为执行面 `confirmed_by` 非空守卫的 CLI 承载（钦定文本未含） | 端口签名现实层优先，落地形态注记（7-1-DF1 迁移专项统一时复核） |
 
 ### 项目结构说明 Project Structure（本 Story 相关面）
 
@@ -916,6 +919,19 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 
 > **R2 审查方法注记：** 双 Agent 并行（R2-A 回归核查：git diff 逐项比对 R1 台账+六组合交互面扫描——R1 的 33 项修复与 diff 完全一致、零 P0/P1/P2 新破口；R2-B 传播完备性+深度推演：10+ 关键词面传播一致、新发现 P1×2/P2×2/P3×5）+ 主会话等待期独立预验（R2-1 序列化问题实测先行，与 R2-B#2 独立同报互证）。R2 合计 16 项修复（P1×3 计入 R2-1/2/10、P2×5、P3×8）。
 
+| R3-1 | `checkpoint show --id`→`checkpoint_use_case`(:2496) 端口错位——该端口实为 CreateCheckpointUseCase 纯创建零查询（无 UUID 查询 API），dev 按表实现 show 无方法可调（R3 签名级核验发现——R1 行号核验只证注册存在未证签名匹配的盲区） | P1 | AC-5 表 show 行重设计：`show --plan-id [--checkpoint-no]`→`checkpoint_recovery_use_case`(:2508 预览视图)；主会话独立实证（组合根 :2496-2500 interface=CreateCheckpointUseCase） |
+| R3-2 | `checkpoint recover --id [--mode]`→`checkpoint_recovery_use_case`(:2508) 预览/执行面错位——:2508 无 mode 无恢复副作用；真实执行面 `checkpoint_recovery_execute_use_case`(:2536) 参数三缺口（--plan-id/--checkpoint-no/`confirmed_by` 非空强制 242） | P1 | recover 行重设计：`--plan-id --checkpoint-no [--mode] [--confirmed-by]`→:2536；:2508 转任 show/--dry-run 预览面；confirmed_by 缺省取 --session 标识；主会话独立实证（checkpoint_approval.py:56-110 签名+空串 242 守卫） |
+| R3-3 | checkpoint `--id` 参数形态错位传播面四处（AC-2 示例/AC-5 表/AC-7 守卫族/异常表） | P1 | 四处联动修订（AC-2 示例复合定位+given 前置创建链注记；AC-7 守卫族收敛 --plan-id；异常表实体族改写+confirmed_by 242 承载注记；Task 6 红阶段测试清单同步）+OD-8 偏离登记（钦定 --id 单参形态在端口面不可实现） |
+| R3-4 | Task 2「六模块子 app 挂载」断言时序缺口（命令组 Task 3-6 才交付，Task 2 挂载断言红→绿路径断裂） | P2 | Task 2 绿阶段注明工厂内联六模块空骨架组（--help 可达），Task 3-6 逐组替换 |
+| R3-5 | load_dotenv 调用位置未钉死（模块级 import 副作用形态会崩坏顺序守卫断言与 monkeypatch 可达性） | P2 | AC-7 钉死 main() 函数体内+bootstrap 前，禁止模块级副作用形态 |
+| R3-6 | `sisys --version` 实现机制与 R1-1 callback 禁令冲突（typer 无内建 --version，标准实现恰是 callback） | P2 | AC-3 机制节补豁免边界（顶层 invoke_without_command 形态，无尾置可达性问题）——主会话实测顶层 exit 0 支撑 |
+| R3-7 | AC-7 大写 UUID 归一命中场景前置数据面未指明 | P3 | 验证项补前置创建链（checkpoint_use_case 直创+大写 --plan-id 查询） |
+| R3-8 | 20 轮 P95 取值方法未钉死（index 18/19 两可） | P3 | Task 9.1 钉死升序第 ceil(0.95×20)=19 个（1-based）+monotonic 差值 |
+| R3-9 | 「轻量真实链」名实差未注记（命令逻辑轻≠绕 bootstrap） | P3 | AC-5 验证项补名实注记 |
+| R3-10 | TDD 变异步骤对纯测试 Task（0/7/8/9）字面不可执行 | P3 | TDD 约束节补适用性注记（变异限实现 Task；纯测试 Task 以断言判别力自证） |
+
+> **R3 审查方法注记：** 单深度推演 Agent（递减投入：23 场景三轴推演[前置可达/期望唯一/可观测]+Task 0→9 依赖干跑+组合交互面第二层）——三 P1 全部主会话独立实证后落码（组合根 :2496/:2508/:2536 三端口 interface/签名/守卫逐一定谳）；轴 1 快扫表+轴 2/3 核过面见 Agent 报告归档。R3 合计 10 项修复（P1×3+P2×3+P3×4），checkpoint 命令族是本轮最大破口。
+
 ---
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
@@ -946,10 +962,11 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-11-20
 **最后更新/Last Updated:** 2026-11-20
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（三 Agent 并行调研：架构文档/现有代码/测试与故事风格；前置留项清单七条裁定落档；DC-1~DC-6 架构决策+OD-1~OD-6 偏离预告；12 命令冻结矩阵+全局参数契约+退出码契约）
 - v1.1.0: Round 1 五轮循环文档审查修订（4 调研+3 审查 Agent 并行，33 项修复：P0×1 typer callback 尾置矛盾/P1×11/P2×13/P3×8，详见 Docs Review Fixes 表）——核心：全局参数机制冻结（Annotated 共享注解）、端口 SSOT 13 化（补 skill_loader）、tool-id slug 语义+解析链、存量 test_document_commands.py/version 命令族处置+7-1-DF5、dry-run 静态 PORT_NAME 机制、性能口径冻结（禁 poetry run）+出处勘正（prd.md:2553）、场景计数统一（Task 0=19→Task 9 补至 23）、接口层覆盖率测量面落地、契约测试零 IO 对齐、OD-7/DF5 登记
 - v1.2.0: Round 2 回归核查+传播完备性修订（双 Agent：R2-A 证实 R1 修复 33 项与 diff 零偏差+六组合交互面零新破口；R2-B 新发现 8 项；主会话预验独立同报序列化缺口；16 项修复：P1×3/P2×5/P3×8）——核心：json_formatter 序列化契约冻结（default=str，UUID/Decimal 降维——首个 JSON 输出面）、三格式化器空态契约冻结、Subtask 0.8 漏 DF5 同步勘正（R1 修复自身联动位未执行缺陷类）、.env ENV_FILE 模块常量+monkeypatch 注入机制、AC-8 降级判定入验证项、--session 两态透传、优先级断言、AC-6 承载面注记、契约测试断言对象形态
+- v1.3.0: Round 3 深度推演修订（单 Agent 三轴推演：23 场景前置可达/期望唯一/可观测+Task 0→9 依赖干跑+组合交互面第二层；10 项修复：P1×3/P2×3/P3×4）——核心：checkpoint show/recover 端口消费契约错位修正（show→:2508 预览视图复合定位、recover→:2536 执行面+confirmed_by 非空承载；原 :2496 创建面移出命令消费清单——R1 行号核验未证签名匹配的盲区由签名级核验补上）+OD-8 偏离登记（钦定 --id 单参形态在端口面不可实现）、Task 2 六模块骨架组时序、load_dotenv main() 体内钉死、--version callback 豁免边界、P95 取法钉死、变异步骤适用性注记
