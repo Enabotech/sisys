@@ -105,6 +105,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"resources": [{"name": "电池专利组合", "type": "intellectual_property"}]}'
 ---
 
 # VRIO 框架

@@ -102,6 +102,8 @@ output_schema:
           description: 组织优化建议清单（维度失配处的调整方向）
           items:
             type: string
+input_examples:
+  - '{"org_structure": {"departments": [{"name": "研发部", "headcount": 120}]}}'
 ---
 
 # 组织设计框架

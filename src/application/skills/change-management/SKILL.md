@@ -90,6 +90,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"change_data": {"change_scope": "组织架构调整", "stakeholders": ["管理层", "一线员工"]}}'
 ---
 
 # 变革管理模型

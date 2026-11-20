@@ -157,6 +157,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"industry": "新能源汽车", "competitors": ["比亚迪", "特斯拉"], "analysis_dimensions": ["技术", "渠道"]}'
 ---
 
 # 竞争对手分析

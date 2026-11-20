@@ -111,6 +111,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"internal_factors": {"strengths": ["品牌力强"]}, "external_factors": {"opportunities": ["出海政策利好"]}}'
 ---
 
 # SWOT-TOWS

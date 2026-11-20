@@ -67,6 +67,8 @@ output_schema:
           description: 职责优化建议清单（负载均衡/单点问责）
           items:
             type: string
+input_examples:
+  - '{"roles_tasks": [{"task": "战略规划编制", "roles": [{"name": "CEO", "assignment": "A"}]}]}'
 ---
 
 # RACI 矩阵

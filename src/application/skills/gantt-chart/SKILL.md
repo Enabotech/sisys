@@ -73,6 +73,8 @@ output_schema:
           description: CPM 关键路径（ES/EF/LS/LF 零浮动链——时长归一真 CPM，与 dependency-graph 跳数最长链的结构代理语义分工；里程碑仅当处于零浮动链才进入本字段，否则以 milestones 标记承载）
           items:
             type: string
+input_examples:
+  - '{"project_plan": {"project_name": "新品上市", "tasks": [{"name": "市场调研", "duration_days": 14}]}}'
 ---
 
 # 甘特图

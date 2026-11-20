@@ -82,6 +82,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"enterprise_data": {"primary_activities": [{"activity": "物流", "cost_ratio": 15}]}}'
 ---
 
 # 价值链分析

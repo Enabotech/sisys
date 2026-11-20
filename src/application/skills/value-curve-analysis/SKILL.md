@@ -77,6 +77,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"competition_data": {"industry_factors": ["价格", "性能"], "players": [{"name": "竞品A", "scores": [3, 8]}]}}'
 ---
 
 # 价值曲线分析

@@ -107,6 +107,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"technology_domain": "固态电池", "incumbent_industry": "传统燃油车"}'
 ---
 
 # 破坏性创新模型

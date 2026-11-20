@@ -90,6 +90,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"market_product_data": {"current_market": "国内新能源汽车", "current_product": "智能座舱"}}'
 ---
 
 # 安索夫矩阵

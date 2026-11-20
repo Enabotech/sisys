@@ -64,6 +64,8 @@ output_schema:
           description: 风险节点清单（扇入 ≥3 的汇聚节点、扇出 ≥3 的发散节点与零依赖/零被依赖的孤立节点——机械规则，其余风险为 LLM 分析项）
           items:
             type: string
+input_examples:
+  - '{"task_list": [{"task_id": "T1", "name": "需求分析", "depends_on": []}]}'
 ---
 
 # 依赖关系图

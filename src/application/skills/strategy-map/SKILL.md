@@ -81,6 +81,8 @@ output_schema:
           description: 战略主题卡清单（每卡含 theme 主题名、dimensions 涉及维度、hypothesis_chain 假设链三键——自由 object，4.3 defer）
           items:
             type: object
+input_examples:
+  - '{"bsc_indicators": [{"perspective": "客户", "indicator": "客户留存率"}]}'
 ---
 
 # 战略地图

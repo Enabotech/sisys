@@ -90,6 +90,8 @@ output_schema:
         consistency_analysis:
           type: object
           description: 块间一致性分析（外层键为对照关系名（如 value_propositions_customer_segments、cost_structure_revenue_streams），值为一致性判定与依据——自由 object，4.3 defer；核心匹配 value_propositions↔customer_segments 与成本-收入对称 cost_structure↔revenue_streams 双侧对照）
+input_examples:
+  - '{"business_model": {"key_partners": ["供应商A"], "revenue_streams": ["订阅制"]}}'
 ---
 
 # 商业模式画布

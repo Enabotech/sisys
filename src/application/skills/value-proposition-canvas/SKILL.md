@@ -84,6 +84,8 @@ output_schema:
           description: 改进建议清单（缺口侧补强方向）
           items:
             type: string
+input_examples:
+  - '{"customer_profile": {"jobs": ["高效通勤"]}, "value_map": {"products": ["智能导航"]}}'
 ---
 
 # 价值主张画布

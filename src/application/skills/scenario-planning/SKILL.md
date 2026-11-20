@@ -98,6 +98,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"focal_issue": "五年后电池技术路线选择", "time_horizon_years": 5, "region_scope": "全球"}'
 ---
 
 # 情景规划

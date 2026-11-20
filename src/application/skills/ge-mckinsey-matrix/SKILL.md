@@ -78,6 +78,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"business_units": [{"name": "智能驾驶事业部", "market_attractiveness": 8, "competitive_strength": 6}]}'
 ---
 
 # GE-麦肯锡矩阵

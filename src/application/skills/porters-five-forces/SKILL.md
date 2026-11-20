@@ -102,6 +102,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"industry": "消费电子", "region_scope": "亚太", "incumbent_players": ["三星", "小米"]}'
 ---
 
 # 波特五力

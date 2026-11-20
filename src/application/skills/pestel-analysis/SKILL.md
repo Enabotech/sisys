@@ -133,6 +133,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"industry": "新能源汽车", "region_scope": "中国", "time_horizon_years": 3, "focus_dimensions": ["political", "technological"]}'
 ---
 
 # PESTEL 分析

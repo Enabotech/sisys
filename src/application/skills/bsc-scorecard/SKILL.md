@@ -97,6 +97,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"strategic_objectives": [{"perspective": "财务", "objective": "营收增长 20%"}]}'
 ---
 
 # BSC 平衡计分卡

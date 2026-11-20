@@ -84,6 +84,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"strategic_factors": {"financial_position": {"ROI": 12}, "competitive_advantage": {"market_share": 25}}}'
 ---
 
 # SPACE 矩阵

@@ -83,6 +83,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"business_objectives": [{"objective": "客户满意度提升", "metric": "NPS"}]}'
 ---
 
 # KPI 树

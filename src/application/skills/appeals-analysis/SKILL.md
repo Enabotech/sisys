@@ -94,6 +94,8 @@ output_schema:
       description: 溯源元数据（source/freshness/confidence）
       items:
         type: object
+input_examples:
+  - '{"product_category": "智能手机", "target_segment": "18-35 岁都市白领", "region_scope": "中国"}'
 ---
 
 # $APPEALS
