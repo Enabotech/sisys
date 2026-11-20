@@ -409,7 +409,7 @@ def verify_version_output(context: dict[str, Any]):
 
 @then("stderr 呈现领域异常编码与消息")
 def verify_domain_error_stderr(context: dict[str, Any]):
-    """验证 stderr 呈现 [EXCEPTION_NNN] message 格式（agent_cli 逐字对齐契约）。"""
+    """验证 stderr 呈现 [EXCEPTION_NNN] message 格式（in-process 单行契约形态——CR3 勘正注）。"""
     pattern = re.compile(r"\[EXCEPTION_\d+\] .+")
     assert pattern.search(context["cli_stderr"]), f"stderr 缺 [EXCEPTION_NNN] message 呈现: {context['cli_stderr']!r}"
 

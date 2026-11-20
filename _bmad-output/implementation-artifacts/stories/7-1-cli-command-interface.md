@@ -212,7 +212,7 @@
 | `NotFoundError` | EXCEPTION_202 | document upload 文件不存在（`require_upload_file` 命令级输入守卫——CR1 补登：dev 消费既有异常类未入表） | 既有 NotFoundError 族 |
 | （用例透传） | 482 等 | plan 重跑守卫等由用例层抛出，CLI 只呈现 | blm_planning 既有 |
 
-> **退出码扩展注记（CR1-F8）：** 实现含 `Abort→exit 130`（Ctrl+C，click 惯例）——0/1/2 冻结契约外的第四码，仅交互中断承载；**异常呈现形态注记：** DomainError stderr 为双行（`ERROR: 领域异常: <msg>` 回显行+`[EXCEPTION_NNN] message` 契约行）——契约行逐字对齐 agent_cli 既有格式，ERROR 前缀行为 typer 入口回显，LLM 解析以 `[EXCEPTION_NNN]` 行为准。
+> **退出码扩展注记（CR1-F8，CR3 勘正）：** 实现含 `Abort→exit 130`（Ctrl+C，click 惯例）——0/1/2 冻结契约外的第四码，仅交互中断承载（无测试锚——Abort 模拟需信号注入，注记级承载）；**异常呈现形态注记：** DomainError stderr 的契约行 `[EXCEPTION_NNN] message` 逐字对齐 agent_cli 既有格式（**in-process 直调为单行契约形态——验收断言锚此形态**）；`ERROR: 领域异常: <msg>` 回显行仅子进程执行形态出现（typer 入口回显），非契约面、不锚断言，LLM 解析以 `[EXCEPTION_NNN]` 行为准。
 
 > **守卫分工注记：** CLI 层双 UUID 守卫契约与 agent_cli 既有分工一致——实体 ID 族（plan-id）走 242、agent-id 走 201（ocr_cli D8 清偿后模式：int 转换→201 先例）；新统一入口按参数族对应采用，禁止混用；`<tool-id>` 为 slug、`--checkpoint-no` 为 CP-N 编号，均不入 UUID 守卫族。
 

@@ -121,6 +121,13 @@ class TestDocumentUploadCommand:
         exit_code = main_cli.main(["document", "upload", "--file", str(tmp_path / "missing.md")])
         assert exit_code == 1
 
+    def test_dry_run_missing_file_guard_precedes_preview(self, tmp_path: Path) -> None:
+        """--dry-run × 文件不存在 → 202 exit 1（命令级输入守卫先于预览短路——CR1-F5 不变量锚，R3 补）。"""
+        from src.entrypoints import main_cli
+
+        exit_code = main_cli.main(["document", "upload", "--file", str(tmp_path / "missing.md"), "--dry-run"])
+        assert exit_code == 1
+
     def test_mock_short_circuit_json(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """--mock --format json：Mock DTO 冻结形态（零 resolve）。"""
         temp_file = tmp_path / "doc.md"
