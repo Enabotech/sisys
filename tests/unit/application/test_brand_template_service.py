@@ -273,19 +273,26 @@ class TestValidationMatrix:
         assert "PNG" in exc_info.value.message or "JPEG" in exc_info.value.message
         mocks["l4"].store.assert_not_awaited()
 
-    async def test_logo_unreadable_chmod_000_494(self, tmp_path: Any) -> None:
+    async def test_logo_unreadable_chmod_000_494(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
         """不可读伞形（chmod 000 真文件——stat 可过而 open 抛 PermissionError）→ 494。
 
         真实语义链锚：isfile/getsize 走 os.stat（父目录 +x 即可）→ open 才触
-        权限错误——「文件不可读」包装落在 open 位（R1-F3 主格）。
+        权限错误——「文件不可读」包装落在 open 位（R1-F3 主格）。CI root 容器
+        无视 mode 位（chmod 形态不可达），改锚被测模块 open 位直接抛
+        PermissionError——伞形捕获（OSError→494）同格可达，不 skip。
         """
         import os as os_module
 
-        if os_module.geteuid() == 0:
-            pytest.skip("root 忽略 mode 位——chmod 形态不可达")
         logo = tmp_path / "locked.png"
         _make_logo_png(logo)
-        logo.chmod(0o000)
+        if os_module.geteuid() == 0:
+
+            def _raise_permission_error(file: Any, mode: str = "rb") -> Any:
+                raise PermissionError(13, "Permission denied", str(file))
+
+            monkeypatch.setattr("src.application.ports.brand_template.open", _raise_permission_error)
+        else:
+            logo.chmod(0o000)
         service, _ = _make_service()
         with pytest.raises(BrandTemplateValidationError) as exc_info:
             await service.save_brand_template(name="x", color_scheme="graphite", font_preset="stsong", logo_path=str(logo))
