@@ -75,8 +75,8 @@
 **验证标准/Validation Criteria:**
 - [ ] `--yes` 无 `--cost-budget` → EXCEPTION_201 + exit 1（全 Agent 专用命令一致）
 - [ ] `--dry-run` 输出含端口名与归一后参数，且无 bootstrap 副作用（可用 stub resolve 断言零调用）
-- [ ] `--mock` 输出为合法 JSON（`--format json` 组合）且零外部服务依赖
-- [ ] `--session`/`--timeout` 透传至用例执行上下文
+- [ ] `--mock` 输出为合法 JSON（`--format json` 组合）且零外部服务依赖；`--dry-run`×`--mock` 同给 → `--dry-run` 优先（输出端口名预览非 mock DTO——R2-8 优先级断言）
+- [ ] `--session`/`--timeout` 透传至用例执行上下文（真实面断言；`--mock` 面 `--session` 缺省自动生成仍入 Mock DTO 的 `session` 字段——透传语义两态都可达，R2-4）
 
 ### AC-4: 三态输出格式化器
 
@@ -86,6 +86,8 @@
 - `json`：合法 JSON 单文档输出（可 pipe 给 jq / LLM 直接消费）
 - `table`：人类可读表格（列宽自适应，参照 agent_cli `_print_*` 两遍法先例）
 - `pretty`：终端美化输出（分组+缩进）
+
+**序列化契约（R2-1）：** `json_formatter` 序列化策略冻结为 `json.dumps(payload, default=str, ensure_ascii=False)`——命令对象/结果 DTO 含 `uuid.UUID`/`Decimal`/`datetime` 字段（R1 机制面新增 `_params.py`/`PORT_NAME` 契约的同族联动），`default=str` 统一降维（UUID→hex 串、Decimal→十进制串）；`--mock` 短路 DTO 的 `parameters` 同走此策略（R2-2）；全仓无既有 `json.dumps` CLI 先例（agent_cli 纯 print 面零 json.dumps），本 Story 为首个 JSON 输出面——策略在 Task 1 红阶段以「payload 含 UUID/Decimal 字段 → `json.loads` 可解析且值形态正确」断言锚定。
 
 **验证标准/Validation Criteria:**
 - [ ] 三格式化器单元测试覆盖：空列表、单条、多条、中文列宽、嵌套字段
@@ -130,10 +132,10 @@
 - **P5/P6/P7 量化指标**（注记锚，OD-1）：SkillSelector 已于 Story 5-2 交付（`skill_selector` 端口）；「工具选择准确率≥85% / 误触发率<5% / 工具调用准确率≥90%」三指标同属评估指标面，7-1 不重复建设，统一锚定 evaluation 专项（`evaluation_harness` 已有基建）
 
 **验证标准/Validation Criteria:**
-- [ ] P4 架构断言测试通过（`test_arch_unified_cli.py`）
-- [ ] frontmatter `input_examples` 字段校验单测（非 list/超 1-5 条 → EXCEPTION_201 族校验异常）
-- [ ] `sisys tool schema <tool-id> --format json` 输出含非空 `input_examples`
-- [ ] 全量 active skills 的 SKILL.md frontmatter 含 1-5 条 input_examples（校验器全量跑批断言）
+- [ ] P4 架构断言测试通过（`test_arch_unified_cli.py`）——架构测试承载（非验收场景）
+- [ ] frontmatter `input_examples` 字段校验单测（非 list/超 1-5 条 → EXCEPTION_201 族校验异常）——unit 承载（非验收场景）
+- [ ] `sisys tool schema <tool-id> --format json` 输出含非空 `input_examples`——验收场景×1 承载（AC-6×1）
+- [ ] 全量 active skills 的 SKILL.md frontmatter 含 1-5 条 input_examples（校验器全量跑批断言）——跑批断言承载（Task 4.4 收尾，非验收场景）；**承载面注记（R2-9）：四验证项分属架构测试/unit/验收场景/跑批四承载面，仅第三项入 23 场景计数**
 
 ### AC-7: 输入守卫与入口环境装配
 
@@ -141,7 +143,7 @@
 **When** 输入非规范形态
 **Then** 守卫契约生效：
 - **UUID canonical 归一**（6.9-R1-DF1 新面清偿）：`--plan-id`/`--id` 等 UUID 参数经共享守卫 `str(uuid.UUID(value))` 归一——大写/URN/无连字符等非 canonical 形态归一后正确命中（与存量 agent_cli 宽松守卫静默空态形成对照）；非 UUID 守卫按参数族分契约：**实体 ID 族（`--plan-id`、checkpoint `--id` 等 plan/checkpoint 实体标识）→ EntityValidationError 242、agent-id 族（`--agent-id`）→ ValidationError 201**（agent_cli 既有分工，R1-F18/_parse_agent_uuid 先例），均 exit 1；**UUID 守卫仅适用 UUID 族参数——`<tool-id>` 为 slug 禁套守卫（见 AC-5 注记）**
-- **.env 入口加载**（6.8-R1-DF1 新面清偿，方案一定谳）：`src/entrypoints/main_cli.py` 在 bootstrap 前显式 `load_dotenv`（显式路径，`usecwd=False`）——`python -m src.entrypoints.main_cli` 形态下 .env 注入不再依赖 litellm import 副作用
+- **.env 入口加载**（6.8-R1-DF1 新面清偿，方案一定谳）：`src/entrypoints/main_cli.py` 在 bootstrap 前显式 `load_dotenv`（显式路径，`usecwd=False`）——`python -m src.entrypoints.main_cli` 形态下 .env 注入不再依赖 litellm import 副作用。**路径推导与可测注入（R2-11）：** 显式路径 = 模块级常量 `ENV_FILE = Path(__file__).resolve().parents[2] / ".env"`（仓库根推导，main_cli.py 位于 src/entrypoints/ 下两层）；集成测试 Task 7.4 经 monkeypatch 该常量指向临时 .env 文件注入（不改仓库根 .env，零污染），单测顺序守卫同锚该常量
 - 枚举值（--format/--mode 等）由 typer choice 守卫 → exit 2
 
 **验证标准/Validation Criteria:**
@@ -161,8 +163,8 @@
 - **编号消歧注记（R1-F10）：** NFR-IF-01 在 prd.md:2553（CLI 延迟）与 epics_v1.0.md:336/:669/:3466（仪表盘加载 <2s，语义实为 NFR-IF-06）双源冲突，本 Story 以 **prd 口径**为准
 
 **验证标准/Validation Criteria:**
-- [ ] 验收性能场景：20 轮 `--dry-run` 子进程直调采样 P95 < 500ms（禁 poetry run 包装）
-- [ ] 验收并发场景：10 并发轻量子进程（--help/--dry-run 面）全部 exit 0
+- [ ] 验收性能场景：20 轮 `--dry-run` 子进程直调采样 P95 < 500ms（禁 poetry run 包装）；直调形态判定：`.venv/bin/sisys` 存在即用，缺失降级 `python -m src.entrypoints.main_cli`（R2-3 降级判定入验证项，与隔离约束表同款）
+- [ ] 验收并发场景：10 并发轻量子进程（--help/--dry-run 面）全部 exit 0（降级判定同上）
 - [ ] 可用性≥99% 口径为运维面指标，7-1 以退出码契约+零回归承载（注记）
 
 ---
@@ -316,7 +318,7 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | formatters | json/table/pretty 三态渲染（空/单条/多条/中文列宽/嵌套） | `tests/unit/interfaces/cli/test_cli_formatters.py` | Task 1 |
 | **TDD 单元测试** | CLI 框架 | create_cli_app 工厂/全局参数/守卫（UUID 归一→242、缺 budget→201）/退出码矩阵/load_dotenv 先于 bootstrap 顺序 | `tests/unit/interfaces/cli/test_cli_framework.py` | Task 2 |
-| **TDD 单元测试** | document 命令 | upload/parse 命令解析+controller+translator（stub resolve 直注） | `tests/unit/interfaces/cli/test_document_commands.py` | Task 3 |
+| **TDD 单元测试** | document 命令 | upload/parse 命令解析+controller+translator（stub resolve 直注） | `tests/unit/interfaces/cli/test_document_commands.py`（重写覆盖存量 version 族——R2-13 标注） | Task 3 |
 | **TDD 单元测试** | tool 命令 | list/schema/run/chain run 四命令 + input_examples 字段校验 | `tests/unit/interfaces/cli/test_tool_commands.py` | Task 4 |
 | **TDD 单元测试** | skill frontmatter | input_examples 字段解析与 1-5 条校验 | `tests/unit/application/skills/test_frontmatter_input_examples.py` | Task 4 |
 | **TDD 单元测试** | agent/plan 命令 | agent run/plan generate + Agent 专用参数透传 | `tests/unit/interfaces/cli/test_agent_plan_commands.py` | Task 5 |
@@ -421,11 +423,11 @@
 - [ ] Subtask 0.1: 冻结统一命令矩阵表（AC-5 表 12 命令 + 框架面 `--help/--version`）——实现禁增删命令名
 - [ ] Subtask 0.2: 冻结全局参数契约表（`--yes/--dry-run/--mock/--format`）与 Agent 专用参数表（`--session/--cost-budget/--timeout`）及语义（AC-3 冻结语义为准）
 - [ ] Subtask 0.3: 冻结退出码契约表（0/1/2）与 DomainError stderr 呈现格式（`[EXCEPTION_NNN] message`）
-- [ ] Subtask 0.4: 编写端口消费契约测试 `tests/contracts/test_port_contract_unified_cli.py`（**13 端口**注册面可达+isinstance，**零 IO 直查形态**对齐 `test_port_contract_agent_checkpoint.py` 先例；绿色门禁守卫形态，跑通即过）
+- [ ] Subtask 0.4: 编写端口消费契约测试 `tests/contracts/test_port_contract_unified_cli.py`（**13 端口**注册面可达+isinstance，**零 IO 直查形态**对齐 `test_port_contract_agent_checkpoint.py` 先例——断言对象=PortSpec 注册元数据（`_global_registry.get(name)` 拿到的 spec：interface/impl/lifetime 等维度断言，R2-12 形态注记），实例化断言经 impl 字符串 import 类的 Protocol 检查或 `_DummyResolver` 分发替身对齐先例，不连真实服务；绿色门禁守卫形态，跑通即过）
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_unified_cli.feature`（**AC-1~AC-7 共 19 个业务场景**，按 AC 分节横幅注释组织；AC-8×2 与收尾×2 由 Task 9 追加至最终态 23——R1-F11 口径）
 - [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_unified_cli.py`（三件套+@scenario 逐场景绑定+延迟 import；**given/when/then 全步骤骨架齐备**——仅 given 骨架会在 pytest-bdd 收集期抛 ScenarioDefinitionError，偏离声明的运行期 ImportError 红形态，R1-F33 收紧）
 - [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证——红形态=运行期 ImportError：`src.entrypoints.main_cli` 不存在）
-- [ ] Subtask 0.8: 前置留项清单七条处置注记落档 `deferred-work.md`（#3 部分清偿/#6/#7 触发清偿注记+#1/#2/#4/#5 顺延注记——历史行不改写追加注记）+ 新登记 7-1-DF1~DF4（gap 四要素+V1 归宿）
+- [ ] Subtask 0.8: 前置留项清单七条处置注记落档 `deferred-work.md`（#3 部分清偿/#6/#7 触发清偿注记+#1/#2/#4/#5 顺延注记——历史行不改写追加注记）+ 新登记 **7-1-DF1~DF5**（gap 四要素+V1 归宿；R2-10 勘正：R1 扩登记 DF5 后本行原写 DF1~DF4 漏同步）
 - [ ] Subtask 0.9: 锚点行号复核（本 Story 引用的组合根行号/importlinter 行号/文档行号实测核对）
 
 **完成标准/Definition of Done:**
@@ -444,8 +446,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_formatters.py`（json 合法性/表格列宽中文对齐/pretty 分组缩进/空态/单条/多条/嵌套） |
-| 🟢 绿 | 实现 `src/interfaces/cli/formatters/{__init__,json_formatter,table_formatter,pretty_formatter}.py` 最小代码 |
+| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_formatters.py`（json 合法性/表格列宽中文对齐/pretty 分组缩进/空态/单条/多条/嵌套）——json 断言含 **UUID/Decimal 字段序列化用例**（`default=str` 策略锚，R2-1）与 **空列表契约**（空态输出=空 JSON 数组 `[]`/空表头+零数据行/pretty 空态提示语，三格式各自形态冻结，R2-6） |
+| 🟢 绿 | 实现 `src/interfaces/cli/formatters/{__init__,json_formatter,table_formatter,pretty_formatter}.py` 最小代码（json_formatter 冻结 `json.dumps(payload, default=str, ensure_ascii=False)`） |
 | 🟡 变异 | 改坏 JSON 序列化键→json 格式断言红；改坏列宽计算→table 断言红；还原绿 |
 | 🔄 重构 | 统一渲染入口签名 `render(payload: Mapping) -> str`、类型注解、中文 docstring |
 
@@ -469,7 +471,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_framework.py`（stub resolve 直注 create_cli_app：六模块子 app 挂载/--help 自描述/--format 值域 exit 2/**全局参数尾置形态解析（`... upload --file x --yes`——R1-F1 P0 回归锚）**/缺省 --format 输出=table 渲染/--dry-run 输出静态端口名且 resolve 零调用/--mock 短路 JSON/--yes 缺 budget→201+exit 1） |
+| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_framework.py`（stub resolve 直注 create_cli_app：六模块子 app 挂载/--help 自描述/--format 值域 exit 2/**全局参数尾置形态解析**（R2-A1 时序注：循环 A 时刻命令组未交付，以工厂内任一已挂载子命令验证尾置机制，各命令组尾置断言随 Task 3-6 落地——R1-F1 P0 回归锚）/缺省 --format 输出=table 渲染/--dry-run 输出静态端口名且 resolve 零调用/--mock 短路 JSON/--yes 缺 budget→201+exit 1） |
 | 🟢 绿 | 实现 `src/interfaces/cli/main.py`（typer 工厂+**共享 Annotated 参数注解（`_params.py` 单一来源，禁 @app.callback() 承载全局参数——尾置形态实测 exit 2）**+退出码处理）最小代码 |
 | 🟡 变异 | 删六模块挂载→help 断言红；删 budget 守卫→拒绝断言红；还原绿 |
 | 🔄 重构 | 类型注解/中文 docstring/参数 DRY |
@@ -484,7 +486,7 @@
 | 🔄 重构 | 守卫住位 _guards.py 单一职责、入口五步定式对齐 agent_cli 先例（幂等 bootstrap 守卫/finally 关闭连接池） |
 
 - [ ] Subtask 2.1: 🔴 红 — 工厂/全局参数失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 main.py 工厂
+- [ ] Subtask 2.2: 🟢 绿 — 实现 main.py 工厂 + `_params.py` 共享注解（R2-A3 摘要对齐循环 A 绿阶段文件面）
 - [ ] Subtask 2.3: 🔴 红 — 守卫/入口失败测试
 - [ ] Subtask 2.4: 🟢 绿 — 实现 _guards.py + main_cli.py + pyproject scripts
 - [ ] Subtask 2.5: 🟡 变异 + 🔄 重构 — 两循环收尾（ruff+mypy）
@@ -542,7 +544,7 @@
 | 🔴 红 | 编写 `tests/unit/interfaces/cli/test_tool_commands.py`（list 域过滤/schema 输出含 input_examples 字段（经 `skill_loader.load_sop`→`SkillDocument.input_examples`——R1-F3 通路锚）/**run 的 `<tool-id>` slug→`get_tool(tool_name=)`→`Tool.id` UUID→ToolCall 解析链**（R1-F4）/--input JSON 装载/chain run --config 装载/Agent 专用参数透传 context） |
 | 🟢 绿 | 实现 `commands/tool_commands.py` + `controllers/tool_controller.py`（消费 tool_registry_service/tool_execution_service/run_tool_chain_use_case） |
 | 🟡 变异 | schema 输出去 examples 键→断言红；run context 去 session→透传断言红；还原绿 |
-| 🔄 重构 | 四命令共享 Agent 参数注解 DRY |
+| 🔄 重构 | 四命令复用 `_params.py` 共享 Agent 参数注解（R2-A2 锚定：不另建 tool 侧注解） |
 
 #### 批量补齐（非 TDD 面——内容资产）
 
@@ -616,7 +618,7 @@
 - [ ] Subtask 7.1: document upload 真实 PG 链（真实临时文件→真实 upload_service→落库断言→定向清理）
 - [ ] Subtask 7.2: archive query fallback 读链（真实 bootstrap 无 session 上下文→fallback find 路径往返——6.4-DF2 部分清偿载体）
 - [ ] Subtask 7.3: checkpoint 族真实链（真实创建→list/show/recover 往返）
-- [ ] Subtask 7.4: .env 入口加载集成验证（临时 .env 形态或既有 .env.test 口径——与单测顺序守卫互补）
+- [ ] Subtask 7.4: .env 入口加载集成验证（临时 .env 经 monkeypatch `main_cli.ENV_FILE` 常量注入——R2-11 机制；与单测顺序守卫互补）
 
 **完成标准/Definition of Done:**
 - [ ] 集成测试真实服务全绿（服务不可达动态 skip）
@@ -692,7 +694,7 @@
 | **DC-3（选中）** | 存量 19 子命令保留冻结，迁移收敛入 deferred | 零回归（4294 行单测+14 验收文件不动）；surgical | 双入口并存期 | ✅ 8/10 |
 | 备选：本 Story 全量迁移 | 单入口一步到位 | 2720 行重构+14 验收文件波及，超出单 Story 可交付面；回归风险不可控 | 3/10 |
 | **DC-4（选中）** | Command Translator 以接口层 frozen dataclass 命令对象承载 | 路线图交付物兑现；不新建 application/commands 包（YAGNI——全仓用例为直接方法签名） | 命令对象与用例签名双轨维护 | ✅ 8/10 |
-| **DC-5（选中）** | `--mock`=命令级 Mock 响应（不 bootstrap）；`--dry-run`=接口层预览（不 bootstrap） | 语义确定可测；验收确定性；零基础设施耦合 | 深度 mock（真实服务+mock LLM）不在 7-1（7-1-DF3 关联） | ✅ 8/10 |
+| **DC-5（选中）** | `--mock`=命令级 Mock 响应（不 bootstrap）；`--dry-run`=接口层预览（不 bootstrap）；**两者同给时 `--dry-run` 优先**（最外层短路，R1-21/R2-5 与 AC-3 契约同步） | 语义确定可测；验收确定性；零基础设施耦合 | 深度 mock（真实服务+mock LLM）不在 7-1（7-1-DF3 关联） | ✅ 8/10 |
 | **DC-6（选中）** | .env 清偿采方案一（入口显式 load_dotenv） | 一行修复根因；6.8-R1-DF1 三选一中最小面 | 存量入口残余待迁移专项 | ✅ 9/10 |
 
 ### 偏离声明预告（Task 0 落档确认，OD-n 前缀）
@@ -818,7 +820,7 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 - `src/interfaces/cli/commands/{tool,agent,planning,checkpoint,archive}_commands.py` - 5 命令组（document_commands.py 重写）
 - `src/interfaces/cli/controllers/` - 6 控制器（含静态 PORT_NAME 常量）
 - `src/interfaces/cli/formatters/{__init__,json_formatter,table_formatter,pretty_formatter}.py` - 4 文件（含包 init）
-- `tests/unit/interfaces/cli/test_cli_formatters.py` 等 7 个测试文件
+- `tests/unit/interfaces/cli/test_cli_formatters.py` 等 7 个 unit 测试文件（6 命令/框架/格式化器 + application/skills frontmatter 1 个）+ 架构/契约/集成/验收 5 文件（test_arch_unified_cli / test_port_contract_unified_cli / test_integration_unified_cli / test_acceptance_unified_cli.feature + .py，R2-7 口径拆分）
 - `tests/unit/architecture/test_arch_unified_cli.py`
 - `tests/contracts/test_port_contract_unified_cli.py`
 - `tests/integration/test_integration_unified_cli.py`
@@ -895,6 +897,24 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 | R1-31 | Subtask 0.6「可仅含 given 前置与调用骨架」会致 pytest-bdd 收集期 ScenarioDefinitionError（偏离运行期 ImportError 红形态声明） | P3 | 收紧为 given/when/then 全步骤骨架齐备 |
 | R1-32 | Subtask 4.4 内容资产批量面（23 SKILL.md）无独立提交批次注记；AC-6 验收 tool-id 未与补齐清单联动 | P3 | Subtask 4.4 补两注记 |
 | R1-33 | epics:2606 示例命令为二级形态（`sisys upload`）与三级结构钦定差异无注记 | P3 | （本轮以 OD-7 范围声明覆盖命令面差异；epics 示例为缩写形态，以 interface-design §4.2 三级结构为准——Dev Notes 架构约束已锚 interface-design） |
+| R2-1 | json_formatter 对 UUID/Decimal/datetime 非原生类型序列化策略未定义（`json.dumps` 直接 TypeError；命令对象字段明文 UUID/Decimal 形态）——主会话预验先行发现，R2-B Agent 独立同报（P1 级） | P1 | AC-4 增序列化契约冻结：`json.dumps(payload, default=str, ensure_ascii=False)`；Task 1 红阶段补 UUID/Decimal 序列化断言。**方案裁定注记：** R2-B 建议 DTO 层 `to_payload()` 预归一（formatter 零特判）——裁定取 `default=str`（最小实现面：12+ 命令对象无需各建 to_payload；table/pretty 侧 f-string 内建支持 UUID/Decimal 转展，formatter 层无需特判；语义等价——UUID→hex/Decimal→十进制串） |
+| R2-2 | `--mock` 短路 DTO 的 `parameters` 含归一后类型同样需序列化策略 | P1 | 并入 R2-1 契约（Mock DTO 同走 default=str） |
+| R2-3 | AC-8 性能场景「.venv/bin/sisys 直调」的降级判定（缺 script 时）只在隔离表、验证项不可操作 | P2 | AC-8 验证项补降级判定（存在即用/缺失降级 python -m，与隔离表同款） |
+| R2-4 | `--session` 透传验证项未区分真实面/mock 面两态（mock 不 bootstrap 时透传断言不可达） | P2 | AC-3 验证项注记两态：真实面透传用例上下文；mock 面缺省生成入 DTO session 字段 |
+| R2-5 | DC-5 决策行未同步 --dry-run×--mock 优先级契约（R1-21 新增） | P3 | DC-5 方案列补「两者同给 --dry-run 优先」 |
+| R2-6 | 三格式化器空态渲染契约未冻结（json `[]` vs `{"items":[]}`、table 表头 vs 提示行、pretty 文案——三种自由实现致验收断言无锚） | P2 | Task 1 红阶段冻结空态契约：json=空数组 `[]`/table=表头+零数据行/pretty=空态提示语 |
+| R2-7 | File List「7 个测试文件」口径模糊（unit 7 个还是全量 12 个） | P3 | File List 拆分：7 unit（含 application/skills 1 个）+ 架构/契约/集成/验收 5 文件 |
+| R2-8 | `--dry-run`×`--mock` 优先级契约（R1-21）无对应验证项 | P2 | AC-3 验证项补优先级断言 |
+| R2-9 | AC-6 四验证项分属架构测试/unit/验收场景/跑批四承载面但未区分（场景计数×1 与四验证项的对应关系不明） | P3 | AC-6 验证项逐条标注承载面；仅 tool schema 项入 23 场景计数 |
+| R2-10 | Subtask 0.8 执行行「新登记 7-1-DF1~DF4」在 R1 扩登记 DF5 后漏同步——R1 修复自身犯「声称联动位未执行」缺陷类（R2-B 发现，主会话漏网） | P1 | 0.8 改「7-1-DF1~DF5」+ 勘正注记 |
+| R2-11 | .env 显式路径的推导值未定义 + Task 7.4 临时 .env 在显式路径语义下无注入机制（改仓库根 .env 污染开发环境）（R2-B 发现） | P2 | AC-7 钉死 `ENV_FILE = Path(__file__).resolve().parents[2] / ".env"` 模块常量；Task 7.4 经 monkeypatch 常量注入临时 .env |
+| R2-12 | 契约测试「零 IO 直查+isinstance」的断言对象形态未钉死（直查拿到 PortSpec 元数据非实例）（R2-B 发现） | P3 | Subtask 0.4 补断言对象注记（PortSpec 维度断言+impl 类 Protocol 检查/DummyResolver 替身对齐先例） |
+| R2-13 | 测试分类表 document 行未标注重写覆盖语义（R2-B 发现） | P3 | 表格行尾加「（重写覆盖存量 version 族）」 |
+| R2-A1 | Task 2 循环 A 尾置断言示例 `... upload --file x --yes` 时序矛盾（循环 A 时刻 upload 未交付）（R2-A 回归核查发现） | P3 | 补时序注：以工厂内任一已挂载子命令验证机制，命令组尾置断言随 Task 3-6 落地 |
+| R2-A2 | Task 4 循环 B 重构行「四命令共享 Agent 参数注解 DRY」可误读为 tool 侧新建注解（R2-A 发现，与 R2-B#6 同） | P3 | 改「四命令复用 `_params.py` 共享注解（不另建）」 |
+| R2-A3 | Subtask 2.2 摘要「实现 main.py 工厂」未列 _params.py（R2-A 发现） | P3 | 摘要补「main.py + _params.py」 |
+
+> **R2 审查方法注记：** 双 Agent 并行（R2-A 回归核查：git diff 逐项比对 R1 台账+六组合交互面扫描——R1 的 33 项修复与 diff 完全一致、零 P0/P1/P2 新破口；R2-B 传播完备性+深度推演：10+ 关键词面传播一致、新发现 P1×2/P2×2/P3×5）+ 主会话等待期独立预验（R2-1 序列化问题实测先行，与 R2-B#2 独立同报互证）。R2 合计 16 项修复（P1×3 计入 R2-1/2/10、P2×5、P3×8）。
 
 ---
 
@@ -926,9 +946,10 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-20
 **最后更新/Last Updated:** 2026-11-20
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（三 Agent 并行调研：架构文档/现有代码/测试与故事风格；前置留项清单七条裁定落档；DC-1~DC-6 架构决策+OD-1~OD-6 偏离预告；12 命令冻结矩阵+全局参数契约+退出码契约）
 - v1.1.0: Round 1 五轮循环文档审查修订（4 调研+3 审查 Agent 并行，33 项修复：P0×1 typer callback 尾置矛盾/P1×11/P2×13/P3×8，详见 Docs Review Fixes 表）——核心：全局参数机制冻结（Annotated 共享注解）、端口 SSOT 13 化（补 skill_loader）、tool-id slug 语义+解析链、存量 test_document_commands.py/version 命令族处置+7-1-DF5、dry-run 静态 PORT_NAME 机制、性能口径冻结（禁 poetry run）+出处勘正（prd.md:2553）、场景计数统一（Task 0=19→Task 9 补至 23）、接口层覆盖率测量面落地、契约测试零 IO 对齐、OD-7/DF5 登记
+- v1.2.0: Round 2 回归核查+传播完备性修订（双 Agent：R2-A 证实 R1 修复 33 项与 diff 零偏差+六组合交互面零新破口；R2-B 新发现 8 项；主会话预验独立同报序列化缺口；16 项修复：P1×3/P2×5/P3×8）——核心：json_formatter 序列化契约冻结（default=str，UUID/Decimal 降维——首个 JSON 输出面）、三格式化器空态契约冻结、Subtask 0.8 漏 DF5 同步勘正（R1 修复自身联动位未执行缺陷类）、.env ENV_FILE 模块常量+monkeypatch 注入机制、AC-8 降级判定入验证项、--session 两态透传、优先级断言、AC-6 承载面注记、契约测试断言对象形态
