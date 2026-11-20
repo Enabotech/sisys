@@ -75,7 +75,7 @@
 **`--dry-run` 端口名来源机制（R1-F5）：** 端口名唯一来源 = **controller 静态 `PORT_NAME` 类常量**（如 `DocumentUploadController.PORT_NAME = "document_upload_service"`），dry-run 渲染命令对象 + 静态端口名后即返回——**禁止调用 `resolve()`**（resolve 依赖 bootstrap，与「不 bootstrap」契约自洽性硬约束）。
 
 **验证标准/Validation Criteria:**
-- [ ] `--yes` 无 `--cost-budget` → EXCEPTION_201 + exit 1（全 Agent 专用命令一致）
+- [ ] `--yes` 无 `--cost-budget` → EXCEPTION_201 + exit 1（**全部命令一致**——CR2 勘正：base 管线统一守卫，原「全 Agent 专用命令」旧口径随 CR1-F6 参数面放宽同步）
 - [ ] `--dry-run` 输出含端口名与归一后参数，且无 bootstrap 副作用（可用 stub resolve 断言零调用）
 - [ ] `--mock` 输出为合法 JSON（`--format json` 组合）且零外部服务依赖；`--dry-run`×`--mock` 同给 → `--dry-run` 优先（输出端口名预览非 mock DTO——R2-8 优先级断言）
 - [ ] `--session`/`--timeout` 透传至用例执行上下文（真实面断言；`--mock` 面 `--session` 缺省自动生成仍入 Mock DTO 的 `session` 字段——透传语义两态都可达，R2-4）
@@ -120,7 +120,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 12 命令 `--help` 全部 exit 0
-- [ ] 轻量真实链验收：`tool list` / `tool schema` / `checkpoint list` / `archive query` 真实服务执行——**名实注记（R3-9）：**「轻量」指命令逻辑轻（查询/展示类），bootstrap 仍装配全组合根（五存储可达性），动态 skip 机制照常生效，不可绕 bootstrap
+- [ ] 轻量真实链验收：`tool list` / `tool schema` / `checkpoint list` / `archive query` 真实服务执行——**承载位注记（CR2）：** AC-5 场景为三命令（tool list/checkpoint list/archive query——feature 场景名已勘正），`tool schema` 的验收承载位由 AC-6×1 场景承载（input_examples 非空断言内含真实执行）；**名实注记（R3-9）：**「轻量」指命令逻辑轻（查询/展示类），bootstrap 仍装配全组合根（五存储可达性），动态 skip 机制照常生效，不可绕 bootstrap
 - [ ] P1 审计断言：契约测试逐一断言 **12 唯一端口**注册面可达（接线断言清单；R5-1 口径勘正：12 命令构成 13 个命令-端口消费对——`tool_registry_service` 被 tool list/schema 双命令消费，唯一注册名 12 个，契约测试按 12 唯一名断言）
 
 ### AC-6: CLI 七原则合规承载（FR-IF-01）
@@ -944,7 +944,7 @@ src 面（20 文件）：
 | R2-3 | AC-8 性能场景「.venv/bin/sisys 直调」的降级判定（缺 script 时）只在隔离表、验证项不可操作 | P2 | AC-8 验证项补降级判定（存在即用/缺失降级 python -m，与隔离表同款） |
 | R2-4 | `--session` 透传验证项未区分真实面/mock 面两态（mock 不 bootstrap 时透传断言不可达） | P2 | AC-3 验证项注记两态：真实面透传用例上下文；mock 面缺省生成入 DTO session 字段 |
 | R2-5 | DC-5 决策行未同步 --dry-run×--mock 优先级契约（R1-21 新增） | P3 | DC-5 方案列补「两者同给 --dry-run 优先」 |
-| R2-6 | 三格式化器空态渲染契约未冻结（json `[]` vs `{"items":[]}`、table 表头 vs 提示行、pretty 文案——三种自由实现致验收断言无锚） | P2 | Task 1 红阶段冻结空态契约：json=空数组 `[]`/table=表头+零数据行/pretty=空态提示语 |
+| R2-6 | 三格式化器空态渲染契约未冻结（json `[]` vs `{"items":[]}`、table 表头 vs 提示行、pretty 文案——三种自由实现致验收断言无锚） | P2 | Task 1 红阶段冻结空态契约：json=空数组 `[]`/table=表头+零数据行/pretty=空态提示语（CR2 内联勘误：table 空态实现形态为**纯空串**——CR1-F8 勘正正文 Task 1 行，空表头无信息量，jq 空输入惯例） |
 | R2-7 | File List「7 个测试文件」口径模糊（unit 7 个还是全量 12 个） | P3 | File List 拆分：7 unit（含 application/skills 1 个）+ 架构/契约/集成/验收 5 文件 |
 | R2-8 | `--dry-run`×`--mock` 优先级契约（R1-21）无对应验证项 | P2 | AC-3 验证项补优先级断言 |
 | R2-9 | AC-6 四验证项分属架构测试/unit/验收场景/跑批四承载面但未区分（场景计数×1 与四验证项的对应关系不明） | P3 | AC-6 验证项逐条标注承载面；仅 tool schema 项入 23 场景计数 |
