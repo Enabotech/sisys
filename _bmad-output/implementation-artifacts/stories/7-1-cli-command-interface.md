@@ -112,14 +112,14 @@
 | agent | `run <role>` | `agent_workflow_use_case`（:3178） |
 | plan | `generate` | `blm_planning_use_case`（:3518，`execute(agent_id, task, plan_id)`） |
 | checkpoint | `list --plan-id` | `checkpoint_list_use_case`（:2524） |
-| checkpoint | `show --plan-id [--checkpoint-no <CP-N>]` | `checkpoint_recovery_use_case`（:2508——RecoverCheckpointUseCase 预览面，`execute(plan_id, checkpoint_no)`→`CheckpointRecoveryView` 详情视图；缺省 checkpoint_no 取最新一条。R3-1 勘正：原写 `show --id`→`checkpoint_use_case`(:2496) 系端口错位——该端口实为 CreateCheckpointUseCase 纯创建零查询，无 `--id` 查询可达面） |
-| checkpoint | `recover --plan-id --checkpoint-no [--mode replay\|override] [--confirmed-by <id>]` | `checkpoint_recovery_execute_use_case`（:2536——ExecuteCheckpointRecoveryUseCase 执行面，`execute(plan_id, checkpoint_no, correction, mode, confirmed_by, created_via)`；`confirmed_by` 非空强制——空串→242 用例守卫。R3-2 勘正：原写 `recover --id [--mode]`→checkpoint_recovery_use_case(:2508) 系预览/执行面错位——:2508 无 mode 无恢复副作用。`--confirmed-by` 缺省取 `--session` 标识；`--dry-run` 面消费 :2508 预览视图天然对齐） |
+| checkpoint | `show --plan-id --checkpoint-no <CP-N>` | `checkpoint_recovery_use_case`（:2508——RecoverCheckpointUseCase 预览面，`execute(*, plan_id, checkpoint_no)` 两参 keyword-only 必填→`CheckpointRecoveryView` 详情视图；**两参均必填**——R5 改判方案 a：不设「缺省取最新」合成层（两步合成有 list↔:2508 间 TOCTOU 语义模糊+无钦定依据+无验收牵引）。R3-1 勘正：原写 `show --id`→`checkpoint_use_case`(:2496) 系端口错位——该端口实为 CreateCheckpointUseCase 纯创建零查询，无 `--id` 查询可达面） |
+| checkpoint | `recover --plan-id --checkpoint-no [--mode replay\|override] [--confirmed-by <id>]` | `checkpoint_recovery_execute_use_case`（:2536——ExecuteCheckpointRecoveryUseCase 执行面，`execute(plan_id, checkpoint_no, correction, mode, confirmed_by, created_via)`；`confirmed_by` 非空强制——空串→242 用例守卫。R3-2 勘正：原写 `recover --id [--mode]`→checkpoint_recovery_use_case(:2508) 系预览/执行面错位——:2508 无 mode 无恢复副作用。`--confirmed-by` 缺省取 `--session` 标识（**解析时点**：守卫层随参数归一完成，`--mock` 面 parameters 含解析后值——R4-3）；controller 固定传 `created_via="cli"`（缺省 "use_case" 会落错触发源审计标识——R4-2）；`--dry-run` 面消费 :2508 预览视图天然对齐） |
 | archive | `query --plan-id` | `blm_chain_trace_use_case`（:2567） |
 
 **验证标准/Validation Criteria:**
 - [ ] 12 命令 `--help` 全部 exit 0
 - [ ] 轻量真实链验收：`tool list` / `tool schema` / `checkpoint list` / `archive query` 真实服务执行——**名实注记（R3-9）：**「轻量」指命令逻辑轻（查询/展示类），bootstrap 仍装配全组合根（五存储可达性），动态 skip 机制照常生效，不可绕 bootstrap
-- [ ] P1 审计断言：契约测试逐一断言 **13 端口**（12 命令消费 13 端口——含 skill_loader）注册面可达（接线断言清单）
+- [ ] P1 审计断言：契约测试逐一断言 **12 唯一端口**注册面可达（接线断言清单；R5-1 口径勘正：12 命令构成 13 个命令-端口消费对——`tool_registry_service` 被 tool list/schema 双命令消费，唯一注册名 12 个，契约测试按 12 唯一名断言）
 
 ### AC-6: CLI 七原则合规承载（FR-IF-01）
 
@@ -187,13 +187,13 @@
 - [ ] **Mock DTO 契约**：`--mock` 短路返回结构固定（`{"mock": true, "command": "<命令名>", "parameters": {...}, "session": "<id>"}`），三格式化器均可渲染
 
 #### 统一端口定义注册与管理 (Port Contract)
-- [x] **本 Story 零新增端口**——仅消费既有端口（AC-5 表 **13 端口**名已核验组合根行号：12 命令消费 13 端口，含 R1-F3 补登记的 `skill_loader`——tool schema 的 input_examples 运行时数据通路；**R3-1/2 勘正后成员**：checkpoint 族=list(:2524)/recovery 预览(:2508)/recovery 执行(:2536) 三端口，`checkpoint_use_case`(:2496 创建面) 移出命令消费清单——仅作验收 given 前置创建链使用（非 CLI 命令消费面），成员变更总数不变）
-- [ ] 端口消费契约测试：`tests/contracts/test_port_contract_unified_cli.py`——逐一断言 13 端口注册面可达且 isinstance 契约成立（**对齐既有零 IO 先例形态**：`test_port_contract_agent_checkpoint.py` 的 `_global_registry.get(name)` 直查——契约测试不执行 IO、不 bootstrap，R1-F21 形态对齐；防注册名漂移——6.4-DF2 同族守卫诉求在 CLI 消费面的落地）
+- [x] **本 Story 零新增端口**——仅消费既有端口（AC-5 表 **12 唯一端口**名已核验组合根行号：12 命令构成 13 个命令-端口消费对（`tool_registry_service` 被 tool list/schema 双命令消费——R5-1 口径勘正，原「13 端口」系消费对计数误作唯一端口数），含 R1-F3 补登记的 `skill_loader`——tool schema 的 input_examples 运行时数据通路；**R3-1/2 勘正后成员**：checkpoint 族=list(:2524)/recovery 预览(:2508)/recovery 执行(:2536) 三端口，`checkpoint_use_case`(:2496 创建面) 移出命令消费清单——仅作验收 given 前置创建链使用（非 CLI 命令消费面））
+- [ ] 端口消费契约测试：`tests/contracts/test_port_contract_unified_cli.py`——逐一断言 **12 唯一端口**注册名可达且 isinstance 契约成立（**对齐既有零 IO 先例形态**：`test_port_contract_agent_checkpoint.py` 的 `_global_registry.get(name)` 直查——契约测试不执行 IO、不 bootstrap，R1-F21 形态对齐；防注册名漂移——6.4-DF2 同族守卫诉求在 CLI 消费面的落地）
 - [ ] 控制器依赖注入方向（DC-2）：`src/interfaces/cli` **禁止 import `src.composition_root`**（importlinter 传导禁令，.importlinter:72-78 注释钦定）；采用 `create_cli_app(resolve: Callable[[str], Any]) -> typer.Typer` 工厂——resolve 函数由 `src/entrypoints/main_cli.py` 装配层传入，interfaces 层零组合根知识
 - [ ] 跨模块调用仅依赖抽象：controllers 类型注解引用 application 层用例类/Protocol（interfaces → application 方向合法）
 
 #### 端口契约清单执行约束（强制）
-- [ ] AC-5 表是唯一事实源（Single Source of Truth）——**13 端口**名冻结，实现 Task 禁止改用其他注册名或绕过 resolve 直构实例
+- [ ] AC-5 表是唯一事实源（Single Source of Truth）——**12 唯一端口**名冻结（13 消费对），实现 Task 禁止改用其他注册名或绕过 resolve 直构实例
 - [ ] 禁止新增未登记端口，禁止语义重复端口
 - [ ] 契约测试与接线断言未通过不得进入实现 Task 收尾
 
@@ -205,7 +205,7 @@
 
 | 异常 | code | 触发场景（本 Story） | 既有锚 |
 |------|------|---------------------|--------|
-| `EntityValidationError` | EXCEPTION_242 | 实体 ID 族（`--plan-id`）非 UUID 守卫（R1-F18 统一形态——chain-query 先例 agent_cli.py:1129-1141，6.9-R1-DF1 命令族契约）；checkpoint recover `--confirmed-by` 空串（:2536 ExecuteCheckpointRecoveryUseCase 用例层守卫，CLI 只呈现——R3-2 承载注记） | business_exceptions.py:106 |
+| `EntityValidationError` | EXCEPTION_242 | 实体 ID 族（`--plan-id`、document parse `--id <doc-id>`——R5-3 显式点名防误读）非 UUID 守卫（R1-F18 统一形态——chain-query 先例 agent_cli.py:1129-1141，6.9-R1-DF1 命令族契约）；checkpoint recover `--confirmed-by` 空串（:2536 ExecuteCheckpointRecoveryUseCase 用例层守卫，CLI 只呈现——R3-2 承载注记） | business_exceptions.py:106 |
 | `ValidationError` | EXCEPTION_201 | `--agent-id` 非 UUID 守卫（`_parse_agent_uuid` 先例 agent_cli.py:156-173）；Agent 模式 `--yes` 缺 `--cost-budget` 拒绝；frontmatter `input_examples` 校验失败 | business_exceptions.py:20 |
 | （用例透传） | 482 等 | plan 重跑守卫等由用例层抛出，CLI 只呈现 | blm_planning 既有 |
 
@@ -287,7 +287,7 @@
 - [ ] 上述规范项全部定义完毕（命令矩阵冻结表 + 全局参数契约表 + 退出码契约表 + 异常消费表 + 端口消费表）
 - [ ] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证——延迟 import 纪律下红形态=运行期 ImportError/命令不存在）
 - [ ] 规范文档通过人工评审或自动化校验
-- [ ] **链路接线断言清单**已定义——本 Story 零新增端口/事件/中间件；消费面清单=AC-5 表 13 端口：契约测试逐一注册面可达断言（Task 0 编写，绿色门禁形态——防注册名漂移守卫，非红绿 TDD 面）
+- [ ] **链路接线断言清单**已定义——本 Story 零新增端口/事件/中间件；消费面清单=AC-5 表 12 唯一端口：契约测试逐一注册面可达断言（Task 0 编写，绿色门禁形态——防注册名漂移守卫，非红绿 TDD 面）
 
 ---
 
@@ -325,7 +325,7 @@
 | **TDD 单元测试** | skill frontmatter | input_examples 字段解析与 1-5 条校验 | `tests/unit/application/skills/test_frontmatter_input_examples.py` | Task 4 |
 | **TDD 单元测试** | agent/plan 命令 | agent run/plan generate + Agent 专用参数透传 | `tests/unit/interfaces/cli/test_agent_plan_commands.py` | Task 5 |
 | **TDD 单元测试** | checkpoint/archive 命令 | list/show/recover/query 四命令 | `tests/unit/interfaces/cli/test_checkpoint_archive_commands.py` | Task 6 |
-| **TDD 契约测试** | 端口消费接线 | 13 端口注册面可达（零 IO 直查）+ isinstance 契约 | `tests/contracts/test_port_contract_unified_cli.py` | Task 0 |
+| **TDD 契约测试** | 端口消费接线 | 12 唯一端口注册面可达（零 IO 直查）+ isinstance 契约 | `tests/contracts/test_port_contract_unified_cli.py` | Task 0 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收（19 场景，Task 9 补至 23） | `tests/acceptance/test_acceptance_unified_cli.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 三件套+in-process 直调+双清+延迟 import | `tests/acceptance/test_acceptance_unified_cli.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单最终确认 | 同上两文件追加场景 | Task 9 |
@@ -425,7 +425,7 @@
 - [ ] Subtask 0.1: 冻结统一命令矩阵表（AC-5 表 12 命令 + 框架面 `--help/--version`）——实现禁增删命令名
 - [ ] Subtask 0.2: 冻结全局参数契约表（`--yes/--dry-run/--mock/--format`）与 Agent 专用参数表（`--session/--cost-budget/--timeout`）及语义（AC-3 冻结语义为准）
 - [ ] Subtask 0.3: 冻结退出码契约表（0/1/2）与 DomainError stderr 呈现格式（`[EXCEPTION_NNN] message`）
-- [ ] Subtask 0.4: 编写端口消费契约测试 `tests/contracts/test_port_contract_unified_cli.py`（**13 端口**注册面可达+isinstance，**零 IO 直查形态**对齐 `test_port_contract_agent_checkpoint.py` 先例——断言对象=PortSpec 注册元数据（`_global_registry.get(name)` 拿到的 spec：interface/impl/lifetime 等维度断言，R2-12 形态注记），实例化断言经 impl 字符串 import 类的 Protocol 检查或 `_DummyResolver` 分发替身对齐先例，不连真实服务；绿色门禁守卫形态，跑通即过）
+- [ ] Subtask 0.4: 编写端口消费契约测试 `tests/contracts/test_port_contract_unified_cli.py`（**12 唯一端口**注册面可达+isinstance，**零 IO 直查形态**对齐 `test_port_contract_agent_checkpoint.py` 先例——断言对象=PortSpec 注册元数据（`_global_registry.get(name)` 拿到的 spec：interface/impl/lifetime 等维度断言，R2-12 形态注记），实例化断言经 impl 字符串 import 类的 Protocol 检查或 `_DummyResolver` 分发替身对齐先例，不连真实服务；绿色门禁守卫形态，跑通即过）
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_unified_cli.feature`（**AC-1~AC-7 共 19 个业务场景**，按 AC 分节横幅注释组织；AC-8×2 与收尾×2 由 Task 9 追加至最终态 23——R1-F11 口径）
 - [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_unified_cli.py`（三件套+@scenario 逐场景绑定+延迟 import；**given/when/then 全步骤骨架齐备**——仅 given 骨架会在 pytest-bdd 收集期抛 ScenarioDefinitionError，偏离声明的运行期 ImportError 红形态，R1-F33 收紧）
 - [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证——红形态=运行期 ImportError：`src.entrypoints.main_cli` 不存在）
@@ -681,7 +681,7 @@
 
 - **架构模式:** 六边形架构（Ports & Adapters）+ D1 方案 A 组装层；CLI 属接口层适配器
 - **设计约束:** 领域层零依赖；interfaces 禁 import composition_root/infrastructure（importlinter 传导禁令）；进程入口住 `src/entrypoints/`
-- **接口治理:** 统一端口注册 PortSpec/组合根装配/契约优先；本 Story 零新增端口，消费 AC-5 表 13 端口（12 命令，含 skill_loader）
+- **接口治理:** 统一端口注册 PortSpec/组合根装配/契约优先；本 Story 零新增端口，消费 AC-5 表 12 唯一端口（12 命令 13 消费对，含 skill_loader）
 - **技术栈:** Python 3.11+ / typer ^0.24.0（pyproject.toml:21 已在依赖，此前零使用——本 Story 首次启用；**全局参数禁 @app.callback() 承载——尾置形态 exit 2 实测，共享 Annotated 注解形态**，R1-F1）；table 渲染沿用 agent_cli 纯标准库两遍法先例（`_print_checkpoint_summary_table` :1495-1518）——**不引入 rich**（零新增依赖，typer 本身不强制 rich）
 - **同名参数边界注记（R1-F26）：** 存量 agent_cli 仅 `--format`（:354）一个近全局参数（无 --yes/--mock/--dry-run/--cost-budget，无存量语义冲突）；其 `--format` 值域与新入口 `json|table|pretty` 的差异在双入口并存期维持各自语义（冻结纪律），7-1-DF1 迁移专项统一
 
@@ -883,7 +883,7 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 | R1-14 | pyproject 双 scripts 段并存（[project.scripts]:155-158 + [tool.poetry.scripts]:160-162）无处置指引 | P2 | Task 2 循环 B/File List 注记：仅入 [project.scripts]，poetry 段勿动 |
 | R1-15 | OD 表与 DF 台账双轨对应关系不明（OD-2/3↔DF3、OD-4↔DF4、OD-6↔DF2） | P2 | OD 表头增台账对应注记 |
 | R1-16 | AC-8「装配」与 --dry-run「不 bootstrap」歧义 | P2 | AC-8 明确「装配=CLI 工厂装配（create_cli_app+子命令挂载），不含组合根 bootstrap」 |
-| R1-17 | checkpoint `--id` 归入「plan-id 族」命名与实体语义错位 | P2 | 异常表/AC-7 改「实体 ID 族（--plan-id、checkpoint --id）」 |
+| R1-17 | checkpoint `--id` 归入「plan-id 族」命名与实体语义错位 | P2 | 异常表/AC-7 改「实体 ID 族（--plan-id、checkpoint --id）」（R3-3 进一步收敛——checkpoint `--id` 形态已废除，现行实体族=`--plan-id`+document `--id`，R4-5 内联勘误注） |
 | R1-18 | AC-2「四大核心工作流」vs Then 列 5 条命令 | P2 | 改「四大核心工作流（document/agent/plan/checkpoint，共五条命令）」 |
 | R1-19 | epics「E2E 测试覆盖率≥80%」（:2636）钦定项无点名归宿 | P2 | OD-5 Gap 补该指标由验收场景承载声明 |
 | R1-20 | `main_cli.main([...])` 直调对 typer 无现成 API（typer.Typer 无 .main 方法） | P2 | BDD 约束/Task 2 循环 B 增模块级 `main(argv)->int` 签名契约（agent_cli:2623 同签名先例+standalone_mode 派发注记） |
@@ -921,7 +921,7 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 
 | R3-1 | `checkpoint show --id`→`checkpoint_use_case`(:2496) 端口错位——该端口实为 CreateCheckpointUseCase 纯创建零查询（无 UUID 查询 API），dev 按表实现 show 无方法可调（R3 签名级核验发现——R1 行号核验只证注册存在未证签名匹配的盲区） | P1 | AC-5 表 show 行重设计：`show --plan-id [--checkpoint-no]`→`checkpoint_recovery_use_case`(:2508 预览视图)；主会话独立实证（组合根 :2496-2500 interface=CreateCheckpointUseCase） |
 | R3-2 | `checkpoint recover --id [--mode]`→`checkpoint_recovery_use_case`(:2508) 预览/执行面错位——:2508 无 mode 无恢复副作用；真实执行面 `checkpoint_recovery_execute_use_case`(:2536) 参数三缺口（--plan-id/--checkpoint-no/`confirmed_by` 非空强制 242） | P1 | recover 行重设计：`--plan-id --checkpoint-no [--mode] [--confirmed-by]`→:2536；:2508 转任 show/--dry-run 预览面；confirmed_by 缺省取 --session 标识；主会话独立实证（checkpoint_approval.py:56-110 签名+空串 242 守卫） |
-| R3-3 | checkpoint `--id` 参数形态错位传播面四处（AC-2 示例/AC-5 表/AC-7 守卫族/异常表） | P1 | 四处联动修订（AC-2 示例复合定位+given 前置创建链注记；AC-7 守卫族收敛 --plan-id；异常表实体族改写+confirmed_by 242 承载注记；Task 6 红阶段测试清单同步）+OD-8 偏离登记（钦定 --id 单参形态在端口面不可实现） |
+| R3-3 | checkpoint `--id` 参数形态错位传播面五处（AC-2 示例/AC-5 表/AC-7 守卫族/异常表/Task 6 红阶段——R4-4 计数勘正：原写四处漏计 Task 6 随动位） | P1 | 五处联动修订（AC-2 示例复合定位+given 前置创建链注记；AC-5 表两行重设计；AC-7 守卫族收敛 --plan-id；异常表实体族改写+confirmed_by 242 承载注记；Task 6 红阶段测试清单同步）+OD-8 偏离登记（钦定 --id 单参形态在端口面不可实现） |
 | R3-4 | Task 2「六模块子 app 挂载」断言时序缺口（命令组 Task 3-6 才交付，Task 2 挂载断言红→绿路径断裂） | P2 | Task 2 绿阶段注明工厂内联六模块空骨架组（--help 可达），Task 3-6 逐组替换 |
 | R3-5 | load_dotenv 调用位置未钉死（模块级 import 副作用形态会崩坏顺序守卫断言与 monkeypatch 可达性） | P2 | AC-7 钉死 main() 函数体内+bootstrap 前，禁止模块级副作用形态 |
 | R3-6 | `sisys --version` 实现机制与 R1-1 callback 禁令冲突（typer 无内建 --version，标准实现恰是 callback） | P2 | AC-3 机制节补豁免边界（顶层 invoke_without_command 形态，无尾置可达性问题）——主会话实测顶层 exit 0 支撑 |
@@ -931,6 +931,21 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 | R3-10 | TDD 变异步骤对纯测试 Task（0/7/8/9）字面不可执行 | P3 | TDD 约束节补适用性注记（变异限实现 Task；纯测试 Task 以断言判别力自证） |
 
 > **R3 审查方法注记：** 单深度推演 Agent（递减投入：23 场景三轴推演[前置可达/期望唯一/可观测]+Task 0→9 依赖干跑+组合交互面第二层）——三 P1 全部主会话独立实证后落码（组合根 :2496/:2508/:2536 三端口 interface/签名/守卫逐一定谳）；轴 1 快扫表+轴 2/3 核过面见 Agent 报告归档。R3 合计 10 项修复（P1×3+P2×3+P3×4），checkpoint 命令族是本轮最大破口。
+
+| R4-1 | AC-5 show 行「缺省 checkpoint_no 取最新一条」与 :2508 签名（两参 keyword-only 必填）不直配（R4 纯验证发现，移交 R5） | P2 | R5 终审改判**方案 a（两参必填）**：不设合成层——两步合成（list 取最新→:2508）有 TOCTOU 语义模糊+无钦定依据（§4.3.5 为显式定位语义）+无验收牵引；主会话原预案 b 弃用 |
+| R4-2 | recover `created_via` CLI 侧取值未注记（缺省 "use_case" 会落错触发源审计标识） | P3 | AC-5 recover 行注记：controller 固定传 `created_via="cli"` |
+| R4-3 | `--confirmed-by` 缺省取 --session 的解析时点未钉死（影响 --mock 面 parameters 内容） | P3 | AC-5 recover 行注记：守卫层随参数归一完成，mock 面 parameters 含解析后值 |
+| R4-4 | 修复表 R3-3 行 Problem 列「四处」与 Fix 列实际五处联动不符（台账描述与实际修复形态不符先例） | P3 | R3-3 行勘正为五处（含 Task 6 随动位） |
+| R4-5 | 修复表 R1-17 行 Fix 列保留「checkpoint --id」旧表述与 R3-3 后正文现状失配 | P3 | R1-17 行尾内联勘误注（历史行不改写惯例） |
+| R5-1 | 「12 命令消费 13 端口」口径错误——tool_registry_service 被 tool list/schema 双命令消费，**唯一端口 12 个、命令-端口消费对 13 个**；契约测试按 13 唯一名断言会对不上（R5 独立终审发现——R1 引入 skill_loader 时以消费对计数误作唯一端口数，R1-R4 四轮未察觉） | P2 | 8 处出现位统一改「12 唯一端口（13 命令-端口消费对——tool_registry_service 双命令消费）」；Subtask 0.4 断言清单口径同步 |
+| R5-2 | AC-5 show 行采纳 R5 终审方案 a（并入 R4-1 处置） | P3 | show 两参必填 `--plan-id --checkpoint-no` |
+| R5-3 | 异常契约表实体 ID 族未显式点名 document parse `--id <doc-id>`（合法 UUID 族参数靠「等」涵盖） | P3 | 异常表显式列名 |
+
+> **R4/R5 审查方法注记：** R4 纯验证 Agent（零修复纪律：R1-R3 台账 59 行 git diff 比对零失实+20+ 契约锚点存续核验+组合交互四疑点实测定谳，5 项发现移交）；R5 独立终审 Agent（不轻信自报：周期闭合/关键修复双向抽验 10 项/独立特权快扫/R4 预案复核[改判 R4-1]/file:line 锚点 10 组零失实/收敛判定六节）。R5 合计清偿 8 项（P2×2 计入 R4-1/R5-1、P3×6）。
+
+### 🏁 审查周期收敛声明（R5 终审产出）
+
+> Story 7-1 文档五轮循环审查周期（R1 调研审查 33 项 / R2 回归传播 16 项 / R3 深度推演 10 项 / R4 纯验证 5 项移交 / R5 独立终审清偿 8 项）共 67 项处置，P0×1 与 P1×17 全部修复入库（d791f5df/c28bce93/58ed8cb2+本轮收敛提交），R4 零提交（纯验证纪律）。终审双向取证：修复台账 59+8 行与文档现状零失实、10 组 file:line 锚点全部精确、周期闭合无游离提交、sprint 状态一致（epic-7 in-progress / 7-1 ready-for-dev）。**零 P0/P1 残留，文档就绪度达 ready-for-dev 交付标准，审查周期收敛。**
 
 ---
 
@@ -962,7 +977,7 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-20
 **最后更新/Last Updated:** 2026-11-20
 **更新说明/Description:**
@@ -970,3 +985,4 @@ pyproject.toml                        # [project.scripts] 增 sisys 入口
 - v1.1.0: Round 1 五轮循环文档审查修订（4 调研+3 审查 Agent 并行，33 项修复：P0×1 typer callback 尾置矛盾/P1×11/P2×13/P3×8，详见 Docs Review Fixes 表）——核心：全局参数机制冻结（Annotated 共享注解）、端口 SSOT 13 化（补 skill_loader）、tool-id slug 语义+解析链、存量 test_document_commands.py/version 命令族处置+7-1-DF5、dry-run 静态 PORT_NAME 机制、性能口径冻结（禁 poetry run）+出处勘正（prd.md:2553）、场景计数统一（Task 0=19→Task 9 补至 23）、接口层覆盖率测量面落地、契约测试零 IO 对齐、OD-7/DF5 登记
 - v1.2.0: Round 2 回归核查+传播完备性修订（双 Agent：R2-A 证实 R1 修复 33 项与 diff 零偏差+六组合交互面零新破口；R2-B 新发现 8 项；主会话预验独立同报序列化缺口；16 项修复：P1×3/P2×5/P3×8）——核心：json_formatter 序列化契约冻结（default=str，UUID/Decimal 降维——首个 JSON 输出面）、三格式化器空态契约冻结、Subtask 0.8 漏 DF5 同步勘正（R1 修复自身联动位未执行缺陷类）、.env ENV_FILE 模块常量+monkeypatch 注入机制、AC-8 降级判定入验证项、--session 两态透传、优先级断言、AC-6 承载面注记、契约测试断言对象形态
 - v1.3.0: Round 3 深度推演修订（单 Agent 三轴推演：23 场景前置可达/期望唯一/可观测+Task 0→9 依赖干跑+组合交互面第二层；10 项修复：P1×3/P2×3/P3×4）——核心：checkpoint show/recover 端口消费契约错位修正（show→:2508 预览视图复合定位、recover→:2536 执行面+confirmed_by 非空承载；原 :2496 创建面移出命令消费清单——R1 行号核验未证签名匹配的盲区由签名级核验补上）+OD-8 偏离登记（钦定 --id 单参形态在端口面不可实现）、Task 2 六模块骨架组时序、load_dotenv main() 体内钉死、--version callback 豁免边界、P95 取法钉死、变异步骤适用性注记
+- v1.3.1: Round 4 纯验证+Round 5 独立终审收敛（R4 零提交纯验证：台账 59 行零失实+锚点全存续，5 项移交；R5 六节终审：双向抽验 10 项+锚点 10 组零失实+R4-1 改判方案 a+R5-1 端口口径勘正；8 项清偿：P2×2+P3×6）——核心：端口口径勘正（12 唯一端口/13 消费对——tool_registry_service 双命令消费，R1 消费对计数误作唯一端口数的四轮未察盲区）、show 两参必填（R5 改判：TOCTOU+无钦定依据）、created_via="cli"+confirmed_by 解析时点注记、台账两处勘误（R3-3 五处/R1-17 内联注）、审查周期收敛声明入档（67 项处置，零 P0/P1 残留）
