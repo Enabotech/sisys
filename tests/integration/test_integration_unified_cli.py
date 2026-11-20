@@ -107,10 +107,13 @@ def _teardown(state: dict[str, Any]) -> None:
             Path(path).unlink(missing_ok=True)
         except OSError:
             pass
+    cleanup_loop = asyncio.new_event_loop()
     try:
-        asyncio.new_event_loop().run_until_complete(_cleanup())
-    except Exception:  # noqa: BLE001 —— teardown 容错（服务不可达静默跳过）
+        cleanup_loop.run_until_complete(_cleanup())
+    except Exception:  # teardown 容错（服务不可达静默跳过）
         pass
+    finally:
+        cleanup_loop.close()
 
 
 def _invoke_cli(state: dict[str, Any], argv: list[str], capsys: pytest.CaptureFixture[str]) -> int:
@@ -203,7 +206,11 @@ class TestDocumentUploadRealChain:
             finally:
                 await conn.close()
 
-        row = asyncio.new_event_loop().run_until_complete(_verify())
+        verify_loop = asyncio.new_event_loop()
+        try:
+            row = verify_loop.run_until_complete(_verify())
+        finally:
+            verify_loop.close()
         assert row is not None, "documents 行应真实落库"
         assert row["tenant_id"] == "cli-default"
 
@@ -255,12 +262,15 @@ class TestCheckpointFamilyRealChain:
                 summary="Story 7-1 集成前置 checkpoint",
             )
 
+        create_loop = asyncio.new_event_loop()
         try:
-            asyncio.new_event_loop().run_until_complete(_create())
-        except Exception as error:  # noqa: BLE001 —— 创建链 LLM 压缩依赖门控（无 Key 环境 skip）
+            create_loop.run_until_complete(_create())
+        except Exception as error:  # 创建链 LLM 压缩依赖门控（无 Key 环境 skip）
             if "API Key" in str(error) or "LLMConfig" in type(error).__name__:
                 pytest.skip(f"LLM API Key 未配置——checkpoint 创建链依赖上下文压缩 LLM: {error}")
             raise
+        finally:
+            create_loop.close()
 
     def test_list_show_recover_roundtrip(self, cli_env: dict[str, Any], capsys: pytest.CaptureFixture[str]) -> None:
         """真实链：直创 CP-1 → list 命中 → show 预览 → recover 执行 → 恢复产物。"""

@@ -28,7 +28,7 @@ def _print_version(value: bool) -> None:
 
         try:
             package_version = version("sisys")
-        except Exception:  # noqa: BLE001 —— 元数据缺失（开发形态）回退占位——版本可观测优先
+        except Exception:  # 元数据缺失（开发形态）回退占位——版本可观测优先
             package_version = "0.0.0+dev"
         typer.echo(f"sisys version {package_version}")
         raise typer.Exit

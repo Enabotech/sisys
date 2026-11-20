@@ -64,7 +64,9 @@
 - `--dry-run`：接口层预览——打印命令解析结果与将调用的用例端口名，**不 bootstrap、不执行**
 - `--mock`：Mock 响应模式——controller 短路返回结构化 mock DTO，**不 bootstrap**（面向 LLM 自测与验收确定性；守卫校验仍先于短路执行）
 - `--format json|table|pretty`：全命令支持，默认 `table`
-- Agent 专用（tool run / tool chain run / agent run / plan generate / checkpoint recover）：`--session <id>`（缺省自动生成 UUID）、`--timeout <seconds>`（缺省 300）、`--cost-budget <amount>`
+- Agent 专用参数（`--session <id>` 缺省自动生成 UUID、`--timeout <seconds>` 缺省 300、`--cost-budget <amount>`）——**参数面口径（CR1-F6 勘正）：全部命令支持**（对齐 interface-design §4.4「所有命令必须支持」原文；dev 实现即 §4.4 形态，原「限五命令」系本 Story 文档期收窄偏差）；`--yes` 缺 `--cost-budget` 拒绝守卫经 base 管线（controllers/base.execute_command 入口）**全命令统一**生效（含 list/show 等查询命令——单一可教不变量，实测 checkpoint list --yes 无 budget → 201 exit 1）
+
+**守卫层定义冻结（CR1-F5，dry-run 语义自洽性）：** 先于 `--dry-run`/`--mock` 短路执行的守卫分两类：①**参数归一守卫**（canonical_uuid 实体族/agent 族/budget/format 枚举——_guards.py 统一）；②**命令级输入守卫**（业务输入的 fail-fast 校验，如 document upload 的文件存在性 202——各 controller 自持）。「dry-run = 守卫通过后的执行预览」是单一不变量（预览不跳过输入校验，更安全）；各命令守卫面差异（upload 有文件守卫、list 无输入守卫）是命令语义的自然结果。**recover 特例**：`checkpoint recover --dry-run` 消费 :2508 真实预览视图（需 bootstrap——预览语义需要真实恢复目标状态，:2508 预览面即 dry-run 的领域等价物，AC-5 行注记钦定）。
 
 **全局参数实现机制冻结（R1-F1，P0 修复）：** 全局参数与 Agent 专用参数经**共享 Annotated 类型在各命令签名逐一声明**（typer 标准形态，前置/尾置形态均可解析）；**禁止 `@app.callback()` 承载全局参数**——click group callback 参数在子命令之后的尾置形态（如 `sisys document upload --file x --yes`）实测 exit 2（typer 0.24.2/click 8.4.2 验证），而本 Story 全部用法示例均为尾置形态。共享注解定义于 `src/interfaces/cli/_params.py`（Annotated 类型单一来源，Task 4「四命令共享 Agent 参数注解 DRY」推广至全部全局参数）。**豁免边界（R3-6）：** `--version` 顶层选项经 `app.callback(invoke_without_command=True)` 承载（实测顶层 exit 0）——豁免于上述禁令：version 是顶层前置形态选项（`sisys --version` 无子命令上下文，无尾置可达性问题），与跨子命令全局参数不同类。
 
@@ -99,7 +101,7 @@
 **Given** sisys 统一入口
 **When** 审计六大服务模块命令入口
 **Then** 冻结命令矩阵（12 命令，Task 0 冻结表）全部可用，document/tool 两模块 CLI 面从零到一。
-**参数语义注记（R1-F4）：** `<tool-id>` 一律为 **TOOLS.md slug**（如 `pestel`，人类/LLM 可读形态），非 UUID——tool run/schema 内部经 `tool_registry_service.get_tool(tool_name=<slug>)` 解析 `Tool.id`（UUID）后构造 `ToolCall`；**禁止对 tool-id 参数套用 canonical_uuid 守卫**（slug 非 UUID 形态）。
+**参数语义注记（R1-F4，CR1-F7b 勘正）：** `<tool-id>` 一律为 **TOOLS.md slug**（如 `pestel-analysis`，人类/LLM 可读形态），非 UUID——tool run/schema 内部解析链 = `skill_manifest.SLUG_TO_TOOL_ID`（**仓内钦定生产 SSOT**，4-x 周期先例）→ `tool_registry_service.get_tool(tool_id=<UUID>)`（**禁 `get_tool(tool_name=slug)` 直查——TOOLS.md 的 slug 与 tool_name 是两个不同列，slug≠tool_name 的工具直查必 miss**；registry.get_tool(tool_name=) 能力存在但 CLI 面统一走 SSOT 映射防两源分叉使用）；**禁止对 tool-id 参数套用 canonical_uuid 守卫**（slug 非 UUID 形态）。
 
 | 模块 | 命令 | 消费端口（组合根注册名，已核验行号） |
 |------|------|------|
@@ -207,7 +209,10 @@
 |------|------|---------------------|--------|
 | `EntityValidationError` | EXCEPTION_242 | 实体 ID 族（`--plan-id`、document parse `--id <doc-id>`——R5-3 显式点名防误读）非 UUID 守卫（R1-F18 统一形态——chain-query 先例 agent_cli.py:1129-1141，6.9-R1-DF1 命令族契约）；checkpoint recover `--confirmed-by` 空串（:2536 ExecuteCheckpointRecoveryUseCase 用例层守卫，CLI 只呈现——R3-2 承载注记） | business_exceptions.py:106 |
 | `ValidationError` | EXCEPTION_201 | `--agent-id` 非 UUID 守卫（`_parse_agent_uuid` 先例 agent_cli.py:156-173）；Agent 模式 `--yes` 缺 `--cost-budget` 拒绝；frontmatter `input_examples` 校验失败 | business_exceptions.py:20 |
+| `NotFoundError` | EXCEPTION_202 | document upload 文件不存在（`require_upload_file` 命令级输入守卫——CR1 补登：dev 消费既有异常类未入表） | 既有 NotFoundError 族 |
 | （用例透传） | 482 等 | plan 重跑守卫等由用例层抛出，CLI 只呈现 | blm_planning 既有 |
+
+> **退出码扩展注记（CR1-F8）：** 实现含 `Abort→exit 130`（Ctrl+C，click 惯例）——0/1/2 冻结契约外的第四码，仅交互中断承载；**异常呈现形态注记：** DomainError stderr 为双行（`ERROR: 领域异常: <msg>` 回显行+`[EXCEPTION_NNN] message` 契约行）——契约行逐字对齐 agent_cli 既有格式，ERROR 前缀行为 typer 入口回显，LLM 解析以 `[EXCEPTION_NNN]` 行为准。
 
 > **守卫分工注记：** CLI 层双 UUID 守卫契约与 agent_cli 既有分工一致——实体 ID 族（plan-id）走 242、agent-id 走 201（ocr_cli D8 清偿后模式：int 转换→201 先例）；新统一入口按参数族对应采用，禁止混用；`<tool-id>` 为 slug、`--checkpoint-no` 为 CP-N 编号，均不入 UUID 守卫族。
 
@@ -448,7 +453,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_formatters.py`（json 合法性/表格列宽中文对齐/pretty 分组缩进/空态/单条/多条/嵌套）——json 断言含 **UUID/Decimal 字段序列化用例**（`default=str` 策略锚，R2-1）与 **空列表契约**（空态输出=空 JSON 数组 `[]`/空表头+零数据行/pretty 空态提示语，三格式各自形态冻结，R2-6） |
+| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_cli_formatters.py`（json 合法性/表格列宽中文对齐/pretty 分组缩进/空态/单条/多条/嵌套）——json 断言含 **UUID/Decimal 字段序列化用例**（`default=str` 策略锚，R2-1）与 **空列表契约**（空态输出=空 JSON 数组 `[]`/table=**纯空串**（零表头零数据行——CR1-F8 勘正：R2-6 原冻结「表头+零数据行」措辞歧义，实现空串形态更优[jq 空输入惯例]，空表头无信息量）/pretty 空态提示语，三格式各自形态冻结，R2-6） |
 | 🟢 绿 | 实现 `src/interfaces/cli/formatters/{__init__,json_formatter,table_formatter,pretty_formatter}.py` 最小代码（json_formatter 冻结 `json.dumps(payload, default=str, ensure_ascii=False)`） |
 | 🟡 变异 | 改坏 JSON 序列化键→json 格式断言红；改坏列宽计算→table 断言红；还原绿 |
 | 🔄 重构 | 统一渲染入口签名 `render(payload: Mapping) -> str`、类型注解、中文 docstring |
@@ -543,7 +548,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_tool_commands.py`（list 域过滤/schema 输出含 input_examples 字段（经 `skill_loader.load_sop`→`SkillDocument.input_examples`——R1-F3 通路锚）/**run 的 `<tool-id>` slug→`get_tool(tool_name=)`→`Tool.id` UUID→ToolCall 解析链**（R1-F4）/--input JSON 装载/chain run --config 装载/Agent 专用参数透传 context） |
+| 🔴 红 | 编写 `tests/unit/interfaces/cli/test_tool_commands.py`（list 域过滤/schema 输出含 input_examples 字段（经 `skill_loader.load_sop`→`SkillDocument.input_examples`——R1-F3 通路锚）/**run 的 `<tool-id>` slug→SLUG_TO_TOOL_ID SSOT→`get_tool(tool_id=)`→`ToolCall` 解析链**（R1-F4/CR1-F7b 勘正形态）/--input JSON 装载/chain run --config 装载/Agent 专用参数透传 context） |
 | 🟢 绿 | 实现 `commands/tool_commands.py` + `controllers/tool_controller.py`（消费 tool_registry_service/tool_execution_service/run_tool_chain_use_case） |
 | 🟡 变异 | schema 输出去 examples 键→断言红；run context 去 session→透传断言红；还原绿 |
 | 🔄 重构 | 四命令复用 `_params.py` 共享 Agent 参数注解（R2-A2 锚定：不另建 tool 侧注解） |
@@ -713,6 +718,7 @@
 | OD-6 | system/config 辅助模块命令组 defer（sisys system auth/monitor/route/health、sisys config 族） | 7-4/后续 |
 | OD-7 | interface-design §4.3 完整命令清单超出 12 命令冻结矩阵的命令面 defer（document search/version/delete、agent status/arbitrate、plan export/review、archive timeline/diff、checkpoint --modifications）——12 命令=路线图「6 服务模块命令骨架」最小集（R1-F7 边界声明；P1 原则以 6 模块覆盖承载） | 后续命令扩展 Story（7-1-DF5） |
 | OD-8 | checkpoint show/recover 参数形态偏离钦定文本（§4.3.5 钦定 `--id <cp-id>` 单参数；落地为 `--plan-id`+`--checkpoint-no` 复合定位）——checkpoint 域端口无 UUID 单参查询 API（R3-1/2 实测：唯一查询入参形态=plan_id+checkpoint_no），钦定单参数形态在当前端口面不可实现；`--confirmed-by` 参数为执行面 `confirmed_by` 非空守卫的 CLI 承载（钦定文本未含） | 端口签名现实层优先，落地形态注记（7-1-DF1 迁移专项统一时复核） |
+| OD-10 | CLI 租户常量策略（CR1-F2 定谳）：document 域 `tenant_id="cli-default"`/`uploaded_by="cli-user"`（端口必填 str——API 面 X-Tenant-ID header 的 CLI 等价取值）与 tool 域 `ExecutionContext.tenant_id=00000000-0000-0000-0000-000000000101`（文档化 UUID 常量，无系统预留语义）——两域形态差异是端口类型现实（str vs UUID），常量已落库（集成测试锚 cli-default）；**单点集中归宿**：常量收敛至 `_guards.py`/独立 cli_context 模块（7-1-DF1 迁移专项或后续租户治理 Story 承载，7-1 不迁移已落数据）；多租户 CLI 切换（env 变量）YAGNI defer（归宿 7-4 config 命令组域） | 后续租户治理/命令族迁移专项 |
 
 ### 项目结构说明 Project Structure（本 Story 相关面）
 
@@ -984,20 +990,30 @@ src 面（20 文件）：
 
 ### 🔍 代码审查发现 Review Findings [代码审查/修正必选]
 
-**审查日期:** 待定
-**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+**审查日期:** 2026-11-20（Round 1，五轮 C1~C5 循环代码审查周期）
+**审查模式:** full（C1 四视角并行调研[契约符合性/越界面/测试质量/运行面实测] → C2 P0 定级方案 → C3 双评审员评审[正确性+破坏性] → C4 提交推送）
 
 #### 需决策 Decision Needed
 
-- [ ] （待审查）
+- [x] ~~CR1-F2 租户常量分裂（cli-default vs UUID101 两 controller 各自定义）~~ 已定谳 OD-10：两域形态差异是端口类型现实；常量单点集中归宿迁移专项；多租户切换 YAGNI defer 7-4
+- [x] ~~CR1-F6 Agent 专用参数面（实现全命令 vs story 五命令冻结）~~ 已定谳：story 勘正为全部命令（对齐 interface-design §4.4 原文——dev 实现即钦定形态，story 文档期收窄才是偏差）
+- [x] ~~CR1-F7 slug 解析链（实现 SSOT 映射 vs story 冻结 get_tool(tool_name=)）~~ 双评审员改判定谳：SLUG_TO_TOOL_ID 系仓内钦定 SSOT 且 slug≠tool_name 双列实证直查必 miss——**story 原冻结契约才是错的**，勘正为 SSOT 解析链
 
 #### 已修复 Patch
 
-- [ ] （待审查）
+- [x] CR1-F1（P0 红线）：7 处多余 `# noqa` 删除（BLE001×6/S603×1——规则集 E/F/I/N/W 未启用这些规则，纯冗余+违反 CLAUDE.md 禁 noqa 红线；B017 处 dev 已自修精确断言）——生产 2+测试 5 文件
+- [x] CR1-F9a：集成测试 3 处裸 `asyncio.new_event_loop().run_until_complete()` 补 loop.close()（:111/:206/:259——资源泄漏；第 4 处 :152 dev 已自修）
+- [x] CR1-F9b：framework:394 冗余自我赋值行删除
+- [x] CR1-A1：守卫统一性命令级锚补充（checkpoint list --yes 无 budget→201 单测——防未来 base 管线守卫移位）
+- [x] CR1-F4b：feature 场景名「轻量真实链四命令」→「三命令」（名实勘正，.feature+.py 绑定串双锁步）
+- [x] story 侧：守卫层两类定义冻结（CR1-F5）/参数面勘正（CR1-F6）/slug 解析链勘正（CR1-F7b）/异常表补 202+退出码 130+异常呈现双行注记（CR1-F8）/table 空态措辞勘正（空串形态）/OD-10 登记
 
 #### 已推迟 Defer
 
-- [ ] （待审查）
+- [x] CLI 租户常量单点集中（`_guards.py`/cli_context 模块收敛）→ 7-1-DF1 迁移专项或后续租户治理 Story（OD-10——不迁移已落库数据）
+- [x] 多租户 CLI 切换（SISYS_TENANT_ID env）→ 7-4 config 命令组域（YAGNI）
+
+> **R1/C3 评审改判记录（评审否决的修复方向）：** F7a（slug 改直查 get_tool(tool_name=)）被双评审员一致否决——若落码即引入 P0 回归（slug≠tool_name 的工具直查必 miss）；F6 改码部分收缩为空集（base.py:86 守卫实测已全命令统一）。C1 报告两项前提被评审实测推翻（「checkpoint list --yes 静默通过」不成立/「SLUG_TO_TOOL_ID 自创双源」不成立）——评审员否决权与实测定谳的价值实证。
 
 ---
 

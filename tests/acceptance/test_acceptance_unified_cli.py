@@ -202,7 +202,7 @@ def _teardown_assets(ctx: dict[str, Any]) -> None:
 
     try:
         loop.run_until_complete(_cleanup())
-    except Exception:  # noqa: BLE001 —— teardown 容错（服务不可达时静默跳过——各步独立 try/except 先例）
+    except Exception:  # teardown 容错（服务不可达时静默跳过——各步独立 try/except 先例）
         pass
 
 
@@ -280,7 +280,7 @@ def _create_checkpoint_fixture(ctx: dict[str, Any], plan_id: str, checkpoint_no:
 
     try:
         ctx["_loop"].run_until_complete(_create())
-    except Exception as error:  # noqa: BLE001 —— LLM 压缩依赖门控（无 Key 环境 skip）
+    except Exception as error:  # LLM 压缩依赖门控（无 Key 环境 skip）
         if "API Key" in str(error) or "LLMConfig" in type(error).__name__:
             pytest.skip(f"LLM API Key 未配置——checkpoint 创建链依赖上下文压缩 LLM: {error}")
         raise
@@ -773,7 +773,7 @@ def verify_pretty_rendering(context: dict[str, Any]):
 # ===================================================================
 
 
-@scenario("test_acceptance_unified_cli.feature", "轻量真实链四命令")
+@scenario("test_acceptance_unified_cli.feature", "轻量真实链三命令")
 def test_lightweight_real_chain_four_commands(context: dict[str, Any]):
     """验证 tool list / checkpoint list / archive query 轻量真实链。"""
     pass
@@ -937,7 +937,7 @@ def sample_twenty_dry_run_subprocess_durations(context: dict[str, Any]):
     for _ in range(20):
         start = time.monotonic()
         result = subprocess.run(
-            [*command, "document", "upload", "--file", sample_file, "--dry-run"],  # noqa: S603
+            [*command, "document", "upload", "--file", sample_file, "--dry-run"],
             capture_output=True,
             cwd=str(ROOT),
             timeout=30,

@@ -160,6 +160,12 @@ class TestCheckpointListCommand:
 
         assert main_cli.main(["checkpoint", "list", "--plan-id", "not-a-uuid"]) == 1
 
+    def test_yes_without_budget_guard_on_non_agent_command(self) -> None:
+        """非 Agent 命令 --yes 无 budget → 201 exit 1（base 管线统一守卫的命令级锚——防未来守卫移位）。"""
+        from src.entrypoints import main_cli
+
+        assert main_cli.main(["checkpoint", "list", "--plan-id", _PLAN_ID, "--yes"]) == 1
+
     def test_empty_list_exit_zero(self) -> None:
         """空清单 exit 0 + 空态输出（json=[]——R2-6 冻结）。"""
         services = _services()

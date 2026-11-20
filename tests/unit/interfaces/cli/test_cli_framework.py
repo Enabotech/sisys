@@ -391,7 +391,6 @@ class TestMainCliEntrypoint:
         from src.entrypoints import main_cli
 
         calls: list[str] = []
-        monkeypatch.setattr(main_cli, "ENV_FILE", main_cli.ENV_FILE)
         monkeypatch.setattr(
             main_cli,
             "load_dotenv",

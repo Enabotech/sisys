@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = app(argv if argv is not None else sys.argv[1:], standalone_mode=False)
         return result if isinstance(result, int) else 0
-    except Exception as error:  # noqa: BLE001 —— 入口统一出口（异常→退出码映射唯一承载位）
+    except Exception as error:  # 入口统一出口（异常→退出码映射唯一承载位）
         return _map_exception_to_exit_code(error)
 
 
