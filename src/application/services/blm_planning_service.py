@@ -85,6 +85,7 @@ from src.domain.value_objects.blm_phases import (
     PerformanceGapArtifacts,
     make_timeline_entry,
 )
+from src.domain.value_objects.timestamps import utc_now_after
 
 logger = logging.getLogger(__name__)
 
@@ -393,7 +394,8 @@ class BlmPlanningService(BlmPlanningServicePort):
                 degraded=degraded,
                 degrade_reason=degrade_reason,
                 started_at=started_at,
-                completed_at=datetime.now(UTC),
+                # utc_now_after 同口径（AC-1.2 时间戳非重叠断言锚的数据面）
+                completed_at=utc_now_after(started_at),
                 structured_output=schema_result.model_dump(),
             )
             summary_excerpt = schema_result.summary
@@ -407,7 +409,8 @@ class BlmPlanningService(BlmPlanningServicePort):
                 degraded=True,
                 degrade_reason=degrade_reason,
                 started_at=started_at,
-                completed_at=datetime.now(UTC),
+                # utc_now_after 同口径（AC-1.2 时间戳非重叠断言锚的数据面）
+                completed_at=utc_now_after(started_at),
             )
             summary_excerpt = ""
 

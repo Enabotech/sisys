@@ -52,6 +52,7 @@ from src.domain.exceptions import (
     ToolNotFoundError,
 )
 from src.domain.services.tool_chain_dag_validator import ToolChainDagValidator
+from src.domain.value_objects.timestamps import utc_now_after
 from src.domain.value_objects.tool_execution import (
     ExecutionContext,
     ToolCall,
@@ -212,8 +213,8 @@ class ToolChainOrchestrator:
             # FAIL_FAST 检查：首个失败立即抛出（TaskGroup 已取消兄弟）
             if dag.failure_strategy == FailureStrategy.FAIL_FAST and failed_nodes:
                 failed_node_id = failed_nodes[0]
-                # 终止态提交（一次性写入 state + completed_at，保留 frozen 语义）
-                completed_at = datetime.now(UTC)
+                # 终止态提交（一次性写入 state + completed_at，保留 frozen 语义；钳制防墙钟回拨触发不变量校验）
+                completed_at = utc_now_after(run.started_at)
                 try:
                     run = replace(run, state=ToolChainRunState.FAILED, completed_at=completed_at)
                 # Round 2 P1-A3 修复：捕获 EntityValidationError（如 completed_at < started_at 等不变量违反）
@@ -235,8 +236,8 @@ class ToolChainOrchestrator:
                     enhanced_retry_count=infeasible_output.get("enhanced_retry_count"),
                 )
 
-        # 6. 终态判定 + 性能指标（含 critical_path 真实算法）
-        completed_at = datetime.now(UTC)
+        # 6. 终态判定 + 性能指标（含 critical_path 真实算法；钳制防墙钟回拨使 wall_clock_sec 为负）
+        completed_at = utc_now_after(run.started_at)
         wall_clock_sec = (completed_at - run.started_at).total_seconds()
 
         # 计算串行总耗时（用于 Amdahl 加速比）
@@ -637,7 +638,7 @@ class ToolChainOrchestrator:
                         tenant_id=context.tenant_id,
                     )
                     result = await self._execution_service.execute(tool_id, tool_call, context)
-                    completed_at = datetime.now(UTC)
+                    completed_at = utc_now_after(started_at)
                     result = replace(
                         result,
                         started_at=started_at,

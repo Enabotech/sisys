@@ -20,11 +20,12 @@ BLM（Business Leadership Model）前两阶段的概念载体：阶段/子步骤
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from src.domain.exceptions import EntityValidationError
+from src.domain.value_objects.timestamps import utc_now_after
 
 #: BLM 前两阶段流程步骤总数钦定（performance_gap + 六子步骤 + synthesis）
 #: ——进度百分比分母（AC-3 total_steps=8 钦定，epics/or.md 范围权威）
@@ -305,7 +306,7 @@ def make_timeline_entry(
     return BlmTimelineEntry(
         step=step,
         started_at=started_at,
-        completed_at=datetime.now(UTC),
+        completed_at=utc_now_after(started_at),
         status="completed",
         summary_excerpt=summary_excerpt,
         degraded=degraded,

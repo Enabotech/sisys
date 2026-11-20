@@ -53,6 +53,7 @@ from src.domain.ports.llm_client import LLMClientPort
 from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.tool_execution_repository import ToolExecutionRepositoryPort
 from src.domain.value_objects.data_source import DataSourceMeta
+from src.domain.value_objects.timestamps import utc_now_after
 from src.domain.value_objects.tool_execution import (
     EvidencePackage,
     ExecutionContext,
@@ -163,7 +164,7 @@ class ToolExecutionEngine:
         except Exception as exc:
             logger.error("沙箱启动失败: %s", exc)
             execution.transition_to(ToolExecutionState.FAILED)
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = utc_now_after(execution.started_at)
             execution.failure_reason = f"sandbox_start_failed: {exc}"
             # 失败态可观测性（R3-3 H1v2：失败路径 best-effort 持久化——save 为
             # upsert，自吞噬异常防顶替在途的 ToolExecutionFailedError）
@@ -199,7 +200,7 @@ class ToolExecutionEngine:
 
             # 终止状态：COMPLETED
             execution.transition_to(ToolExecutionState.COMPLETED)
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = utc_now_after(execution.started_at)
             execution.plan = plan
             execution.observation = observation
             execution.validation = validation
@@ -236,7 +237,7 @@ class ToolExecutionEngine:
             # 状态机守卫：仅在非终态时迁移到 FAILED
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
-                execution.completed_at = datetime.now(UTC)
+                execution.completed_at = utc_now_after(execution.started_at)
                 execution.failure_reason = str(exc)
             await self._persist_execution(execution)
             raise
@@ -246,7 +247,7 @@ class ToolExecutionEngine:
             # 守卫恒 False——「完成但超预算」也须记录原因并持久化 COMPLETED 态）
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
-                execution.completed_at = datetime.now(UTC)
+                execution.completed_at = utc_now_after(execution.started_at)
             execution.failure_reason = str(exc)
             await self._persist_execution(execution)
             raise
@@ -257,7 +258,7 @@ class ToolExecutionEngine:
             # 重试包装器使语义变化实际仅限 _resolve_data_sources 路径）
             if execution.state not in TERMINAL_STATES:
                 execution.transition_to(ToolExecutionState.FAILED)
-                execution.completed_at = datetime.now(UTC)
+                execution.completed_at = utc_now_after(execution.started_at)
                 execution.failure_reason = str(exc)
             await self._persist_execution(execution)
             raise
@@ -266,7 +267,7 @@ class ToolExecutionEngine:
             if execution.state not in TERMINAL_STATES:
                 logger.exception("工具执行失败: tool_id=%s exc=%s", tool_id, exc)
                 execution.transition_to(ToolExecutionState.FAILED)
-                execution.completed_at = datetime.now(UTC)
+                execution.completed_at = utc_now_after(execution.started_at)
                 execution.failure_reason = str(exc)
             await self._persist_execution(execution)
             raise ToolExecutionFailedError(

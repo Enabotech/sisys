@@ -90,6 +90,7 @@ from src.domain.value_objects.storage_encryption_result import (
     EncryptedData,
     EncryptionVerificationResult,
 )
+from src.domain.value_objects.timestamps import utc_now_after
 from src.domain.value_objects.token_payload import TokenPayload
 from src.domain.value_objects.udmr_task import UDMRTask
 from src.domain.value_objects.upload_limits import (
@@ -176,6 +177,7 @@ __all__ = [
     "SUPPORTED_FORMATS",
     "TokenPayload",
     "UDMRTask",
+    "utc_now_after",
     "get_chunk_size",
     "get_extension",
     "get_mime_type",

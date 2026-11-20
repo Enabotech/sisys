@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import FrozenInstanceError
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -26,6 +26,7 @@ from src.domain.value_objects.blm_phases import (
     InsightSynthesis,
     MarketInsightStep,
     PerformanceGapArtifacts,
+    make_timeline_entry,
 )
 
 # ===================================================================
@@ -159,6 +160,38 @@ class TestBlmPlanningStatus:
         assert "started_at" in payload
         assert isinstance(payload["started_at"], str)
         assert json.loads(serialized)["step"] == "performance_gap"
+
+
+# ===================================================================
+# 工厂：make_timeline_entry（completed_at 采样单调性——时钟回拨防御）
+# ===================================================================
+
+
+class TestMakeTimelineEntry:
+    """make_timeline_entry 工厂不变量（completed_at 采样对墙钟回拨免疫）。"""
+
+    def test_completed_at_not_before_started_at(self) -> None:
+        """正常路径：completed_at 采样不早于 started_at。"""
+        started_at = datetime.now(UTC) - timedelta(seconds=1)
+        entry = make_timeline_entry("trend", started_at, "摘要", degraded=False)
+        assert entry.started_at == started_at
+        assert entry.completed_at >= started_at
+
+    def test_completed_at_clamped_when_wall_clock_steps_back(self) -> None:
+        """时钟回拨防御：started_at 落于未来（墙钟被向后 step——WSL2 hv_utils/timesyncd 场景）时钳制为 started_at 而非抛错。"""
+        future_started_at = datetime.now(UTC) + timedelta(seconds=5)
+        entry = make_timeline_entry("trend", future_started_at, "摘要", degraded=False)
+        assert entry.completed_at == future_started_at
+
+    def test_direct_inversion_still_rejected(self) -> None:
+        """VO 契约保留：绕过工厂直接构造倒挂条目仍被 __post_init__ 拒绝。"""
+        started_at = datetime.now(UTC)
+        with pytest.raises(EntityValidationError):
+            BlmTimelineEntry(
+                step="trend",
+                started_at=started_at,
+                completed_at=started_at - timedelta(seconds=1),
+            )
 
 
 # ===================================================================
