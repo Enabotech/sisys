@@ -98,7 +98,7 @@
 **Then** 错误响应契约生效（sisys-uni-exception-design §响应体规范）：
 - 响应体结构：`{"error": {"code": "EXCEPTION_NNN", "message": "...", "context": {...}}, "request_id": "..."}`
 - 响应头：`X-Error-Code` + `X-Request-ID`（ExceptionContextMiddleware 从请求头取/生成 request_id——既有机制）
-- 关键映射断言：NotFound→404（documents/{id} 不存在——**端点层前置查询锚定**：parse/versions 端点先经 `document_repository.find(DocumentQuery)`（tenant_id 过滤）查存在性，None→端点 raise NotFoundError→404；端口层宽语义不承担 404 契约[parse_document 文档不存在返回合成 FAILED Document——document_parsing_service.py:121-128；list_versions 租户不匹配返回 []——impl :226-227，均 R1 实证]）/plans/{plan_id} 状态无记录）、Conflict→409（BLM 并发守卫 482）、EntityValidation 242→400、Validation 201→400、AuthenticationError→401、PermissionDenied→403、BusinessRuleViolation→422
+- 关键映射断言：NotFound→404（documents/{id} 不存在——**端点层前置查询锚定**：parse/versions 端点先经 `document_repository.find(DocumentQuery)`（tenant_id 过滤）查存在性，None→端点 raise NotFoundError→404；端口层宽语义不承担 404 契约[parse_document 文档不存在返回合成 FAILED Document——document_parsing_service.py:121-128；list_versions 租户不匹配返回 []——impl :226-227，均 R1 实证]；plans/{plan_id} 状态无记录）、Conflict→409（BLM 并发守卫 482）、EntityValidation 242→400、Validation 201→400、AuthenticationError→401、PermissionDenied→403、BusinessRuleViolation→422
 - Pydantic 请求体校验失败 → 422 RequestValidationError（ExceptionHandlers 既有四注册之一）
 - **零新增领域异常**（REST 是接口层薄壳，EXCEPTION_HTTP_MAP 全覆盖——异常消费表见 SDD 节）
 
@@ -921,10 +921,16 @@ tests/
 | R3-7 | AC-4 四态↔2 场景分组映射未写 | P3 | 分组建议注记（404+422 请求校验族/401+409 认证并发族——dev 可调） |
 | R3-8 | 跨租户 given 上传形态未写+租户分叉防坑注记缺失（7-1 CR6-2 假绿先例：given 租户与请求头租户分叉→find miss→弱断言恒绿） | P3 | given 钦定真实 upload 链+同租户正查 200 对照断言必须有（A/B 显式分置） |
 | R3-9 | parse 断言强度（7-1 CR6-1 parse_status 锚先例未采纳）+recover 后查询期望留白 | P3 | parse_status=completed 判别锚注记+recover 后 list 复核建议注记 |
+| R4-1 | L101 AC-4 NotFound 行中文圆括号不平衡（`均 R1 实证]）/plans` 多一个 `）`——R1-9 修复引入的排版残留，语义无损 | P3 | 随 R5 收敛提交清偿（改分号分隔——成本趋零应做） |
+| R5-1 | 收敛终审：六节取证全过（周期闭合[3 提交零游离]/双向抽验 8⁄8/台账完整/门禁如实/锚点 17⁄17 精确零失实/收敛判定可收敛） | — | 收敛声明入 Story（本节下方）+版本 v1.3.1 |
 
 > **R1 审查组织：** D1 四调研 Agent（REST 资产/端口 SSOT/契约测试/规格留项）+ D2 双评审（A 正确性+一致性：P0×4+P1×7+P2×6+P3×9+传播位清单 10 组；B 可行性+科学性：两大 P0 方案定谳+Task 级干跑+场景可满足性推演）+主会话实测定谳 3 项（N13 traceability 路由面/get_by_id 不存在/find 租户语义）。评审员间零事实冲突，D1 发现全部采信。
 > **R2 审查组织：** 双调研 Agent——R2-A 修复回归核查（git 取证：R1-1~R1-15 逐项 15/15 完备零漏网+新破口零发现+残留终扫零残留+场景算术复核自洽）+ R2-B 新增内容事实核验（OD 新行节号/端点名/行号族/组合交互面——R1 新写入声明中 4 项缺陷：OD-13 双失实/差集二次漏网/模糊数/checkpoint 偏离无登记；14 path 七处一致+SCOPED 双对象 11 处一致+trace 三角一致+created_via 三处一致等组合面全通过；附加正向事实：parse_document :119 内部已 find()——端点前置查询与内部构成双查询无害）。
 > **R3 审查组织：** 单深度推演 Agent 四轴（Task 依赖干跑[import 闭合全通过+port_contract 文件时间线自洽]/17 场景期望唯一性[期望唯一性机制成立，given 前置三处缺口]/AC↔测试承载矩阵[28 条 25 闭合，3 条 P3 承载面未明]/长状态时间线[document 链可观测 ✓，plan 链 recover 后留白]）——9 项发现（P1×1+P2×3+P3×5）+5 个缺失决策点全部补决策；7-1 CR6 最新教训三条直接反哺（R3-1 过时先例/R3-8 租户分叉假绿/R3-9 parse_status 判别锚）。
+> **R4 审查组织：** 纯验证 Agent 七维度（R1-R3 修复存续 26 组锚点/台账可追溯 10 行抽验 10⁄10/数字口径互证/结构完整性/状态字段/Task 链自洽/红线终扫）——6 通过+1 项 P3 排版级（R4-1），零实质发现不造独立提交轮（4-x 周期先例）。
+> **R5 审查组织：** 独立终审 Agent 六节取证（不轻信自报）——周期闭合[3 提交与版本说明一一对应零游离、文件面纯 .md/.yaml]/关键修复双向抽验[8⁄8：trace 签名/双对象注册块现值 SINGLETON=待迁移正确态/EXCEPTION_HTTP_MAP/shared_models//health 消费方/find 租户过滤/slug SSOT/482 守卫]/台账完整[29 行修复+OD 16 行+DF 双侧同号]/门禁如实[三提交 hooks 全 Passed、ruff-mypy 不适用 .md 如实注明]/锚点实测[17⁄17 精确零失实]/收敛判定[可收敛]。
+
+**收敛声明（R5 终审，2026-11-21）：** 本 Story 文档审查周期五轮收敛（v1.0.0→v1.3.1，提交 9f1325df/6fc540f6/f7b7fcea/本轮收敛批与轮记录一一对应零游离）。周期总账：R1 四调研+双评审（P0×4：trace 端点域错配迁 plans//health 双错勘正/SCOPED 双缺陷重设计/上游端点覆盖差集登记）、R2 回归核查 15⁄15 完备+新增内容核验 4 项清偿、R3 四轴推演 9 项清偿（含 7-1 CR6 三条教训反哺）、R4 纯验证 6 通过+1 项 P3、R5 六节全过（双向 8⁄8+锚点 17⁄17 精确零失实）——修复台账 30 行（P0×4+P1×7+P2×9+P3×10，全部清偿零残留）；OD 表扩至 16 行+DF 登记句 8+1 项。零 P0/P1/P2 残留；R4-1 排版级随本收敛提交清偿。Story 维持 `ready-for-dev`，可进入 dev-story。
 
 ---
 
@@ -943,11 +949,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.3.1
 **创建日期/Created:** 2026-11-21
 **最后更新/Last Updated:** 2026-11-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（4 调研 Agent 并行：REST 资产盘点/端口签名核验/留项与验收风格/架构边界深读；前置留项 14 条裁定落档含三向定夺承载；DC-1~DC-7 架构决策+OD-1~OD-9 偏离预告；13 端点冻结矩阵+13 唯一端口 14 消费对 SSOT 表[签名级核验]+认证/错误响应/租户/契约四契约面+6.1-DF5/6.5a-DF1 清偿承载+per-plan 锁+SCOPED 迁移）
+- v1.3.1: 文档审查周期收敛（R4 纯验证七维度 6 通过+1 项 P3[R4-1 L101 括号排版残留——随本批清偿]+R5 独立终审六节全过[周期闭合 3 提交零游离/双向抽验 8⁄8/台账完整/门禁如实/锚点 17⁄17 精确零失实/收敛判定可收敛]——收敛声明入 Story；周期总账：五轮 30 修复行[P0×4+P1×7+P2×9+P3×10]全清偿+OD 扩至 16 行+DF 8+1 项登记句；Story 维持 ready-for-dev 可进入 dev-story）
 - v1.3.0: 文档审查 Round 3（单深度推演 Agent 四轴：Task 依赖干跑/17 场景期望唯一性/AC↔测试承载矩阵/长状态时间线）——9 项发现全部清偿：P1×1[R3-1 checkpoint given 引用 7-1 R3-7 过时先例已被 CR6 判连带 skip与「确定性全绿」口径矛盾——改仓储/snapshot 直构绕开 LLM 依赖链]+P2×3[R3-2 Task 0 行为型契约测试 import 形态定谳拆分[顶部 import 连坐 yaml 断言——Task 0 仅 yaml 消费型，行为型随 Task 1-5 逐族补入]/R3-3 trace+archive given 前置补决策[R3-4 同源 snapshot 直构]/R3-4 tool execute LLM skip 归类补注记]+P3×5[health version 来源钦定 importlib.metadata/metrics 承载面钦定单测/AC-4 四态分组建议/跨租户 given 真实 upload+同租户正查对照防 CR6-2 假绿/parse_status 判别锚+recover 后 list 复核建议]；推演通过面：Task 序 import 闭合全过+port_contract 时间线自洽+28 条承载 25 闭合+期望唯一性机制成立；7-1 CR6 三条最新教训直接反哺（过时先例/租户分叉假绿/parse_status 锚）
 - v1.2.0: 文档审查 Round 2（双调研 Agent：R2-A 回归核查[R1-1~R1-15 逐项 git 取证 15/15 完备+新破口零发现+残留终扫零残留+场景算术自洽]+R2-B 新增内容事实核验[R1 新写入声明核出 4 项：OD-13 节号端点名双失实勘正[§8.2.7 /archive/timeline——旧 timeline-diff 系不精确继承名]/覆盖差集二次漏网补登[GET /documents/{id} §8.2.1 P0 入 OD-12+POST /plans 入 OD-13]/OD-14 模糊数精确化[激活面 21 端点确定缺口 crawler 4+monitoring 1——auth 11/audit 5 已有契约]/checkpoint 参数偏离新增 OD-16[复合双参 vs §8.2.6 钦定单参]]；组合交互面全通过[14 path 七处一致/SCOPED 双对象 11 处一致/trace 三角/created_via 三处]；OD-15 DF 编号勘正+映射句增 OD-16 归宿）
 - v1.1.0: 文档审查 Round 1（D1 四调研+D2 双评审）——P0×4 清偿：①trace 端点域错配（迁 GET /plans/{plan_id}/trace，OD-10——端口 plan 域现实+CLI 先例+与 /search/trace/{document_id} 引文端点语义分立）②/health 改名方案双错勘正（实为 embedding server 契约有消费方——改为新增 /system/health 保留 /health，漂移修正缩至一处，新 path 12→14）③SCOPED 迁移双缺陷重设计（双对象 service :2036+use_case :2065+机制诚实注记[clear_scoped 生产零接线下 SCOPED≡SINGLETON——声明语义正确化，真实隔离归 OD-15]+analyst_view 传播注记+lifetime 断言移 Task 2 红阶段防 CI 可见红窗）④上游端点覆盖差集登记（OD-10~OD-15 六行：compare/financial P0 不承载+P1 端点族+slug 偏离+激活面契约缺口+clear_scoped 专项+DF 映射句对齐）；P1×6：零手动 HTTPException 勘正（auth.py 实证）/audit 5 端点 Depends 实质改造/端口计数 15 对 18 端口/archive-query path 补入/端点层 find() 前置查询 404 设计决策（list_versions 返 [] 与 parse 合成 FAILED 的宽语义不承担 404——主会话实测定谳）/ErrorResponse 已收敛勘正（shared_models.py:12）；P2/P3 15 项（注册名/文件名/三向定夺预判改判/计数行号族/可行性注记族——monitoring 挂载形态冻结/锁字典无界增长/密码哈希归因/并发 409 时序/场景覆盖映射等）
