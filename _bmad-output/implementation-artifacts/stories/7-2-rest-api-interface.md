@@ -458,7 +458,7 @@
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_rest_api.feature`（AC-1~AC-7 共 17 个业务场景[AC-1×2/AC-2×8/AC-3×3/AC-4×2/AC-5×1/AC-7×1]，按 AC 分节横幅注释组织；AC-8×2 与收尾×2 由 Task 9 追加至最终态 21；**按 Gherkin 节的 AC-2×8↔13 端点覆盖映射撰写**——R1 注记）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_rest_api.py`（R6 七要点+HTTP 级装配形态+given/when/then 全步骤骨架齐备——**若仅 given 骨架则收集期抛 ScenarioDefinitionError**[7-1 R1-F31 教训]，故要求全骨架：红形态=运行期 ImportError[新增路由模块不存在]）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——红形态=运行期 ImportError：新增路由模块不存在）
-- [ ] Subtask 0.7: 前置留项清单 14 条处置注记落档 `deferred-work.md`（历史行不改写追加注记）+ **三向定夺执行**（:125/:129——grep 全仓核验 StrategicAnalysisUseCase/orchestration_service/data_pipeline 引用[R1 预判：tests 7+3 文件引用实证，大概率 defer]，零引用则删除类文件+注册行并落档，有引用则改判 defer 并注记）+ 新登记 7-2-DF 族（**R1 对齐版 8 项+1 归宿**：异步 job+agents status[DF1——OD-2/OD-3]、3-8 高保真 REST 面[DF2——OD-10 后段]、equilibrium_security 挂载[DF3——OD-6]、BLM 长驻含锁字典淘汰[DF4——OD-7]、compare+financial 族[DF5——OD-12]、P1 端点族含 timeline-diff[DF6——OD-13]、激活面契约缺口[DF7 关联——OD-14]、clear_scoped 接线[DF8——OD-15]、PT-03→7-3 Gateway 面[OD-8]——OD 表对应）
+- [ ] Subtask 0.7: 前置留项清单 14 条处置注记落档 `deferred-work.md`（历史行不改写追加注记）+ **三向定夺执行**（:125/:129——grep 全仓核验 StrategicAnalysisUseCase/orchestration_service/data_pipeline 引用[R1 预判：tests 7+3 文件引用实证，大概率 defer]，零引用则删除类文件+注册行并落档，有引用则改判 defer 并注记）+ 新登记 7-2-DF 族（**R1 对齐版 8 项+1 归宿，R2 勘正**：异步 job+agents status[DF1——OD-2/OD-3]、3-8 高保真 REST 面[DF2——OD-10 后段]、equilibrium_security 挂载[DF3——OD-6]、BLM 长驻含锁字典淘汰[DF4——OD-7]、compare+financial+documents 元数据查询族[DF5——OD-12，R2 增补]、P1 端点族含 /archive/timeline[R2 勘正端点名][DF6——OD-13]、激活面契约缺口[DF7 关联——OD-14]、clear_scoped 接线[DF8——OD-15]、PT-03→7-3 Gateway 面[OD-8]——OD 表对应）
 - [ ] Subtask 0.8: 锚点行号复核（本 Story 引用的组合根行号/api_app 行号/openapi path 消费方实测核对——主会话独立复核）
 
 **完成标准/Definition of Done:**
@@ -719,7 +719,7 @@
 
 ### 偏离声明预告（Task 0 落档确认，OD-n 前缀）
 
-> **台账对应注记（R1 对齐版）：** OD 表为决策记录，执行台账以 deferred-work.md 为准——OD-2/OD-3 → 7-2-DF1（异步 job+agents status 端点族）、OD-10 后段 → 7-2-DF2（3-8 高保真 REST 面）、OD-6 → 7-2-DF3（equilibrium_security 挂载）、OD-7 → 7-2-DF4（BLM 长驻含锁字典淘汰）、OD-12 → 7-2-DF5（compare+financial 族）、OD-13 → 7-2-DF6（P1 端点族）、OD-14 → 7-2-DF7 关联（激活面契约，归宿 OD-5 契约治理）、OD-15 → 7-2-DF8（clear_scoped 接线）、OD-8（PT-03）→ 7-3 Gateway 面。
+> **台账对应注记（R1 对齐版，R2 勘正）：** OD 表为决策记录，执行台账以 deferred-work.md 为准——OD-2/OD-3 → 7-2-DF1（异步 job+agents status 端点族）、OD-10 后段 → 7-2-DF2（3-8 高保真 REST 面）、OD-6 → 7-2-DF3（equilibrium_security 挂载）、OD-7 → 7-2-DF4（BLM 长驻含锁字典淘汰）、OD-12 → 7-2-DF5（compare+financial+documents 元数据查询族）、OD-13 → 7-2-DF6（P1 端点族含 /archive/timeline）、OD-14 → 7-2-DF7 关联（激活面契约，归宿 OD-5 契约治理）、OD-15 → 7-2-DF8（clear_scoped 接线）、OD-8（PT-03）→ 7-3 Gateway 面、OD-1/OD-11/OD-16 → 7-1-DF1 迁移专项统一复核。
 
 | OD | Gap（四要素） | V1 归宿 |
 |----|--------------|--------|
@@ -734,10 +734,11 @@
 | OD-9 | 可用性口径双源消歧（epics:2662「≥99%」vs prd NFR-IF-05「≥99.5% V1」）——以 prd 为准；运维面指标 7-2 以错误响应契约+零回归承载 | 运维监控专项（7-4 协同） |
 | OD-10（R1） | trace 端点域迁 plans（interface-design §8.2.1 钦定 `/documents/{id}/trace`=高保真溯源 vs 仓内端口现实：TraceabilityTreePort 为 plan 域[execute(*, plan_id, depth)]、3-8 TraceabilityPort.trace(claim: str) 入参为 claim 文本——document 域溯源树端口为零）——端点 `GET /plans/{plan_id}/trace` 对齐端口现实+CLI `trace-tree --plan-id` 先例；**3-8 高保真溯源 REST 面零承载**（claim 入参与钦定 {id} path 形态的上游双源不一致待澄清） | 上游契约澄清+3-8 REST 面专项（7-2-DF2） |
 | OD-11（R1） | tools 端点参数 `{slug}` vs 钦定 `{id}`/`{tool_id}`（interface-design §8.2.2+architecture:2466 双源）——slug SSOT 链理由（`skill_manifest.SLUG_TO_TOOL_ID`→`get_tool(tool_id=)`，7-1 CR1-F7b 勘正同链） | 7-1-DF1 迁移专项统一时复核 |
-| OD-12（R1） | 钦定 P0 端点不承载集：`GET /plans/{id}/compare`（§8.2.5 情景对比 P0）+ financial 族 `POST /financial/analyze`/`/sensitivity`（§8.2.4 双 P0）——R1 覆盖差集补登 | 后续 Story 立项承载（7-2-DF5 登记） |
-| OD-13（R1） | 钦定 P1 端点族不承载集：`/agents/arbitrate`（§8.2.3）、`/tool-chains/{id}/execute`（§8.2.2）、`/reports/regulatory`（§8.2.8）、`/risk/heatmap`（§8.2.9）、`/routing-decisions`（architecture:2494）、`/archive` timeline-diff（§8.2.6）+ `GET /plans` 规划列表（architecture:2479 与 interface-design 双上游不一致待消歧） | Epic 7 后续 Story 承载 |
-| OD-14（R1） | 激活面契约缺口：挂载激活的 metrics/crawler/roles 族端点（~14 端点）yaml 无对应 path——NFR-IF-05「OpenAPI 3.1 契约测试通过率 100%」在激活面不闭环 | 契约治理专项（OD-5 关联，7-6 协同） |
-| OD-15（R1） | clear_scoped 生产接线（真实 per-request SCOPED 隔离）——per-request clear 中间件并发不安全（进程级 `_scoped_context` dict 在途请求互毁，R1 推演定谳），contextvar 级 scope 绑定为正解（4-7 周期 `_RETRY_POLICY_OVERRIDE` 同款机制先例） | scope 机制重构专项（7-2-DF7 登记） |
+| OD-12（R1，R2 增补） | 钦定 P0 端点不承载集：`GET /plans/{id}/compare`（§8.2.5 情景对比 P0）+ financial 族 `POST /financial/analyze`/`/sensitivity`（§8.2.4 双 P0）+ `GET /documents/{id}`（§8.2.1 P0 查询文档元数据——7-2 document 族仅承载 parse/versions，元数据查询端点零承载[R2 二次差集补登]）——R1 覆盖差集补登 | 后续 Story 立项承载（7-2-DF5 登记） |
+| OD-13（R1，R2 勘正） | 钦定 P1 端点族不承载集：`/agents/arbitrate`（§8.2.3）、`/tool-chains/{id}/execute`（§8.2.2）、`/reports/regulatory`（§8.2.8）、`/risk/heatmap`（§8.2.9）、`/routing-decisions`（architecture:2494）、`/archive/timeline`（§8.2.7 时间轴演进 P1——R2 勘正：原「timeline-diff §8.2.6」节号与端点名双失实，系旧 DF 清单不精确继承名）+ `GET /plans`/`POST /plans`（architecture:2479/:2480 与 interface-design 双上游不一致待消歧[R2 增补 POST]） | Epic 7 后续 Story 承载 |
+| OD-14（R1，R2 精确化） | 激活面契约缺口：激活面 21 端点中确定缺口=crawler 4+monitoring 1（auth 11/audit 5 已有 yaml 契约覆盖；roles permissions 子面 dev 期核验）——NFR-IF-05「OpenAPI 3.1 契约测试通过率 100%」在激活面不闭环 | 契约治理专项（OD-5 关联，7-6 协同） |
+| OD-15（R1） | clear_scoped 生产接线（真实 per-request SCOPED 隔离）——per-request clear 中间件并发不安全（进程级 `_scoped_context` dict 在途请求互毁，R1 推演定谳），contextvar 级 scope 绑定为正解（4-7 周期 `_RETRY_POLICY_OVERRIDE` 同款机制先例） | scope 机制重构专项（7-2-DF8 登记——R2 勘正编号） |
+| OD-16（R2） | checkpoint 端点参数 `{plan_id}/{checkpoint_no}` 复合双参 vs §8.2.6 钦定 `/checkpoints/{id}` 单参——7-1 OD-8 端口签名现实层优先原则继承（checkpoint_recovery_use_case execute(*, plan_id, checkpoint_no) 两参必填，无 id 单参解析面） | 7-1-DF1 迁移专项统一时复核（同 OD-1/OD-11 归宿） |
 
 ### 项目结构说明 Project Structure（本 Story 相关面）
 
@@ -907,8 +908,13 @@ tests/
 | R1-13 | 三向定夺裁定「删除」的依据漏 tests 引用面（StrategicAnalysisUseCase 7 测试文件、orchestration_service 3 文件 resolve 消费——删除前提注定不成立） | P2 | #12 裁定改「R1 预判 defer 为大概率落点」+引用面实证入表 |
 | R1-14 | 计数/行号微漂移族：X-Tenant-ID 先例 8→6 处、「存量 13 文件」→15 个 .py（4 处）、EXCEPTION_HTTP_MAP :161→:160（2 处）、tools.py 端点枚举 3→6、「6 单测文件」→5（2 处）、Task 2「--help 等价」CLI 残留措辞、留项 #2 序号错乱、验收先例 :51-78→:49-78、Makefile :278-280→:279-281、auth 工厂 :150-186→:150-195 | P3 | 逐处勘正（本轮全部清偿） |
 | R1-15 | 可行性补强注记族：monitoring 挂载形态未冻结（无 prefix router）、per-plan 锁字典无界增长、锁变异「如可测」模糊、密码哈希归因失实（真约束=EncryptionService bcrypt+防锁定一次性用户名）、并发双跑 409 时序（锁释放后守卫非超时）、Subtask 0.5 骨架表述防误读、AC-2×8↔13 端点覆盖映射 | P2/P3 | 逐项注记/具体化（本轮全部清偿：AC-1/Task 1/Task 4/Task 7/Subtask 0.4/0.5/Gherkin 节） |
+| R2-1 | OD-13「/archive timeline-diff（§8.2.6）」双失实：节号错（§8.2.6=Checkpoint 管理，archive 在 §8.2.7）+端点名不精确（钦定 `/archive/timeline`——timeline-diff 系旧 DF 清单不精确继承名） | P2 | OD-13 行+Subtask 0.7 DF6+映射句三处勘正（interface-design §8 实测定谳） |
+| R2-2 | 覆盖差集二次漏网：`GET /documents/{id}`（§8.2.1 P0 文档元数据查询）未承载且 OD 零登记（R1 补登差集仍漏）；`POST /plans`（architecture:2480）未入双源不一致清单 | P2 | OD-12 增补 GET /documents/{id}（DF5 联动）+OD-13 增补 POST /plans |
+| R2-3 | OD-14「~14 端点」模糊数：实测激活面 21 端点（auth 11+monitoring 1+crawler 4+audit 5），其中 auth/audit 已有 yaml 契约——确定缺口=crawler 4+monitoring 1 | P3 | OD-14 精确化口径（roles permissions 子面 dev 期核验注记） |
+| R2-4 | checkpoint 参数偏离无 OD 行：§8.2.6 钦定 `/checkpoints/{id}` 单参 vs 本 Story 复合双参（7-1 OD-8 原则继承但偏离未登记） | P3 | 新增 OD-16 行（归宿 7-1-DF1 统一复核，同 OD-1/OD-11） |
 
 > **R1 审查组织：** D1 四调研 Agent（REST 资产/端口 SSOT/契约测试/规格留项）+ D2 双评审（A 正确性+一致性：P0×4+P1×7+P2×6+P3×9+传播位清单 10 组；B 可行性+科学性：两大 P0 方案定谳+Task 级干跑+场景可满足性推演）+主会话实测定谳 3 项（N13 traceability 路由面/get_by_id 不存在/find 租户语义）。评审员间零事实冲突，D1 发现全部采信。
+> **R2 审查组织：** 双调研 Agent——R2-A 修复回归核查（git 取证：R1-1~R1-15 逐项 15/15 完备零漏网+新破口零发现+残留终扫零残留+场景算术复核自洽）+ R2-B 新增内容事实核验（OD 新行节号/端点名/行号族/组合交互面——R1 新写入声明中 4 项缺陷：OD-13 双失实/差集二次漏网/模糊数/checkpoint 偏离无登记；14 path 七处一致+SCOPED 双对象 11 处一致+trace 三角一致+created_via 三处一致等组合面全通过；附加正向事实：parse_document :119 内部已 find()——端点前置查询与内部构成双查询无害）。
 
 ---
 
@@ -927,9 +933,10 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.1.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-11-21
 **最后更新/Last Updated:** 2026-11-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（4 调研 Agent 并行：REST 资产盘点/端口签名核验/留项与验收风格/架构边界深读；前置留项 14 条裁定落档含三向定夺承载；DC-1~DC-7 架构决策+OD-1~OD-9 偏离预告；13 端点冻结矩阵+13 唯一端口 14 消费对 SSOT 表[签名级核验]+认证/错误响应/租户/契约四契约面+6.1-DF5/6.5a-DF1 清偿承载+per-plan 锁+SCOPED 迁移）
+- v1.2.0: 文档审查 Round 2（双调研 Agent：R2-A 回归核查[R1-1~R1-15 逐项 git 取证 15/15 完备+新破口零发现+残留终扫零残留+场景算术自洽]+R2-B 新增内容事实核验[R1 新写入声明核出 4 项：OD-13 节号端点名双失实勘正[§8.2.7 /archive/timeline——旧 timeline-diff 系不精确继承名]/覆盖差集二次漏网补登[GET /documents/{id} §8.2.1 P0 入 OD-12+POST /plans 入 OD-13]/OD-14 模糊数精确化[激活面 21 端点确定缺口 crawler 4+monitoring 1——auth 11/audit 5 已有契约]/checkpoint 参数偏离新增 OD-16[复合双参 vs §8.2.6 钦定单参]]；组合交互面全通过[14 path 七处一致/SCOPED 双对象 11 处一致/trace 三角/created_via 三处]；OD-15 DF 编号勘正+映射句增 OD-16 归宿）
 - v1.1.0: 文档审查 Round 1（D1 四调研+D2 双评审）——P0×4 清偿：①trace 端点域错配（迁 GET /plans/{plan_id}/trace，OD-10——端口 plan 域现实+CLI 先例+与 /search/trace/{document_id} 引文端点语义分立）②/health 改名方案双错勘正（实为 embedding server 契约有消费方——改为新增 /system/health 保留 /health，漂移修正缩至一处，新 path 12→14）③SCOPED 迁移双缺陷重设计（双对象 service :2036+use_case :2065+机制诚实注记[clear_scoped 生产零接线下 SCOPED≡SINGLETON——声明语义正确化，真实隔离归 OD-15]+analyst_view 传播注记+lifetime 断言移 Task 2 红阶段防 CI 可见红窗）④上游端点覆盖差集登记（OD-10~OD-15 六行：compare/financial P0 不承载+P1 端点族+slug 偏离+激活面契约缺口+clear_scoped 专项+DF 映射句对齐）；P1×6：零手动 HTTPException 勘正（auth.py 实证）/audit 5 端点 Depends 实质改造/端口计数 15 对 18 端口/archive-query path 补入/端点层 find() 前置查询 404 设计决策（list_versions 返 [] 与 parse 合成 FAILED 的宽语义不承担 404——主会话实测定谳）/ErrorResponse 已收敛勘正（shared_models.py:12）；P2/P3 15 项（注册名/文件名/三向定夺预判改判/计数行号族/可行性注记族——monitoring 挂载形态冻结/锁字典无界增长/密码哈希归因/并发 409 时序/场景覆盖映射等）
