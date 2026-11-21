@@ -735,6 +735,11 @@ class DocumentParsingService:
         if self._ocr is None:
             return parsed_doc, {}
 
+        # 仅 PDF 格式触发 OCR（与 _apply_layout/_apply_table_detection 门控对齐——
+        # 非 PDF 文本页字符数低于扫描密度阈值时会被误判为扫描页，md/txt 进 OCR 必失败）
+        if not mime_type.startswith("application/pdf"):
+            return parsed_doc, {}
+
         # 文件大小守卫：仅对 ≤ 50MB 的文件执行 OCR
         # 使用领域层常量，避免直接依赖基础设施层
         max_pdf_bytes = 100 * 1024 * 1024  # 100MB — PDF 解析器上限（与 _limits.py MAX_PDF_BYTES 对齐）

@@ -55,6 +55,8 @@
 - [ ] agent run / plan generate 真实 LLM 面动态跳过（无 Key 环境 `pytest.skip()`），Mock 面（`--mock`）确定性全绿
 - [ ] checkpoint recover 验收场景真实链（given 前置真实创建 checkpoint → recover → 断言恢复结果）
 
+> **Skip 口径归类注记（CR6）：** 验收「Checkpoint 恢复真实链」与集成「checkpoint 族往返」两场景的无 Key 环境 skip，归类为 **checkpoint 创建链 OD-12 五步编排的压缩强制环节依赖连带**（非 AC-2 钦定的「agent run/plan generate 真实 LLM 面」skip——钦定面是被测面即 LLM，此两场景是被测面零 LLM 的前置依赖拖累）；解耦归宿（创建链空 docs 压缩短路）动摇快照完整性语义，deferred 登记 checkpoint 域专项复核。AC-7 大写归一场景已换 document 域前置（CR6，无 Key 环境可跑）。
+
 ### AC-3: 全局参数与 Agent 模式参数契约
 
 **Given** sisys CLI 任一命令
@@ -149,7 +151,7 @@
 - 枚举值（--format/--mode 等）由 typer choice 守卫 → exit 2
 
 **验证标准/Validation Criteria:**
-- [ ] 大写 UUID 输入 → 归一后真实查询命中（非静默空态）验收场景——**前置数据链（R3-7）：** 经 `checkpoint_use_case`（:2496）直创一条 checkpoint 后，以大写 `--plan-id` 形态执行 `checkpoint list` 断言命中
+- [x] 大写 UUID 输入 → 归一后真实查询命中（非静默空态）验收场景——**前置数据链（CR6 换域改造）：** 经 document 域真实 upload（零 LLM 依赖）产出 document_id 后，以大写 `--id` 形态执行 `document parse --format json` 断言 `parse_status=completed`+`document_id` 归一小写形态（锚同一 canonical_uuid 实体族守卫——R5-3 点名 document parse --id 属实体族；原 R3-7 的 checkpoint 前置因创建链 OD-12 压缩强制环节依赖 LLM 而在无 Key 环境连带 skip，本清偿面曾零验收覆盖——换域后无 Key 环境可跑，miss 形态合成 FAILED 文档的 parse_status 即判别锚）
 - [ ] 非 UUID → plan-id 族 EXCEPTION_242 / agent-id 族 EXCEPTION_201，均 exit 1
 - [ ] 单测断言 main_cli 中 load_dotenv 先于 bootstrap 调用（顺序守卫）
 - [ ] 非法 `--format`/`--mode` 值 → exit 2
@@ -1014,6 +1016,16 @@ src 面（20 文件）：
 - [x] 多租户 CLI 切换（SISYS_TENANT_ID env）→ 7-4 config 命令组域（YAGNI）
 
 > **R1/C3 评审改判记录（评审否决的修复方向）：** F7a（slug 改直查 get_tool(tool_name=)）被双评审员一致否决——若落码即引入 P0 回归（slug≠tool_name 的工具直查必 miss）；F6 改码部分收缩为空集（base.py:86 守卫实测已全命令统一）。C1 报告两项前提被评审实测推翻（「checkpoint list --yes 静默通过」不成立/「SLUG_TO_TOOL_ID 自创双源」不成立）——评审员否决权与实测定谳的价值实证。
+
+#### 收敛后追加固化 CR6（2026-11-21，用户授权选项 1：skip 面治理）
+
+- [x] CR6-1 大写 UUID 归一场景换 document 域前置：原 checkpoint 前置（创建链 OD-12 压缩强制环节依赖 LLM → 无 Key 环境连带 skip，6.9-R1-DF1 清偿面曾零验收覆盖）→ 换 document 真实 upload（零 LLM）+ 大写 `--id` parse，断言升级 `parse_status=completed`+`document_id` 归一小写（miss 形态合成 FAILED 文档的状态即判别锚——比原「CP-1 in stdout」更强的归一命中证明）；验收 21+2 skip → **22 passed+1 skip**
+- [x] CR6-2 验收 given 租户分叉修复（**预存缺陷①**，强断言暴露）：given upload 用 `cli-acceptance` vs CLI 常量 `cli-default` → find miss → 既有「文档解析真实链」场景一直是 miss 形态假绿（弱断言 exit 0 恒真从未暴露）——given 租户对齐 `cli-default`（与集成侧一致，teardown 按 id 删租户无关，既有场景零破坏且从假绿变真实绿）
+- [x] CR6-3 OCR 增强 mime 门控修复（**预存生产缺陷②**，强断言暴露）：`_apply_ocr` 缺「仅 PDF」门控（兄弟 `_apply_layout/_apply_table_detection` 均有）——md/txt 短文本页字符数 <50 被 `detect_scanned_pages` 误判扫描页 → 进 OCR recognize 抛 OCRProcessingError → 非 PDF 文档在 OCR 端口注入环境解析恒 FAILED；补 `application/pdf` 门控一行（既有 OCR 测试面全用 PDF，38 passed 零回归）
+- [x] Skip 口径归类勘正：checkpoint 族两场景 skip 归「创建链 OD-12 压缩依赖连带」非「AC-2 钦定 LLM 面」（AC-2 节注记）+解耦归宿 deferred 登记
+- 验证：四目录全量 **15583 passed + 4 skipped** 零失败（基线 15581+大写转绿+新增 1）+ruff/mypy 全绿
+
+> **CR6 方法论注记：** 弱断言（exit 0 恒真）掩盖「场景从未真正走通」的两层实证——既有解析场景 miss 假绿（租户分叉）+非 PDF 解析恒 FAILED（OCR 门控缺失）均被强断言一次暴露；「换域改造」的断言升级是发现预存缺陷的探针。
 
 #### 代码审查周期收敛声明（R5 终审产出，CR5）
 

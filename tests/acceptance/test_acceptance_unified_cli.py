@@ -471,7 +471,7 @@ def document_uploaded_via_real_service(context: dict[str, Any]):
             filename=Path(context["temp_file"]).name,
             mime_type="text/markdown",
             file_size_bytes=Path(context["temp_file"]).stat().st_size,
-            tenant_id="cli-acceptance",
+            tenant_id="cli-default",
             uploaded_by="cli-acceptance",
             file_path=context["temp_file"],
             metadata={
@@ -850,10 +850,10 @@ def test_non_uuid_guard_dual_contract(context: dict[str, Any]):
     pass
 
 
-@when("执行大写 PlanID 的 Checkpoint 清单命令")
-def execute_checkpoint_list_uppercase_plan_id(context: dict[str, Any]):
-    """执行 checkpoint list --plan-id <大写UUID>。"""
-    _invoke_cli(context, ["checkpoint", "list", "--plan-id", context["plan_id_upper"]])
+@when("执行大写文档标识的解析命令")
+def execute_document_parse_uppercase_id(context: dict[str, Any]):
+    """执行 document parse --id <大写UUID>（document 域前置——零 LLM 依赖，CR6 换域改造）。"""
+    _invoke_cli(context, ["document", "parse", "--id", context["document_id"].upper(), "--format", "json"])
 
 
 @when("执行非 UUID PlanID 的 Checkpoint 清单命令")
@@ -868,10 +868,16 @@ def execute_plan_generate_non_uuid_agent_id(context: dict[str, Any]):
     _invoke_cli(context, ["plan", "generate", "--agent-id", "not-a-uuid", "--task", "分析"])
 
 
-@then("输出包含 Checkpoint 清单命中")
-def verify_checkpoint_list_hit(context: dict[str, Any]):
-    """验证大写 --plan-id 归一命中 CP-1（非静默空态——与存量宽松守卫对照）。"""
-    assert "CP-1" in context["cli_stdout"], f"大写 --plan-id 未归一命中 CP-1: {context['cli_stdout']!r}"
+@then("输出包含解析命中状态")
+def verify_document_parse_hit_status(context: dict[str, Any]):
+    """验证大写 --id 归一命中真实文档（parse_status=completed——miss 形态返回合成 FAILED 文档，状态即判别锚）。"""
+    payload = _parse_json_payload(context)
+    assert payload.get("parse_status") == "completed", (
+        f"大写 --id 未归一命中（miss 形态 parse_status=failed 合成文档）: {context['cli_stdout']!r}"
+    )
+    assert payload.get("document_id") == context["document_id"], (
+        f"document_id 未归一为 canonical 小写形态: {payload.get('document_id')!r}"
+    )
 
 
 # ===================================================================
