@@ -19,7 +19,7 @@
 - **Epic 定位：** Epic 7（多触点用户界面与 API 集成）第二 Story，P0-2 优先级。与 7-1（CLI）并行依赖关系（epics:2577——仅依赖 Epic 1 Story 1.1）。覆盖 FR-UI-02（prd.md:1932，P0）+ NFR-IF-05（OpenAPI 3.1 契约测试通过率 100%）。
 - **价值组：** 多触点操作与监控能力——第三方系统经 REST API 集成 sisys。
 - **现状缺口（四调研 Agent 实测，2026-11-21 时点）：**
-  1. **auth 路由存在但未挂载**（`src/interfaces/api/auth.py:198` `create_auth_router` 完整实现 login/refresh/logout/me/roles，`src/entrypoints/api_app.py:75-81` 仅挂 7 router——登录端点不可达，deferred-work:115 钦定「最大单点风险」）；同批未挂载：audit（:124）/crawler（:108）/monitoring（:19）/equilibrium_security（:160，依赖 3 个失效 impl 不可挂载）。
+  1. **auth 路由存在但未挂载**（`src/interfaces/api/auth.py:198` `create_auth_router` 完整实现 login/refresh/logout/me/roles，`src/entrypoints/api_app.py:75-81` 仅挂 7 router——登录端点不可达，deferred-work:115 钦定「最大单点风险」）；同批未挂载：audit（:124——5 端点零 Depends）/crawler（:108——**4 端点零 Depends 且工厂无认证参数**[R6 实证]）/monitoring（:19——metrics 零认证既有形态）/equilibrium_security（:160，依赖 3 个失效 impl 不可挂载）。
   2. **三大端点族 REST 面为零**：plan（generate/状态查询/导出）、checkpoint（list/show/recover）、agent（run）——interface-design §8.2 钦定 P0 端点无任何 REST 实现。
   3. **tools 路由缺执行面**：`tools.py` 仅版本管理族六端点（versions 注册/列表/publish/rollback/abort-canary/traffic），缺 §8.2.2 钦定的 `/{tool_id}/execute` 与 `/{tool_id}/schema` 两个 P0 端点。
   4. **document 路由缺 parse/versions**：`document_upload.py` 有上传族，缺 `/{id}/parse`、`/{id}/versions`（§8.2.1 钦定的 `/{id}/trace` 因端口域现实迁 plans 域承载——OD-10；既有 `GET /api/v1/search/trace/{document_id}`[引文查询，traceability.py:155] 承载 document 域溯源查询面）。
@@ -36,7 +36,7 @@
 **When** 应用启动（lifespan bootstrap → 中间件 → router 挂载）
 **Then** 挂载契约生效：
 - 既有 7 router（archive/summary/evaluate/trace/document_dictionary/document_upload/tools 版本面）零回归零改动
-- **4 个既有 router 挂载激活**：auth（`create_auth_router` auth.py:198——POST /api/v1/auth/login 等端点族可达）、monitoring（`create_metrics_router` monitoring.py:19——router 自身无 prefix、metrics_path 参数默认 `/metrics`，**挂载形态冻结**：`include_router(..., prefix="/api/v1/system")` 拼装为 `/api/v1/system/metrics`）、crawler（crawler.py:108，prefix 已带 `/api/v1/crawler` 零处理）、audit（audit.py:124——**前缀统一** `/audit`→`/api/v1/audit` + **认证实质改造**：get_current_user 参数现有但全部端点零 `Depends` 挂载[R1 实证]，须逐端点签名补挂，见 AC-3）
+- **4 个既有 router 挂载激活**：auth（`create_auth_router` auth.py:198——POST /api/v1/auth/login 等端点族可达）、monitoring（`create_metrics_router` monitoring.py:19——router 自身无 prefix、metrics_path 参数默认 `/metrics`，**挂载形态冻结**：`include_router(..., prefix="/api/v1/system")` 拼装为 `/api/v1/system/metrics`）、crawler（crawler.py:108，prefix 已带 `/api/v1/crawler`；**认证实质改造[R6 实证]**：4 端点[submit_task/get_task_status/cancel_task/list_supported_formats]零 get_current_user 零 Depends 且工厂连认证参数都无[create_crawler_router 仅 get_crawler_client 参数]——挂载即激活未认证 POST 任务提交面，须加工厂认证参数+逐端点补挂，对齐 audit 待遇，见 AC-3）、audit（audit.py:124——**前缀统一** `/audit`→`/api/v1/audit` + **认证实质改造**：get_current_user 参数现有但全部端点零 `Depends` 挂载[R1 实证]，须逐端点签名补挂，见 AC-3）
 - **equilibrium_security 不挂载**（defer——3 个 impl 字符串指向不存在类，deferred-work:126 等保接线专项；OD-6 登记）
 - **新增 system 路由**：GET `/api/v1/system/health`（轻量存活探测——返回 `{"status": "ok", "version": ...}` 形态，不连真实存储；**version 来源钦定**：`importlib.metadata.version("sisys")` 装配期解析[取不到则常量兜底——dev 实测裁定]，R3 补决策点；认证豁免面，见 AC-3）
 - 中间件链顺序保持现状（SessionMiddleware → ExceptionContextMiddleware，api_app.py:62-63）+ `register_exception_handlers` 零改动
@@ -53,16 +53,16 @@
 **Given** 系统真实服务（PG/Redis 等）可用且组合根 bootstrap 完成
 **When** 依次调用新增 P0 端点族
 **Then** 端点正确路由→消费端口→返回结构化响应（端点冻结矩阵见 SDD 节 SSOT 表）：
-- `POST /api/v1/documents/{document_id}/parse` → `document_parsing_service`（:1377）→ 解析后 Document 元数据
+- `POST /api/v1/documents/{document_id}/parse` → `document_parsing_service`（:1377）→ 解析后 Document 元数据（**响应序列化注记[R6]**：Document 含 embedding 向量字段 list[float]|None——响应 Schema 剔除向量字段[体积+向量面外泄]）
 - `GET /api/v1/plans/{plan_id}/trace` → `traceability_tree_use_case`（:2065，`execute(*, plan_id: str, depth: int = 4)`——plan 域溯源树；**SINGLETON→SCOPED 双对象迁移本 Story 承载**[service :2036+use_case :2065，AC-7]）→ 溯源树视图（**域迁注记 OD-10**：interface-design §8.2.1 钦定 `/documents/{id}/trace` 但仓内零 document 域溯源树端口——7-1 OD-8 端口签名现实层优先原则，CLI `trace-tree --plan-id` 先例同域对齐；**语义分立注记**：与既有 `GET /api/v1/search/trace/{document_id}`[引文查询——3-8 高保真溯源消费面] 不同源不同义，CLI archive query 同款注记形态）
 - `GET /api/v1/documents/{document_id}/versions` → `document_repository`（:1180 `list_versions`）→ 版本列表
 - `POST /api/v1/tools/{slug}/execute` → slug 解析链（`skill_manifest.SLUG_TO_TOOL_ID` SSOT → `get_tool(tool_id=)`——7-1 冻结链复用）→ `tool_execution_service`（:2747）→ ToolResult
 - `GET /api/v1/tools/{slug}/schema` → `tool_registry_service`（:2604）+ `skill_loader`（:2881）→ 含 `input_examples` 的 schema
-- `POST /api/v1/agents/{agent_id}/run` → `agent_workflow_use_case`（:3184，`execute(agent_id: UUID, task: str)`）→ AgentWorkflowResult（真实 LLM 面动态 skip——无 Key 环境 `pytest.skip()`，7-1 同款）
+- `POST /api/v1/agents/{agent_id}/run` → `agent_workflow_use_case`（:3184，`execute(agent_id: UUID, task: str)`）→ AgentWorkflowResult（真实 LLM 面动态 skip——无 Key 环境 `pytest.skip()`，7-1 同款；agent 不存在→AgentNotFoundError 443→404 用例首步自抛[R6 注记]；**深嵌套序列化注记[R6]**：含 ChainOfThought+TaskEvidencePackage——响应字段子集 dev 按可观测需要裁定）
 - `POST /api/v1/plans/generate` → `blm_planning_use_case`（:3524，`execute(agent_id, task, plan_id=None)`——**plan_id 为 str 非 UUID**）→ BlmPlanningResult（LLM 面动态 skip）
 - `GET /api/v1/plans/{plan_id}` → `blm_planning_status_use_case`（:3548，`execute(plan_id: str) -> BlmPlanningStatus`——**6.1-DF5 首激活清偿**）
-- `POST /api/v1/plans/{plan_id}/export` → `report_generation_use_case`（:3610，markdown）/ `pdf_report_generation_use_case`（:3714，pdf；`format` query 参数分派）——**6.5a-DF1 清偿**
-- `GET /api/v1/checkpoints?plan_id={uuid}` → `checkpoint_list_use_case`（:2530）→ CheckpointSummaryView 列表
+- `POST /api/v1/plans/{plan_id}/export` → `report_generation_use_case`（:3610，markdown）/ `pdf_report_generation_use_case`（:3714，pdf；`format` query 参数分派）——**6.5a-DF1 清偿**；**响应语义定谳[R6]**：StrategicReport 元数据 JSON（report_id/file_path/section_count——StrategicReport 为纯元数据实体无内容字段；file_path 为 L0 逻辑路径集成方不可直读，非文件流下载；文件内容获取面 OD-18 登记）
+- `GET /api/v1/checkpoints?plan_id={uuid}` → `checkpoint_list_use_case`（:2530）→ CheckpointSummaryView 列表（**分页 YAGNI 注记[R6]**：plan 内 checkpoint 上限 8 条[CP-1..CP-8 编号体系]且端口签名无分页参数——不加 limit/offset）
 - `GET /api/v1/checkpoints/{plan_id}/{checkpoint_no}` → `checkpoint_recovery_use_case`（:2514 预览面，`execute(*, plan_id, checkpoint_no)` 两参必填——7-1 R5 终审方案 a 口径）
 - `POST /api/v1/checkpoints/recover`（body：plan_id + checkpoint_no + mode? + confirmed_by?）→ `checkpoint_recovery_execute_use_case`（:2542；**created_via 固定传 "api"**——7-1 R4-2 同款触发源审计标识；confirmed_by 缺省取认证用户标识——REST 面有真实身份，优于 CLI 缺省取 session；**recover 后再 list/status 的期望留白[R3 注记]**：dev 设计自由，建议验收场景含 recover 后 checkpoint list 复核）
 - `GET /api/v1/archive/query?plan_id={uuid}` → `blm_chain_trace_use_case`（:2573）→ BLM 链路追溯视图（**语义注记**：与既有 `GET /api/v1/archive/plans/{plan_id}`[strategic_archive 档案条目查询，:2405 族] 不同源不同义——CLI archive query 同款消费面）
@@ -79,15 +79,16 @@
 **When** 请求到达 7-2 全部新增端点
 **Then** 认证契约生效：
 - **全部新增端点必须挂 `get_current_user` dependency**（复用 `get_current_user_dependency(auth_service)` 工厂或 `get_current_user_override` 注入形态——单测/验收 override 注入 TokenPayload，集成面真实 JWT）
-- **认证豁免面冻结（仅 2 类）**：`POST /api/v1/auth/login`（登录本身）+ `GET /api/v1/system/health`（存活探测）；openapi.yaml 中豁免端点不加 security 声明，其余全部 `security: OAuth2: []`
+- **认证豁免面冻结（三态口径[R6 勘正]）**：①设计豁免 2 面——`POST /api/v1/auth/login`（登录本身）+ `GET /api/v1/system/health`（存活探测）；②既有形态豁免 1 面——`GET /api/v1/system/metrics`（monitoring router 零认证既有形态[R6 实证：get_metrics 无 Depends]——Prometheus 抓取形态，加认证需部署面协同[scrape bearer/网络隔离归 7-3 Gateway，OD-8 关联]，本 Story 不动其认证）；③既有弱形态注记（auth.py 既有语义如实登记，收口归 7-3）——refresh 凭 refresh_token 自凭证换发（无 get_current_user，业界正当形态）、logout 无 token 时静默 204 非 401（`Depends(oauth2_scheme)+if token:` 弱凭证）；openapi.yaml 中设计豁免端点显式写 `security: []`（防未来全局 security 引入时豁免面漂移——R6 措辞钦定），其余新增 path 全部 `security: OAuth2: []`；本 AC 的 401 断言限定「受保护端点」（豁免/弱形态面不写 401 期望——防矩阵误判）
 - 无 token / 伪造 token / 过期 token → 401 + `WWW-Authenticate` 头（AuthenticationError→ExceptionHandlers 既有映射）
-- **login 端到端链**：POST /auth/login（真实 `auth_service` :514——AuthServiceImpl+JWTService 既有实现零新建）→ AuthTokens → 携带 Bearer token 访问受保护端点成功
+- **login 端到端链**：POST /auth/login（真实 `auth_service` :514——AuthServiceImpl+JWTService 既有实现零新建）→ AuthTokens → 携带 Bearer token 访问受保护端点成功（**login 为 JSON body**[LoginRequest pydantic——auth.py 既有形态]非 OAuth2 表单——yaml flows 写法按既有 application/json 契约形态[R6 注记]）
 - **audit 路由认证补挂**：`create_audit_router`（audit.py:124）的 `get_current_user` 现为可选参数**且全部端点零 `Depends` 挂载（R1 实证：参数声明之外全文件零使用）——须逐端点签名补挂 `Depends(get_current_user)`（5 端点实质改造，Task 1 承载）**
+- **crawler 路由认证补挂（R6 勘正）**：`create_crawler_router`（crawler.py:108）**连 get_current_user 工厂参数都无**且 4 端点零 `Depends`（submit_task :135/get_task_status :172/cancel_task :209/list_supported_formats :238——挂载即激活未认证 POST 任务提交面，违 CLAUDE.md「所有 API 路由必须过认证」硬约束）——须加工厂认证参数+4 端点补挂（对齐 audit 待遇，Task 1 同批承载）
 - 权限不足 → 403（PermissionDenied→403 既有映射；RBAC 深度面归 7-3/存量 roles 端点，本 Story 仅断言映射正确性）
 
 **验证标准/Validation Criteria:**
 - [ ] 架构测试断言：新增全部端点 handler 挂认证 dependency（AST/依赖检查——test_arch_rest_api.py）
-- [ ] 无 token → 401 矩阵断言（抽查每端点族 ≥1 端点）
+- [ ] 无 token → 401 矩阵断言（抽查每端点族 ≥1 **受保护**端点——豁免面 login/health 与既有形态豁免 metrics 不适用[R6 口径]）
 - [ ] login→token→受保护端点访问链集成测试全绿（真实 auth_service+真实 user 仓储；测试用户 teardown 定向清理）
 - [ ] OAuth 2.1 统一认证体系/令牌桶限流/注入检测**不在本 Story**（7-3 边界——epics:2693-2733 Story 7.3 四能力 + ADR-010；7-2 仅基础认证）
 
@@ -98,14 +99,14 @@
 **Then** 错误响应契约生效（sisys-uni-exception-design §响应体规范）：
 - 响应体结构：`{"error": {"code": "EXCEPTION_NNN", "message": "...", "context": {...}}, "request_id": "..."}`
 - 响应头：`X-Error-Code` + `X-Request-ID`（ExceptionContextMiddleware 从请求头取/生成 request_id——既有机制）
-- 关键映射断言：NotFound→404（documents/{id} 不存在——**端点层前置查询锚定**：parse/versions 端点先经 `document_repository.find(DocumentQuery)`（tenant_id 过滤）查存在性，None→端点 raise NotFoundError→404；端口层宽语义不承担 404 契约[parse_document 文档不存在返回合成 FAILED Document——document_parsing_service.py:121-128；list_versions 租户不匹配返回 []——impl :226-227，均 R1 实证]；plans/{plan_id} 状态无记录）、Conflict→409（BLM 并发守卫 482）、EntityValidation 242→400、Validation 201→400、AuthenticationError→401、PermissionDenied→403、BusinessRuleViolation→422
+- 关键映射断言：NotFound→404（documents/{id} 不存在——**端点层前置查询锚定**：parse/versions 端点先经 `document_repository.find(DocumentQuery)`（tenant_id 过滤）查存在性，None→端点 raise NotFoundError→404；端口层宽语义不承担 404 契约[parse_document 文档不存在返回合成 FAILED Document——document_parsing_service.py:121-128；list_versions 租户不匹配返回 []——impl :226-227，均 R1 实证]；plans/{plan_id} 状态无记录**实为 PlanningNotFoundError 480→404[R6 勘正——非泛 NotFound 202，用例自抛 get_blm_planning_status.py:66]**）、Conflict→409（BLM 并发守卫 482）、EntityValidation 242→400、Validation 201→400、AuthenticationError→401、PermissionDenied→403、BusinessRuleViolation→422；**404 首要路径三锚注记[R6]**：未知 slug→ToolNotFoundError 380、agent 不存在→AgentNotFoundError 443（均既有映射，见异常消费表）；**423 行注记[R6]**：login 连败锁定映射（exception_handlers.py:407-420 既有）不单列验收场景
 - Pydantic 请求体校验失败 → 422 RequestValidationError（ExceptionHandlers 既有四注册之一）
 - **零新增领域异常**（REST 是接口层薄壳，EXCEPTION_HTTP_MAP 全覆盖——异常消费表见 SDD 节）
 
 **验证标准/Validation Criteria:**
-- [ ] 404/401/409/422 四态验收场景（资源不存在/无 token/并发冲突/请求体缺字段）——响应体三字段+双头断言（**断言形态先实测锚定**——7-1 CR3 教训：ExceptionHandlers 实际响应体形态以实测为准再冻结断言；**AC-4×2 场景分组建议[R3]**：404+422 同场景[请求校验族]/401+409 同场景[认证与并发族]——dev 可调）
+- [ ] 404/401/409/422 四态验收场景（资源不存在/无 token/并发冲突/请求体缺字段）——响应体三字段+双头断言（**断言形态先实测锚定**——7-1 CR3 教训：ExceptionHandlers 实际响应体形态以实测为准再冻结断言；**AC-4×2 场景分组建议[R3]**：404+422 同场景[请求校验族]/401+409 同场景[认证与并发族]——dev 可调；**404 锚定对象三选一注记[R6]**：documents find None/未知 slug 380/agent 不存在 443）
 - [ ] 单测矩阵：领域异常族→HTTP 状态码逐一断言（test_exception_handlers.py 既有文件扩展或新文件）
-- [ ] 错误消息不泄露堆栈/SQL（消息安全性——既有契约复验）
+- [ ] 错误消息不泄露堆栈/SQL（消息安全性——**新增断言[R6 勘正：全仓零既有承载，「既有契约复验」前提失实]**：主路径 to_dict 三字段断言无堆栈/SQL 子串；fallback 分支 str(exc)[:500]+cause 的 str(cause) 直透泄露面登记 OD-17 专项加固，本 Story 不动生产行为）
 
 ### AC-5: 租户契约（X-Tenant-ID）
 
@@ -128,7 +129,7 @@
 **Then** 契约治理生效：
 - **新增 14 个 path 补入 openapi.yaml**：/documents/{document_id}/parse、/documents/{document_id}/versions、/plans/{plan_id}/trace、/tools/{slug}/execute、/tools/{slug}/schema、/agents/{agent_id}/run、/plans/generate、/plans/{plan_id}、/plans/{plan_id}/export、/checkpoints、/checkpoints/{plan_id}/{checkpoint_no}、/checkpoints/recover、/archive/query（13 域 path——R1 勘正补入 /archive/query）+ /system/health（**新增**——R1 勘正：yaml 既有 `/health` 实为 embedding API server 契约[tags [embedding]+EmbeddingHealthResponse，:1031-1050]，消费方 `test_api_contract_embedding.py:34` 断言存在，**原样保留不改名**；本 Story /system/health 以新 path 入 yaml）——**path 不带 /api/v1 前缀**（servers 已含——新增 path 按规范形态写；注记：yaml 既有 /api/v1/search×3 自带前缀与 servers 拼接构成双前缀预存怪癖，预存不一致归 OD-5 契约治理专项不动）
 - **漂移修正（仅一处，存量其余漂移 defer）**：`/documents` GET 列表 yaml 有而实现无——裁定从 yaml 删除（无实现契约即死契约；OD-5 登记；R1 实测 grep 零契约消费方，删除零波及）
-- 新增 path 全部含 OpenAPI 3.1 契约要素：operationId/请求体 Schema/响应 Schema/错误响应（401/404/422 引用 components）/security 声明（豁免面除外）
+- 新增 path 全部含 OpenAPI 3.1 契约要素：operationId/请求体 Schema/响应 Schema/错误响应（401/404/422 引用 components）/security 声明（豁免面除外）；**成功状态码钦定[R6]**：新增端点成功响应全部 200（动作执行/查询语义非资源创建——yaml 既有 201 仅资源创建型先例[创建快照/创建角色]，本 Story 13 端点无资源创建型；既有 crawler POST /tasks 201 不动）；**豁免端点显式 `security: []` 写法**（防全局 security 引入时豁免面漂移——R6 措辞，见 AC-3 三态口径）
 - API 契约测试（`tests/contracts/test_api_contract_rest_api.py`）双形态对齐先例：yaml 消费型（`read_from_filename` + `openapi_spec_validator.validate` + expected_paths 断言）+ TestClient 行为型（端点存在性+响应格式——test_api_contract_document_upload.py:79-162 先例；**行为型按端点 Task 逐族补入——R3 拆分定谳**：Task 0 仅 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 落地）
 - **Schemathesis 深度契约测试归 Story 7-6**（schemathesis ^3.19 已在 dev 依赖但零使用——7-2 不启用，7-6 专项承载；epics NFR 覆盖注记）
 
@@ -184,7 +185,7 @@
 - [ ] 核验：`configs/event_channels.yaml` 与 `ChannelRouter.DEFAULT_MAPPINGS` 零 diff
 
 #### 数据模型 (Data Models)
-- [ ] **请求/响应 Pydantic Schema**：新增端点族各定义请求体（PlanGenerateRequest{agent_id, task, plan_id?}/CheckpointRecoverRequest{plan_id, checkpoint_no, mode?, confirmed_by?}/ToolExecuteRequest{input_data, session_id?, cost_budget?} 等）与响应 Schema（对齐用例返回类型字段——BlmPlanningStatus/CheckpointSummaryView/ToolResult 序列化形态）——文件位 `src/interfaces/api/` 各域路由文件内或 `schemas` 集中（**裁定：随域路由文件内聚定义**，对齐存量 auth.py/tools.py 内聚先例；architecture.md:2143-2153 钦定的 v1/schemas/ 目录结构 defer——存量平铺形态现实层优先，OD-4 登记）
+- [ ] **请求/响应 Pydantic Schema**：新增端点族各定义请求体（PlanGenerateRequest{agent_id, task, plan_id?}/CheckpointRecoverRequest{plan_id, checkpoint_no, mode?, confirmed_by?}[用例另有 correction: CorrectionRecord|None 缺省 None——REST 请求体静默裁剪注记，R6]/ToolExecuteRequest{input_data, session_id?, timeout?}——**cost_budget 删除[R6 勘正]**：ToolCall 四键/ExecutionContext 六键均无该字段无透传落点（CLI 侧 CommandContext 预算台账是另一体系，禁塞 extensions——发明语义），timeout→ExecutionContext.timeout_sec 为合法可选映射[dev 裁定] 等）与响应 Schema（对齐用例返回类型字段——BlmPlanningStatus/CheckpointSummaryView/ToolResult 序列化形态）——文件位 `src/interfaces/api/` 各域路由文件内或 `schemas` 集中（**裁定：随域路由文件内聚定义**，对齐存量 auth.py/tools.py 内聚先例；architecture.md:2143-2153 钦定的 v1/schemas/ 目录结构 defer——存量平铺形态现实层优先，OD-4 登记）
 - [ ] **统一错误响应模型**：新增端点错误响应统一 import 共享 ErrorResponse（`src/interfaces/api/shared_models.py:12` 唯一定义——R1 勘正：sisys-uni-exception-design「5 文件重复应合并」债务**已清偿**[设计文档 :30 标注 ✅]，auth/equilibrium_security 等均 import 共享；零新建零收敛动作）
 - [ ] UUID/Decimal/datetime 序列化：Pydantic jsonable_encoder 既有机制（FastAPI 内建）——无需 CLI 侧 default=str 等价特判（框架红利注记）
 
@@ -205,7 +206,7 @@
 | agent | run | `agent_workflow_use_case`（:3184） | execute(agent_id: UUID, task: str) —— **agent_id 非 role**（OD-1） |
 | plan | generate | `blm_planning_use_case`（:3524） | execute(agent_id: UUID, task: str, plan_id: str \| None = None) —— **plan_id 为 str** |
 | plan | status | `blm_planning_status_use_case`（:3548） | execute(plan_id: str) -> BlmPlanningStatus —— **6.1-DF5 首激活** |
-| plan | export | `report_generation_use_case`（:3610）+ `pdf_report_generation_use_case`（:3714） | execute(*, plan_id: str) / (+brand_template_name) —— **6.5a-DF1 清偿** |
+| plan | export | `report_generation_use_case`（:3610）+ `pdf_report_generation_use_case`（:3714） | execute(*, plan_id: str) / (+brand_template_name) —— **6.5a-DF1 清偿**；响应=StrategicReport 元数据 JSON（R6 定谳） |
 | checkpoint | list | `checkpoint_list_use_case`（:2530） | execute(*, plan_id) -> list[CheckpointSummaryView] |
 | checkpoint | show | `checkpoint_recovery_use_case`（:2514 预览面） | execute(*, plan_id, checkpoint_no) 两参必填 |
 | checkpoint | recover | `checkpoint_recovery_execute_use_case`（:2542） | execute(*, plan_id, checkpoint_no, correction=None, mode=None, confirmed_by="", created_via="use_case")——confirmed_by 空串 242；**REST 端点显式传 created_via="api"**（覆盖 use_case 缺省）/confirmed_by 取认证用户标识（覆盖空串缺省） |
@@ -224,11 +225,14 @@
 
 > **原则**：异常是领域契约的一部分。本 Story 新增/修改的领域异常必须在 Task 0 中完成设计，禁止在实现 Task 中临时定义。
 
-- [ ] **本 Story 零新增领域异常**（`src/domain/exceptions/` 零 diff）——消费既有异常体系，经 EXCEPTION_HTTP_MAP（exception_handlers.py:160）自动映射：
+- [ ] **本 Story 零新增领域异常**（`src/domain/exceptions/` 零 diff）——消费既有异常体系（**消费面 10 行——R6 扩**：补登 PlanningNotFound 480/ToolNotFound 380/AgentNotFound 443 三行既有异常，均为端点首要 miss 态），经 EXCEPTION_HTTP_MAP（exception_handlers.py:160）自动映射：
 
 | 异常 | code | HTTP | 触发场景（本 Story） |
 |------|------|------|---------------------|
-| `NotFoundError` | EXCEPTION_202 | 404 | documents/{id} 不存在（parse/versions **端点层 find() 前置查询锚定**——端口宽语义不承担，AC-4）/plans/{plan_id} 状态无记录 |
+| `NotFoundError` | EXCEPTION_202 | 404 | documents/{id} 不存在（parse/versions **端点层 find() 前置查询锚定**——端口宽语义不承担，AC-4） |
+| `PlanningNotFoundError` | EXCEPTION_480 | 404 | plans/{plan_id} 状态无记录——用例自抛（get_blm_planning_status.py:66），映射 exception_handlers.py:314（**R6 勘正**：原表归 NotFound 202 错位——断言 error.code 须精确 480） |
+| `ToolNotFoundError` | EXCEPTION_380 | 404 | /tools/{slug} 未知 slug——get_tool_id miss 返 None（skill_manifest.py:49）**端点自 raise ToolNotFoundError**（与仓储 get_by_id miss 同码一致，映射 :256；**R6 补行**——注意其继承 NotFoundError 但 code 独立，断言须精确 380） |
+| `AgentNotFoundError` | EXCEPTION_443 | 404 | /agents/{agent_id} 不存在——用例首步 get_by_id None 自抛（run_agent_workflow.py:134，映射 :295；**R6 补行**） |
 | `ValidationError` | EXCEPTION_201 | 400 | 请求语义校验（用例层透传） |
 | `EntityValidationError` | EXCEPTION_242 | 400 | checkpoint recover confirmed_by 空串（:2542 用例守卫）/plan_id 值域（用例层共面守卫——6.9-R1-DF1 共面注记） |
 | `AuthenticationError` | EXCEPTION_401 族 | 401 | token 缺失/伪造/过期（get_current_user 守卫） |
@@ -283,7 +287,7 @@
 **BDD 步骤实现约束：**
 - 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试；**禁 `@pytest.mark.asyncio`**（context 数据丢失）
 - **R6 模板对齐七要点**（模板 test_acceptance_postgresql_relational_layer.feature/.py + 7-1 R6 实战）：①`# language: zh-CN` 头+功能/背景块；②场景按 AC 三行横幅注释分节；③场景命名中文短句无 AC 前缀（条件-结果命名法）；④步骤文本纯中文业务语言+参数内嵌（**禁引号字面量/parsers.re**）；⑤`@scenario` 显式逐场景绑定（**禁 scenarios() 自动绑定**——pytest-bdd 双收集陷阱）；⑥fixture 驱动分区结构+文件头 docstring（Story 号+真实服务声明+运行命令+租户隔离说明）；⑦共享 dict 跨步状态（response: dict[str, Any] fixture）
-- **HTTP 级装配形态**（test_acceptance_document_upload.py:49-78 先例）：`test_client` fixture 装配链=裸 FastAPI → add ExceptionContextMiddleware → register_exception_handlers → **路由工厂 DI**（服务 AsyncMock/真实实例注入）→ include_router → TestClient；认证 override（`get_current_user_override` 返回固定 TokenPayload）；`X-Tenant-ID` header 承载租户
+- **HTTP 级装配形态**（test_acceptance_document_upload.py:50-78 先例[R6 勘正起点行]）：`test_client` fixture 装配链=裸 FastAPI → add ExceptionContextMiddleware → register_exception_handlers → **路由工厂 DI**（服务 AsyncMock/真实实例注入）→ include_router → TestClient；认证 override（`get_current_user_override` 返回固定 TokenPayload）；`X-Tenant-ID` header 承载租户
 - **真实服务面**：验收对真实可达面（health/login 链/document parse 真实链/checkpoint 族/plan 状态/export）走真实服务+动态 skip（`_require_services` 形态探活——CI root 恒 skip 教训 efd0f11d）；纯 HTTP 适配层断言（路由/状态码/错误体）可用 AsyncMock 子模式（CLAUDE.md 验收强制真实服务的例外=HTTP 适配层既定子模式，记忆 acceptance_test_patterns 口径）
 - **延迟 import 纪律**：新交付模块一律步骤函数体内 import（收集期零 error，红形态=运行期 ImportError）
 - **teardown**：真实服务面创建的资源（PG 行/测试用户/L0 文件）定向清理（「断言失败也执行」）
@@ -305,7 +309,7 @@
 | 7 | 6.1-DF4 BLM 租户维度（:329） | **顺延** | 7-2 仅 X-Tenant-ID header 透传面（AC-5）；多租户贯通归 V1 Story |
 | 8 | 6.1-DF7③ 错误响应设计（:332） | **触发注记** | 7-2 错误响应体含 context 字段（失败信息不丢失面）；①②残余归可观测性专项维持 |
 | 9 | 6.3-R1-DF2 stage_id 值域（:349） | **顺延** | 7-2 端点面不引入 stage_id 参数（checkpoint 入参=plan_id+checkpoint_no 复合定位） |
-| 10 | :115 create_app 5 router 未挂载 | **触发，7-2 清偿（4/5）** | auth/monitoring/crawler/audit 挂载（AC-1——audit 含 5 端点认证实质改造+monitoring 挂载形态冻结）；equilibrium_security defer（3 失效 impl——:126 等保专项，OD-6） |
+| 10 | :115 create_app 5 router 未挂载 | **触发，7-2 清偿（4/5）** | auth/monitoring/crawler/audit 挂载（AC-1——audit 5+crawler 4 端点认证实质改造[R6 勘正：crawler 连工厂认证参数都无]+monitoring 挂载形态冻结）；equilibrium_security defer（3 失效 impl——:126 等保专项，OD-6） |
 | 11 | :116 exception_metrics 未接线 | **顺手清偿或注记** | 一行接线成本（register_exception_handlers 传 metrics）；dev Task 1 实测裁定（metrics 端口可用即接线） |
 | 12 | :125/:129 三向定夺（StrategicAnalysisUseCase/orchestration_service/data_pipeline） | **触发，Task 0 定夺承载（R1 预判改判：defer 为大概率落点）** | 7-2 端点矩阵零消费三者；R1 实测引用面：StrategicAnalysisUseCase src 仅 2 处 docstring 但 **tests 7 文件实质引用**（test_strategic_analysis_usecase/datasource 实例化+4 架构断言文件）、orchestration_service **tests 3 文件 resolve 消费**（prefect/langgraph 集成+单测）、data_pipeline 为 orchestration_service 内 task_type Literal（:26/:68-71）随主体一体定夺——「零生产引用」删除前提不成立（测试爆炸半径非零）；Task 0 按 grep 全仓（含 tests）执行定夺：零引用则删、有引用则 defer 落档（R1 预判后者） |
 | 13 | :191 谓词键预设白名单 | **触发注记** | 7-2 REST 入口不预设 retry_count/executed_phases 初始 state 键（agent run 请求体不含引擎内部键——白名单过滤注记落档） |
@@ -454,7 +458,7 @@
 
 - [ ] Subtask 0.1: 冻结端点矩阵表（AC-2 列 13 端点 + 挂载激活 4 router + health——实现禁增删端点路径）
 - [ ] Subtask 0.2: 编写端口消费契约测试 `tests/contracts/test_port_contract_rest_api.py`（**18 唯一端口注册面可达断言——全绿入库**；零 IO 直查形态对齐 7-1 Subtask 0.4 先例；lifetime 双断言归 Task 2 🔴红阶段编写[见 Task 2]——防 Task 0→2 间 CI 可见红窗，R1 定谳）
-- [ ] Subtask 0.3: 编写 API 契约测试 `tests/contracts/test_api_contract_rest_api.py`（yaml 消费型 14 新 path+validator——**红形态**：yaml 未补 path 时断言红，红绿同 Subtask 闭合[7-1 Task 0 绿色门禁先例同构]；**TestClient 行为型按端点 Task 逐族补入**——R3 定谳：先例 test_api_contract_document_upload.py:20 顶部 import 路由模块，新路由模块 Task 0 不存在→收集期 ImportError 连坐 yaml 断言，故 Task 0 仅写 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 各族落地补入）+ openapi.yaml 补 14 path（13 域 path+/system/health）+ 单漂移修正（/documents GET 删除——R1 实测零消费方；**/health 保留**[embedding 契约，test_api_contract_embedding.py:34 消费方，R1 勘正]）
+- [ ] Subtask 0.3: 编写 API 契约测试 `tests/contracts/test_api_contract_rest_api.py`（yaml 消费型 14 新 path+validator——**红形态**：yaml 未补 path 时断言红，红绿同 Subtask 闭合[7-1 Task 0 绿色门禁先例同构]；**TestClient 行为型按端点 Task 逐族补入**——R3 定谳：先例 test_api_contract_document_upload.py:28 顶部 import 路由模块（R6 勘正：原 :20 为 fastapi import，路由模块 import 在 :28），新路由模块 Task 0 不存在→收集期 ImportError 连坐 yaml 断言，故 Task 0 仅写 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 各族落地补入）+ openapi.yaml 补 14 path（13 域 path+/system/health）+ 单漂移修正（/documents GET 删除——R1 实测零消费方；**/health 保留**[embedding 契约，test_api_contract_embedding.py:34 消费方，R1 勘正]）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_rest_api.feature`（AC-1~AC-7 共 17 个业务场景[AC-1×2/AC-2×8/AC-3×3/AC-4×2/AC-5×1/AC-7×1]，按 AC 分节横幅注释组织；AC-8×2 与收尾×2 由 Task 9 追加至最终态 21；**按 Gherkin 节的 AC-2×8↔13 端点覆盖映射撰写**——R1 注记）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_rest_api.py`（R6 七要点+HTTP 级装配形态+given/when/then 全步骤骨架齐备——**若仅 given 骨架则收集期抛 ScenarioDefinitionError**[7-1 R1-F31 教训]，故要求全骨架：红形态=运行期 ImportError[新增路由模块不存在]）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——红形态=运行期 ImportError：新增路由模块不存在）
@@ -478,9 +482,9 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写/扩展 `tests/unit/interfaces/api/test_app.py`（挂载断言：auth/metrics/crawler/audit router 在 app.routes 可达+路径前缀断言 /api/v1/audit、/api/v1/system/metrics）+ 新建 `tests/unit/interfaces/api/test_system_routes.py`（health 返回 200+status ok+无认证可达） |
-| 🟢 绿 | 修改 `src/entrypoints/api_app.py`（include 4 router——audit 挂载 prefix="/api/v1/audit"；monitoring 挂载形态冻结 `include_router(create_metrics_router(...), prefix="/api/v1/system")`[router 自身无 prefix]；auth/router 工厂调用需服务注入——**lazy resolve 三级 fallback 形态** document_upload.py:150-163 先例）+ 修改 `src/interfaces/api/audit.py`（**5 端点签名补 Depends(get_current_user)——认证实质改造，R1 实证端点零挂载**）+ 新建 `src/interfaces/api/system.py`（create_system_router：GET /system/health 轻量实现——认证豁免） |
-| 🟡 变异 | 去掉 auth 挂载→挂载断言红；health 加认证→无认证断言红；还原绿 |
-| 🔄 重构 | 挂载段注释分节（既有 7 router / 激活 4 router / 新增路由族）；audit 认证改造收尾核验（每端点 Depends 在位） |
+| 🟢 绿 | 修改 `src/entrypoints/api_app.py`（include 4 router——audit 挂载 prefix="/api/v1/audit"；monitoring 挂载形态冻结 `include_router(create_metrics_router(...), prefix="/api/v1/system")`[router 自身无 prefix]；auth/router 工厂调用需服务注入——**lazy resolve 三级 fallback 形态** document_upload.py:150-163 先例）+ 修改 `src/interfaces/api/audit.py`（**5 端点签名补 Depends(get_current_user)——认证实质改造，R1 实证端点零挂载**）+ 修改 `src/interfaces/api/crawler.py`（**认证实质改造[R6]**：工厂加 get_current_user 可选参数+4 端点补挂 Depends——对齐 audit 同款）+ 新建 `src/interfaces/api/system.py`（create_system_router：GET /system/health 轻量实现——认证豁免） |
+| 🟡 变异 | 去掉 auth 挂载→挂载断言红；health 加认证→无认证断言红；摘除 crawler 端点认证→AC-3 401 断言红；还原绿 |
+| 🔄 重构 | 挂载段注释分节（既有 7 router / 激活 4 router / 新增路由族）；audit+crawler 认证改造收尾核验（每端点 Depends 在位——9 端点） |
 
 - [ ] Subtask 1.1: 🔴 红 — 挂载/health 失败测试
 - [ ] Subtask 1.2: 🟢 绿 — api_app 挂载扩展 + system.py
@@ -525,7 +529,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/api/test_tool_execution_routes.py`（slug→SLUG_TO_TOOL_ID SSOT→get_tool(tool_id=) 解析链断言[**禁 get_tool(tool_name=slug) 直查——7-1 CR1-F7b 勘正同款**]/execute 构造 ToolCall+ExecutionContext 透传 session/cost_budget/schema 输出含 input_examples[skill_loader.load_sop 通路]/认证断言/ToolExecuted 结果序列化） |
+| 🔴 红 | 编写 `tests/unit/interfaces/api/test_tool_execution_routes.py`（slug→SLUG_TO_TOOL_ID SSOT→get_tool(tool_id=) 解析链断言[**禁 get_tool(tool_name=slug) 直查——7-1 CR1-F7b 勘正同款**]/**未知 slug→get_tool_id miss 返 None→端点 raise ToolNotFoundError→404+error.code=380 断言[R6]**/execute 构造 ToolCall+ExecutionContext 透传 session[timeout→timeout_sec 可选映射——cost_budget 已删，R6]/schema 输出含 input_examples[skill_loader.load_sop 通路]/认证断言/ToolExecuted 结果序列化） |
 | 🟢 绿 | 新建 `src/interfaces/api/tool_execution.py`（create_tool_execution_router：两端点——与既有 tools.py 版本管理面共 prefix /api/v1/tools 但独立文件独立 router） |
 | 🟡 变异 | slug 解析链改直查→断言红；schema 去 input_examples 键→断言红；还原绿 |
 | 🔄 重构 | slug 解析链按 SSOT 映射重写（`skill_manifest.SLUG_TO_TOOL_ID`[skill_manifest.py:41]→`get_tool(tool_id=)`[tool_registry_service.py:52 二选一签名]——**唯一映射源；禁止从 `src/interfaces/cli/` 包 import 复用**[interfaces 内跨接口子包耦合]，REST 侧独立实现同链；{slug} vs 钦定 {id} 偏离 OD-11 登记） |
@@ -549,7 +553,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/interfaces/api/test_agent_plan_routes.py`（agent run：agent_id UUID path 参数[非 UUID→422 Pydantic]+task 请求体+调用契约断言；plan generate：三参数透传[plan_id 为 str]+**per-plan_id 锁断言：同 plan_id 并发两请求串行化——mock 服务侧记录进入序**；482 Conflict→409 映射） |
+| 🔴 红 | 编写 `tests/unit/interfaces/api/test_agent_plan_routes.py`（agent run：agent_id UUID path 参数[非 UUID→422 Pydantic]+task 请求体+调用契约断言+**agent 不存在→AgentNotFoundError 443→404 断言[R6]**；plan generate：三参数透传[plan_id 为 str]+**per-plan_id 锁断言：同 plan_id 并发两请求串行化——mock 服务侧记录进入序**；482 Conflict→409 映射） |
 | 🟢 绿 | 新建 `src/interfaces/api/agents.py` + `src/interfaces/api/plans.py`（generate 部分）——**per-plan 锁模块级实现**：`_plan_locks: dict[str, asyncio.Lock]` + `_locks_guard: asyncio.Lock`（模块级纪律——CLAUDE.md Gotcha；**无界增长注记**：锁字典只增不减与 6.1-DF6② _runs 同域同性质，淘汰策略归 BLM 长驻专项[OD-7 关联]） |
 | 🟡 变异 | 去锁→并发串行化断言红（mock side_effect 内 `await asyncio.sleep(0)` 让渡控制+记录进入/退出序，断言区间不重叠——确定性形态）；锁改实例变量→隔离断言红（**两 app 实例共享同一 mock 服务**并发打点判别——单 app 实例下实例级锁同样串行化不可判别，R1 具体化）；还原绿 |
 | 🔄 重构 | 锁逻辑收敛单一模块级函数 |
@@ -558,7 +562,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 追加测试（status：plan_id str path 参数→blm_planning_status_use_case 调用契约+BlmPlanningStatus 序列化+NotFound→404；export：format query 参数 markdown\|pdf 分派双用例+brand_template_name 可选透传[仅 pdf]+StrategicReport 响应；**trace：plan_id str path 参数→traceability_tree_use_case[execute(*, plan_id, depth)] 调用契约+溯源树视图序列化+与 /search/trace/{document_id} 语义分立注记锚——R1 域迁[OD-10]**） |
+| 🔴 红 | 追加测试（status：plan_id str path 参数→blm_planning_status_use_case 调用契约+BlmPlanningStatus 序列化+**PlanningNotFoundError(480)→404 断言[R6 勘正——非泛 NotFound]**；export：format query 参数 markdown\|pdf 分派双用例+brand_template_name 可选透传[仅 pdf]+StrategicReport 元数据 JSON 响应[非文件流——R6 定谳]；**trace：plan_id str path 参数→traceability_tree_use_case[execute(*, plan_id, depth)] 调用契约+溯源树视图序列化[空树 build_degraded 哨兵为合法响应非 404——R6 注记]+与 /search/trace/{document_id} 语义分立注记锚——R1 域迁[OD-10]**） |
 | 🟢 绿 | plans.py 扩展（status/export/trace 端点——report_generation_use_case/pdf_report_generation_use_case 分派；trace 消费 traceability_tree_use_case） |
 | 🟡 变异 | format 分派错置→断言红；status 用例替换→断言红；trace 用例替换→断言红；还原绿 |
 | 🔄 重构 | export 双用例分派收敛；trace 与 status 共享 plan_id 参数构造 |
@@ -607,7 +611,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 扩展 `tests/unit/interfaces/api/test_exception_handlers.py`（异常族→HTTP 矩阵：202→404/201→400/242→400/482→409/401 族/403 族/422 族逐一断言+响应体三字段 error.code/error.message/error.context[或既有实际形态——**先实测锚定**]+X-Error-Code/X-Request-ID 头断言）；新建认证矩阵断言（每端点族 ≥1 端点无 token→401+WWW-Authenticate；伪造 token→401；豁免面 login/health 无 token→2xx） |
+| 🔴 红 | 扩展 `tests/unit/interfaces/api/test_exception_handlers.py`（异常族→HTTP 矩阵：202→404/380→404/443→404/480→404[R6 三行补登]/201→400/242→400/482→409/401 族/403 族/422 族逐一断言+响应体三字段 error.code/error.message/error.context[或既有实际形态——**先实测锚定**]+X-Error-Code/X-Request-ID 头断言+**消息安全新增断言[R6]**：主路径 to_dict 三字段无堆栈/SQL 子串——fallback 泄露面归 OD-17 不在此断言）；新建认证矩阵断言（每端点族 ≥1 **受保护**端点无 token→401+WWW-Authenticate；伪造 token→401；豁免面 login/health 无 token→2xx+metrics 无 token→200[既有形态豁免——R6]） |
 | 🟢 绿 | 修正各路由认证 dependency 遗漏面（红阶段暴露的缺口——**预期每端点 Task 已挂，本 Task 为集中矩阵验证+补漏**）；Pydantic 422 断言（请求体缺字段→422 RequestValidationError 响应体） |
 | 🟡 变异 | 摘除某端点认证 dependency→对应 401 断言红；EXCEPTION_HTTP_MAP 摘除一条映射→矩阵断言红；还原绿 |
 | 🔄 重构 | 新增端点统一 import `shared_models.ErrorResponse`（R1 勘正：共享定义已存在[shared_models.py:12]，零新建零收敛动作） |
@@ -651,7 +655,7 @@
 
 - [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_arch_rest_api.py`
 - [ ] Subtask 8.2: 分层断言（`src/interfaces/api` 零 `composition_root`/`infrastructure` import——AST 扫描；fastapi/httpx 零入 `src/domain`/`src/application`）
-- [ ] Subtask 8.3: 认证覆盖断言（新增全部端点 handler 挂 get_current_user dependency——AST/依赖树检查，豁免面白名单[login/health]显式枚举）
+- [ ] Subtask 8.3: 认证覆盖断言（新增全部端点+改造端点[audit 5+crawler 4] handler 挂 get_current_user dependency——AST/依赖树检查，豁免白名单三态显式枚举[login/health 设计豁免+metrics 既有形态豁免——R6 口径]）
 - [ ] Subtask 8.4: 既有测试零回归（17 unit api 文件+13 契约文件+7 HTTP 验收文件引用面）
 - [ ] Subtask 8.5: 运行完整测试套件并生成报告（循环依赖检测沿用 ruff/isort 既有面）
 
@@ -697,6 +701,7 @@
 - **接口治理:** 统一端口注册 PortSpec/组合根装配；本 Story 零新增端口消费 18 既有端口+2 处 lifetime 迁移（R1 口径）
 - **技术栈:** Python 3.11+ / FastAPI ^0.111.0（pyproject:16 实装——**architecture.md:236 钦定 0.111+ 为准**，interface-design §2.1「0.104+」为下界表述）/ uvicorn[standard] ^0.24.0 / httpx ^0.27.0（性能采样面）/ Schemathesis ^3.19（dev 依赖零使用——7-6 归宿）
 - **7-3 边界铁律:** OAuth 2.1 统一认证体系/令牌桶限流/路径-方法-角色路由/注入检测/Kong/Traefik 部署**全归 Story 7-3**（epics:2693-2733 + ADR-010）——7-2 仅基础认证（既有 auth_service per-endpoint dependency 形态）
+- **可观测性注记（R6）:** request_id 链路响应头/响应体已闭环（ExceptionContextMiddleware 取/生成→state→响应头回写）但**日志侧零关联**（infrastructure/logging 无 request_id）——归可观测性专项（OD-9 关联）；CORS 零配置（全仓无 CORSMiddleware——服务器间集成不受影响，浏览器跨域不可用）——归 7-3/部署面
 
 ### 关键架构决策
 
@@ -704,7 +709,7 @@
 |---|------|------|------|------|
 | **DC-1（选中）** | 7-2=P0 端点子集+4 router 挂载激活+health（7-3 四能力零承载） | 边界清晰（epics 7.3 定义钦定）；既有资产最大化复用 | 双 Story 切分期认证深度有限 | ✅ 9/10 |
 | 备选：7-2 含 Gateway 能力 | 单 Story 交付完整 API 面 | 范围蔓延；7-3 无独立交付物；OAuth 2.1 体系超出单 Story | 3/10 |
-| **DC-2（选中）** | 认证=per-endpoint `get_current_user` dependency（存量形态沿用）+ 豁免白名单（login/health） | 零新建中间件；存量先例（auth.py:150-186）；架构断言可机械化 | 「认证中间件」字面语义以「全端点 dependency 覆盖」承载（注记） | ✅ 8/10 |
+| **DC-2（选中）** | 认证=per-endpoint `get_current_user` dependency（存量形态沿用+audit/crawler 零挂载端点实质改造）+ 豁免白名单三态（login/health 设计豁免+metrics 既有形态豁免+refresh/logout 既有弱形态注记——R6 勘正） | 零新建中间件；存量先例（auth.py:150-195）；架构断言可机械化 | 「认证中间件」字面语义以「全端点 dependency 覆盖」承载（注记） | ✅ 8/10 |
 | 备选：新建全局认证中间件 | 字面合规 | 与存量 15 个 .py 形态冲突；7-3 Gateway 统一面重复建设 | 4/10 |
 | **DC-3（选中）** | 端点参数=端口签名现实层优先（agent_id UUID/plan_id str/checkpoint 复合定位/slug） | 7-1 OD-8/OD-9 原则直接继承；签名级核验完成零错位 | 与 interface-design 钦定文本有偏离（OD 表登记） | ✅ 9/10 |
 | 备选：钦定文本优先+适配层 | 文档忠实 | 适配层无先例；role→agent_id 解析引入额外端口消费 | 5/10 |
@@ -723,9 +728,9 @@
 
 | OD | Gap（四要素） | V1 归宿 |
 |----|--------------|--------|
-| OD-1 | agents 端点参数 `agent_id: UUID` 非 `{role}`（interface-design §8.2.3/§13.3 钦定 `{role}/run`）——端口签名 `execute(agent_id: UUID, task)`（agent_workflow_use_case :3184）无 role 解析面；architecture.md:2465 `{agent_id}` 形态一致；动词保留 run（interface-design 双处+CLI agent run 三源一致；**R1 注记**：architecture:2474 第四源用 `{agent_id}/execute` 动词——上游四源不一致归上游契约澄清） | 7-1-DF1 迁移专项统一时复核 |
+| OD-1 | agents 端点参数 `agent_id: UUID` 非 `{role}`（interface-design §8.2.3/§13.3 钦定 `{role}/run`）——端口签名 `execute(agent_id: UUID, task)`（agent_workflow_use_case :3184）无 role 解析面；architecture.md:2475 `{agent_id}` 形态一致（R6 勘正：原 :2465 为 documents 上传行）；动词保留 run（interface-design 双处+CLI agent run 三源一致；**R1 注记**：architecture:2475 第四源用 `{agent_id}/execute` 动词[R6 勘正行号]——上游四源不一致归上游契约澄清） | 7-1-DF1 迁移专项统一时复核 |
 | OD-2 | /documents/batch 同步批量形态（interface-design §8.2.1.1 钦定 202 Accepted+job_id 异步契约）——仓内无 job 队列框架（upload_batch 请求内信号量并发同步返回，:1195 注册块既有形态） | 异步 job 基建专项（7-2-DF1） |
-| OD-3 | /agents/{role}/status 端点 defer——全仓无 agent run 状态查询端口（agent_workflow_service 六阶段无 status 方法，结果即时返回无持久化 run 实体） | Agent run 持久化专项 |
+| OD-3 | /agents/{role}/status 端点 defer——全仓无 agent run 状态查询端口（agent_workflow_service 六阶段无 status 方法，结果即时返回无持久化 run 实体）；**业界对标注记[R6]**：202+轮询为 >10s 长时操作主流形态（Stripe/Fabric 先例）——本 Story 同步形态是有基建缺口（run 持久化）的偏离而非忽视；B 请求经 per-plan 锁阻塞 A 全程（60s 级）为同步方案真实代价（网关/客户端超时面归 7-3） | Agent run 持久化专项 |
 | OD-4 | 新增文件平铺对齐存量（architecture.md:2102-2153 钦定 api/v1/ 子目录结构 defer）——存量 15 个 .py 平铺+create_app 在 entrypoints 的演化态现实 | API 面结构重构专项 |
 | OD-5 | openapi.yaml 漂移修正仅一处（/documents GET 删除——R1 勘正：/health 保留为 embedding 契约）——chunked 族 yaml 缺失、/api/v1/search×3 双前缀怪癖等存量漂移不动（防 13 契约测试连锁回归）；激活面端点（metrics/crawler/roles 族）yaml 无契约缺口同归本项 | 契约治理专项（7-6 协同） |
 | OD-6 | equilibrium_security router 不挂载——3 个 impl 字符串指向不存在类（storage_encryption/api_security/container_security，deferred-work:126 脚手架遗留，接线必 RuntimeError） | 等保接线专项 |
@@ -735,10 +740,12 @@
 | OD-10（R1） | trace 端点域迁 plans（interface-design §8.2.1 钦定 `/documents/{id}/trace`=高保真溯源 vs 仓内端口现实：TraceabilityTreePort 为 plan 域[execute(*, plan_id, depth)]、3-8 TraceabilityPort.trace(claim: str) 入参为 claim 文本——document 域溯源树端口为零）——端点 `GET /plans/{plan_id}/trace` 对齐端口现实+CLI `trace-tree --plan-id` 先例；**3-8 高保真溯源 REST 面零承载**（claim 入参与钦定 {id} path 形态的上游双源不一致待澄清） | 上游契约澄清+3-8 REST 面专项（7-2-DF2） |
 | OD-11（R1） | tools 端点参数 `{slug}` vs 钦定 `{id}`/`{tool_id}`（interface-design §8.2.2+architecture:2466 双源）——slug SSOT 链理由（`skill_manifest.SLUG_TO_TOOL_ID`→`get_tool(tool_id=)`，7-1 CR1-F7b 勘正同链） | 7-1-DF1 迁移专项统一时复核 |
 | OD-12（R1，R2 增补） | 钦定 P0 端点不承载集：`GET /plans/{id}/compare`（§8.2.5 情景对比 P0）+ financial 族 `POST /financial/analyze`/`/sensitivity`（§8.2.4 双 P0）+ `GET /documents/{id}`（§8.2.1 P0 查询文档元数据——7-2 document 族仅承载 parse/versions，元数据查询端点零承载[R2 二次差集补登]）——R1 覆盖差集补登 | 后续 Story 立项承载（7-2-DF5 登记） |
-| OD-13（R1，R2 勘正） | 钦定 P1 端点族不承载集：`/agents/arbitrate`（§8.2.3）、`/tool-chains/{id}/execute`（§8.2.2）、`/reports/regulatory`（§8.2.8）、`/risk/heatmap`（§8.2.9）、`/routing-decisions`（architecture:2494）、`/archive/timeline`（§8.2.7 时间轴演进 P1——R2 勘正：原「timeline-diff §8.2.6」节号与端点名双失实，系旧 DF 清单不精确继承名）+ `GET /plans`/`POST /plans`（architecture:2479/:2480 与 interface-design 双上游不一致待消歧[R2 增补 POST]） | Epic 7 后续 Story 承载 |
+| OD-13（R1，R2 勘正） | 钦定 P1 端点族不承载集：`/agents/arbitrate`（§8.2.3）、`/tool-chains/{id}/execute`（§8.2.2）、`/reports/regulatory`（§8.2.8）、`/risk/heatmap`（§8.2.9）、`/routing-decisions`（architecture:2496[R6 勘正行号]）、`/archive/timeline`（§8.2.7 时间轴演进 P1——R2 勘正：原「timeline-diff §8.2.6」节号与端点名双失实，系旧 DF 清单不精确继承名）+ `GET /plans`/`POST /plans`（architecture:2483/:2484[R6 勘正行号——原 :2479/:2480 实为 financial 族行] 与 interface-design 双上游不一致待消歧[R2 增补 POST]） | Epic 7 后续 Story 承载 |
 | OD-14（R1，R2 精确化） | 激活面契约缺口：激活面 21 端点中确定缺口=crawler 4+monitoring 1（auth 11/audit 5 已有 yaml 契约覆盖；roles permissions 子面 dev 期核验）——NFR-IF-05「OpenAPI 3.1 契约测试通过率 100%」在激活面不闭环 | 契约治理专项（OD-5 关联，7-6 协同） |
 | OD-15（R1） | clear_scoped 生产接线（真实 per-request SCOPED 隔离）——per-request clear 中间件并发不安全（进程级 `_scoped_context` dict 在途请求互毁，R1 推演定谳），contextvar 级 scope 绑定为正解（4-7 周期 `_RETRY_POLICY_OVERRIDE` 同款机制先例） | scope 机制重构专项（7-2-DF8 登记——R2 勘正编号） |
 | OD-16（R2） | checkpoint 端点参数 `{plan_id}/{checkpoint_no}` 复合双参 vs §8.2.6 钦定 `/checkpoints/{id}` 单参——7-1 OD-8 端口签名现实层优先原则继承（checkpoint_recovery_use_case execute(*, plan_id, checkpoint_no) 两参必填，无 id 单参解析面） | 7-1-DF1 迁移专项统一时复核（同 OD-1/OD-11 归宿） |
+| OD-17（R6） | exception_handlers fallback 分支消息泄露面：to_dict() 失败罕见路径 str(exc)[:500]+cause 的 str(cause) 直透响应体（exception_handlers.py:433/:438-443——R6 实证），主路径安全但兜底无脱敏；全仓零消息安全断言（7-2 Task 6 仅补主路径断言，生产行为不动——surgical） | exception_handlers 安全加固专项（脱敏白名单/cause 截断策略） |
+| OD-18（R6） | export 文件内容获取面零承载：export 响应=StrategicReport 元数据 JSON（report_id/file_path[L0 逻辑路径——集成方不可直读]/section_count——实体无内容字段），文件流下载端点无契约（6.5a-DF1 清偿面为元数据契约非内容传输） | 文件下载端点专项（7-6 协同） |
 
 ### 项目结构说明 Project Structure（本 Story 相关面）
 
@@ -752,7 +759,7 @@ src/
 ├── interfaces/api/
 │   ├── auth.py                      # 既有零改动（挂载激活）
 │   ├── monitoring.py                # 既有零改动（挂载激活）
-│   ├── crawler.py                   # 既有零改动（挂载激活）
+│   ├── crawler.py                   # ★实质改造：4 端点补 Depends(get_current_user)+工厂加认证参数（R6：零挂载+工厂无认证参数实证）
 │   ├── audit.py                     # ★实质改造：5 端点签名补 Depends(get_current_user)+前缀统一 /api/v1/audit（R1：端点零挂载实证）
 │   ├── equilibrium_security.py      # 既有零改动（不挂载——OD-6）
 │   ├── exception_handlers.py        # 既有零改动（:116 metrics 接线视裁定）
@@ -818,7 +825,7 @@ tests/
 | **Template** | `.claude/skills/bmad-create-story/template.md` |
 | **Checklist** | `.claude/skills/bmad-create-story/checklist.md` |
 | **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md`（Epic 7 :2565-2692；Story 7.2 :2651-2691） |
-| **架构文档** | `docs/architecture/architecture.md`（:2102-2153 API 目录/:2465-2496 端点清单）+ `docs/architecture/interface-design.md`（§8 :1383-1513）+ `docs/architecture/arch-appendix.md`（附录 H 租户传播） |
+| **架构文档** | `docs/architecture/architecture.md`（:2102-2153 API 目录/:2465-2496 端点清单）+ `docs/architecture/interface-design.md`（§8 :1383-1515[R6 勘正区间尾]）+ `docs/architecture/arch-appendix.md`（附录 H 租户传播） |
 | **前置留项源** | `_bmad-output/implementation-artifacts/deferred-work.md`（:115-:129/:191/:329-:332/:349/:362/:369-:370/:409） |
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/7-1-cli-command-interface.md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
@@ -859,6 +866,7 @@ tests/
 
 - `src/entrypoints/api_app.py`（4 router 挂载+新路由族挂载——monitoring prefix 形态冻结）
 - `src/interfaces/api/audit.py`（5 端点 Depends 认证实质改造+前缀统一）
+- `src/interfaces/api/crawler.py`（4 端点 Depends 认证实质改造+工厂加认证参数——R6 勘正）
 - `src/composition_root.py`（traceability service+use_case lifetime SCOPED 双迁移）
 - `docs/api/openapi.yaml`（14 新 path+单漂移修正）
 - `_bmad-output/implementation-artifacts/deferred-work.md`（14 条处置注记+7-2-DF 登记）
@@ -890,6 +898,8 @@ tests/
 ### 🔧 文档审查修复 Docs Review Fixes [文档审查/修订必选]
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
+>
+> **编号规则（R6 增注）：** 本表 R<轮>-<序号> 与先例 Story 的 R<n>-F/P/D 为不同命名空间；R1~R5=第一审查周期（v1.0.0→v1.3.1）、R6~=第二审查周期（续编号）。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
@@ -923,12 +933,26 @@ tests/
 | R3-9 | parse 断言强度（7-1 CR6-1 parse_status 锚先例未采纳）+recover 后查询期望留白 | P3 | parse_status=completed 判别锚注记+recover 后 list 复核建议注记 |
 | R4-1 | L101 AC-4 NotFound 行中文圆括号不平衡（`均 R1 实证]）/plans` 多一个 `）`——R1-9 修复引入的排版残留，语义无损 | P3 | 随 R5 收敛提交清偿（改分号分隔——成本趋零应做） |
 | R5-1 | 收敛终审：六节取证全过（周期闭合[3 提交零游离]/双向抽验 8⁄8/台账完整/门禁如实/锚点 17⁄17 精确零失实/收敛判定可收敛） | — | 收敛声明入 Story（本节下方）+版本 v1.3.1 |
+| R6-1 | crawler.py 4 端点零认证+工厂无认证参数，Story 却写「既有零改动（挂载激活）」——挂载即激活未认证 POST 任务提交面，违 CLAUDE.md「所有 API 路由必须过认证」硬约束，且与 audit 补挂待遇不对称（R6-D 调研发现，主会话 grep 实锤零 Depends） | P0 | Story 承载认证实质改造（工厂加认证参数+4 端点补挂——Task 1 与 audit 同批同款，评审 B 三选项裁定[a]承载：defer 自相矛盾[audit 先例在面+硬约束违反发生在挂载瞬间]、不挂载违背 deferred-work:115 钦定）；传播 9 处（现状缺口#1/AC-1/AC-3 新增 bullet/留项#10/Task 1 绿·变异·重构/项目结构/待修改清单/Task 8.3） |
+| R6-2 | metrics 零认证（get_metrics 无 Depends——R6-B/D 双调研独立发现）与「豁免面仅 2 类」矛盾：第三类未登记豁免——dev 误挂认证破坏 Prometheus 抓取/架构断言误纳管红双风险 | P1 | 豁免面三态口径（设计豁免 login/health+既有形态豁免 metrics[Prometheus 抓取形态，scrape bearer/网络隔离归 7-3 OD-8 关联]+既有弱形态注记 refresh/logout）——AC-3 主条改写+401 断言限定受保护端点+Task 6 红豁免断言[metrics 无 token→200]+Task 8.3 白名单三态+DC-2 行同步 |
+| R6-3 | 异常消费表 plans status 无记录写 NotFoundError/202——实际 PlanningNotFoundError(EXCEPTION_480)（get_blm_planning_status.py:66 用例自抛，映射 exception_handlers.py:314 收 404）——dev 按表断言 error.code=202 必红（R6-C 发现，主会话实锤映射行） | P1 | 表行勘正+AC-4 表述+Task 4 红 B 表述+Task 6 红矩阵 480 行——签名级核验原则在异常消费面的失效修复 |
+| R6-4 | 未知 slug 与 agent 不存在两 404 首要路径零承载：ToolNotFoundError(380→404 映射 :256)/AgentNotFoundError(443→404 映射 :295) 均既有异常既有映射但不在异常表——dev 须发明契约（R6-C 发现，主会话实锤双映射行） | P1 | 表补两行（slug miss=get_tool_id 返 None 端点自 raise 380[与仓储 get_by_id miss 同码]；agent 用例首步自抛 443）+Task 3/4 红断言位+AC-4 404 锚定三选一注记；零新增领域异常声明不变（既有异常消费补行） |
+| R6-5 | refresh（凭 refresh_token 自凭证换发）/logout（无 token 静默 204 非 401）弱形态与豁免面表述差集——AC-3 401 矩阵抽查误写期望风险（R6-D 发现） | P2 | AC-3 既有弱形态注记如实登记（4 认证形态并存，收口归 7-3）+401 断言限定「受保护端点」；不改生产行为（收紧超 surgical 面） |
+| R6-6 | 「消息安全既有契约复验」前提失实（全仓零此类断言）+fallback 分支 str(exc)[:500]/str(cause) 直透泄露路径（exception_handlers.py:433/:438-443——R6-D 发现，主会话实锤） | P2 | AC-4 验证标准勘正为「新增断言」（主路径 to_dict 三字段无堆栈/SQL）+Task 6 红补承载+泄露面登记 OD-17（生产行为不动——评审 B 裁定拒顺手修代码） |
+| R6-7 | ToolExecuteRequest.cost_budget 无透传落点：ToolCall 四键/ExecutionContext 六键均无该字段（CLI 侧 CommandContext 预算台账另一体系——R6-C 发现，主会话实锤 VO 字段） | P2 | 删 cost_budget+timeout→ExecutionContext.timeout_sec 合法可选映射注记（数据模型节+Task 3 红）；禁塞 extensions（评审 A 补禁令——Story 4.3 装饰器通道，塞入属发明语义） |
+| R6-8 | POST 成功状态码 200/201 未钦定（AC-6 yaml 契约必填项——R6-C 发现） | P2 | 一句钦定「新增端点成功响应全部 200」（201 仅资源创建型——yaml 既有先例创建快照/创建角色；本 Story 13 端点无资源创建型；crawler 既有 201 不动）——AC-6+Subtask 0.3 场景注记；评审 A 证伪 D1 逐端点设计（惯例已答）轻量化 |
+| R6-9 | export 响应语义未消歧（元数据 JSON vs 文件流误读）——StrategicReport 实为纯元数据实体无内容字段（评审 B worktree 实测字段清单） | P2 | 定谳：StrategicReport 元数据 JSON+file_path 为 L0 逻辑路径注记（集成方不可直读）+文件内容获取面 OD-18 登记——AC-2/Task 4 红/SSOT 行三处（评审 A 半证伪：Task 4 已隐含 JSON，本修复为一句消歧非零钦定） |
+| R6-10 | 锚点行号族 8 处失实：OD-1 architecture :2465/:2474→:2475×2、OD-13 :2479/:2480→:2483/:2484（原行恰 financial 族串位）+:2494→:2496、R3-2 先例 :20→:28、§8 区间尾→1515、验收先例 :49→:50、DC-2 行 auth.py:150-186 残留（R1-14 传播漏网）（R6-A 实测 65+ 锚点精确、7 失实集中 architecture.md 端点清单族——机理断言无一失实；R5 抽验 17/17 未覆盖该族=抽验面盲区实证） | P3 | 逐处勘正（Subtask 0.3/OD-1/OD-13/调试日志/Gherkin 节/DC-2 六处位） |
+| R6-11 | 业界对标注记 4 条补强（R6-B 七主题对标）：OD-3 增 202+轮询主流论据+B 请求 60s 阻塞窗口/checkpoint 上限 8 分页 YAGNI 实证/豁免端点显式 security: [] 写法/409 Retry-After dev 裁定 | P3 | 注记入对应节（OD-3/AC-2 checkpoints/AC-6/AC-7 时序注记）；health-liveness 与 RFC 9457 两条对标注记被评审证伪拒绝（添噪——AC-1「轻量不连存储」已是 liveness 语义/AC-4 已声明不动） |
+| R6-12 | 可观测性三注记：request_id 日志侧零关联/CORS 零配置/AC-4 矩阵缺 423（锁定）行（R6-D 取证） | P3 | Dev Notes 可观测性注记（归可观测性专项/7-3）+AC-4 423 行注记（映射 :407-420 既有不单列场景） |
+| R6-13 | 序列化四注记：Document.embedding 响应剔除锚定/AgentWorkflowResult 深嵌套字段子集裁定/CheckpointRecoverRequest 静默裁剪 correction/login JSON body+yaml flows 写法（R6-C 消费者视角） | P3 | 对应端点 bullet 注记（AC-2 parse/run+数据模型节+AC-3 login——防 dev 发明契约） |
 
 > **R1 审查组织：** D1 四调研 Agent（REST 资产/端口 SSOT/契约测试/规格留项）+ D2 双评审（A 正确性+一致性：P0×4+P1×7+P2×6+P3×9+传播位清单 10 组；B 可行性+科学性：两大 P0 方案定谳+Task 级干跑+场景可满足性推演）+主会话实测定谳 3 项（N13 traceability 路由面/get_by_id 不存在/find 租户语义）。评审员间零事实冲突，D1 发现全部采信。
 > **R2 审查组织：** 双调研 Agent——R2-A 修复回归核查（git 取证：R1-1~R1-15 逐项 15/15 完备零漏网+新破口零发现+残留终扫零残留+场景算术复核自洽）+ R2-B 新增内容事实核验（OD 新行节号/端点名/行号族/组合交互面——R1 新写入声明中 4 项缺陷：OD-13 双失实/差集二次漏网/模糊数/checkpoint 偏离无登记；14 path 七处一致+SCOPED 双对象 11 处一致+trace 三角一致+created_via 三处一致等组合面全通过；附加正向事实：parse_document :119 内部已 find()——端点前置查询与内部构成双查询无害）。
 > **R3 审查组织：** 单深度推演 Agent 四轴（Task 依赖干跑[import 闭合全通过+port_contract 文件时间线自洽]/17 场景期望唯一性[期望唯一性机制成立，given 前置三处缺口]/AC↔测试承载矩阵[28 条 25 闭合，3 条 P3 承载面未明]/长状态时间线[document 链可观测 ✓，plan 链 recover 后留白]）——9 项发现（P1×1+P2×3+P3×5）+5 个缺失决策点全部补决策；7-1 CR6 最新教训三条直接反哺（R3-1 过时先例/R3-8 租户分叉假绿/R3-9 parse_status 判别锚）。
 > **R4 审查组织：** 纯验证 Agent 七维度（R1-R3 修复存续 26 组锚点/台账可追溯 10 行抽验 10⁄10/数字口径互证/结构完整性/状态字段/Task 链自洽/红线终扫）——6 通过+1 项 P3 排版级（R4-1），零实质发现不造独立提交轮（4-x 周期先例）。
 > **R5 审查组织：** 独立终审 Agent 六节取证（不轻信自报）——周期闭合[3 提交与版本说明一一对应零游离、文件面纯 .md/.yaml]/关键修复双向抽验[8⁄8：trace 签名/双对象注册块现值 SINGLETON=待迁移正确态/EXCEPTION_HTTP_MAP/shared_models//health 消费方/find 租户过滤/slug SSOT/482 守卫]/台账完整[29 行修复+OD 16 行+DF 双侧同号]/门禁如实[三提交 hooks 全 Passed、ruff-mypy 不适用 .md 如实注明]/锚点实测[17⁄17 精确零失实]/收敛判定[可收敛]。
+> **R6 审查组织（第二周期 Round 1）：** D1 四调研 Agent（A 代码锚点终局复核[65+ 精确/7 失实集中 architecture.md 端点清单行号族+R5 抽验盲区实证]/B 业界最佳实践对标[7 主题网络+代码双源——metrics 口径缝隙最有价值]/C 消费者可实施性[13 端点逐个走查——错误面系统性薄面：三 404 异常缺席+状态码/export 语义/cost_budget 落点]/D 安全与可观测性[4 router 认证全谱——crawler 零认证 P0+豁免面三处差集+消息安全零承载+request_id/CORS 取证]）+ D2 双评审（A 正确性一致性：逐项传播位清单+组合交互四组[白名单三口径/AC-6 零冲突/场景计数不变声明/DF1 清偿主张]+F8 证伪轻量化+F9 半证伪+F6 部分证伪；B 合理可行性：F1 三选项裁定承载[defer 自相矛盾论证]+crawler 工厂实测[连参数都无——加参成本]+StrategicReport 字段实测[F9 定谳依据]+拒绝 F6/F9 代码级诱惑方案+2 条添噪注记）+主会话实测定谳 9 组（crawler/monitoring 零 Depends、480/380/443 映射行、get_tool_id None、fallback 透传、cost_budget 全仓落点、ToolCall/ExecutionContext 字段、auth refresh/logout 形态）。修复 13 项（P0×1+P1×3+P2×5+P3×4）+OD 表扩至 18 行（OD-17 fallback 泄露/OD-18 export 文件面）+DC-2 勘正。**场景计数 17/21 不变**（全部修复并入既有断言面/注记位，无新场景——防回归核查重问，评审 A 组合交互③）。
 
 **收敛声明（R5 终审，2026-11-21）：** 本 Story 文档审查周期五轮收敛（v1.0.0→v1.3.1，提交 9f1325df/6fc540f6/f7b7fcea/本轮收敛批与轮记录一一对应零游离）。周期总账：R1 四调研+双评审（P0×4：trace 端点域错配迁 plans//health 双错勘正/SCOPED 双缺陷重设计/上游端点覆盖差集登记）、R2 回归核查 15⁄15 完备+新增内容核验 4 项清偿、R3 四轴推演 9 项清偿（含 7-1 CR6 三条教训反哺）、R4 纯验证 6 通过+1 项 P3、R5 六节全过（双向 8⁄8+锚点 17⁄17 精确零失实）——修复台账 30 行（P0×4+P1×7+P2×9+P3×10，全部清偿零残留）；OD 表扩至 16 行+DF 登记句 8+1 项。零 P0/P1/P2 残留；R4-1 排版级随本收敛提交清偿。Story 维持 `ready-for-dev`，可进入 dev-story。
 
@@ -949,11 +973,12 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.3.1
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-11-21
 **最后更新/Last Updated:** 2026-11-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（4 调研 Agent 并行：REST 资产盘点/端口签名核验/留项与验收风格/架构边界深读；前置留项 14 条裁定落档含三向定夺承载；DC-1~DC-7 架构决策+OD-1~OD-9 偏离预告；13 端点冻结矩阵+13 唯一端口 14 消费对 SSOT 表[签名级核验]+认证/错误响应/租户/契约四契约面+6.1-DF5/6.5a-DF1 清偿承载+per-plan 锁+SCOPED 迁移）
+- v1.4.0: 第二审查周期 Round 1（R6：D1 四调研[锚点终局复核/业界最佳实践对标/消费者可实施性/安全与可观测性]+D2 双评审[A 正确性一致性+B 合理可行性对抗裁定]+主会话实测定谳 9 组）——13 项修复：P0×1（crawler 4 端点零认证+工厂无认证参数而 Story 写「既有零改动」——勘正为认证实质改造承载[工厂加参+4 端点补挂，Task 1 与 audit 同批；评审 B 三选项裁定 defer 自相矛盾]）+P1×3（metrics 零认证豁免面三态口径[设计豁免 login/health+既有形态豁免 metrics+弱形态注记 refresh/logout]/异常表 480 勘正[PlanningNotFoundError 非 NotFound 202——dev 按表断言必红]/380+443 两行补登[未知 slug 与 agent 不存在 404 首要路径]）+P2×5（消息安全「复验」勘正为新增断言+OD-17/cost_budget 删字段无透传落点/成功码钦定全部 200/export 语义定谳元数据 JSON+OD-18）+P3×4（锚点 8 处勘正[architecture.md 端点清单行号族+DC-2 :150-195 残留]/业界注记 4 条[2 条证伪拒绝]/可观测性 3 注记/序列化 4 注记）；OD 表扩至 18 行；场景计数 17/21 不变
 - v1.3.1: 文档审查周期收敛（R4 纯验证七维度 6 通过+1 项 P3[R4-1 L101 括号排版残留——随本批清偿]+R5 独立终审六节全过[周期闭合 3 提交零游离/双向抽验 8⁄8/台账完整/门禁如实/锚点 17⁄17 精确零失实/收敛判定可收敛]——收敛声明入 Story；周期总账：五轮 30 修复行[P0×4+P1×7+P2×9+P3×10]全清偿+OD 扩至 16 行+DF 8+1 项登记句；Story 维持 ready-for-dev 可进入 dev-story）
 - v1.3.0: 文档审查 Round 3（单深度推演 Agent 四轴：Task 依赖干跑/17 场景期望唯一性/AC↔测试承载矩阵/长状态时间线）——9 项发现全部清偿：P1×1[R3-1 checkpoint given 引用 7-1 R3-7 过时先例已被 CR6 判连带 skip与「确定性全绿」口径矛盾——改仓储/snapshot 直构绕开 LLM 依赖链]+P2×3[R3-2 Task 0 行为型契约测试 import 形态定谳拆分[顶部 import 连坐 yaml 断言——Task 0 仅 yaml 消费型，行为型随 Task 1-5 逐族补入]/R3-3 trace+archive given 前置补决策[R3-4 同源 snapshot 直构]/R3-4 tool execute LLM skip 归类补注记]+P3×5[health version 来源钦定 importlib.metadata/metrics 承载面钦定单测/AC-4 四态分组建议/跨租户 given 真实 upload+同租户正查对照防 CR6-2 假绿/parse_status 判别锚+recover 后 list 复核建议]；推演通过面：Task 序 import 闭合全过+port_contract 时间线自洽+28 条承载 25 闭合+期望唯一性机制成立；7-1 CR6 三条最新教训直接反哺（过时先例/租户分叉假绿/parse_status 锚）
 - v1.2.0: 文档审查 Round 2（双调研 Agent：R2-A 回归核查[R1-1~R1-15 逐项 git 取证 15/15 完备+新破口零发现+残留终扫零残留+场景算术自洽]+R2-B 新增内容事实核验[R1 新写入声明核出 4 项：OD-13 节号端点名双失实勘正[§8.2.7 /archive/timeline——旧 timeline-diff 系不精确继承名]/覆盖差集二次漏网补登[GET /documents/{id} §8.2.1 P0 入 OD-12+POST /plans 入 OD-13]/OD-14 模糊数精确化[激活面 21 端点确定缺口 crawler 4+monitoring 1——auth 11/audit 5 已有契约]/checkpoint 参数偏离新增 OD-16[复合双参 vs §8.2.6 钦定单参]]；组合交互面全通过[14 path 七处一致/SCOPED 双对象 11 处一致/trace 三角/created_via 三处]；OD-15 DF 编号勘正+映射句增 OD-16 归宿）
