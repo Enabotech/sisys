@@ -38,14 +38,14 @@
 - 既有 7 router（archive/summary/evaluate/trace/document_dictionary/document_upload/tools 版本面）零回归零改动
 - **4 个既有 router 挂载激活**：auth（`create_auth_router` auth.py:198——POST /api/v1/auth/login 等端点族可达）、monitoring（`create_metrics_router` monitoring.py:19——router 自身无 prefix、metrics_path 参数默认 `/metrics`，**挂载形态冻结**：`include_router(..., prefix="/api/v1/system")` 拼装为 `/api/v1/system/metrics`）、crawler（crawler.py:108，prefix 已带 `/api/v1/crawler` 零处理）、audit（audit.py:124——**前缀统一** `/audit`→`/api/v1/audit` + **认证实质改造**：get_current_user 参数现有但全部端点零 `Depends` 挂载[R1 实证]，须逐端点签名补挂，见 AC-3）
 - **equilibrium_security 不挂载**（defer——3 个 impl 字符串指向不存在类，deferred-work:126 等保接线专项；OD-6 登记）
-- **新增 system 路由**：GET `/api/v1/system/health`（轻量存活探测——返回 `{"status": "ok", "version": ...}` 形态，不连真实存储；认证豁免面，见 AC-3）
+- **新增 system 路由**：GET `/api/v1/system/health`（轻量存活探测——返回 `{"status": "ok", "version": ...}` 形态，不连真实存储；**version 来源钦定**：`importlib.metadata.version("sisys")` 装配期解析[取不到则常量兜底——dev 实测裁定]，R3 补决策点；认证豁免面，见 AC-3）
 - 中间件链顺序保持现状（SessionMiddleware → ExceptionContextMiddleware，api_app.py:62-63）+ `register_exception_handlers` 零改动
 - **前缀统一纪律**：全部新挂载/新增端点一律 `/api/v1` 前缀（openapi.yaml servers 已含 `/api/v1`）
 
 **验证标准/Validation Criteria:**
 - [ ] `create_app()` 挂载断言：4 个激活 router + 既有 7 router + 新增路由族全部在 `app.routes` 可达（单测 test_app.py 扩展——**新建挂载断言**，该文件现仅 3 基础测试无挂载断言）
 - [ ] GET `/api/v1/system/health` 返回 200 + status ok（无认证）
-- [ ] GET `/api/v1/system/metrics` 返回 Prometheus 文本格式（metrics 端口 :898 真实采集）
+- [ ] GET `/api/v1/system/metrics` 返回 Prometheus 文本格式（metrics 端口 :898 真实采集；**承载面钦定[R3]**：单测 test_system_routes.py[metrics 端口 resolve 真实 collect 零 IO]——验收 AC-1×2 场景聚焦挂载可达+health）
 - [ ] 既有 API 测试零回归（tests/unit/interfaces/api/ 17 文件 + tests/contracts/ 13 API 契约文件全绿）
 
 ### AC-2: P0 核心端点端到端（真实服务）
@@ -64,13 +64,13 @@
 - `POST /api/v1/plans/{plan_id}/export` → `report_generation_use_case`（:3610，markdown）/ `pdf_report_generation_use_case`（:3714，pdf；`format` query 参数分派）——**6.5a-DF1 清偿**
 - `GET /api/v1/checkpoints?plan_id={uuid}` → `checkpoint_list_use_case`（:2530）→ CheckpointSummaryView 列表
 - `GET /api/v1/checkpoints/{plan_id}/{checkpoint_no}` → `checkpoint_recovery_use_case`（:2514 预览面，`execute(*, plan_id, checkpoint_no)` 两参必填——7-1 R5 终审方案 a 口径）
-- `POST /api/v1/checkpoints/recover`（body：plan_id + checkpoint_no + mode? + confirmed_by?）→ `checkpoint_recovery_execute_use_case`（:2542；**created_via 固定传 "api"**——7-1 R4-2 同款触发源审计标识；confirmed_by 缺省取认证用户标识——REST 面有真实身份，优于 CLI 缺省取 session）
+- `POST /api/v1/checkpoints/recover`（body：plan_id + checkpoint_no + mode? + confirmed_by?）→ `checkpoint_recovery_execute_use_case`（:2542；**created_via 固定传 "api"**——7-1 R4-2 同款触发源审计标识；confirmed_by 缺省取认证用户标识——REST 面有真实身份，优于 CLI 缺省取 session；**recover 后再 list/status 的期望留白[R3 注记]**：dev 设计自由，建议验收场景含 recover 后 checkpoint list 复核）
 - `GET /api/v1/archive/query?plan_id={uuid}` → `blm_chain_trace_use_case`（:2573）→ BLM 链路追溯视图（**语义注记**：与既有 `GET /api/v1/archive/plans/{plan_id}`[strategic_archive 档案条目查询，:2405 族] 不同源不同义——CLI archive query 同款消费面）
 
 **验证标准/Validation Criteria:**
 - [ ] 全部端点验收场景走真实服务（真实数据 → 真实端口 → teardown 定向清理）；LLM 依赖面（agent run/plan generate）动态 skip + 非依赖面（status/export/checkpoint/archive）确定性全绿
-- [ ] checkpoint 族 given 前置经 `checkpoint_use_case`（:2502 创建面，主会话实测）直创 checkpoint（7-1 R3-7 先例）；plan 状态查询 given 前置经真实 generate 或 snapshot 测试数据直构（blm_planning_status 依赖 snapshot_repository——dev 实测裁定直构形态）
-- [ ] 端点响应体为合法 JSON 且含领域字段（document_id/plan_id/checkpoint_no 等）
+- [ ] checkpoint 族 given 前置经 **checkpoint 仓储/snapshot 直构（dev 实测裁定形态）**——R3 勘正：原引「7-1 R3-7 checkpoint_use_case 直创」先例已被 7-1 CR6 判定为无 Key 环境连带 skip（创建链 OD-12 压缩强制环节依赖 LLM——7-1 验收至今 1 skip 正是它），与本条「非依赖面确定性全绿」口径矛盾，直构绕开 LLM 依赖链；plan 状态查询 given 前置经真实 generate 或 snapshot 测试数据直构（blm_planning_status 依赖 snapshot_repository——dev 实测裁定直构形态）；**trace/archive query given 前置同源 snapshot 直构**（R3 补决策点：溯源树与 BLM 链路均为 plan 域快照族消费——dev 实测裁定直构形态）；**tool execute 走 LLM 工具时 skip 归类同 agent run/plan generate**（R3 补注记；schema 端点零 LLM 确定性全绿）
+- [ ] 端点响应体为合法 JSON 且含领域字段（document_id/plan_id/checkpoint_no 等；**parse 断言强度注记[R3]**：断言 `parse_status=completed`+document_id 归一形态[7-1 CR6-1 先例——miss 形态合成 FAILED 文档的 parse_status 即判别锚]，非泛 JSON 字段存在性）
 - [ ] 既有 `POST /api/v1/documents`（单传）/`POST /documents/batch`（**同步批量**——`document_upload_service`[注册名，R1 勘正] `upload_batch` 请求内信号量并发同步返回，:1195 注册块的既有形态）零改动零回归；interface-design §8.2.1.1 钦定的 **202 异步 job 契约无基建支撑，defer**（OD-2 登记——无 job 队列框架，Prefect 无 flow-run 端口）
 
 ### AC-3: 认证契约（全端点覆盖）
@@ -103,7 +103,7 @@
 - **零新增领域异常**（REST 是接口层薄壳，EXCEPTION_HTTP_MAP 全覆盖——异常消费表见 SDD 节）
 
 **验证标准/Validation Criteria:**
-- [ ] 404/401/409/422 四态验收场景（资源不存在/无 token/并发冲突/请求体缺字段）——响应体三字段+双头断言（**断言形态先实测锚定**——7-1 CR3 教训：ExceptionHandlers 实际响应体形态以实测为准再冻结断言）
+- [ ] 404/401/409/422 四态验收场景（资源不存在/无 token/并发冲突/请求体缺字段）——响应体三字段+双头断言（**断言形态先实测锚定**——7-1 CR3 教训：ExceptionHandlers 实际响应体形态以实测为准再冻结断言；**AC-4×2 场景分组建议[R3]**：404+422 同场景[请求校验族]/401+409 同场景[认证与并发族]——dev 可调）
 - [ ] 单测矩阵：领域异常族→HTTP 状态码逐一断言（test_exception_handlers.py 既有文件扩展或新文件）
 - [ ] 错误消息不泄露堆栈/SQL（消息安全性——既有契约复验）
 
@@ -118,7 +118,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] document parse/versions 端点 X-Tenant-ID 必填断言（缺头 → 422）
-- [ ] 跨租户隔离验收场景（上传→异租户查询 404）
+- [ ] 跨租户隔离验收场景（上传→异租户查询 404；**given 形态与防坑注记[R3]**：A 租户上传走真实 document_upload_service 链；**同租户正查 200 对照断言必须有**——7-1 CR6-2 假绿先例[given 租户与请求头租户分叉→find miss→弱断言恒绿]，A/B 两租户显式分置+正查对照防分叉）
 - [ ] 6.1-DF4（BLM 租户维度贯通）注记顺延维持（多租户 Story V1 归宿——本 Story 仅 header 透传面）
 
 ### AC-6: openapi.yaml 契约与 API 契约测试
@@ -129,7 +129,7 @@
 - **新增 14 个 path 补入 openapi.yaml**：/documents/{document_id}/parse、/documents/{document_id}/versions、/plans/{plan_id}/trace、/tools/{slug}/execute、/tools/{slug}/schema、/agents/{agent_id}/run、/plans/generate、/plans/{plan_id}、/plans/{plan_id}/export、/checkpoints、/checkpoints/{plan_id}/{checkpoint_no}、/checkpoints/recover、/archive/query（13 域 path——R1 勘正补入 /archive/query）+ /system/health（**新增**——R1 勘正：yaml 既有 `/health` 实为 embedding API server 契约[tags [embedding]+EmbeddingHealthResponse，:1031-1050]，消费方 `test_api_contract_embedding.py:34` 断言存在，**原样保留不改名**；本 Story /system/health 以新 path 入 yaml）——**path 不带 /api/v1 前缀**（servers 已含——新增 path 按规范形态写；注记：yaml 既有 /api/v1/search×3 自带前缀与 servers 拼接构成双前缀预存怪癖，预存不一致归 OD-5 契约治理专项不动）
 - **漂移修正（仅一处，存量其余漂移 defer）**：`/documents` GET 列表 yaml 有而实现无——裁定从 yaml 删除（无实现契约即死契约；OD-5 登记；R1 实测 grep 零契约消费方，删除零波及）
 - 新增 path 全部含 OpenAPI 3.1 契约要素：operationId/请求体 Schema/响应 Schema/错误响应（401/404/422 引用 components）/security 声明（豁免面除外）
-- API 契约测试（`tests/contracts/test_api_contract_rest_api.py`）双形态对齐先例：yaml 消费型（`read_from_filename` + `openapi_spec_validator.validate` + expected_paths 断言）+ TestClient 行为型（端点存在性+响应格式——test_api_contract_document_upload.py:79-162 先例）
+- API 契约测试（`tests/contracts/test_api_contract_rest_api.py`）双形态对齐先例：yaml 消费型（`read_from_filename` + `openapi_spec_validator.validate` + expected_paths 断言）+ TestClient 行为型（端点存在性+响应格式——test_api_contract_document_upload.py:79-162 先例；**行为型按端点 Task 逐族补入——R3 拆分定谳**：Task 0 仅 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 落地）
 - **Schemathesis 深度契约测试归 Story 7-6**（schemathesis ^3.19 已在 dev 依赖但零使用——7-2 不启用，7-6 专项承载；epics NFR 覆盖注记）
 
 **验证标准/Validation Criteria:**
@@ -356,7 +356,7 @@
 | **TDD 单元测试** | system 路由 | health 轻量形态 | `tests/unit/interfaces/api/test_system_routes.py` | Task 1 |
 | **TDD 单元测试** | 错误响应矩阵 | 异常族→HTTP 状态码/响应体三字段/双头 | `tests/unit/interfaces/api/test_exception_handlers.py`（既有扩展） | Task 6 |
 | **TDD 契约测试** | 端口消费接线 | 18 唯一端口注册面可达（零 IO 直查；lifetime 双断言归 Task 2 红） | `tests/contracts/test_port_contract_rest_api.py` | Task 0 |
-| **TDD 契约测试** | API 契约 | yaml 消费型（14 新 path+validator）+TestClient 行为型 | `tests/contracts/test_api_contract_rest_api.py` | Task 0 |
+| **TDD 契约测试** | API 契约 | yaml 消费型（14 新 path+validator，Task 0）+TestClient 行为型（**按端点 Task 逐族补入**——R3 拆分定谳） | `tests/contracts/test_api_contract_rest_api.py` | Task 0+1-5 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收（17 场景，Task 9 补至 21） | `tests/acceptance/test_acceptance_rest_api.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | R6 七要点+HTTP 级装配+真实服务动态 skip | `tests/acceptance/test_acceptance_rest_api.py` | Task 0 |
 | **TDD 验收测试** | 收尾验收场景 | src 与测试目录完成清单+性能并发 | 同上两文件追加场景 | Task 9 |
@@ -454,7 +454,7 @@
 
 - [ ] Subtask 0.1: 冻结端点矩阵表（AC-2 列 13 端点 + 挂载激活 4 router + health——实现禁增删端点路径）
 - [ ] Subtask 0.2: 编写端口消费契约测试 `tests/contracts/test_port_contract_rest_api.py`（**18 唯一端口注册面可达断言——全绿入库**；零 IO 直查形态对齐 7-1 Subtask 0.4 先例；lifetime 双断言归 Task 2 🔴红阶段编写[见 Task 2]——防 Task 0→2 间 CI 可见红窗，R1 定谳）
-- [ ] Subtask 0.3: 编写 API 契约测试 `tests/contracts/test_api_contract_rest_api.py`（yaml 消费型 14 新 path+validator——**红形态**：yaml 未补 path 时断言红）+ openapi.yaml 补 14 path（13 域 path+/system/health）+ 单漂移修正（/documents GET 删除——R1 实测零消费方；**/health 保留**[embedding 契约，test_api_contract_embedding.py:34 消费方，R1 勘正]）
+- [ ] Subtask 0.3: 编写 API 契约测试 `tests/contracts/test_api_contract_rest_api.py`（yaml 消费型 14 新 path+validator——**红形态**：yaml 未补 path 时断言红，红绿同 Subtask 闭合[7-1 Task 0 绿色门禁先例同构]；**TestClient 行为型按端点 Task 逐族补入**——R3 定谳：先例 test_api_contract_document_upload.py:20 顶部 import 路由模块，新路由模块 Task 0 不存在→收集期 ImportError 连坐 yaml 断言，故 Task 0 仅写 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 各族落地补入）+ openapi.yaml 补 14 path（13 域 path+/system/health）+ 单漂移修正（/documents GET 删除——R1 实测零消费方；**/health 保留**[embedding 契约，test_api_contract_embedding.py:34 消费方，R1 勘正]）
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_rest_api.feature`（AC-1~AC-7 共 17 个业务场景[AC-1×2/AC-2×8/AC-3×3/AC-4×2/AC-5×1/AC-7×1]，按 AC 分节横幅注释组织；AC-8×2 与收尾×2 由 Task 9 追加至最终态 21；**按 Gherkin 节的 AC-2×8↔13 端点覆盖映射撰写**——R1 注记）
 - [ ] Subtask 0.5: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_rest_api.py`（R6 七要点+HTTP 级装配形态+given/when/then 全步骤骨架齐备——**若仅 given 骨架则收集期抛 ScenarioDefinitionError**[7-1 R1-F31 教训]，故要求全骨架：红形态=运行期 ImportError[新增路由模块不存在]）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证——红形态=运行期 ImportError：新增路由模块不存在）
@@ -912,9 +912,19 @@ tests/
 | R2-2 | 覆盖差集二次漏网：`GET /documents/{id}`（§8.2.1 P0 文档元数据查询）未承载且 OD 零登记（R1 补登差集仍漏）；`POST /plans`（architecture:2480）未入双源不一致清单 | P2 | OD-12 增补 GET /documents/{id}（DF5 联动）+OD-13 增补 POST /plans |
 | R2-3 | OD-14「~14 端点」模糊数：实测激活面 21 端点（auth 11+monitoring 1+crawler 4+audit 5），其中 auth/audit 已有 yaml 契约——确定缺口=crawler 4+monitoring 1 | P3 | OD-14 精确化口径（roles permissions 子面 dev 期核验注记） |
 | R2-4 | checkpoint 参数偏离无 OD 行：§8.2.6 钦定 `/checkpoints/{id}` 单参 vs 本 Story 复合双参（7-1 OD-8 原则继承但偏离未登记） | P3 | 新增 OD-16 行（归宿 7-1-DF1 统一复核，同 OD-1/OD-11） |
+| R3-1 | checkpoint given 前置引用过时先例：原引「7-1 R3-7 checkpoint_use_case 直创」已被 7-1 CR6 判定为无 Key 环境连带 skip（创建链 OD-12 压缩强制环节依赖 LLM——7-1 验收至今 1 skip 正是它），与 AC-2「非依赖面确定性全绿」口径直接矛盾 | P1 | given 前置改 checkpoint 仓储/snapshot 直构（绕开 LLM 依赖链——dev 实测裁定形态）；AC-2 验证标准②重写 |
+| R3-2 | Task 0 TestClient 行为型契约测试 import 形态未定谳：先例 test_api_contract_document_upload.py:20 顶部 import 路由模块——新路由模块 Task 0 不存在→收集期 ImportError 连坐同文件 yaml 断言（比断言红更糟） | P2 | 定谳拆分：Task 0 仅 yaml 消费型+既有端点行为型，新端点行为型随 Task 1-5 逐族补入（Subtask 0.3/AC-6/测试分类表三处联动） |
+| R3-3 | trace/archive query 场景 given 前置零交代（「确定性全绿」口径受 given 前置制约） | P2 | 补决策点：同源 snapshot 直构（plan 域快照族——dev 实测裁定直构形态） |
+| R3-4 | tool execute 场景 LLM 依赖归类缺失（skip 口径只列 agent run/plan generate） | P2 | 补注记：走 LLM 工具时同款 skip 归类（schema 端点零 LLM 确定性全绿） |
+| R3-5 | health 场景 version 来源未定义 | P3 | 钦定 importlib.metadata.version 装配期解析+常量兜底（dev 实测裁定）——AC-1 端点描述 |
+| R3-6 | metrics 真实采集承载面未明（单测/验收未定） | P3 | 钦定单测 test_system_routes.py（零 IO resolve+真实 collect）——验收聚焦挂载可达+health |
+| R3-7 | AC-4 四态↔2 场景分组映射未写 | P3 | 分组建议注记（404+422 请求校验族/401+409 认证并发族——dev 可调） |
+| R3-8 | 跨租户 given 上传形态未写+租户分叉防坑注记缺失（7-1 CR6-2 假绿先例：given 租户与请求头租户分叉→find miss→弱断言恒绿） | P3 | given 钦定真实 upload 链+同租户正查 200 对照断言必须有（A/B 显式分置） |
+| R3-9 | parse 断言强度（7-1 CR6-1 parse_status 锚先例未采纳）+recover 后查询期望留白 | P3 | parse_status=completed 判别锚注记+recover 后 list 复核建议注记 |
 
 > **R1 审查组织：** D1 四调研 Agent（REST 资产/端口 SSOT/契约测试/规格留项）+ D2 双评审（A 正确性+一致性：P0×4+P1×7+P2×6+P3×9+传播位清单 10 组；B 可行性+科学性：两大 P0 方案定谳+Task 级干跑+场景可满足性推演）+主会话实测定谳 3 项（N13 traceability 路由面/get_by_id 不存在/find 租户语义）。评审员间零事实冲突，D1 发现全部采信。
 > **R2 审查组织：** 双调研 Agent——R2-A 修复回归核查（git 取证：R1-1~R1-15 逐项 15/15 完备零漏网+新破口零发现+残留终扫零残留+场景算术复核自洽）+ R2-B 新增内容事实核验（OD 新行节号/端点名/行号族/组合交互面——R1 新写入声明中 4 项缺陷：OD-13 双失实/差集二次漏网/模糊数/checkpoint 偏离无登记；14 path 七处一致+SCOPED 双对象 11 处一致+trace 三角一致+created_via 三处一致等组合面全通过；附加正向事实：parse_document :119 内部已 find()——端点前置查询与内部构成双查询无害）。
+> **R3 审查组织：** 单深度推演 Agent 四轴（Task 依赖干跑[import 闭合全通过+port_contract 文件时间线自洽]/17 场景期望唯一性[期望唯一性机制成立，given 前置三处缺口]/AC↔测试承载矩阵[28 条 25 闭合，3 条 P3 承载面未明]/长状态时间线[document 链可观测 ✓，plan 链 recover 后留白]）——9 项发现（P1×1+P2×3+P3×5）+5 个缺失决策点全部补决策；7-1 CR6 最新教训三条直接反哺（R3-1 过时先例/R3-8 租户分叉假绿/R3-9 parse_status 判别锚）。
 
 ---
 
@@ -933,10 +943,11 @@ tests/
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-11-21
 **最后更新/Last Updated:** 2026-11-21
 **更新说明/Description:**
 - v1.0.0: 创建故事文件（4 调研 Agent 并行：REST 资产盘点/端口签名核验/留项与验收风格/架构边界深读；前置留项 14 条裁定落档含三向定夺承载；DC-1~DC-7 架构决策+OD-1~OD-9 偏离预告；13 端点冻结矩阵+13 唯一端口 14 消费对 SSOT 表[签名级核验]+认证/错误响应/租户/契约四契约面+6.1-DF5/6.5a-DF1 清偿承载+per-plan 锁+SCOPED 迁移）
+- v1.3.0: 文档审查 Round 3（单深度推演 Agent 四轴：Task 依赖干跑/17 场景期望唯一性/AC↔测试承载矩阵/长状态时间线）——9 项发现全部清偿：P1×1[R3-1 checkpoint given 引用 7-1 R3-7 过时先例已被 CR6 判连带 skip与「确定性全绿」口径矛盾——改仓储/snapshot 直构绕开 LLM 依赖链]+P2×3[R3-2 Task 0 行为型契约测试 import 形态定谳拆分[顶部 import 连坐 yaml 断言——Task 0 仅 yaml 消费型，行为型随 Task 1-5 逐族补入]/R3-3 trace+archive given 前置补决策[R3-4 同源 snapshot 直构]/R3-4 tool execute LLM skip 归类补注记]+P3×5[health version 来源钦定 importlib.metadata/metrics 承载面钦定单测/AC-4 四态分组建议/跨租户 given 真实 upload+同租户正查对照防 CR6-2 假绿/parse_status 判别锚+recover 后 list 复核建议]；推演通过面：Task 序 import 闭合全过+port_contract 时间线自洽+28 条承载 25 闭合+期望唯一性机制成立；7-1 CR6 三条最新教训直接反哺（过时先例/租户分叉假绿/parse_status 锚）
 - v1.2.0: 文档审查 Round 2（双调研 Agent：R2-A 回归核查[R1-1~R1-15 逐项 git 取证 15/15 完备+新破口零发现+残留终扫零残留+场景算术自洽]+R2-B 新增内容事实核验[R1 新写入声明核出 4 项：OD-13 节号端点名双失实勘正[§8.2.7 /archive/timeline——旧 timeline-diff 系不精确继承名]/覆盖差集二次漏网补登[GET /documents/{id} §8.2.1 P0 入 OD-12+POST /plans 入 OD-13]/OD-14 模糊数精确化[激活面 21 端点确定缺口 crawler 4+monitoring 1——auth 11/audit 5 已有契约]/checkpoint 参数偏离新增 OD-16[复合双参 vs §8.2.6 钦定单参]]；组合交互面全通过[14 path 七处一致/SCOPED 双对象 11 处一致/trace 三角/created_via 三处]；OD-15 DF 编号勘正+映射句增 OD-16 归宿）
 - v1.1.0: 文档审查 Round 1（D1 四调研+D2 双评审）——P0×4 清偿：①trace 端点域错配（迁 GET /plans/{plan_id}/trace，OD-10——端口 plan 域现实+CLI 先例+与 /search/trace/{document_id} 引文端点语义分立）②/health 改名方案双错勘正（实为 embedding server 契约有消费方——改为新增 /system/health 保留 /health，漂移修正缩至一处，新 path 12→14）③SCOPED 迁移双缺陷重设计（双对象 service :2036+use_case :2065+机制诚实注记[clear_scoped 生产零接线下 SCOPED≡SINGLETON——声明语义正确化，真实隔离归 OD-15]+analyst_view 传播注记+lifetime 断言移 Task 2 红阶段防 CI 可见红窗）④上游端点覆盖差集登记（OD-10~OD-15 六行：compare/financial P0 不承载+P1 端点族+slug 偏离+激活面契约缺口+clear_scoped 专项+DF 映射句对齐）；P1×6：零手动 HTTPException 勘正（auth.py 实证）/audit 5 端点 Depends 实质改造/端口计数 15 对 18 端口/archive-query path 补入/端点层 find() 前置查询 404 设计决策（list_versions 返 [] 与 parse 合成 FAILED 的宽语义不承担 404——主会话实测定谳）/ErrorResponse 已收敛勘正（shared_models.py:12）；P2/P3 15 项（注册名/文件名/三向定夺预判改判/计数行号族/可行性注记族——monitoring 挂载形态冻结/锁字典无界增长/密码哈希归因/并发 409 时序/场景覆盖映射等）
